@@ -7,7 +7,7 @@ import {
   Dimensions,
   ScrollView,
 } from 'react-native';
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {UserImg} from '@assets/Images';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -15,25 +15,20 @@ import {
   ClientMaster,
   LeftChevron,
   UpChevron,
-  LeadManagment,
   Logout,
   Tasklog,
 } from '@assets/Icons';
 import {DrawerContentComponentProps} from '@react-navigation/drawer';
-import {Colors, Fonts, StorageKeys} from '@constants/index';
+import {Colors, Fonts} from '@constants/index';
 import {useDispatch, useSelector} from 'react-redux';
-import {removeStorage} from '@services/localStorage';
-import {authActions} from '@store/auth';
 import {Alert} from 'react-native';
-import { userSelector } from '@store/user';
+import {userSelector} from '@store/user';
+import {logoutUser} from '@services/api/api';
 
 export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const [isOpen, setIsOpen] = React.useState(false);
-  const [DisOpen, setDIsOpen] = React.useState(false);
   const {top, bottom} = useSafeAreaInsets();
-  const dispatch = useDispatch();
   const userInfo = useSelector(userSelector.getUserInfo);
-
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to log out?', [
@@ -45,12 +40,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       {
         text: 'OK',
         onPress: () => {
-          // Clear all user-related storage
-          removeStorage(StorageKeys.IS_LOGGED_IN);
-          removeStorage(StorageKeys.TOKEN);
-          // Reset complete auth state in Redux
-          dispatch(authActions.resetAuthState());
-          console.log('User logged out successfully - all data cleared');
+          logoutUser();
         },
       },
     ]);
@@ -86,7 +76,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
               <TouchableOpacity
                 style={styles.button}
                 onPress={() => {
-                  setDIsOpen(!DisOpen);
+                  setIsOpen(!isOpen);
                 }}>
                 <View style={styles.rowCenter}>
                   <ClientMaster
@@ -97,9 +87,9 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                     Client Information Master
                   </Text>
                 </View>
-                <UpChevron rotation={DisOpen ? 0 : 180} />
+                <UpChevron rotation={isOpen ? 0 : 180} />
               </TouchableOpacity>
-              {DisOpen && (
+              {isOpen && (
                 <View style={{marginLeft: scaleWidth(24)}}>
                   <TouchableOpacity
                     style={styles.button}
@@ -186,7 +176,6 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                   <Text style={styles.buttonText}>Task log</Text>
                 </View>
               </TouchableOpacity>
-              {isOpen && <View style={{marginLeft: scaleWidth(24)}}></View>}
             </View>
           </ScrollView>
         </View>

@@ -1,5 +1,5 @@
 import StorageKeys from '@constants/StorageKeys';
-import {getStorage} from '@services/localStorage';
+import {getStorage, setStorage} from '@services/localStorage';
 import {authActions, authSelector} from '@store/auth';
 import {userActions} from '@store/user';
 import {useEffect, useState} from 'react';
@@ -13,6 +13,12 @@ export function useAuth() {
   useEffect(() => {
     const storedLoginStatus = getStorage(StorageKeys.IS_LOGGED_IN, true);
     const storedToken = getStorage(StorageKeys.TOKEN);
+    const rememberMe = getStorage(StorageKeys.REMEMBER_ME, true);
+    if(!rememberMe){
+      setStorage(StorageKeys.TOKEN, null);
+      setStorage(StorageKeys.IS_LOGGED_IN, false);
+      return;
+    }
     if (storedToken) {
       dispatch(userActions.loadInfoFromToken(storedToken));
     }
