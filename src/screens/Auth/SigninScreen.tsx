@@ -2,17 +2,17 @@ import React, {useEffect, useState} from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {EyeClose, EyeOpen} from '@assets/Icons';
 import {Button, Container, Header, Input, TnCFooter} from '@components/index';
-import {AuthScreens, Colors, Fonts} from '@constants/index';
+import {AuthScreens, Colors, Fonts, StorageKeys} from '@constants/index';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {authSelector} from '@store/auth';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {handleEmailVerification} from '@utils/Utils';
 import Toast from 'react-native-toast-message';
-import { Feather } from '@react-native-vector-icons/feather';
+import {Feather} from '@react-native-vector-icons/feather';
 import {useDispatch, useSelector} from 'react-redux';
 import {signinRequest} from '@store/auth/auth.slice';
-
+import {setStorage} from '@services/localStorage';
 
 type SigninProps = NativeStackScreenProps<
   AuthNavigatorType,
@@ -49,34 +49,31 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
   const dispatch = useDispatch();
 
   const onSignupSuccess = (message: string, mobileNumber: string) => {
+    setStorage(StorageKeys.REMEMBER_ME, rememberMe);
     Toast.show({
       type: 'success',
       text1: message || Strings.otpSent,
       visibilityTime: 2000,
     });
-
-    // Small delay to ensure loader state is updated
-    setTimeout(() => {
-      const data = {
-        email: email,
-        password: passwordValue,
-        mobileNumber,
-      };
-      const params = {
-        showCreatePass: false,
-        screen: 'signin',
-        data,
-      };
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: AuthScreens.OTPInputScreen,
-            params,
-          },
-        ],
-      });
-    }, 100);
+    const data = {
+      email: email,
+      password: passwordValue,
+      mobileNumber,
+    };
+    const params = {
+      showCreatePass: false,
+      screen: 'signin',
+      data,
+    };
+    navigation.reset({
+      index: 0,
+      routes: [
+        {
+          name: AuthScreens.OTPInputScreen,
+          params,
+        },
+      ],
+    });
   };
 
   const onSignupError = (errorMessage: string) => {
