@@ -23,6 +23,7 @@ import {
   ITaskRecordsFilterPayload,
   ITaskReordsFilterResponse,
   IClientsDetailsPayload,
+  ClientsDetailsResponseType,
 } from '@store/client';
 import {CustomRequestConfig} from './api';
 import {storage} from '@services/localStorage';
@@ -159,6 +160,7 @@ const getTaskHistory = async () => {
   };
 };
 
+// Form APIs
 const saveBasicDetailForm = async (body: IBasicDetailsPayload) => {
   const {data, error} = await tryCatch<AxiosResponse<IBasicDetailsResponse>>(
     Api.post(Endpoints.apiSaveBasicDetails, body, {
@@ -188,7 +190,34 @@ const saveClientsDetailsForm = async (
       authRequired: true,
     } as CustomRequestConfig),
   );
-  return {data: data?.data ?? null, error};
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  return {
+    data: data.data,
+    error: null,
+  };
+};
+
+const getClientsDetailsForm = async (clientFormId: string) => {
+  const {data, error} = await tryCatch<AxiosResponse<ClientsDetailsResponseType>>(
+    Api.get(`${Endpoints.apiGetClientsDetails}${clientFormId}`, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  return {
+    data: data.data,
+    error: null,
+  };
 };
 
 const saveVendorForm = async (clientId: string, body: IvendorPayload) => {
@@ -728,8 +757,11 @@ const getVisitDetailsList = async () => {
 
 export default {
   getAllClients,
+
   saveBasicDetailForm,
   saveClientsDetailsForm,
+  
+  getClientsDetailsForm,
 
   getRemarkReport,
   getLeadProgress,

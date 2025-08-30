@@ -18,7 +18,10 @@ const getClientDetailsFormData = createSelector(
   _state => _state.clientsDetails,
 );
 
-
+const getClientsDetailsFormStatus = createSelector(
+  _selectState,
+  _state => _state.isSavedClientsDetails,
+);
 
 const getClientFormData = createSelector(
   _selectState,
@@ -251,7 +254,8 @@ export default {
   getClientList,
   getBasicDetailFormData,
   getClientDetailsFormData,
-
+  getClientsDetailsFormStatus,
+  
   getClientFormData,
   getClientFormId,
   getRemarkReport,

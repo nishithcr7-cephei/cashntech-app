@@ -15,6 +15,7 @@ const Endpoints = {
   apiGetAllClients: '/client-info-master/list',
   apiSaveBasicDetails: '/client-info-master/basic-details',
   apiSaveClientsDetails: '/client-info-master/client-details/',
+  apiGetClientsDetails: 'client-info-master/details/',
   apiSaveVendorDetails: (clientId: string) =>
     `/client-info-master/vendor-details/${clientId}`,
   apiSaveVisitDetails: (clientId: string) =>

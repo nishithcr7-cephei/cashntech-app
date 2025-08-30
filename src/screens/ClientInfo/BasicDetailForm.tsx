@@ -150,12 +150,14 @@ export const BasicDetailForm = ({navigation}: Props) => {
             data={listOfProgram}
             onChange={value => setData('programType', value)}
             value={programType}
+            showSearch={false}
           />
           <CustomDropdown
             label="Product Type"
             data={listOfProduct}
             onChange={value => setData('productType', value)}
             value={productType}
+            showSearch={false}
           />
           <Input
             label="Firm Name"

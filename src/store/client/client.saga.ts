@@ -4,6 +4,7 @@ import {
   FilterRequest,
   getBankList,
   getClients,
+  getClientsDetails,
   getKycBusinessChecked,
   getKycChecked,
   getLead,
@@ -19,6 +20,7 @@ import {
   saveVisitDetails,
   TaskRecordsFilterRequest,
   updateClientBasicDetails,
+  updateClientsDetails,
   uploadAdharFailure,
   uploadAdharRequest,
   uploadAdharSuccess,
@@ -53,10 +55,8 @@ import {ClientApis} from '@services/api';
 import axiosInstance from '@services/api/api';
 import {
   clientActions,
-  ClientFormType,
   clientSelector,
   IBasicDetailsResponse,
-  IclientFirmResponse,
   IBankListResponse,
   IClientInfoSuccessResponse,
   ILeadProgressResponse,
@@ -87,8 +87,6 @@ import {
   IUploadCompanyInfoResponse,
   ISoftSanctionResponse,
   IBasicDetailsPayload,
-  IClientFirmPayload,
-  IvendorPayload,
   IVisitPayload,
   IFilterPayload,
   IBankStatementPayload,
@@ -100,18 +98,18 @@ import {PayloadAction} from '@reduxjs/toolkit';
 import moment from 'moment';
 import {PayloadWithCallback} from '@type/global.types';
 import {
-  ISoftSanctionClientListResponse,
   IFilterResponseDatum,
   ITaskRecordsFilterPayload,
   ITaskReordsFilterResponseDatum,
   BasicDetailsType,
   ClientsDetailsType,
   IClientsDetailsPayload,
+  ClientsDetailsResponseType,
 } from './client.types';
 import Toast from 'react-native-toast-message';
 import {userSelector} from '@store/user';
-import {AxiosError} from 'axios';
-import {encryptUtility} from '@utils/crypto';
+import {AxiosError, AxiosResponse} from 'axios';
+import {decryptUtility, encryptUtility} from '@utils/crypto';
 
 function* handleGetClient(): unknown {
   console.log('Saga: handleGetClient called');
@@ -291,16 +289,89 @@ function* saveClientsDetailsSaga(): unknown {
     AxiosError<{message?: string}>
   > = yield call(ClientApis.saveClientsDetailsForm, clientId, body);
   if (error) {
+    yield put(clientActions.setClientLoader(false));
     Toast.show({
       type: 'error',
       text1: error.response?.data?.message || 'Failed to save client details.',
     });
     return;
   }
+  yield put(clientActions.getClientsDetails());
+  yield put(clientActions.setClientLoader(false));
   Toast.show({
     type: 'success',
     text1: data.message || 'Client details saved successfully.',
   });
+}
+
+function* updateClientsDetailsSaga(): unknown {
+  const clientDetails: ClientsDetailsType = yield select(
+    clientSelector.getClientDetailsFormData,
+  );
+  const {first_name, last_name} = yield select(userSelector.getUserInfo);
+  const clientId = yield select(clientSelector.getClientFormId);
+  const body: IClientsDetailsPayload = clientDetails.map(client => ({
+    client_type: client.clientType,
+    name_of_client: client.nameOfClient,
+    contact_number: client.contactNumber,
+    email: client.email,
+    created_by: `${first_name} ${last_name}`,
+    ...(client.id && {client_detail_id: client.id}),
+  }));
+  const {
+    data,
+    error,
+  }: Result<
+    {statusCode: number; message: string},
+    AxiosError<{message?: string}>
+  > = yield call(ClientApis.saveClientsDetailsForm, clientId, body);
+  if (error) {
+    yield put(clientActions.setClientLoader(false));
+    Toast.show({
+      type: 'error',
+      text1:
+        error.response?.data?.message || 'Failed to update client details.',
+    });
+    return;
+  }
+  yield put(clientActions.getClientsDetails());
+  yield put(clientActions.setClientLoader(false));
+  Toast.show({
+    type: 'success',
+    text1: data.message || 'Client details updated successfully.',
+  });
+}
+
+function* getClientsDetailsSaga(): unknown {
+  const clientId = yield select(clientSelector.getClientFormId);
+  const {first_name, last_name} = yield select(userSelector.getUserInfo);
+  const {
+    data,
+    error,
+  }: Result<
+    ClientsDetailsResponseType,
+    AxiosError<{message?: string}>
+  > = yield call(ClientApis.getClientsDetailsForm, clientId);
+  if (error) {
+    Toast.show({
+      type: 'error',
+      text1: error.response?.data?.message || 'Failed to fetch client details.',
+    });
+    return;
+  }
+  const clientsDetails: ClientsDetailsType =
+    data.data.map(client => ({
+      key: Math.random().toString(36).substring(7),
+      id: client.id,
+      clientType: client.client_type,
+      nameOfClient: decryptUtility(client.name_of_client),
+      contactNumber: decryptUtility(client.contact_number),
+      email: decryptUtility(client.email),
+      createdBy: `${first_name} ${last_name}`,
+    })) || [];
+
+  yield put(clientActions.setAllClientsDetails(clientsDetails));
+  yield put(clientActions.setClientLoader(false));
 }
 
 function* saveVendor(
@@ -333,9 +404,8 @@ function* saveVendor(
 }
 
 function* savevisit(): unknown {
-  const clientFormData: ClientFormType = yield select(
-    clientSelector.getClientFormData,
-  );
+  // TODO: update function
+  const clientFormData: any = yield select(clientSelector.getClientFormData);
   const clientId: number = yield select(clientSelector.getClientFormId);
   const visitForm = clientFormData.VisitScreen;
 
@@ -1047,6 +1117,8 @@ export default function* clientSaga() {
   yield takeLatest(saveClientBasicDetails.type, saveBasicDetails);
   yield takeLatest(updateClientBasicDetails.type, updateBasicDetails);
   yield takeLatest(saveClientsDetails.type, saveClientsDetailsSaga);
+  yield takeLatest(updateClientsDetails.type, updateClientsDetailsSaga);
+  yield takeLatest(getClientsDetails.type, getClientsDetailsSaga);
 
   yield takeLatest(getReport.type, handleGetRemarkReport);
   yield takeLatest(getLead.type, handleGetLeadProgress);

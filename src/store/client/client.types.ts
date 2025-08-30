@@ -9,11 +9,11 @@ import {
 export type ClientState = {
   clientLoader: boolean;
   clientList: Array<IClientInfoResponseDatum>;
-  clientFormData: ClientFormType;
   basicDetails: BasicDetailsType;
   clientsDetails: ClientsDetailsType;
 
   clientFormId: number | undefined;
+  isSavedClientsDetails: boolean;
 
   reportLoader: boolean;
   reportList: Array<IRemarkReportResponseDatum>;
@@ -140,12 +140,13 @@ export type BasicDetailsType = {
   city: string;
   dateOfVisit: Date | undefined;
   address: string;
-  programType: string 
-  productType: string
+  programType: string;
+  productType: string;
 };
 
 export type ClientsDetailsType = Array<{
-  id: string;
+  key: string;
+  id: number | undefined; 
   clientType: string;
   nameOfClient: string;
   contactNumber: string;
@@ -153,17 +154,18 @@ export type ClientsDetailsType = Array<{
   createdBy: string;
 }>;
 
-type ClientFirmScreenType = {
-  [K in ClientFirmNames]: K extends 'bankName' ? string[] : string;
-};
-type VendorScreenType = Record<VendorNames, string>;
-type VisitScreenType = Record<VisitNames, string>;
-export type ClientFormType = {
-  BasicDetails: BasicDetailsType;
-  ClientFirmScreen: ClientFirmScreenType;
-  VendorScreen: VendorScreenType;
-  VisitScreen: VisitScreenType;
-};
+export interface ClientsDetailsResponseType {
+  statusCode: number;
+  data: Array<{
+    id: number;
+    name_of_client: string;
+    client_type: string;
+    email: string;
+    contact_number: string;
+    client: number;
+  }>;
+  message: string;
+}
 
 export type ClientFormPayload =
   | {
@@ -303,9 +305,6 @@ export type IClientsDetailsPayload = Array<{
   created_by: string;
   client_detail_id?: number;
 }>;
-
-
-
 
 export type IvendorPayload = {
   product_category: string;
