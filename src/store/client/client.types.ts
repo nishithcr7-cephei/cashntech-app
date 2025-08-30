@@ -140,6 +140,8 @@ export type BasicDetailsType = {
   city: string;
   dateOfVisit: Date | undefined;
   address: string;
+  programType: string 
+  productType: string
 };
 
 export type ClientsDetailsType = Array<{
@@ -282,6 +284,8 @@ export type IBasicDetailsPayload = {
   state: string;
   firm_name: string;
   address: string;
+  program_type: string;
+  product_type: string;
   clientId?: number;
 };
 
@@ -301,24 +305,7 @@ export type IClientsDetailsPayload = Array<{
 }>;
 
 
-export type IClientFirmPayload = {
-  client_name: string;
-  firm_name: string;
-  contact_number: string;
-  business_vintage: string;
-  sector: string;
-  bank_name: string;
-  cibil_score: number;
-  facility_type: string;
-  existing_funding_sanctioned_amount: number;
-  estimated_funding_required: number;
-  credit_period_offer: number;
-};
 
-export type IclientFirmResponse = {
-  statusCode: number;
-  message: string;
-};
 
 export type IvendorPayload = {
   product_category: string;

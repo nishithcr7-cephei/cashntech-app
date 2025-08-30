@@ -256,10 +256,10 @@ const clientSlice = createSlice({
       state.basicDetails = initialState.basicDetails;
     },
     saveClientBasicDetails: state => {
-      state.clientLoader = false;
+      state.clientLoader = true;
     },
     updateClientBasicDetails: state => {
-      state.clientLoader = false;
+      state.clientLoader = true;
     },
     // Client Details
     setClientsDetails: (
@@ -311,9 +311,6 @@ const clientSlice = createSlice({
     resetAllClientFormData: state => {
       state.clientFormData = clientFormData;
       state.clientFormId = undefined;
-    },
-    saveClientFirmDetails: state => {
-      state.clientLoader = false;
     },
     saveVendorDetails: (
       state,
@@ -839,7 +836,6 @@ export const {
   setClientFormData,
   resetClientFormData,
   resetAllClientFormData,
-  saveClientFirmDetails,
   saveVendorDetails,
   saveVisitDetails,
   getReport,

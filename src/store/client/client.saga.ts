@@ -14,7 +14,6 @@ import {
   getSoftSanctionRuleset,
   getTaskHistory,
   saveClientBasicDetails,
-  saveClientFirmDetails,
   saveClientsDetails,
   saveVendorDetails,
   saveVisitDetails,
@@ -109,13 +108,10 @@ import {
   ClientsDetailsType,
   IClientsDetailsPayload,
 } from './client.types';
-import Endpoints from '@constants/ApiEndPoints';
 import Toast from 'react-native-toast-message';
-import {decodeJWT} from '@utils/Utils';
-import {getStorage} from '@services/localStorage';
-import StorageKeys from '@constants/StorageKeys';
 import {userSelector} from '@store/user';
-import { AxiosError } from 'axios';
+import {AxiosError} from 'axios';
+import {encryptUtility} from '@utils/crypto';
 
 function* handleGetClient(): unknown {
   console.log('Saga: handleGetClient called');
@@ -206,19 +202,22 @@ function* saveBasicDetails(): unknown {
   const {id, first_name, last_name} = yield select(userSelector.getUserInfo);
   const body: IBasicDetailsPayload = {
     source_of_lead: basicDetailForm.sourceOfLead,
-    location: basicDetailForm.location,
-    city: basicDetailForm.city,
-    state: basicDetailForm.state ?? '',
-    address: basicDetailForm.address,
+    location: encryptUtility(basicDetailForm.location),
+    city: encryptUtility(basicDetailForm.city),
+    state: encryptUtility(basicDetailForm.state ?? ''),
+    address: encryptUtility(basicDetailForm.address),
     created_by: `${first_name} ${last_name}`,
     date_of_visit: moment(basicDetailForm.dateOfVisit).toISOString(),
-    firm_name: basicDetailForm.firmName,
+    firm_name: encryptUtility(basicDetailForm.firmName),
+    program_type: basicDetailForm.programType,
+    product_type: basicDetailForm.productType,
     userId: id,
   };
   const {data, error}: Result<IBasicDetailsResponse> = yield call(
     ClientApis.saveBasicDetailForm,
     body,
   );
+  yield put(clientActions.setClientLoader(false));
   if (error) {
     Toast.show({
       type: 'error',
@@ -241,13 +240,15 @@ function* updateBasicDetails(): unknown {
   const clientId = yield select(clientSelector.getClientFormId);
   const body: IBasicDetailsPayload = {
     source_of_lead: basicDetailForm.sourceOfLead,
-    location: basicDetailForm.location,
-    city: basicDetailForm.city,
-    state: basicDetailForm.state ?? '',
-    address: basicDetailForm.address,
+    location: encryptUtility(basicDetailForm.location),
+    city: encryptUtility(basicDetailForm.city),
+    state: encryptUtility(basicDetailForm.state ?? ''),
+    address: encryptUtility(basicDetailForm.address),
     created_by: `${first_name} ${last_name}`,
     date_of_visit: moment(basicDetailForm.dateOfVisit).toISOString(),
-    firm_name: basicDetailForm.firmName,
+    firm_name: encryptUtility(basicDetailForm.firmName),
+    program_type: basicDetailForm.programType,
+    product_type: basicDetailForm.productType,
     userId: id,
     clientId: clientId,
   };
@@ -255,6 +256,7 @@ function* updateBasicDetails(): unknown {
     ClientApis.saveBasicDetailForm,
     body,
   );
+  yield put(clientActions.setClientLoader(false));
   if (error) {
     Toast.show({
       type: 'error',
@@ -281,8 +283,13 @@ function* saveClientsDetailsSaga(): unknown {
     email: client.email,
     created_by: `${first_name} ${last_name}`,
   }));
-  const {data, error}: Result<{statusCode: number; message: string}, AxiosError<{message?: string}>> =
-    yield call(ClientApis.saveClientsDetailsForm, clientId, body);
+  const {
+    data,
+    error,
+  }: Result<
+    {statusCode: number; message: string},
+    AxiosError<{message?: string}>
+  > = yield call(ClientApis.saveClientsDetailsForm, clientId, body);
   if (error) {
     Toast.show({
       type: 'error',
@@ -294,65 +301,6 @@ function* saveClientsDetailsSaga(): unknown {
     type: 'success',
     text1: data.message || 'Client details saved successfully.',
   });
-}
-
-function* saveClientFirm(): unknown {
-  const clientFormData: ClientFormType = yield select(
-    clientSelector.getClientFormData,
-  );
-  console.log('ClientFormData:', clientFormData);
-
-  const clientId: number = yield select(clientSelector.getClientFormId);
-  console.log('Client ID:', clientId);
-
-  const clientFirmDetailForm = clientFormData.ClientFirmScreen;
-  console.log('ClientFirmScreen Data:', clientFirmDetailForm);
-
-  const body: IClientFirmPayload = {
-    client_name: clientFirmDetailForm.clientName,
-    contact_number: clientFirmDetailForm.contactNumber,
-    firm_type: clientFirmDetailForm.typeOfFirm,
-    business_vintage: clientFirmDetailForm.businessVintage,
-    sector: clientFirmDetailForm.sector,
-    bank_name: clientFirmDetailForm.bankName,
-    cibil_score: parseInt(clientFirmDetailForm.cibilScore),
-    facility_type: clientFirmDetailForm.facilityType,
-    existing_funding_sanctioned_amount: parseInt(
-      clientFirmDetailForm.existingFunding,
-    ),
-    estimated_funding_required: parseInt(clientFirmDetailForm.estimatedFunding),
-    credit_period_offer: parseInt(clientFirmDetailForm.creditPeriod),
-  };
-
-  console.log('Final Payload to API:', body);
-
-  try {
-    const {data, error}: Result<IclientFirmResponse> = yield call(
-      ClientApis.saveClientFirmForm,
-      String(clientId),
-      body,
-    );
-    console.log('API Response:', {data, error});
-
-    if (!error && data) {
-      Toast.show({
-        type: 'success',
-        text1: data.message || 'Client firm details saved successfully.',
-      });
-    } else {
-      console.error('API error response:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to save client firm details.',
-      });
-    }
-  } catch (e: any) {
-    console.error('Caught exception:', e);
-    Toast.show({
-      type: 'error',
-      text1: 'Failed to save client firm details.',
-    });
-  }
 }
 
 function* saveVendor(
@@ -1105,7 +1053,6 @@ export default function* clientSaga() {
   yield takeLatest(getLeadDesciption.type, handleGetLeadDesProgress);
   yield takeLatest(getTaskHistory.type, handleGetTaskHistory);
 
-  yield takeLatest(saveClientFirmDetails.type, saveClientFirm);
   yield takeLatest(saveVendorDetails.type, saveVendor);
   yield takeLatest(saveVisitDetails.type, savevisit);
   yield takeLatest(uploadKycRequest.type, handleUploadKyc);
@@ -1140,8 +1087,4 @@ export default function* clientSaga() {
     clientActions.getLeadProgressDetails.type,
     handleGetLeadProgressDetails,
   );
-}
-
-function deleteClientFailure(error: unknown): any {
-  throw new Error('Function not implemented.');
 }

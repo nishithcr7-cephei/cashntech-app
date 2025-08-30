@@ -23,7 +23,7 @@ import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-
 import Cities from '@constants/Cities';
 import moment from 'moment';
 import {useDispatch, useSelector} from 'react-redux';
-import {clientActions, clientSelector} from '@store/client';
+import {BasicDetailsType, clientActions, clientSelector} from '@store/client';
 import Toast from 'react-native-toast-message';
 import {userSelector} from '@store/user';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
@@ -39,6 +39,21 @@ export enum LeadSourceType {
   INSURANCE = 'Insurance (I)',
   WEALTH_AND_INVESTMENT = 'Wealth & Investment (W)',
 }
+
+export enum ProgramType {
+  STAND_ALONE = 'Stand-Alone',
+  ANCHOR_BASED = 'Anchor-Based',
+}
+
+export enum ProductType {
+  VF = 'VF',
+  DF = 'DF',
+  CF = 'CF',
+  PID = 'PID',
+  SID = 'SID',
+  DYNAMIC_DISCOUNTING = 'Dynamic Discounting',
+}
+
 const listOfLeadSources = Object.values(LeadSourceType).map(item => {
   return {label: item, value: item};
 });
@@ -47,18 +62,35 @@ const listOfStates = Object.keys(Cities).map(key => {
   return {label: key, value: key};
 });
 
+const listOfProgram = Object.values(ProgramType).map(item => {
+  return {label: item, value: item};
+});
+
+const listOfProduct = Object.values(ProductType).map(item => {
+  return {label: item, value: item};
+});
+
 type Props = NativeStackScreenProps<ClientNavigatorType, 'BasicDetailForm'>;
 
 export const BasicDetailForm = ({navigation}: Props) => {
   const dispatch = useDispatch();
-  const {sourceOfLead, firmName, location, state, city, dateOfVisit, address} =
-    useSelector(clientSelector.getBasicDetailFormData);
+  const {
+    sourceOfLead,
+    firmName,
+    location,
+    state,
+    city,
+    dateOfVisit,
+    address,
+    productType,
+    programType,
+  } = useSelector(clientSelector.getBasicDetailFormData);
 
   const clientFormId = useSelector(clientSelector.getClientFormId);
   const clientLoader = useSelector(clientSelector.getClientLoader);
   const fullName = useSelector(userSelector.getFullName);
 
-  function setData<T>(field: string, value: T) {
+  function setData<T>(field: keyof BasicDetailsType, value: T) {
     dispatch(clientActions.setBasicDetails({[field]: value}));
   }
 
@@ -113,17 +145,23 @@ export const BasicDetailForm = ({navigation}: Props) => {
             onChange={value => setData('sourceOfLead', value)}
             value={sourceOfLead}
           />
+          <CustomDropdown
+            label="Type of Program"
+            data={listOfProgram}
+            onChange={value => setData('programType', value)}
+            value={programType}
+          />
+          <CustomDropdown
+            label="Product Type"
+            data={listOfProduct}
+            onChange={value => setData('productType', value)}
+            value={productType}
+          />
           <Input
             label="Firm Name"
             placeholder="Enter Firm Name"
             value={firmName}
             onChangeText={value => setData('firmName', value)}
-          />
-          <Input
-            label="Location"
-            placeholder="Enter Location"
-            value={location}
-            onChangeText={value => setData('location', value)}
           />
           <CustomDropdown
             label="State"
@@ -143,6 +181,12 @@ export const BasicDetailForm = ({navigation}: Props) => {
             placeholder="Enter Date of Visit"
             value={dateOfVisit ? moment(dateOfVisit).format('DD/MM/YYYY') : ''}
             onConfirm={date => setData('dateOfVisit', date)}
+          />
+          <Input
+            label="Location"
+            placeholder="Enter Location"
+            value={location}
+            onChangeText={value => setData('location', value)}
           />
           <Input
             label="Address"
