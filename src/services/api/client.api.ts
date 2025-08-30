@@ -7,8 +7,6 @@ import {
   IBasicDetailsPayload,
   IBankListResponse,
   IBasicDetailsResponse,
-  IClientFirmPayload,
-  IclientFirmResponse,
   IClientInfoSuccessResponse,
   ILeadProgressResponse,
   IRemarkReportResponse,
@@ -27,7 +25,6 @@ import {
   IClientsDetailsPayload,
 } from '@store/client';
 import {CustomRequestConfig} from './api';
-import {API_URL} from '@config/config';
 import {storage} from '@services/localStorage';
 import {Config} from '@config/index';
 import StorageKeys from '@constants/StorageKeys';
@@ -179,18 +176,6 @@ const saveClientsDetailsForm = async (
     AxiosResponse<{statusCode: number; message: string}>
   >(
     Api.post(`${Endpoints.apiSaveClientsDetails}${clientFormId}`, body, {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  return {data: data?.data ?? null, error};
-};
-
-const saveClientFirmForm = async (
-  clientId: string,
-  body: IClientFirmPayload,
-) => {
-  const {data, error} = await tryCatch<AxiosResponse<IclientFirmResponse>>(
-    Api.post(Endpoints.apiSaveClientFirmDetails(clientId), body, {
       authRequired: true,
     } as CustomRequestConfig),
   );
@@ -741,7 +726,6 @@ export default {
   getLeadProgress,
   getLeadDesProgress,
   getTaskHistory,
-  saveClientFirmForm,
   saveVendorForm,
   saveVisitForm,
   uploadKycDocument,

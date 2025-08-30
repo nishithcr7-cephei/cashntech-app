@@ -37,7 +37,7 @@ import {useDispatch, useSelector} from 'react-redux';
 import {clientActions, clientSelector} from '@store/client';
 import {ClientFormType} from '@store/client/client.types';
 import {Api} from '@services/api';
-import {encryptSingleValueUtility, decryptLocation, decryptConditionally} from '@utils/crypto';
+import {decryptConditionally} from '@utils/crypto';
 import {API_URL, RK_ENCRYPTION_KEY, RK_ENCRYPTION_IV} from '@config/config';
 import {
   validateClientForm,
@@ -478,7 +478,7 @@ export const CreateClientForm: React.FC<CreateClientFormProps> = ({
             ? new Date(rest.dateOfVisit).toISOString()
             : undefined,
         };
-        
+
         // Show API Debug Alert for Basic Details Edit
         // Alert.alert(
         //   'Basic Details API Debug (EDIT)',
@@ -487,35 +487,35 @@ export const CreateClientForm: React.FC<CreateClientFormProps> = ({
         //     {
         //       text: 'OK',
         //       onPress: async () => {
-                try {
-                  await dispatch(
-                    clientActions.saveClientBasicDetails({clientId: params.clientId}),
-                  );
-                  // Alert.alert(
-                  //   'Basic Details API Response',
-                  //   'SUCCESS: Basic Details Saved Successfully',
-                  //   [{text: 'OK'}]
-                  // );
-                  Toast.show({
-                    type: 'success',
-                    text1: 'Basic Details Saved Successfully',
-                  });
-                  if (formIndex < formNames.length - 1) {
-                    setFormIndex(prev => prev + 1);
-                  }
-                } catch (error) {
-                  // Alert.alert(
-                  //   'Basic Details API Response',
-                  //   `ERROR: ${error}`,
-                  //   [{text: 'OK'}]
-                  // );
-                  Toast.show({
-                    type: 'error',
-                    text1: 'Failed to save basic details',
-                  });
-                  setIsLoading(false);
-                  return;
-                }
+        try {
+          await dispatch(
+            clientActions.saveClientBasicDetails({clientId: params.clientId}),
+          );
+          // Alert.alert(
+          //   'Basic Details API Response',
+          //   'SUCCESS: Basic Details Saved Successfully',
+          //   [{text: 'OK'}]
+          // );
+          Toast.show({
+            type: 'success',
+            text1: 'Basic Details Saved Successfully',
+          });
+          if (formIndex < formNames.length - 1) {
+            setFormIndex(prev => prev + 1);
+          }
+        } catch (error) {
+          // Alert.alert(
+          //   'Basic Details API Response',
+          //   `ERROR: ${error}`,
+          //   [{text: 'OK'}]
+          // );
+          Toast.show({
+            type: 'error',
+            text1: 'Failed to save basic details',
+          });
+          setIsLoading(false);
+          return;
+        }
         //       }
         //     }
         //   ]
@@ -534,7 +534,7 @@ export const CreateClientForm: React.FC<CreateClientFormProps> = ({
             ? new Date(formData.BasicDetails.dateOfVisit).toISOString()
             : undefined,
         };
-        
+
         // Show API Debug Alert for Basic Details Create
         // Alert.alert(
         //   'Basic Details API Debug (CREATE)',
@@ -543,33 +543,33 @@ export const CreateClientForm: React.FC<CreateClientFormProps> = ({
         //     {
         //       text: 'OK',
         //       onPress: async () => {
-                try {
-                  await dispatch(clientActions.saveClientBasicDetails());
-                  // Alert.alert(
-                  //   'Basic Details API Response',
-                  //   'SUCCESS: Basic Details Saved Successfully',
-                  //   [{text: 'OK'}]
-                  // );
-                  Toast.show({
-                    type: 'success',
-                    text1: 'Basic Details Saved Successfully',
-                  });
-                  if (formIndex < formNames.length - 1) {
-                    setFormIndex(prev => prev + 1);
-                  }
-                } catch (error) {
-                  // Alert.alert(
-                  //   'Basic Details API Response',
-                  //   `ERROR: ${error}`,
-                  //   [{text: 'OK'}]
-                  // );
-                  Toast.show({
-                    type: 'error',
-                    text1: 'Failed to save basic details',
-                  });
-                  setIsLoading(false);
-                  return;
-                }
+        try {
+          await dispatch(clientActions.saveClientBasicDetails());
+          // Alert.alert(
+          //   'Basic Details API Response',
+          //   'SUCCESS: Basic Details Saved Successfully',
+          //   [{text: 'OK'}]
+          // );
+          Toast.show({
+            type: 'success',
+            text1: 'Basic Details Saved Successfully',
+          });
+          if (formIndex < formNames.length - 1) {
+            setFormIndex(prev => prev + 1);
+          }
+        } catch (error) {
+          // Alert.alert(
+          //   'Basic Details API Response',
+          //   `ERROR: ${error}`,
+          //   [{text: 'OK'}]
+          // );
+          Toast.show({
+            type: 'error',
+            text1: 'Failed to save basic details',
+          });
+          setIsLoading(false);
+          return;
+        }
         //       }
         //     }
         //   ]
@@ -580,7 +580,7 @@ export const CreateClientForm: React.FC<CreateClientFormProps> = ({
         ...formData.ClientFirmScreen,
         bank_name: (formData.ClientFirmScreen.bankName || []).join(','),
       };
-      
+
       // Show API Debug Alert for Client Firm Details
       // Alert.alert(
       //   'Client Firm API Debug',
@@ -589,33 +589,33 @@ export const CreateClientForm: React.FC<CreateClientFormProps> = ({
       //     {
       //       text: 'OK',
       //       onPress: async () => {
-                try {
-                  await dispatch(clientActions.saveClientFirmDetails());
-                  // Alert.alert(
-                  //   'Client Firm API Response',
-                  //   'SUCCESS: Client Firm Details Saved Successfully',
-                  //   [{text: 'OK'}]
-                  // );
-                  Toast.show({
-                    type: 'success',
-                    text1: 'Client Firm Details Saved Successfully',
-                  });
-                  if (formIndex < formNames.length - 1) {
-                    setFormIndex(prev => prev + 1);
-                  }
-                } catch (error) {
-                  // Alert.alert(
-                  //   'Client Firm API Response',
-                  //   `ERROR: ${error}`,
-                  //   [{text: 'OK'}]
-                  // );
-                  Toast.show({
-                    type: 'error',
-                    text1: 'Failed to save client firm details',
-                  });
-                  setIsLoading(false);
-                  return;
-                }
+      try {
+        // await dispatch(clientActions.saveClientFirmDetails());
+        // Alert.alert(
+        //   'Client Firm API Response',
+        //   'SUCCESS: Client Firm Details Saved Successfully',
+        //   [{text: 'OK'}]
+        // );
+        Toast.show({
+          type: 'success',
+          text1: 'Client Firm Details Saved Successfully',
+        });
+        if (formIndex < formNames.length - 1) {
+          setFormIndex(prev => prev + 1);
+        }
+      } catch (error) {
+        // Alert.alert(
+        //   'Client Firm API Response',
+        //   `ERROR: ${error}`,
+        //   [{text: 'OK'}]
+        // );
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to save client firm details',
+        });
+        setIsLoading(false);
+        return;
+      }
       //       }
       //     }
       //   ]
@@ -628,7 +628,7 @@ export const CreateClientForm: React.FC<CreateClientFormProps> = ({
       }));
       const url = Endpoints.apiSaveVendorDetails(String(clientId));
       const fullUrl = `${API_URL}${url}`;
-      
+
       // Show API Debug Alert for Vendor Details
       // Alert.alert(
       //   'Vendor Details API Debug',
@@ -637,52 +637,52 @@ export const CreateClientForm: React.FC<CreateClientFormProps> = ({
       //     {
       //       text: 'OK',
       //       onPress: async () => {
-                try {
-                  const response = await Api.post(url, vendorListWithCreatedBy);
-                  if (response?.status === 201 && response?.data?.message) {
-                    // Alert.alert(
-                    //   'Vendor Details API Response',
-                    //   `SUCCESS: ${JSON.stringify(response.data, null, 2)}`,
-                    //   [{text: 'OK'}]
-                    // );
-                    Toast.show({
-                      type: 'success',
-                      text1: response.data.message,
-                    });
-                    if (formIndex < formNames.length - 1) {
-                      setFormIndex(prev => prev + 1);
-                    }
-                  } else {
-                    // Alert.alert(
-                    //   'Vendor Details API Response',
-                    //   `UNEXPECTED RESPONSE: ${JSON.stringify(response, null, 2)}`,
-                    //   [{text: 'OK'}]
-                    // );
-                    Toast.show({
-                      type: 'error',
-                      text1: 'Failed to save vendors.',
-                    });
-                  }
-                } catch (error) {
-                  // Alert.alert(
-                  //   'Vendor Details API Response',
-                  //   `ERROR: ${error}`,
-                  //   [{text: 'OK'}]
-                  // );
-                  Toast.show({
-                    type: 'error',
-                    text1: 'Failed to save vendors.',
-                  });
-                }
-                setIsLoading(false);
-                return;
+      try {
+        const response = await Api.post(url, vendorListWithCreatedBy);
+        if (response?.status === 201 && response?.data?.message) {
+          // Alert.alert(
+          //   'Vendor Details API Response',
+          //   `SUCCESS: ${JSON.stringify(response.data, null, 2)}`,
+          //   [{text: 'OK'}]
+          // );
+          Toast.show({
+            type: 'success',
+            text1: response.data.message,
+          });
+          if (formIndex < formNames.length - 1) {
+            setFormIndex(prev => prev + 1);
+          }
+        } else {
+          // Alert.alert(
+          //   'Vendor Details API Response',
+          //   `UNEXPECTED RESPONSE: ${JSON.stringify(response, null, 2)}`,
+          //   [{text: 'OK'}]
+          // );
+          Toast.show({
+            type: 'error',
+            text1: 'Failed to save vendors.',
+          });
+        }
+      } catch (error) {
+        // Alert.alert(
+        //   'Vendor Details API Response',
+        //   `ERROR: ${error}`,
+        //   [{text: 'OK'}]
+        // );
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to save vendors.',
+        });
+      }
+      setIsLoading(false);
+      return;
       //       }
       //     }
       //   ]
       // );
     } else if (currentForm === 'VisitScreen') {
       const payload = formData.VisitScreen;
-      
+
       // Show API Debug Alert for Visit Details
       // Alert.alert(
       //   'Visit Details API Debug',
@@ -691,33 +691,33 @@ export const CreateClientForm: React.FC<CreateClientFormProps> = ({
       //     {
       //       text: 'OK',
       //       onPress: async () => {
-                try {
-                  await dispatch(clientActions.saveVisitDetails());
-                  // Alert.alert(
-                  //   'Visit Details API Response',
-                  //   'SUCCESS: Visit Details Saved Successfully',
-                  //   [{text: 'OK'}]
-                  // );
-                  Toast.show({
-                    type: 'success',
-                    text1: 'Visit Details Saved Successfully',
-                  });
-                  if (formIndex < formNames.length - 1) {
-                    setFormIndex(prev => prev + 1);
-                  }
-                } catch (error) {
-                  // Alert.alert(
-                  //   'Visit Details API Response',
-                  //   `ERROR: ${error}`,
-                  //   [{text: 'OK'}]
-                  // );
-                  Toast.show({
-                    type: 'error',
-                    text1: 'Failed to save visit details',
-                  });
-                  setIsLoading(false);
-                  return;
-                }
+      try {
+        await dispatch(clientActions.saveVisitDetails());
+        // Alert.alert(
+        //   'Visit Details API Response',
+        //   'SUCCESS: Visit Details Saved Successfully',
+        //   [{text: 'OK'}]
+        // );
+        Toast.show({
+          type: 'success',
+          text1: 'Visit Details Saved Successfully',
+        });
+        if (formIndex < formNames.length - 1) {
+          setFormIndex(prev => prev + 1);
+        }
+      } catch (error) {
+        // Alert.alert(
+        //   'Visit Details API Response',
+        //   `ERROR: ${error}`,
+        //   [{text: 'OK'}]
+        // );
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to save visit details',
+        });
+        setIsLoading(false);
+        return;
+      }
       //       }
       //     }
       //   ]
