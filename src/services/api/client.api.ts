@@ -165,7 +165,16 @@ const saveBasicDetailForm = async (body: IBasicDetailsPayload) => {
       authRequired: true,
     } as CustomRequestConfig),
   );
-  return {data: data?.data ?? null, error};
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  return {
+    data: data.data,
+    error: null,
+  };
 };
 
 const saveClientsDetailsForm = async (
