@@ -1,0 +1,204 @@
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  ActivityIndicator,
+} from 'react-native';
+import React, {useMemo, useState} from 'react';
+import {
+  AppBar,
+  Container,
+  CustomDropdown,
+  DateNTimePicker,
+  FooterButton,
+  Input,
+} from '@components/index';
+import {LeftChevronCircle} from '@assets/Icons';
+import Colors from '@constants/Colors';
+import fontWeight from '@constants/FontWeight';
+import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
+import Cities from '@constants/Cities';
+import moment from 'moment';
+import {useDispatch, useSelector} from 'react-redux';
+import {clientActions, clientSelector} from '@store/client';
+import Toast from 'react-native-toast-message';
+import {userSelector} from '@store/user';
+import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {ClientNavigatorType} from '@type/NavigatorTypes';
+
+// Static Data
+export enum LeadSourceType {
+  MARKET_KNOWLEDGE = 'Market Knowledge (D)',
+  CUSTOMER_REFERENCE = 'Customer Reference (C)',
+  TELECALLING = 'Telecalling (H)',
+  OUTSOURCED_AGENCY = 'Outsourced Agency (H)',
+  CHARETRED_ACCOUNTANT = 'Chartered Accountant (A)',
+  INSURANCE = 'Insurance (I)',
+  WEALTH_AND_INVESTMENT = 'Wealth & Investment (W)',
+}
+const listOfLeadSources = Object.values(LeadSourceType).map(item => {
+  return {label: item, value: item};
+});
+
+const listOfStates = Object.keys(Cities).map(key => {
+  return {label: key, value: key};
+});
+
+type Props = NativeStackScreenProps<ClientNavigatorType, 'BasicDetailForm'>;
+
+export const BasicDetailForm = ({navigation}: Props) => {
+  const dispatch = useDispatch();
+  const {sourceOfLead, firmName, location, state, city, dateOfVisit, address} =
+    useSelector(clientSelector.getBasicDetailFormData);
+
+  const clientFormId = useSelector(clientSelector.getClientFormId);
+  const clientLoader = useSelector(clientSelector.getClientLoader);
+  const fullName = useSelector(userSelector.getFullName);
+
+  function setData<T>(field: string, value: T) {
+    dispatch(clientActions.setBasicDetails({[field]: value}));
+  }
+
+  const listOfCities = useMemo(() => {
+    if (state) {
+      return Cities[state] ?? [];
+    }
+    return [];
+  }, [state]);
+
+  const handleClear = () => {
+    dispatch(clientActions.clearBasicDetails());
+  };
+
+  const handleSave = () => {
+    if (clientFormId) {
+      dispatch(clientActions.updateClientBasicDetails());
+      return;
+    }
+    dispatch(clientActions.saveClientBasicDetails());
+  };
+
+  const handleNext = () => {
+    if (clientFormId) {
+      navigation.navigate('ClientDetailForm');
+    } else {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please save the form before proceeding to next step.',
+      });
+    }
+  };
+
+  return (
+    <Container>
+      <AppBar title="Client Information Master" navigation={navigation} />
+      <View>
+        <TouchableOpacity
+          style={styles.subContainer}
+          onPress={navigation.goBack}>
+          <LeftChevronCircle height={26} width={26} />
+          <Text style={styles.subheader}>Basic Details</Text>
+        </TouchableOpacity>
+      </View>
+      <KeyboardAvoidingScrollView style={{flexGrow: 1}}>
+        <View style={styles.inputContainer}>
+          <CustomDropdown
+            label="Source of lead"
+            data={listOfLeadSources}
+            showSearch={false}
+            onChange={value => setData('sourceOfLead', value)}
+            value={sourceOfLead}
+          />
+          <Input
+            label="Firm Name"
+            placeholder="Enter Firm Name"
+            value={firmName}
+            onChangeText={value => setData('firmName', value)}
+          />
+          <Input
+            label="Location"
+            placeholder="Enter Location"
+            value={location}
+            onChangeText={value => setData('location', value)}
+          />
+          <CustomDropdown
+            label="State"
+            data={listOfStates}
+            onChange={value => setData('state', value)}
+            value={state}
+          />
+          <CustomDropdown
+            label="City"
+            data={listOfCities}
+            onChange={value => setData('city', value)}
+            value={city}
+          />
+
+          <DateNTimePicker
+            label="Date of visit"
+            placeholder="Enter Date of Visit"
+            value={dateOfVisit ? moment(dateOfVisit).format('DD/MM/YYYY') : ''}
+            onConfirm={date => setData('dateOfVisit', date)}
+          />
+          <Input
+            label="Address"
+            placeholder="Enter Address"
+            value={address}
+            onChangeText={value => setData('address', value)}
+          />
+          <Input
+            label="Filed by"
+            placeholder="Enter Name"
+            value={fullName}
+            editable={false}
+          />
+        </View>
+      </KeyboardAvoidingScrollView>
+      <FooterButton
+        onPressClearAll={handleClear}
+        onPressSave={handleSave}
+        onPressNext={handleNext}
+      />
+      <Modal transparent visible={clientLoader}>
+        <View style={styles.loader}>
+          <ActivityIndicator size="large" color={Colors.primaryColor} />
+        </View>
+      </Modal>
+    </Container>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  subContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.LimeGray,
+    paddingLeft: 16,
+    paddingVertical: 12,
+  },
+  subheader: {
+    marginLeft: 12,
+    fontSize: scaleFont(16),
+    fontWeight: fontWeight.SemiBold,
+    color: Colors.darkblack,
+  },
+  inputContainer: {
+    marginHorizontal: scaleWidth(24),
+    marginTop: scaleHeight(17),
+    gap: scaleHeight(20),
+  },
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+});
