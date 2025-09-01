@@ -2,8 +2,6 @@ import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {
   BasicDetailsType,
   ClientsDetailsType,
-  ClientFormPayload,
-  ClientFormType,
   ClientState,
   IBankListResponseDatum,
   IBankStatementPayload,
@@ -50,12 +48,15 @@ const basicDetails: BasicDetailsType = {
   state: undefined,
   location: '',
   dateOfVisit: undefined,
+  productType: '',
+  programType: '',
   address: '',
 };
 
 const clientsDetails: ClientsDetailsType = [
   {
-    id: Math.random().toString(),
+    key: Math.random().toString(36).substring(7),
+    id: undefined,
     clientType: '',
     nameOfClient: '',
     contactNumber: '',
@@ -64,61 +65,16 @@ const clientsDetails: ClientsDetailsType = [
   },
 ];
 
-const clientFormData: ClientFormType = {
-  BasicDetails: {
-    firmName: '',
-    city: '',
-    dateOfVisit: '',
-    location: '',
-    pincode: '',
-    sourceOfLead: '',
-    state: '',
-    typeOfVisit: '',
-    visitNumber: '',
-    Fillby: '',
-  },
-  ClientFirmScreen: {
-    bankName: [],
-    businessVintage: '',
-    cibilScore: '',
-    clientName: '',
-    contactNumber: '',
-    creditPeriod: '',
-    estimatedFunding: '',
-    facilityType: '',
-    sector: '',
-    typeOfFirm: '',
-    existingFunding: '',
-  },
-  VendorScreen: {
-    Product: '',
-    state: '',
-    city: '',
-    vendorName: '',
-    address: '',
-    pincode: '',
-    vendorContact: '',
-    vendorEmail: '',
-    monthlySales: '',
-  },
-  VisitScreen: {
-    intent: '',
-    interested: '',
-    UserResponse: '',
-    nextVisitDate: '',
-    reason: '',
-  },
-};
-
 const initialState: ClientState = {
   // Client Info List screen
   clientLoader: false,
   clientList: [],
   // Client Information Form Data
-  clientFormId: undefined,
-  clientFormData: clientFormData,
+  clientFormId: undefined,  
   basicDetails: basicDetails,
+
   clientsDetails: clientsDetails,
+  isSavedClientsDetails: false,
 
   //Remark Report fields
   reportLoader: false,
@@ -262,6 +218,12 @@ const clientSlice = createSlice({
       state.clientLoader = true;
     },
     // Client Details
+    setAllClientsDetails: (
+      state,
+      action: PayloadAction<ClientsDetailsType>,
+    ) => {
+      state.clientsDetails = action.payload;
+    },
     setClientsDetails: (
       state,
       action: PayloadAction<[Partial<ClientsDetailsType[number]>, number]>,
@@ -273,7 +235,8 @@ const clientSlice = createSlice({
     },
     addNewClientDetails: state => {
       state.clientsDetails.push({
-        id: Math.random().toString(),
+        key: Math.random().toString(),
+        id: undefined,
         nameOfClient: '',
         clientType: '',
         contactNumber: '',
@@ -283,7 +246,7 @@ const clientSlice = createSlice({
     },
     removeClientDetails: (state, action: PayloadAction<string>) => {
       state.clientsDetails = state.clientsDetails.filter(
-        client => client.id !== action.payload
+        client => client.key !== action.payload
       );
     },
     clearClientDetails: state => {
@@ -292,24 +255,19 @@ const clientSlice = createSlice({
     saveClientsDetails: state => {
       state.clientLoader = false;
     },
+    getClientsDetails: state => {
+      state.clientLoader = true;
+    },
+    updateClientsDetails: state => {
+      state.clientLoader = true;
+    },
 
-    // Set Client Form Data
-    setClientFormData: (state, action: PayloadAction<ClientFormPayload>) => {
-      const {formName, name, value} = action.payload;
-      if (state.clientFormData[formName]) {
-        // @ts-expect-error: name is correctly typed per formName in ClientFormPayload
-        state.clientFormData[formName][name] = value;
-      }
-    },
-    resetClientFormData: (
-      state,
-      action: PayloadAction<keyof ClientFormType>,
-    ) => {
-      // @ts-expect-error: name is correctly typed per formName in ClientFormPayload
-      state.clientFormData[action.payload] = clientFormData[action.payload];
-    },
+    // Set Client Form Data,
     resetAllClientFormData: state => {
-      state.clientFormData = clientFormData;
+      state.clientLoader = false;
+      state.basicDetails = initialState.basicDetails;
+      state.clientsDetails = initialState.clientsDetails;
+      state.isSavedClientsDetails = initialState.isSavedClientsDetails;
       state.clientFormId = undefined;
     },
     saveVendorDetails: (
@@ -827,14 +785,15 @@ export const {
   saveClientBasicDetails,
   updateClientBasicDetails,
 
+  setAllClientsDetails,
   setClientsDetails,
   addNewClientDetails,
   removeClientDetails,
   clearClientDetails,
   saveClientsDetails,
-
-  setClientFormData,
-  resetClientFormData,
+  getClientsDetails,
+  updateClientsDetails,
+  
   resetAllClientFormData,
   saveVendorDetails,
   saveVisitDetails,

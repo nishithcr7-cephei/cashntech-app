@@ -5,7 +5,6 @@ export * from './Auth/SignupScreen';
 export * from './Auth/SuccessScreen';
 
 export * from './BusinessKYCValidation/BusinessKYCValidation';
-export * from './ClientDetailsScreen/ClientDetailsScreen';
 
 export * from './ClientInfo/ClientInfo';
 export * from './ClientInfo/BasicDetailForm';

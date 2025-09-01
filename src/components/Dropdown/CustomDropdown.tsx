@@ -1,7 +1,14 @@
 import Colors from '@constants/Colors';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import React, {useState} from 'react';
-import {View, Text, StyleSheet, StyleProp, ViewStyle} from 'react-native';
+import React from 'react';
+import {
+  Text,
+  StyleSheet,
+  StyleProp,
+  ViewStyle,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import {Dropdown} from 'react-native-element-dropdown';
 
 type Props = {
@@ -12,6 +19,7 @@ type Props = {
   onChange?: (value: string) => void;
   containerStyle?: StyleProp<ViewStyle>;
   showSearch?: boolean;
+  dropdownPosition?: 'bottom' | 'top' | 'auto' | undefined;
 };
 
 export const CustomDropdown = ({
@@ -22,13 +30,16 @@ export const CustomDropdown = ({
   onChange,
   showSearch = true,
   containerStyle,
+  dropdownPosition,
 }: Props) => {
   const handleChange = (item: {label: string; value: string}) => {
     onChange?.(item.value);
   };
 
   return (
-    <View style={[styles.container, containerStyle]}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <Dropdown
         style={styles.dropdown}
@@ -36,6 +47,7 @@ export const CustomDropdown = ({
         selectedTextStyle={styles.selectedTextStyle}
         itemTextStyle={styles.itemTextStyle}
         data={data}
+        dropdownPosition={dropdownPosition}
         labelField="label"
         valueField="value"
         placeholder={placeholder}
@@ -47,7 +59,7 @@ export const CustomDropdown = ({
         search={showSearch}
         searchPlaceholder="Search"
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

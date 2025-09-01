@@ -6,7 +6,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import {
   AppBar,
   Container,
@@ -24,6 +24,7 @@ import {clientActions, ClientsDetailsType, clientSelector} from '@store/client';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
+import Toast from 'react-native-toast-message';
 
 export enum ClientType {
   OWNER = 'Owner',
@@ -44,6 +45,7 @@ export const ClientDetailForm = ({navigation}: Props) => {
   const clientFormId = useSelector(clientSelector.getClientFormId);
   const clientLoader = useSelector(clientSelector.getClientLoader);
   const clientDetails = useSelector(clientSelector.getClientDetailsFormData);
+  const isSavedClientsDetails = useSelector(clientSelector.getClientsDetailsFormStatus);
 
   function setData<T>(
     field: keyof ClientsDetailsType[number],
@@ -62,10 +64,24 @@ export const ClientDetailForm = ({navigation}: Props) => {
   };
 
   const handleSave = () => {
-    dispatch(clientActions.saveClientsDetails());
+    if (isSavedClientsDetails) {
+      dispatch(clientActions.saveClientsDetails());
+    }else {
+      dispatch(clientActions.updateClientsDetails());
+    }
   };
 
-  const handleNext = () => {};
+  const handleNext = () => {
+    if(isSavedClientsDetails){
+      navigation.navigate('ClientDetailForm');
+    }else{
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please save the client details before proceeding.',
+      });
+    }
+  };
 
   const removeClient = (id: string) => {
     dispatch(clientActions.removeClientDetails(id));
@@ -91,14 +107,14 @@ export const ClientDetailForm = ({navigation}: Props) => {
           containerStyle={{marginHorizontal: scaleWidth(24)}}
         />
         {clientDetails.map((client, index) => (
-          <View key={client.id} style={{marginBottom: 20}}>
+          <View key={client.key} style={{marginBottom: 20}}>
             <View style={styles.inputContainer}>
               <View style={styles.clientHeader}>
                 <Text style={styles.formTitle}>Client {index + 1}</Text>
                 {index != 0 && (
                   <TouchableOpacity
                     style={styles.trashButton}
-                    onPress={() => removeClient(client.id)}>
+                    onPress={() => removeClient(client.key)}>
                     <FontAwesome6
                       name="trash"
                       iconStyle="solid"
