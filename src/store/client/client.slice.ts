@@ -70,7 +70,7 @@ const initialState: ClientState = {
   clientLoader: false,
   clientList: [],
   // Client Information Form Data
-  clientFormId: undefined,  
+  clientFormId: undefined,
   basicDetails: basicDetails,
 
   clientsDetails: clientsDetails,
@@ -201,6 +201,14 @@ const clientSlice = createSlice({
     saveClientFormId: (state, action: PayloadAction<number>) => {
       state.clientFormId = action.payload;
     },
+    // Reset All Client Form Data
+    resetAllClientFormData: state => {
+      state.clientLoader = false;
+      state.basicDetails = initialState.basicDetails;
+      state.clientsDetails = initialState.clientsDetails;
+      state.isSavedClientsDetails = initialState.isSavedClientsDetails;
+      state.clientFormId = undefined;
+    },
     // Basic Details
     setBasicDetails: (
       state,
@@ -246,30 +254,26 @@ const clientSlice = createSlice({
     },
     removeClientDetails: (state, action: PayloadAction<string>) => {
       state.clientsDetails = state.clientsDetails.filter(
-        client => client.key !== action.payload
+        client => client.key !== action.payload,
       );
     },
     clearClientDetails: state => {
       state.clientDetails = initialState.clientDetails;
     },
+    setSavedClientsDetails: (state, action: PayloadAction<boolean>) => {
+      state.isSavedClientsDetails = action.payload;
+    },
     saveClientsDetails: state => {
       state.clientLoader = false;
-    },
-    getClientsDetails: state => {
-      state.clientLoader = true;
     },
     updateClientsDetails: state => {
       state.clientLoader = true;
     },
+    getClientsDetails: state => {
+      state.clientLoader = true;
+    },
 
     // Set Client Form Data,
-    resetAllClientFormData: state => {
-      state.clientLoader = false;
-      state.basicDetails = initialState.basicDetails;
-      state.clientsDetails = initialState.clientsDetails;
-      state.isSavedClientsDetails = initialState.isSavedClientsDetails;
-      state.clientFormId = undefined;
-    },
     saveVendorDetails: (
       state,
       _action: PayloadAction<{clientId: string; vendors: any[]}>,
@@ -787,13 +791,14 @@ export const {
 
   setAllClientsDetails,
   setClientsDetails,
+  setSavedClientsDetails,
   addNewClientDetails,
   removeClientDetails,
   clearClientDetails,
   saveClientsDetails,
   getClientsDetails,
   updateClientsDetails,
-  
+
   resetAllClientFormData,
   saveVendorDetails,
   saveVisitDetails,

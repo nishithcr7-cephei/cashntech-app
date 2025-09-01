@@ -8,7 +8,7 @@ import axios, {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from 'axios';
-import { Alert } from 'react-native';
+import {Alert} from 'react-native';
 
 const GENERAL_TIMEOUT = 10000;
 
@@ -106,6 +106,7 @@ axiosInstance.interceptors.response.use(
 
     // Check if the error is a token expiration error
     if (error.response?.status === 401) {
+      Alert.alert('Error', 'Token expired..');
       logoutUser();
     }
     return Promise.reject(error);
@@ -128,7 +129,6 @@ export const cancelAllRequests = () => {
 export const logoutUser = () => {
   cancelAllRequests();
   storage.clearAll();
-  Alert.alert("Error", "Token expired..")
   store.dispatch(authActions.resetAuthState());
 };
 

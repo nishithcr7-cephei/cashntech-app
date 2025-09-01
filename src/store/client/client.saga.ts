@@ -298,6 +298,7 @@ function* saveClientsDetailsSaga(): unknown {
   }
   yield put(clientActions.getClientsDetails());
   yield put(clientActions.setClientLoader(false));
+  yield put(clientActions.setSavedClientsDetails(true));
   Toast.show({
     type: 'success',
     text1: data.message || 'Client details saved successfully.',
@@ -336,6 +337,7 @@ function* updateClientsDetailsSaga(): unknown {
   }
   yield put(clientActions.getClientsDetails());
   yield put(clientActions.setClientLoader(false));
+  yield put(clientActions.setSavedClientsDetails(true));
   Toast.show({
     type: 'success',
     text1: data.message || 'Client details updated successfully.',
