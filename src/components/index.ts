@@ -22,3 +22,4 @@ export * from './SoftsanctionModel/SoftSanctionModel';
 export * from './ThreeDotsDropdown/ThreeDotsDropdown';
 export * from './FilterBox/FilterDropdown';
 export * from './TaskFilter/TaskFilterDropdown';
+export * from './FilterModel/FilterModel';
