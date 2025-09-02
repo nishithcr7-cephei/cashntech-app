@@ -9,6 +9,7 @@ export * from './BusinessKYCValidation/BusinessKYCValidation';
 export * from './ClientInfo/ClientInfo';
 export * from './ClientInfo/BasicDetailForm';
 export * from './ClientInfo/ClientDetailForm';
+export * from './ClientInfo/FirmDetailForm';
 
 export * from './ClientLeadInfoTabs/ClientLeadInfoTab';
 export * from './CompanyDocuments/CompanyDocument';

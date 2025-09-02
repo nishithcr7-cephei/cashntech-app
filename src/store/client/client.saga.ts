@@ -9,6 +9,7 @@ import {
   getKycChecked,
   getLead,
   getLeadDesciption,
+  getMasterBankList,
   getReport,
   getSoftSanction,
   getSoftSanctionBnkPro,
@@ -16,6 +17,7 @@ import {
   getTaskHistory,
   saveClientBasicDetails,
   saveClientsDetails,
+  saveFirmDetails,
   saveVendorDetails,
   saveVisitDetails,
   TaskRecordsFilterRequest,
@@ -56,7 +58,7 @@ import axiosInstance from '@services/api/api';
 import {
   clientActions,
   clientSelector,
-  IBasicDetailsResponse,
+  BasicDetailsResponse,
   IBankListResponse,
   IClientInfoSuccessResponse,
   ILeadProgressResponse,
@@ -103,12 +105,15 @@ import {
   ITaskReordsFilterResponseDatum,
   BasicDetailsType,
   ClientsDetailsType,
-  IClientsDetailsPayload,
+  ClientsDetailsPayload,
   ClientsDetailsResponseType,
+  MasterBankResponse,
+  FirmDetailsType,
+  FirmDetailsPayload,
 } from './client.types';
 import Toast from 'react-native-toast-message';
 import {userSelector} from '@store/user';
-import {AxiosError, AxiosResponse} from 'axios';
+import {AxiosError} from 'axios';
 import {decryptUtility, encryptUtility} from '@utils/crypto';
 
 function* handleGetClient(): unknown {
@@ -211,7 +216,7 @@ function* saveBasicDetails(): unknown {
     product_type: basicDetailForm.productType,
     userId: id,
   };
-  const {data, error}: Result<IBasicDetailsResponse> = yield call(
+  const {data, error}: Result<BasicDetailsResponse> = yield call(
     ClientApis.saveBasicDetailForm,
     body,
   );
@@ -250,7 +255,7 @@ function* updateBasicDetails(): unknown {
     userId: id,
     clientId: clientId,
   };
-  const {data, error}: Result<IBasicDetailsResponse> = yield call(
+  const {data, error}: Result<BasicDetailsResponse> = yield call(
     ClientApis.saveBasicDetailForm,
     body,
   );
@@ -274,7 +279,7 @@ function* saveClientsDetailsSaga(): unknown {
   );
   const {first_name, last_name} = yield select(userSelector.getUserInfo);
   const clientId = yield select(clientSelector.getClientFormId);
-  const body: IClientsDetailsPayload = clientDetails.map(client => ({
+  const body: ClientsDetailsPayload = clientDetails.map(client => ({
     client_type: client.clientType,
     name_of_client: client.nameOfClient,
     contact_number: client.contactNumber,
@@ -311,7 +316,7 @@ function* updateClientsDetailsSaga(): unknown {
   );
   const {first_name, last_name} = yield select(userSelector.getUserInfo);
   const clientId = yield select(clientSelector.getClientFormId);
-  const body: IClientsDetailsPayload = clientDetails.map(client => ({
+  const body: ClientsDetailsPayload = clientDetails.map(client => ({
     client_type: client.clientType,
     name_of_client: client.nameOfClient,
     contact_number: client.contactNumber,
@@ -374,6 +379,66 @@ function* getClientsDetailsSaga(): unknown {
 
   yield put(clientActions.setAllClientsDetails(clientsDetails));
   yield put(clientActions.setClientLoader(false));
+}
+
+function* handleGetMasterBankList(): unknown {
+  const {
+    data,
+    error,
+  }: Result<MasterBankResponse, AxiosError<{message?: string}>> = yield call(
+    ClientApis.getMasterBankList,
+  );
+  if (error) {
+    Toast.show({
+      type: 'error',
+      text1:
+        error.response?.data?.message || 'Failed to fetch master bank list.',
+    });
+    return;
+  }
+  yield put(clientActions.setMasterBankList(data.data));
+  yield put(clientActions.setClientLoader(false));
+}
+
+function* saveFirmDetailsSaga(): unknown {
+  const clientId = yield select(clientSelector.getClientFormId);
+  const {first_name, last_name} = yield select(userSelector.getUserInfo);
+  const firmDetails: FirmDetailsType = yield select(
+    clientSelector.getFirmDetailsFormData,
+  );
+  const body: FirmDetailsPayload = {
+    firm_type: firmDetails.firmType,
+    bank_name: encryptUtility(firmDetails.bankName),
+    business_vintage: firmDetails.businessVintage,
+    sector: firmDetails.sector,
+    facility_type: firmDetails.facilityType,
+    cibil_score: Number(firmDetails.cibilScore),
+    credit_period_offer: Number(firmDetails.creditPeriodOffer),
+    estimated_funding_required: Number(firmDetails.estimatedFundingRequired),
+    existing_funding_sanctioned_amount: Number(
+      firmDetails.existingFundingSanctionedAmount,
+    ),
+    monthly_turnover: Number(firmDetails.monthlyTurnover),
+    created_by: `${first_name} ${last_name}`,
+  };
+  const {
+    error,
+  }: Result<
+    {statusCode: number; message: string},
+    AxiosError<{message?: string}>
+  > = yield call(ClientApis.saveFirmDetailsForm, clientId, body);
+  if (error) {
+    Toast.show({
+      type: 'error',
+      text1: error.response?.data?.message || 'Failed to save firm details.',
+    });
+    return;
+  }
+  yield put(clientActions.setClientLoader(false));
+  Toast.show({
+    type: 'success',
+    text1: 'Firm details saved successfully.',
+  });
 }
 
 function* saveVendor(
@@ -1121,6 +1186,8 @@ export default function* clientSaga() {
   yield takeLatest(saveClientsDetails.type, saveClientsDetailsSaga);
   yield takeLatest(updateClientsDetails.type, updateClientsDetailsSaga);
   yield takeLatest(getClientsDetails.type, getClientsDetailsSaga);
+  yield takeLatest(getMasterBankList.type, handleGetMasterBankList);
+  yield takeLatest(saveFirmDetails.type, saveFirmDetailsSaga);
 
   yield takeLatest(getReport.type, handleGetRemarkReport);
   yield takeLatest(getLead.type, handleGetLeadProgress);

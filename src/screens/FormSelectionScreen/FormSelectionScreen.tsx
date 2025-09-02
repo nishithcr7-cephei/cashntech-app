@@ -25,7 +25,6 @@ const Strings = {
 
 export const FormSelectionScreen: React.FC<FormSelectionProps> = ({
   navigation,
-  route,
 }) => {
   const currentFormId = useSelector(clientSelector.getClientFormId);
   const onPressFormItem = (item: ListItemProps) => {
@@ -42,6 +41,9 @@ export const FormSelectionScreen: React.FC<FormSelectionProps> = ({
     }
     if (item.screen === 'ClientDetails') {
       navigation.navigate(ClientScreens.ClientDetailForm);
+    }
+    if (item.screen === 'FirmDetails') {
+      navigation.navigate(ClientScreens.FirmDetailForm);
     }
   };
 

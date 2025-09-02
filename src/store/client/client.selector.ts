@@ -3,7 +3,10 @@ import {RootState} from '@store/app/store';
 
 const _selectState = (state: RootState) => state.client;
 
-const getClientLoader = createSelector(_selectState, _state => _state.clientLoader);
+const getClientLoader = createSelector(
+  _selectState,
+  _state => _state.clientLoader,
+);
 const getClientList = createSelector(_selectState, _state => _state.clientList);
 const getClientFormId = createSelector(
   _selectState,
@@ -23,9 +26,22 @@ const getClientsDetailsFormStatus = createSelector(
   _state => _state.isSavedClientsDetails,
 );
 
-const getClientFormData = createSelector(
+const getMasterBankDropdown = createSelector(
   _selectState,
-  _state => _state.clientFormData,
+  _state => _state.masterBankList.map(item => ({
+    label: item.bank_name,
+    value: item.bank_name,
+  })),
+);
+
+const getFirmDetailsFormData = createSelector(
+  _selectState,
+  _state => _state.firmDetails
+);
+
+const getFirmDetailsFormStatus = createSelector(
+  _selectState,
+  _state => _state.isSavedFirmDetails,
 );
 
 const getRemarkReport = createSelector(
@@ -255,8 +271,10 @@ export default {
   getBasicDetailFormData,
   getClientDetailsFormData,
   getClientsDetailsFormStatus,
-  
-  getClientFormData,
+  getFirmDetailsFormData,
+  getMasterBankDropdown,
+  getFirmDetailsFormStatus,
+
   getClientFormId,
   getRemarkReport,
   getLeadProgress,

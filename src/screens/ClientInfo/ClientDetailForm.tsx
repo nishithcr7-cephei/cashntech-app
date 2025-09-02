@@ -25,6 +25,7 @@ import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
 import Toast from 'react-native-toast-message';
+import { ClientScreens } from '@constants/Screens';
 
 export enum ClientType {
   OWNER = 'Owner',
@@ -73,7 +74,7 @@ export const ClientDetailForm = ({navigation}: Props) => {
 
   const handleNext = () => {
     if(isSavedClientsDetails){
-      navigation.navigate('ClientDetailForm');
+      navigation.navigate(ClientScreens.FirmDetailForm);
     }else{
       Toast.show({
         type: 'error',

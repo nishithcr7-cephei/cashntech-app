@@ -6,8 +6,7 @@ import {
   StyleSheet,
   StyleProp,
   ViewStyle,
-  KeyboardAvoidingView,
-  Platform,
+  View,
 } from 'react-native';
 import {Dropdown} from 'react-native-element-dropdown';
 
@@ -37,9 +36,7 @@ export const CustomDropdown = ({
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={[styles.container, containerStyle]}>
+    <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <Dropdown
         style={styles.dropdown}
@@ -59,7 +56,7 @@ export const CustomDropdown = ({
         search={showSearch}
         searchPlaceholder="Search"
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
