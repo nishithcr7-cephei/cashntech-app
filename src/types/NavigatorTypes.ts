@@ -1,7 +1,4 @@
-import {
-  FormTitlesType,
-  FormTypes,
-} from '@screens/CreateClientForm/CreateClientForm.type';
+
 import {Country} from 'react-native-country-picker-modal';
 
 export type AuthNavigatorType = {
@@ -67,13 +64,7 @@ export type ClientNavigatorType = {
   FormSelectionScreen: undefined;
   BasicDetailForm: undefined;
   ClientDetailForm: undefined;
-  CreateClientForm: {
-    screen: FormTypes;
-    title: FormTitlesType;
-    clientId?: number;
-    isEdit?: boolean;
-    fromScreen?: string;
-  };
+  FirmDetailForm: undefined;
   ClientLeadInfoTab: {clientId: number};
   ClientCardReadMore: undefined;
 };

@@ -14,11 +14,10 @@ export const ALL_FORMS = [
 export type ListItemProps = (typeof ALL_FORMS)[number];
 
 export type NavigationType = CompositeScreenProps<
-  NativeStackScreenProps<ClientNavigatorType>,
+  NativeStackScreenProps<ClientNavigatorType, "FormSelectionScreen">,
   DrawerScreenProps<HomeNavigatorType>
 >;
 
 export type FormSelectionProps = {
   navigation: NavigationType['navigation'];
-  route: any;
 };

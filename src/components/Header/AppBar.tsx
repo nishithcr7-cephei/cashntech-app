@@ -9,7 +9,7 @@ import {
   TouchableOpacityProps,
 } from 'react-native';
 import React from 'react';
-import {Colors, DrawerScreens, Fonts} from '@constants/index';
+import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {MenuIcon} from '@assets/Icons';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
@@ -17,7 +17,7 @@ import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 
-export type AppBarProps<TNav = any> = {
+export type AppBarProps = {
   title?: string;
   containerStyle?: StyleProp<ViewStyle>;
   titleTextStyle?: StyleProp<TextStyle>;
@@ -27,10 +27,18 @@ export type AppBarProps<TNav = any> = {
   leftIconProps?: TouchableOpacityProps;
   leftIconContainerStyle?: StyleProp<ViewStyle>;
 
-  navigation?: TNav;
+  navigation?:
+    | DrawerNavigationProp<HomeNavigatorType>
+    | CompositeNavigationProp<
+        NativeStackNavigationProp<
+          ClientNavigatorType,
+          keyof ClientNavigatorType
+        >,
+        DrawerNavigationProp<HomeNavigatorType>
+      >;
 };
 
-export const AppBar = <TNav,>({
+export const AppBar = ({
   title = '',
   containerStyle,
   leftIconContainerStyle,
@@ -39,15 +47,18 @@ export const AppBar = <TNav,>({
   leftIconProps,
   titleTextStyle,
   navigation,
-}: AppBarProps<TNav>) => {
+}: AppBarProps) => {
   return (
     <View style={[styles.container, containerStyle]}>
       <TouchableOpacity
         onPress={() => {
           if (onPressLeftIcon) {
             onPressLeftIcon();
-          } else if (navigation && typeof (navigation as any).openDrawer === 'function') {
-            (navigation as any).openDrawer();
+          } else if (
+            navigation &&
+            typeof navigation?.openDrawer === 'function'
+          ) {
+            navigation.openDrawer();
           }
         }}
         style={[leftIconContainerStyle]}

@@ -25,7 +25,6 @@ const Strings = {
 
 export const FormSelectionScreen: React.FC<FormSelectionProps> = ({
   navigation,
-  route,
 }) => {
   const currentFormId = useSelector(clientSelector.getClientFormId);
   const onPressFormItem = (item: ListItemProps) => {
