@@ -30,6 +30,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
 import {DrawerScreenProps} from 'node_modules/@react-navigation/drawer/lib/typescript/module/src/types';
 import {CompositeScreenProps} from '@react-navigation/native';
+import { ClientScreens } from '@constants/Screens';
 
 // Static Data
 export enum LeadSourceType {
@@ -120,7 +121,7 @@ export const BasicDetailForm = ({navigation}: Props) => {
 
   const handleNext = () => {
     if (clientFormId) {
-      navigation.navigate('ClientDetailForm');
+      navigation.navigate(ClientScreens.ClientDetailForm);
     } else {
       Toast.show({
         type: 'error',

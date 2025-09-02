@@ -3,6 +3,7 @@ import {
   BasicDetailsType,
   ClientsDetailsType,
   ClientState,
+  FirmDetailsType,
   IBankListResponseDatum,
   IBankStatementPayload,
   IClientInfoResponseDatum,
@@ -65,16 +66,33 @@ const clientsDetails: ClientsDetailsType = [
   },
 ];
 
+const firmDetails: FirmDetailsType = {
+  firmType: '',
+  businessVintage: '',
+  sector: '',
+  bankName: '',
+  cibilScore: '',
+  facilityType: '',
+  monthlyTurnover: '',
+  existingFundingSanctionedAmount: '',
+  estimatedFundingRequired: '',
+  creditPeriodOffer: '',
+  createdBy: '',
+};
+
 const initialState: ClientState = {
   // Client Info List screen
   clientLoader: false,
   clientList: [],
   // Client Information Form Data
   clientFormId: undefined,
+  masterBankList: [],
   basicDetails: basicDetails,
+  firmDetails: firmDetails,
 
   clientsDetails: clientsDetails,
   isSavedClientsDetails: false,
+  isSavedFirmDetails: false,
 
   //Remark Report fields
   reportLoader: false,
@@ -207,6 +225,8 @@ const clientSlice = createSlice({
       state.basicDetails = initialState.basicDetails;
       state.clientsDetails = initialState.clientsDetails;
       state.isSavedClientsDetails = initialState.isSavedClientsDetails;
+      state.firmDetails = initialState.firmDetails;
+      state.isSavedFirmDetails = initialState.isSavedFirmDetails;
       state.clientFormId = undefined;
     },
     // Basic Details
@@ -271,6 +291,32 @@ const clientSlice = createSlice({
     },
     getClientsDetails: state => {
       state.clientLoader = true;
+    },
+    // Firm Details
+    getMasterBankList: state => {
+      state.clientLoader = true;
+    },
+    setMasterBankList: (
+      state,
+      action: PayloadAction<Array<{id: number; bank_name: string}>>,
+    ) => {
+      state.clientLoader = false;
+      state.masterBankList = action.payload;
+    },
+    setFirmDetails: (
+      state,
+      action: PayloadAction<Partial<FirmDetailsType>>,
+    ) => {
+      state.firmDetails = {...state.firmDetails, ...action.payload};
+    },
+    clearFirmDetails: state => {
+      state.firmDetails = initialState.firmDetails;
+    },
+    saveFirmDetails: state => {
+      state.clientLoader = true;
+    },
+    setSavedFirmDetails: (state, action: PayloadAction<boolean>) => {
+      state.isSavedFirmDetails = action.payload;
     },
 
     // Set Client Form Data,
@@ -799,7 +845,15 @@ export const {
   getClientsDetails,
   updateClientsDetails,
 
+  getMasterBankList,
+  setMasterBankList,
+  setFirmDetails,
+  clearFirmDetails,
+  saveFirmDetails,
+  setSavedFirmDetails,
+
   resetAllClientFormData,
+
   saveVendorDetails,
   saveVisitDetails,
   getReport,

@@ -26,19 +26,19 @@ import {clientActions, clientSelector, FirmDetailsType} from '@store/client';
 import Toast from 'react-native-toast-message';
 
 export enum FirmType {
-  CHARITY = 'Charity',
-  EDUCATIONAL_INSTITUTE = 'Educational institute',
-  GOVERNMENT = 'Government',
-  HUF = ' HUF',
-  INDIVIDUAL_SALARIED = 'Individual/Salaried',
-  LIMITED_LIABILITY_PARTNERSHIP = 'Limited liability Partnership',
+  CHARITY = 'CHARITY',
+  EDUCATIONAL_INSTITUTE = 'EDUCATIONAL_INSTITUTE',
+  GOVERNMENT = 'GOVERNMENT',
+  HUF = 'HUF',
+  INDIVIDUAL_SALARIED = 'INDIVIDUAL/SALARIED',
+  LIMITED_LIABILITY_PARTNERSHIP = 'LIMITED LIABILITY PARTNERSHIP',
   MNC = 'MNC',
-  NON_GOVERNMENT_ORGANIZATION = 'Non Government Organization',
+  NON_GOVERNMENT_ORGANIZATION = 'NON GOVERNMENT ORGANIZATION',
   PARTNERSHIP = 'Partnership',
   PRIVATE_LTD = 'Private Ltd',
-  PROPRIETERSHIP = 'Proprietership',
+  PROPRIETORSHIP = 'Proprietorship',
   PUBLIC_LTD = 'Public Ltd',
-  TRUST = 'Trust',
+  TRUST = 'TRUST',
 }
 
 export enum SectorType {
@@ -57,6 +57,13 @@ export enum FacilityType {
   OTHERS = 'Others',
 }
 
+export enum CreditPeriodOffer {
+  DAYS_30 = '30',
+  DAYS_45 = '45',
+  DAYS_60 = '60',
+  DAYS_90 = '90',
+}
+
 const listOfFirmTypes = Object.values(FirmType).map(item => ({
   label: item,
   value: item,
@@ -68,6 +75,11 @@ const listOfSectors = Object.values(SectorType).map(item => ({
 }));
 
 const listOfFacilityTypes = Object.values(FacilityType).map(item => ({
+  label: item,
+  value: item,
+}));
+
+const listOfCreditPeriodOffer = Object.values(CreditPeriodOffer).map(item => ({
   label: item,
   value: item,
 }));
@@ -96,6 +108,9 @@ export const FirmDetailForm = ({navigation}: Props) => {
     creditPeriodOffer,
   } = useSelector(clientSelector.getFirmDetailsFormData);
   const firmLoader = useSelector(clientSelector.getClientLoader);
+  const isSavedFirmDetails = useSelector(
+    clientSelector.getFirmDetailsFormStatus,
+  );
 
   function setData<T>(field: keyof FirmDetailsType, value: T) {
     dispatch(clientActions.setFirmDetails({[field]: value}));
@@ -106,19 +121,19 @@ export const FirmDetailForm = ({navigation}: Props) => {
   };
 
   const handleSave = () => {
-    // dispatch(clientActions.saveFirmDetails());
+    dispatch(clientActions.saveFirmDetails());
   };
 
   const handleNext = () => {
-    // if (clientFormId) {
-    //   navigation.navigate('VendorDetailForm');
-    // } else {
-    Toast.show({
-      type: 'error',
-      text1: 'Error',
-      text2: 'Please save the form before proceeding to next step.',
-    });
-    // }
+    if (isSavedFirmDetails) {
+      // navigation.navigate('VendorDetailForm');
+    } else {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please save the form before proceeding to next step.',
+      });
+    }
   };
 
   return (
@@ -190,11 +205,12 @@ export const FirmDetailForm = ({navigation}: Props) => {
             value={estimatedFundingRequired}
             onChangeText={value => setData('estimatedFundingRequired', value)}
           />
-          <Input
+          <CustomDropdown
             label="Credit Period Offer (In Days)"
-            placeholder="Enter Credit Period"
+            data={listOfCreditPeriodOffer}
             value={creditPeriodOffer}
-            onChangeText={value => setData('creditPeriodOffer', value)}
+            dropdownPosition='top'
+            onChange={value => setData('creditPeriodOffer', value)}
           />
         </View>
       </KeyboardAvoidingScrollView>

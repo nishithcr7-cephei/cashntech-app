@@ -11,9 +11,12 @@ export type ClientState = {
   clientList: Array<IClientInfoResponseDatum>;
   basicDetails: BasicDetailsType;
   clientsDetails: ClientsDetailsType;
+  firmDetails: FirmDetailsType;
 
   clientFormId: number | undefined;
+  masterBankList: Array<{id: number; bank_name: string}>;
   isSavedClientsDetails: boolean;
+  isSavedFirmDetails: boolean;
 
   reportLoader: boolean;
   reportList: Array<IRemarkReportResponseDatum>;
@@ -146,13 +149,27 @@ export type BasicDetailsType = {
 
 export type ClientsDetailsType = Array<{
   key: string;
-  id: number | undefined; 
+  id: number | undefined;
   clientType: string;
   nameOfClient: string;
   contactNumber: string;
   email: string;
   createdBy: string;
 }>;
+
+export type FirmDetailsType = {
+  firmType: string;
+  businessVintage: string;
+  sector: string;
+  bankName: string;
+  cibilScore: string;
+  facilityType: string;
+  monthlyTurnover: string;
+  existingFundingSanctionedAmount: string;
+  estimatedFundingRequired: string;
+  creditPeriodOffer: string;
+  createdBy: string;
+};
 
 export interface ClientsDetailsResponseType {
   statusCode: number;
@@ -166,6 +183,14 @@ export interface ClientsDetailsResponseType {
   }>;
   message: string;
 }
+
+export type MasterBankResponse = {
+  statusCode: number;
+  data: Array<{
+    id: number;
+    bank_name: string;
+  }>;
+};
 
 export type ClientFormPayload =
   | {
@@ -291,13 +316,13 @@ export type IBasicDetailsPayload = {
   clientId?: number;
 };
 
-export type IBasicDetailsResponse = {
+export type BasicDetailsResponse = {
   statusCode: number;
   message: string;
   data: number;
 };
 
-export type IClientsDetailsPayload = Array<{
+export type ClientsDetailsPayload = Array<{
   client_type: string;
   name_of_client: string;
   contact_number: string;
@@ -305,6 +330,20 @@ export type IClientsDetailsPayload = Array<{
   created_by: string;
   client_detail_id?: number;
 }>;
+
+export type FirmDetailsPayload = {
+  firm_type: string;
+  business_vintage: string;
+  sector: string;
+  bank_name: string;
+  cibil_score: number;
+  monthly_turnover: number;
+  facility_type: string;
+  existing_funding_sanctioned_amount: number;
+  estimated_funding_required: number;
+  credit_period_offer: number;
+  created_by: string;
+};
 
 export type IvendorPayload = {
   product_category: string;
