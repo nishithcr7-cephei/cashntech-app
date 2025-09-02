@@ -2,11 +2,10 @@ import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {
   ClientInfo,
-  ClientLeadInfoTab,
   FormSelectionScreen,
-  CreateClientForm,
   BasicDetailForm,
   ClientDetailForm,
+  FirmDetailForm,
 } from '@screens/index';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
 import {ClientScreens} from '@constants/Screens';
@@ -30,11 +29,9 @@ export const ClientNavigator = () => {
         component={ClientDetailForm}
       />
       <Stack.Screen
-        name={ClientScreens.CreateClientForm}
-        component={CreateClientForm}
+        name={ClientScreens.FirmDetailForm}
+        component={FirmDetailForm}
       />
-
-      <Stack.Screen name="ClientLeadInfoTab" component={ClientLeadInfoTab} />
     </Stack.Navigator>
   );
 };

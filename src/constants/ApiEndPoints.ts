@@ -11,11 +11,15 @@ const Endpoints = {
   // TODO
   apiResendOtp: '/auth/resend-otp',
 
+  // Bank List
+  apiGetMasterBank: '/client-info-master/bankmaster-list',
+
   // Client apis
   apiGetAllClients: '/client-info-master/list',
   apiSaveBasicDetails: '/client-info-master/basic-details',
   apiSaveClientsDetails: '/client-info-master/client-details/',
   apiGetClientsDetails: 'client-info-master/details/',
+  apiSaveFirmDetails: `/client-info-master/client-firm-details`,
   apiSaveVendorDetails: (clientId: string) =>
     `/client-info-master/vendor-details/${clientId}`,
   apiSaveVisitDetails: (clientId: string) =>
