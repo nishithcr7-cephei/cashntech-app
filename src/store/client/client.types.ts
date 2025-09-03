@@ -1,10 +1,5 @@
 import Cities from '@constants/Cities';
-import {
-  BasicDetailsNames,
-  ClientFirmNames,
-  VendorNames,
-  VisitNames,
-} from '@screens/CreateClientForm/CreateClientForm.type';
+import { ProductCategory } from '@screens/index';
 
 export type ClientState = {
   clientLoader: boolean;
@@ -12,6 +7,7 @@ export type ClientState = {
   basicDetails: BasicDetailsType;
   clientsDetails: ClientsDetailsType;
   firmDetails: FirmDetailsType;
+  vendorDetails: VendorDetailsType;
 
   clientFormId: number | undefined;
   masterBankList: Array<{id: number; bank_name: string}>;
@@ -171,6 +167,19 @@ export type FirmDetailsType = {
   createdBy: string;
 };
 
+export type VendorDetailsType = Array<{
+  key: string;
+  productCategory: ProductCategory;
+  productType: string;
+  vendorName: string;
+  address: string;
+  state: keyof typeof Cities | undefined;
+  city: string;
+  pinCode: string;
+  vendorContactNumber: string;
+  monthlySalesValue: string;
+}>;
+
 export interface ClientsDetailsResponseType {
   statusCode: number;
   data: Array<{
@@ -191,28 +200,6 @@ export type MasterBankResponse = {
     bank_name: string;
   }>;
 };
-
-export type ClientFormPayload =
-  | {
-      formName: 'BasicDetails';
-      name: BasicDetailsNames;
-      value: string;
-    }
-  | {
-      formName: 'ClientFirmScreen';
-      name: ClientFirmNames;
-      value: string | string[];
-    }
-  | {
-      formName: 'VendorScreen';
-      name: VendorNames;
-      value: string;
-    }
-  | {
-      formName: 'VisitScreen';
-      name: VisitNames;
-      value: string;
-    };
 
 export interface IClientInfoSuccessResponse {
   statusCode: number;
@@ -301,7 +288,7 @@ export interface ITaskHistoryResponseDatum {
   client: number;
 }
 
-export type IBasicDetailsPayload = {
+export type BasicDetailsPayload = {
   source_of_lead: string;
   created_by: string;
   userId: number;

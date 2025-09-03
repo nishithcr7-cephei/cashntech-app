@@ -4,7 +4,7 @@ import {Api} from '.';
 import Endpoints from '@constants/ApiEndPoints';
 // Types
 import {
-  IBasicDetailsPayload,
+  BasicDetailsPayload,
   IBankListResponse,
   BasicDetailsResponse,
   IClientInfoSuccessResponse,
@@ -163,7 +163,7 @@ const getTaskHistory = async () => {
 };
 
 // Form APIs
-const saveBasicDetailForm = async (body: IBasicDetailsPayload) => {
+const saveBasicDetailForm = async (body: BasicDetailsPayload) => {
   const {data, error} = await tryCatch<AxiosResponse<BasicDetailsResponse>>(
     Api.post(Endpoints.apiSaveBasicDetails, body, {
       authRequired: true,

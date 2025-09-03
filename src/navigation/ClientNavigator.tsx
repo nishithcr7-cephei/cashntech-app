@@ -6,6 +6,7 @@ import {
   BasicDetailForm,
   ClientDetailForm,
   FirmDetailForm,
+  VendorDetailForm,
 } from '@screens/index';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
 import {ClientScreens} from '@constants/Screens';
@@ -31,6 +32,10 @@ export const ClientNavigator = () => {
       <Stack.Screen
         name={ClientScreens.FirmDetailForm}
         component={FirmDetailForm}
+      />
+      <Stack.Screen
+        name={ClientScreens.VendorDetailForm}
+        component={VendorDetailForm}
       />
     </Stack.Navigator>
   );

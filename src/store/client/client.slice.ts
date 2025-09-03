@@ -39,6 +39,7 @@ import {
   IUploadShareholdingResponse,
   IUploadUdhyamPayload,
   IUploadUdhyamResponse,
+  VendorDetailsType,
 } from './client.types';
 import {PayloadWithCallback} from '@type/global.types';
 
@@ -80,6 +81,21 @@ const firmDetails: FirmDetailsType = {
   createdBy: '',
 };
 
+const vendorDetails: VendorDetailsType = [
+  {
+    key: Math.random().toString(36).substring(7),
+    vendorName: '',
+    address: '',
+    city: '',
+    pinCode: '',
+    productCategory: '',
+    productType: '',
+    state: '',
+    vendorContactNumber: '',
+    monthlySalesValue: '',
+  },
+];
+
 const initialState: ClientState = {
   // Client Info List screen
   clientLoader: false,
@@ -89,6 +105,7 @@ const initialState: ClientState = {
   masterBankList: [],
   basicDetails: basicDetails,
   firmDetails: firmDetails,
+  vendorDetails: vendorDetails,
 
   clientsDetails: clientsDetails,
   isSavedClientsDetails: false,
@@ -317,6 +334,38 @@ const clientSlice = createSlice({
     },
     setSavedFirmDetails: (state, action: PayloadAction<boolean>) => {
       state.isSavedFirmDetails = action.payload;
+    },
+    // Vendor Details
+    setVendorDetails: (
+      state,
+      action: PayloadAction<[Partial<VendorDetailsType[number]>, number]>,
+    ) => {
+      const [data, index] = action.payload;
+      let existingVendor = state.vendorDetails[index];
+      existingVendor = {...existingVendor, ...data};
+      state.vendorDetails[index] = existingVendor;
+    },
+    clearVendorDetails: state => {
+      state.vendorDetails = initialState.vendorDetails;
+    },
+    addNewVendorDetails: state => {
+      state.vendorDetails.push({
+        key: Math.random().toString(36).substring(7),
+        productCategory: '',
+        productType: '',
+        vendorName: '',
+        address: '',
+        state: '',
+        city: '',
+        pinCode: '',
+        monthlySalesValue: '',
+        vendorContactNumber: '',
+      });
+    },
+    removeVendorDetails: (state, action: PayloadAction<string>) => {
+      state.vendorDetails = state.vendorDetails.filter(
+        vendor => vendor.key !== action.payload,
+      );
     },
 
     // Set Client Form Data,
@@ -851,6 +900,11 @@ export const {
   clearFirmDetails,
   saveFirmDetails,
   setSavedFirmDetails,
+
+  setVendorDetails,
+  clearVendorDetails,
+  addNewVendorDetails,
+  removeVendorDetails,
 
   resetAllClientFormData,
 

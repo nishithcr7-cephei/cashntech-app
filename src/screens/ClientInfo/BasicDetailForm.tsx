@@ -6,7 +6,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {
   AppBar,
   Container,
@@ -30,7 +30,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
 import {DrawerScreenProps} from 'node_modules/@react-navigation/drawer/lib/typescript/module/src/types';
 import {CompositeScreenProps} from '@react-navigation/native';
-import { ClientScreens } from '@constants/Screens';
+import {ClientScreens} from '@constants/Screens';
 
 // Static Data
 export enum LeadSourceType {
@@ -99,6 +99,10 @@ export const BasicDetailForm = ({navigation}: Props) => {
   function setData<T>(field: keyof BasicDetailsType, value: T) {
     dispatch(clientActions.setBasicDetails({[field]: value}));
   }
+
+  useEffect(() => {
+    setData('city', '');
+  }, [state]);
 
   const listOfCities = useMemo(() => {
     if (state) {

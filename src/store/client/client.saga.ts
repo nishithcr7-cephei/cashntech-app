@@ -88,7 +88,7 @@ import {
   IUploadCompanyInfoPayload,
   IUploadCompanyInfoResponse,
   ISoftSanctionResponse,
-  IBasicDetailsPayload,
+  BasicDetailsPayload,
   IVisitPayload,
   IFilterPayload,
   IBankStatementPayload,
@@ -203,7 +203,7 @@ function* saveBasicDetails(): unknown {
     clientSelector.getBasicDetailFormData,
   );
   const {id, first_name, last_name} = yield select(userSelector.getUserInfo);
-  const body: IBasicDetailsPayload = {
+  const body: BasicDetailsPayload = {
     source_of_lead: basicDetailForm.sourceOfLead,
     location: encryptUtility(basicDetailForm.location),
     city: encryptUtility(basicDetailForm.city),
@@ -241,7 +241,7 @@ function* updateBasicDetails(): unknown {
   );
   const {id, first_name, last_name} = yield select(userSelector.getUserInfo);
   const clientId = yield select(clientSelector.getClientFormId);
-  const body: IBasicDetailsPayload = {
+  const body: BasicDetailsPayload = {
     source_of_lead: basicDetailForm.sourceOfLead,
     location: encryptUtility(basicDetailForm.location),
     city: encryptUtility(basicDetailForm.city),
