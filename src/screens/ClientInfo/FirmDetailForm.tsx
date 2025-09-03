@@ -24,6 +24,7 @@ import {ClientNavigatorType} from '@type/NavigatorTypes';
 import {useDispatch, useSelector} from 'react-redux';
 import {clientActions, clientSelector, FirmDetailsType} from '@store/client';
 import Toast from 'react-native-toast-message';
+import { ClientScreens } from '@constants/Screens';
 
 export enum FirmType {
   CHARITY = 'CHARITY',
@@ -126,7 +127,7 @@ export const FirmDetailForm = ({navigation}: Props) => {
 
   const handleNext = () => {
     if (isSavedFirmDetails) {
-      // navigation.navigate('VendorDetailForm');
+      navigation.navigate(ClientScreens.VendorDetailForm);
     } else {
       Toast.show({
         type: 'error',

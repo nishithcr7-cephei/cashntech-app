@@ -39,6 +39,7 @@ import {
   IUploadShareholdingResponse,
   IUploadUdhyamPayload,
   IUploadUdhyamResponse,
+  VendorDetailsType,
 } from './client.types';
 import {PayloadWithCallback} from '@type/global.types';
 
@@ -80,6 +81,21 @@ const firmDetails: FirmDetailsType = {
   createdBy: '',
 };
 
+const vendorDetails: VendorDetailsType = [
+  {
+    key: Math.random().toString(36).substring(7),
+    vendorName: '',
+    address: '',
+    city: '',
+    pinCode: '',
+    productCategory: undefined,
+    productType: '',
+    state: undefined,
+    vendorContactNumber: '',
+    monthlySalesValue: '',
+  },
+];
+
 const initialState: ClientState = {
   // Client Info List screen
   clientLoader: false,
@@ -89,10 +105,12 @@ const initialState: ClientState = {
   masterBankList: [],
   basicDetails: basicDetails,
   firmDetails: firmDetails,
+  vendorDetails: vendorDetails,
 
   clientsDetails: clientsDetails,
   isSavedClientsDetails: false,
   isSavedFirmDetails: false,
+  isSavedVendorDetails: false,
 
   //Remark Report fields
   reportLoader: false,
@@ -227,6 +245,8 @@ const clientSlice = createSlice({
       state.isSavedClientsDetails = initialState.isSavedClientsDetails;
       state.firmDetails = initialState.firmDetails;
       state.isSavedFirmDetails = initialState.isSavedFirmDetails;
+      state.vendorDetails = initialState.vendorDetails;
+      state.isSavedVendorDetails = initialState.isSavedVendorDetails;
       state.clientFormId = undefined;
     },
     // Basic Details
@@ -280,7 +300,7 @@ const clientSlice = createSlice({
     clearClientDetails: state => {
       state.clientDetails = initialState.clientDetails;
     },
-    setSavedClientsDetails: (state, action: PayloadAction<boolean>) => {
+    setSavedClientsDetailsStatus: (state, action: PayloadAction<boolean>) => {
       state.isSavedClientsDetails = action.payload;
     },
     saveClientsDetails: state => {
@@ -315,17 +335,49 @@ const clientSlice = createSlice({
     saveFirmDetails: state => {
       state.clientLoader = true;
     },
-    setSavedFirmDetails: (state, action: PayloadAction<boolean>) => {
+    setSavedFirmDetailsStatus: (state, action: PayloadAction<boolean>) => {
       state.isSavedFirmDetails = action.payload;
+    },
+    // Vendor Details
+    setVendorDetails: (
+      state,
+      action: PayloadAction<[Partial<VendorDetailsType[number]>, number]>,
+    ) => {
+      const [data, index] = action.payload;
+      let existingVendor = state.vendorDetails[index];
+      existingVendor = {...existingVendor, ...data};
+      state.vendorDetails[index] = existingVendor;
+    },
+    clearVendorDetails: state => {
+      state.vendorDetails = initialState.vendorDetails;
+    },
+    addNewVendorDetails: state => {
+      state.vendorDetails.push({
+        key: Math.random().toString(36).substring(7),
+        productCategory: '',
+        productType: '',
+        vendorName: '',
+        address: '',
+        state: '',
+        city: '',
+        pinCode: '',
+        monthlySalesValue: '',
+        vendorContactNumber: '',
+      });
+    },
+    removeVendorDetails: (state, action: PayloadAction<string>) => {
+      state.vendorDetails = state.vendorDetails.filter(
+        vendor => vendor.key !== action.payload,
+      );
+    },
+    saveVendorDetails: state => {
+      state.clientLoader = false;
+    },
+    setSavedVendorDetailsStatus: (state, action: PayloadAction<boolean>) => {
+      state.isSavedVendorDetails = action.payload;
     },
 
     // Set Client Form Data,
-    saveVendorDetails: (
-      state,
-      _action: PayloadAction<{clientId: string; vendors: any[]}>,
-    ) => {
-      state.clientLoader = false;
-    },
     saveVisitDetails: state => {
       state.clientLoader = false;
     },
@@ -837,7 +889,7 @@ export const {
 
   setAllClientsDetails,
   setClientsDetails,
-  setSavedClientsDetails,
+  setSavedClientsDetailsStatus,
   addNewClientDetails,
   removeClientDetails,
   clearClientDetails,
@@ -850,11 +902,17 @@ export const {
   setFirmDetails,
   clearFirmDetails,
   saveFirmDetails,
-  setSavedFirmDetails,
+  setSavedFirmDetailsStatus,
+
+  setVendorDetails,
+  clearVendorDetails,
+  addNewVendorDetails,
+  removeVendorDetails,
+  saveVendorDetails,
+  setSavedVendorDetailsStatus,
 
   resetAllClientFormData,
 
-  saveVendorDetails,
   saveVisitDetails,
   getReport,
   setReportList,

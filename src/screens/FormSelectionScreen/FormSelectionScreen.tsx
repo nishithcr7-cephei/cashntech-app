@@ -45,6 +45,9 @@ export const FormSelectionScreen: React.FC<FormSelectionProps> = ({
     if (item.screen === 'FirmDetails') {
       navigation.navigate(ClientScreens.FirmDetailForm);
     }
+    if (item.screen === 'VendorDetails') {
+      navigation.navigate(ClientScreens.VendorDetailForm);
+    }
   };
 
   return (

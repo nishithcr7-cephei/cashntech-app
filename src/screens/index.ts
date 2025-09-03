@@ -10,6 +10,7 @@ export * from './ClientInfo/ClientInfo';
 export * from './ClientInfo/BasicDetailForm';
 export * from './ClientInfo/ClientDetailForm';
 export * from './ClientInfo/FirmDetailForm';
+export * from './ClientInfo/VendorDetailForm';
 
 export * from './ClientLeadInfoTabs/ClientLeadInfoTab';
 export * from './CompanyDocuments/CompanyDocument';

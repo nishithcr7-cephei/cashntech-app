@@ -1,10 +1,5 @@
 import Cities from '@constants/Cities';
-import {
-  BasicDetailsNames,
-  ClientFirmNames,
-  VendorNames,
-  VisitNames,
-} from '@screens/CreateClientForm/CreateClientForm.type';
+import {ProductCategory} from '@screens/index';
 
 export type ClientState = {
   clientLoader: boolean;
@@ -12,11 +7,13 @@ export type ClientState = {
   basicDetails: BasicDetailsType;
   clientsDetails: ClientsDetailsType;
   firmDetails: FirmDetailsType;
+  vendorDetails: VendorDetailsType;
 
   clientFormId: number | undefined;
   masterBankList: Array<{id: number; bank_name: string}>;
   isSavedClientsDetails: boolean;
   isSavedFirmDetails: boolean;
+  isSavedVendorDetails: boolean;
 
   reportLoader: boolean;
   reportList: Array<IRemarkReportResponseDatum>;
@@ -171,6 +168,19 @@ export type FirmDetailsType = {
   createdBy: string;
 };
 
+export type VendorDetailsType = Array<{
+  key: string;
+  productCategory: ProductCategory | undefined;
+  productType: string;
+  vendorName: string;
+  address: string;
+  state: keyof typeof Cities | undefined;
+  city: string;
+  pinCode: string;
+  vendorContactNumber: string;
+  monthlySalesValue: string;
+}>;
+
 export interface ClientsDetailsResponseType {
   statusCode: number;
   data: Array<{
@@ -192,27 +202,17 @@ export type MasterBankResponse = {
   }>;
 };
 
-export type ClientFormPayload =
-  | {
-      formName: 'BasicDetails';
-      name: BasicDetailsNames;
-      value: string;
-    }
-  | {
-      formName: 'ClientFirmScreen';
-      name: ClientFirmNames;
-      value: string | string[];
-    }
-  | {
-      formName: 'VendorScreen';
-      name: VendorNames;
-      value: string;
-    }
-  | {
-      formName: 'VisitScreen';
-      name: VisitNames;
-      value: string;
-    };
+export type VendorDetailsPayload = Array<{
+  product_category: string;
+  product_type: string;
+  vendor_name: string;
+  address: string;
+  city: string;
+  state: string;
+  pin_code: string;
+  vendor_contact_number: string;
+  monthly_sales_value: number;
+}>;
 
 export interface IClientInfoSuccessResponse {
   statusCode: number;
@@ -301,7 +301,7 @@ export interface ITaskHistoryResponseDatum {
   client: number;
 }
 
-export type IBasicDetailsPayload = {
+export type BasicDetailsPayload = {
   source_of_lead: string;
   created_by: string;
   userId: number;
@@ -343,38 +343,6 @@ export type FirmDetailsPayload = {
   estimated_funding_required: number;
   credit_period_offer: number;
   created_by: string;
-};
-
-export type IvendorPayload = {
-  product_category: string;
-  product_type: string;
-  vendor_name: string;
-  address: string;
-  city: string;
-  state: string;
-  pin_code: string;
-  vendor_contact_number: string;
-  monthly_sales_value: number;
-};
-
-export type IVendorResponse = {
-  statusCode: number;
-  message: string;
-  data: IVendorResponseDatum[];
-};
-
-export type IVendorResponseDatum = {
-  id: number;
-  product_category: string;
-  product_type: string;
-  vendor_name: string;
-  address: string;
-  city: string;
-  state: string;
-  pin_code: string;
-  vendor_contact_number: string;
-  monthly_sales_value: number;
-  client: Client;
 };
 
 export type Client = {

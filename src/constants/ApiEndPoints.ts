@@ -20,8 +20,7 @@ const Endpoints = {
   apiSaveClientsDetails: '/client-info-master/client-details/',
   apiGetClientsDetails: 'client-info-master/details/',
   apiSaveFirmDetails: `/client-info-master/client-firm-details/`,
-  apiSaveVendorDetails: (clientId: string) =>
-    `/client-info-master/vendor-details/${clientId}`,
+  apiSaveVendorDetails: `/client-info-master/vendor-details/`,
   apiSaveVisitDetails: (clientId: string) =>
     `/client-info-master/follow-up/${clientId}`,
   apiDeleteClient: (clientId: string | number) =>

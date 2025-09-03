@@ -7,8 +7,8 @@ export const ALL_FORMS = [
   {title: 'Basic Details', screen: 'BasicDetails'},
   {title: 'Client Details', screen: 'ClientDetails'},
    {title: 'Firm Details', screen: 'FirmDetails'},
-  {title: 'Vendor Details', screen: 'VendorScreen'},
-  {title: 'Visit Details', screen: 'VisitScreen'},
+  {title: 'Vendor Details', screen: 'VendorDetails'},
+  {title: 'Visit Details', screen: 'VisitDetails'},
 ] as const;
 
 export type ListItemProps = (typeof ALL_FORMS)[number];

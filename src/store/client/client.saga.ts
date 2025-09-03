@@ -66,7 +66,6 @@ import {
   ITaskHistoryResponse,
   IUploadKycDocumentPayload,
   IUploadKycDocumentResponse,
-  IVendorResponse,
   IvisitResponse,
   IKycCheckedResponse,
   IUploadPanDocumentsPayload,
@@ -88,7 +87,7 @@ import {
   IUploadCompanyInfoPayload,
   IUploadCompanyInfoResponse,
   ISoftSanctionResponse,
-  IBasicDetailsPayload,
+  BasicDetailsPayload,
   IVisitPayload,
   IFilterPayload,
   IBankStatementPayload,
@@ -110,9 +109,11 @@ import {
   MasterBankResponse,
   FirmDetailsType,
   FirmDetailsPayload,
+  VendorDetailsType,
+  VendorDetailsPayload,
 } from './client.types';
 import Toast from 'react-native-toast-message';
-import {userSelector} from '@store/user';
+import {userSelector, UserState} from '@store/user';
 import {AxiosError} from 'axios';
 import {decryptUtility, encryptUtility} from '@utils/crypto';
 
@@ -202,8 +203,10 @@ function* saveBasicDetails(): unknown {
   const basicDetailForm: BasicDetailsType = yield select(
     clientSelector.getBasicDetailFormData,
   );
-  const {id, first_name, last_name} = yield select(userSelector.getUserInfo);
-  const body: IBasicDetailsPayload = {
+  const {id, first_name, last_name}: UserState = yield select(
+    userSelector.getUserInfo,
+  );
+  const body: BasicDetailsPayload = {
     source_of_lead: basicDetailForm.sourceOfLead,
     location: encryptUtility(basicDetailForm.location),
     city: encryptUtility(basicDetailForm.city),
@@ -239,9 +242,11 @@ function* updateBasicDetails(): unknown {
   const basicDetailForm: BasicDetailsType = yield select(
     clientSelector.getBasicDetailFormData,
   );
-  const {id, first_name, last_name} = yield select(userSelector.getUserInfo);
+  const {id, first_name, last_name}: UserState = yield select(
+    userSelector.getUserInfo,
+  );
   const clientId = yield select(clientSelector.getClientFormId);
-  const body: IBasicDetailsPayload = {
+  const body: BasicDetailsPayload = {
     source_of_lead: basicDetailForm.sourceOfLead,
     location: encryptUtility(basicDetailForm.location),
     city: encryptUtility(basicDetailForm.city),
@@ -277,7 +282,9 @@ function* saveClientsDetailsSaga(): unknown {
   const clientDetails: ClientsDetailsType = yield select(
     clientSelector.getClientDetailsFormData,
   );
-  const {first_name, last_name} = yield select(userSelector.getUserInfo);
+  const {first_name, last_name}: UserState = yield select(
+    userSelector.getUserInfo,
+  );
   const clientId = yield select(clientSelector.getClientFormId);
   const body: ClientsDetailsPayload = clientDetails.map(client => ({
     client_type: client.clientType,
@@ -303,7 +310,7 @@ function* saveClientsDetailsSaga(): unknown {
   }
   yield put(clientActions.getClientsDetails());
   yield put(clientActions.setClientLoader(false));
-  yield put(clientActions.setSavedClientsDetails(true));
+  yield put(clientActions.setSavedClientsDetailsStatus(true));
   Toast.show({
     type: 'success',
     text1: data.message || 'Client details saved successfully.',
@@ -314,7 +321,9 @@ function* updateClientsDetailsSaga(): unknown {
   const clientDetails: ClientsDetailsType = yield select(
     clientSelector.getClientDetailsFormData,
   );
-  const {first_name, last_name} = yield select(userSelector.getUserInfo);
+  const {first_name, last_name}: UserState = yield select(
+    userSelector.getUserInfo,
+  );
   const clientId = yield select(clientSelector.getClientFormId);
   const body: ClientsDetailsPayload = clientDetails.map(client => ({
     client_type: client.clientType,
@@ -342,7 +351,7 @@ function* updateClientsDetailsSaga(): unknown {
   }
   yield put(clientActions.getClientsDetails());
   yield put(clientActions.setClientLoader(false));
-  yield put(clientActions.setSavedClientsDetails(true));
+  yield put(clientActions.setSavedClientsDetailsStatus(true));
   Toast.show({
     type: 'success',
     text1: data.message || 'Client details updated successfully.',
@@ -351,7 +360,9 @@ function* updateClientsDetailsSaga(): unknown {
 
 function* getClientsDetailsSaga(): unknown {
   const clientId = yield select(clientSelector.getClientFormId);
-  const {first_name, last_name} = yield select(userSelector.getUserInfo);
+  const {first_name, last_name}: UserState = yield select(
+    userSelector.getUserInfo,
+  );
   const {
     data,
     error,
@@ -402,7 +413,9 @@ function* handleGetMasterBankList(): unknown {
 
 function* saveFirmDetailsSaga(): unknown {
   const clientId = yield select(clientSelector.getClientFormId);
-  const {first_name, last_name} = yield select(userSelector.getUserInfo);
+  const {first_name, last_name}: UserState = yield select(
+    userSelector.getUserInfo,
+  );
   const firmDetails: FirmDetailsType = yield select(
     clientSelector.getFirmDetailsFormData,
   );
@@ -435,39 +448,50 @@ function* saveFirmDetailsSaga(): unknown {
     return;
   }
   yield put(clientActions.setClientLoader(false));
+  yield put(clientActions.setSavedFirmDetailsStatus(true));
   Toast.show({
     type: 'success',
     text1: 'Firm details saved successfully.',
   });
 }
 
-function* saveVendor(
-  action: PayloadAction<{clientId: string; vendors: any[]}>,
-): unknown {
-  try {
-    const {clientId, vendors} = action.payload;
-    const {data, error}: Result<IVendorResponse> = yield call(
-      ClientApis.saveVendorForm,
-      String(clientId),
-      vendors,
-    );
-    if (!error) {
-      Toast.show({
-        type: 'success',
-        text1: 'Vendor Details Save successfully',
-      });
-    } else {
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to save vendors.',
-      });
-    }
-  } catch (error) {
+function* saveVendorDetailsSaga(): unknown {
+  const clientId = yield select(clientSelector.getClientFormId);
+  const vendorDetails: VendorDetailsType = yield select(
+    clientSelector.getVendorDetailsFormData,
+  );
+  const body: VendorDetailsPayload = vendorDetails.map(vendor => ({
+    product_category: vendor.productCategory ?? '',
+    product_type: vendor.productType,
+    vendor_name: vendor.vendorName,
+    address: encryptUtility(vendor.address),
+    city: encryptUtility(vendor.city),
+    state: encryptUtility(vendor.state ?? ''),
+    pin_code: vendor.pinCode,
+    vendor_contact_number: vendor.vendorContactNumber,
+    monthly_sales_value: Number(vendor.monthlySalesValue),
+  }));
+  const {
+    error,
+  }: Result<
+    {statusCode: number; message: string},
+    AxiosError<{message?: string}>
+  > = yield call(ClientApis.saveVendorDetailsForm, clientId, body);
+  if (error) {
     Toast.show({
       type: 'error',
-      text1: 'Failed to save vendors.',
+      text1:
+        error.response?.data?.message ||
+        'Failed to save/update vendor details.',
     });
+    return;
   }
+  yield put(clientActions.setClientLoader(false));
+  yield put(clientActions.setSavedVendorDetailsStatus(true));
+  Toast.show({
+    type: 'success',
+    text1: 'Vendor details saved/updated successfully.',
+  });
 }
 
 function* savevisit(): unknown {
@@ -1188,13 +1212,13 @@ export default function* clientSaga() {
   yield takeLatest(getClientsDetails.type, getClientsDetailsSaga);
   yield takeLatest(getMasterBankList.type, handleGetMasterBankList);
   yield takeLatest(saveFirmDetails.type, saveFirmDetailsSaga);
+  yield takeLatest(saveVendorDetails.type, saveVendorDetailsSaga);
 
   yield takeLatest(getReport.type, handleGetRemarkReport);
   yield takeLatest(getLead.type, handleGetLeadProgress);
   yield takeLatest(getLeadDesciption.type, handleGetLeadDesProgress);
   yield takeLatest(getTaskHistory.type, handleGetTaskHistory);
 
-  yield takeLatest(saveVendorDetails.type, saveVendor);
   yield takeLatest(saveVisitDetails.type, savevisit);
   yield takeLatest(uploadKycRequest.type, handleUploadKyc);
   yield takeLatest(uploadPanRequest.type, handleUploadPan);
