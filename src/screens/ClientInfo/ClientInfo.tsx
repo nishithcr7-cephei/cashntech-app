@@ -213,6 +213,7 @@ export const ClientInfo: React.FC<ClientInfoProps> = ({navigation}) => {
                     onChangeText={setSearchQuery}
                   />
                 </View>
+
                 <TouchableOpacity onPress={() => setShowFilterModel(true)}>
                   <View style={styles.filterBox}>
                     <Filter height={12} width={12} />
@@ -223,6 +224,9 @@ export const ClientInfo: React.FC<ClientInfoProps> = ({navigation}) => {
               <FilterModel
                 visible={showFilterModel}
                 onClose={() => setShowFilterModel(false)}
+                onApply={(filters: any) => {
+                  console.log('------->>>>>', filters);
+                }}
               />
 
               <View style={styles.cardList}>

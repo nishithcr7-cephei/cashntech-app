@@ -16,6 +16,7 @@ import {Colors} from '@constants/index';
 type FilterModelProps = {
   visible: boolean;
   onClose: () => void;
+  onApply?: (selectedFilter: {menu: string; option: string | null}) => void;
 };
 
 const Data: Record<string, string[]> = {
@@ -26,9 +27,23 @@ const Data: Record<string, string[]> = {
 
 const sideMenu = ['City', 'Sector', 'Source'];
 
-export const FilterModel: React.FC<FilterModelProps> = ({visible, onClose}) => {
+export const FilterModel: React.FC<FilterModelProps> = ({
+  visible,
+  onClose,
+  onApply,
+}) => {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [selectedMenus, setSelectedMenus] = useState<string>(sideMenu[0]);
+
+  const clearFilters = () => {
+    setSelectedOption(null);
+    setSelectedMenus(sideMenu[0]);
+  };
+
+  const handleApply = () => {
+    onApply && onApply({menu: selectedMenus, option: selectedOption});
+    onClose();
+  };
 
   const toggleMenu = (menu: string) => {
     setSelectedMenus(menu);
@@ -89,14 +104,10 @@ export const FilterModel: React.FC<FilterModelProps> = ({visible, onClose}) => {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <TouchableOpacity
-            onPress={() => {
-              setSelectedOption(null);
-              setSelectedMenus(sideMenu[0]);
-            }}>
+          <TouchableOpacity onPress={clearFilters}>
             <Text style={styles.clearText}>Clear Filters</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.applyBtn} onPress={onClose}>
+          <TouchableOpacity style={styles.applyBtn} onPress={handleApply}>
             <Text style={styles.applyText}>Apply</Text>
           </TouchableOpacity>
         </View>
