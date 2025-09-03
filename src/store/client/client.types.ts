@@ -1,5 +1,5 @@
 import Cities from '@constants/Cities';
-import { ProductCategory } from '@screens/index';
+import {ProductCategory} from '@screens/index';
 
 export type ClientState = {
   clientLoader: boolean;
@@ -13,6 +13,7 @@ export type ClientState = {
   masterBankList: Array<{id: number; bank_name: string}>;
   isSavedClientsDetails: boolean;
   isSavedFirmDetails: boolean;
+  isSavedVendorDetails: boolean;
 
   reportLoader: boolean;
   reportList: Array<IRemarkReportResponseDatum>;
@@ -169,7 +170,7 @@ export type FirmDetailsType = {
 
 export type VendorDetailsType = Array<{
   key: string;
-  productCategory: ProductCategory;
+  productCategory: ProductCategory | undefined;
   productType: string;
   vendorName: string;
   address: string;
@@ -200,6 +201,18 @@ export type MasterBankResponse = {
     bank_name: string;
   }>;
 };
+
+export type VendorDetailsPayload = Array<{
+  product_category: string;
+  product_type: string;
+  vendor_name: string;
+  address: string;
+  city: string;
+  state: string;
+  pin_code: string;
+  vendor_contact_number: string;
+  monthly_sales_value: number;
+}>;
 
 export interface IClientInfoSuccessResponse {
   statusCode: number;
@@ -330,38 +343,6 @@ export type FirmDetailsPayload = {
   estimated_funding_required: number;
   credit_period_offer: number;
   created_by: string;
-};
-
-export type IvendorPayload = {
-  product_category: string;
-  product_type: string;
-  vendor_name: string;
-  address: string;
-  city: string;
-  state: string;
-  pin_code: string;
-  vendor_contact_number: string;
-  monthly_sales_value: number;
-};
-
-export type IVendorResponse = {
-  statusCode: number;
-  message: string;
-  data: IVendorResponseDatum[];
-};
-
-export type IVendorResponseDatum = {
-  id: number;
-  product_category: string;
-  product_type: string;
-  vendor_name: string;
-  address: string;
-  city: string;
-  state: string;
-  pin_code: string;
-  vendor_contact_number: string;
-  monthly_sales_value: number;
-  client: Client;
 };
 
 export type Client = {

@@ -88,9 +88,9 @@ const vendorDetails: VendorDetailsType = [
     address: '',
     city: '',
     pinCode: '',
-    productCategory: '',
+    productCategory: undefined,
     productType: '',
-    state: '',
+    state: undefined,
     vendorContactNumber: '',
     monthlySalesValue: '',
   },
@@ -110,6 +110,7 @@ const initialState: ClientState = {
   clientsDetails: clientsDetails,
   isSavedClientsDetails: false,
   isSavedFirmDetails: false,
+  isSavedVendorDetails: false,
 
   //Remark Report fields
   reportLoader: false,
@@ -244,6 +245,8 @@ const clientSlice = createSlice({
       state.isSavedClientsDetails = initialState.isSavedClientsDetails;
       state.firmDetails = initialState.firmDetails;
       state.isSavedFirmDetails = initialState.isSavedFirmDetails;
+      state.vendorDetails = initialState.vendorDetails;
+      state.isSavedVendorDetails = initialState.isSavedVendorDetails;
       state.clientFormId = undefined;
     },
     // Basic Details
@@ -297,7 +300,7 @@ const clientSlice = createSlice({
     clearClientDetails: state => {
       state.clientDetails = initialState.clientDetails;
     },
-    setSavedClientsDetails: (state, action: PayloadAction<boolean>) => {
+    setSavedClientsDetailsStatus: (state, action: PayloadAction<boolean>) => {
       state.isSavedClientsDetails = action.payload;
     },
     saveClientsDetails: state => {
@@ -332,7 +335,7 @@ const clientSlice = createSlice({
     saveFirmDetails: state => {
       state.clientLoader = true;
     },
-    setSavedFirmDetails: (state, action: PayloadAction<boolean>) => {
+    setSavedFirmDetailsStatus: (state, action: PayloadAction<boolean>) => {
       state.isSavedFirmDetails = action.payload;
     },
     // Vendor Details
@@ -367,14 +370,14 @@ const clientSlice = createSlice({
         vendor => vendor.key !== action.payload,
       );
     },
-
-    // Set Client Form Data,
-    saveVendorDetails: (
-      state,
-      _action: PayloadAction<{clientId: string; vendors: any[]}>,
-    ) => {
+    saveVendorDetails: state => {
       state.clientLoader = false;
     },
+    setSavedVendorDetailsStatus: (state, action: PayloadAction<boolean>) => {
+      state.isSavedVendorDetails = action.payload;
+    },
+
+    // Set Client Form Data,
     saveVisitDetails: state => {
       state.clientLoader = false;
     },
@@ -886,7 +889,7 @@ export const {
 
   setAllClientsDetails,
   setClientsDetails,
-  setSavedClientsDetails,
+  setSavedClientsDetailsStatus,
   addNewClientDetails,
   removeClientDetails,
   clearClientDetails,
@@ -899,16 +902,17 @@ export const {
   setFirmDetails,
   clearFirmDetails,
   saveFirmDetails,
-  setSavedFirmDetails,
+  setSavedFirmDetailsStatus,
 
   setVendorDetails,
   clearVendorDetails,
   addNewVendorDetails,
   removeVendorDetails,
+  saveVendorDetails,
+  setSavedVendorDetailsStatus,
 
   resetAllClientFormData,
 
-  saveVendorDetails,
   saveVisitDetails,
   getReport,
   setReportList,

@@ -25,6 +25,8 @@ import {clientActions, clientSelector, VendorDetailsType} from '@store/client';
 import FontAwesome6 from '@react-native-vector-icons/fontawesome6';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
+import Toast from 'react-native-toast-message';
+import { ClientScreens } from '@constants/Screens';
 
 export enum ProductCategory {
   PERSONAL_CARE_HYGIENE = 'Personal Care & Hygiene',
@@ -256,7 +258,9 @@ export const VendorDetailForm = ({navigation}: Props) => {
   const dispatch = useDispatch();
   const vendorLoader = useSelector(clientSelector.getClientLoader);
   const vendorDetails = useSelector(clientSelector.getVendorDetailsFormData);
-
+  const isSavedVendorDetails = useSelector(
+    clientSelector.getVendorDetailsFormStatus,
+  );
   const setData = useCallback(
     <T,>(field: keyof VendorDetailsType[number], value: T, index: number) => {
       dispatch(clientActions.setVendorDetails([{[field]: value}, index]));
@@ -272,14 +276,21 @@ export const VendorDetailForm = ({navigation}: Props) => {
   };
 
   const handleSave = () => {
-    // if (isSavedClientsDetails) {
-    //   dispatch(clientActions.saveVendorDetails());
-    // } else {
-    //   dispatch(clientActions.updateVendorDetails());
-    // }
+    dispatch(clientActions.saveVendorDetails());
   };
 
-  const handleNext = () => {};
+  const handleNext = () => {
+    if (isSavedVendorDetails) {
+      // TODO: replace with next form 
+      navigation.navigate(ClientScreens.VendorDetailForm);
+    } else {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please save the vendor details before proceeding.',
+      });
+    }
+  };
 
   return (
     <Container>

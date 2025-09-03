@@ -49,6 +49,11 @@ const getVendorDetailsFormData = createSelector(
   _state => _state.vendorDetails
 );
 
+const getVendorDetailsFormStatus = createSelector(
+  _selectState,
+  _state => _state.isSavedVendorDetails
+);
+
 const getRemarkReport = createSelector(
   _selectState,
   _state => _state.reportList,
@@ -276,10 +281,13 @@ export default {
   getBasicDetailFormData,
   getClientDetailsFormData,
   getVendorDetailsFormData,
-  getClientsDetailsFormStatus,
   getFirmDetailsFormData,
-  getMasterBankDropdown,
+
+  getClientsDetailsFormStatus,
   getFirmDetailsFormStatus,
+  getVendorDetailsFormStatus,
+  getMasterBankDropdown,
+  
 
   getClientFormId,
   getRemarkReport,
