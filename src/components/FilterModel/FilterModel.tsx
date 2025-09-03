@@ -8,7 +8,7 @@ import {
   FlatList,
 } from 'react-native';
 import React, {useState} from 'react';
-import {LeftChevron} from '@assets/Icons';
+import {LeftChevron, Tick} from '@assets/Icons';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import fontWeight from '@constants/FontWeight';
 import {Colors} from '@constants/index';
@@ -18,33 +18,30 @@ type FilterModelProps = {
   onClose: () => void;
 };
 
-const Data = ['data shown here'];
+const Data: Record<string, string[]> = {
+  City: ['Mumbai', 'Delhi', 'Bangalore'],
+  Sector: ['FMCG', 'Pharma', 'Manufacturing'],
+  Source: ['Market Knowledge', 'Customer Reference', 'Telecalling'],
+};
 
 const sideMenu = ['City', 'Sector', 'Source'];
 
 export const FilterModel: React.FC<FilterModelProps> = ({visible, onClose}) => {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [selectedMenus, setSelectedMenus] = useState<string[]>([sideMenu[0]]);
-
-  const toggleOption = (option: string) => {
-    setSelectedOption(prev => (prev === option ? null : option));
-  };
+  const [selectedMenus, setSelectedMenus] = useState<string>(sideMenu[0]);
 
   const toggleMenu = (menu: string) => {
-    if (selectedMenus.includes(menu)) {
-      setSelectedMenus(prev => prev.filter(m => m !== menu));
-    } else {
-      setSelectedMenus(prev => [...prev, menu]);
-    }
+    setSelectedMenus(menu);
+    setSelectedOption(null);
   };
 
   const renderOptionItem = ({item}: {item: string}) => (
     <TouchableOpacity
       style={styles.optionRow}
-      onPress={() => toggleOption(item)}>
-      <View
-        style={[styles.checkbox, selectedOption === item && styles.checked]}
-      />
+      onPress={() => setSelectedOption(prev => (prev === item ? null : item))}>
+      <View style={styles.checkbox}>
+        {selectedOption === item && <Tick width={14} height={14} />}
+      </View>
       <Text style={styles.optionText}>{item}</Text>
     </TouchableOpacity>
   );
@@ -58,16 +55,9 @@ export const FilterModel: React.FC<FilterModelProps> = ({visible, onClose}) => {
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={{padding: scaleWidth(8)}}>
+          <TouchableOpacity onPress={onClose} style={styles.backButton}>
             <LeftChevron width={12} height={12} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Filters</Text>
-          <TouchableOpacity
-            onPress={() => {
-              setSelectedOption(null);
-              setSelectedMenus([]);
-            }}>
-            <Text style={styles.clearText}>Clear Filters</Text>
+            <Text style={styles.headerTitle}>Filters</Text>
           </TouchableOpacity>
         </View>
 
@@ -90,7 +80,7 @@ export const FilterModel: React.FC<FilterModelProps> = ({visible, onClose}) => {
           </View>
           <View style={styles.optionsContainer}>
             <FlatList
-              data={selectedMenus.length ? Data : []}
+              data={Data[selectedMenus] || []}
               keyExtractor={item => item}
               renderItem={renderOptionItem}
             />
@@ -99,6 +89,13 @@ export const FilterModel: React.FC<FilterModelProps> = ({visible, onClose}) => {
 
         {/* Footer */}
         <View style={styles.footer}>
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedOption(null);
+              setSelectedMenus(sideMenu[0]);
+            }}>
+            <Text style={styles.clearText}>Clear Filters</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.applyBtn} onPress={onClose}>
             <Text style={styles.applyText}>Apply</Text>
           </TouchableOpacity>
@@ -115,18 +112,21 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     padding: scaleWidth(16),
     alignItems: 'center',
     borderBottomWidth: 0.5,
     borderBottomColor: Colors.lightGray,
   },
-  backArrow: {
-    fontSize: scaleFont(20),
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: scaleWidth(8),
   },
   headerTitle: {
     fontSize: scaleFont(18),
     fontWeight: fontWeight.Bold,
+    marginLeft: scaleWidth(8),
   },
   clearText: {
     color: Colors.lightGray,
@@ -158,11 +158,12 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     alignItems: 'center',
     padding: scaleWidth(16),
     borderTopWidth: 0.5,
     borderTopColor: Colors.lightGray,
+    gap: scaleWidth(12),
   },
   footerText: {
     fontSize: scaleFont(14),
@@ -185,6 +186,8 @@ const styles = StyleSheet.create({
     marginBottom: scaleHeight(14),
   },
   checkbox: {
+    justifyContent: 'center',
+    alignItems: 'center',
     width: scaleWidth(18),
     height: scaleWidth(18),
     borderWidth: 1,
