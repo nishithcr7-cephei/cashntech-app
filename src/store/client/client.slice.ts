@@ -456,6 +456,14 @@ const clientSlice = createSlice({
     updateVisitDetails: state => {
       state.clientLoader = true;
     },
+    deleteClientSuccess: (state, action) => {
+      state.clientList = state.clientList.filter(
+        client => client.id !== action.payload,
+      );
+    },
+    deleteClientFailure: (state, action) => {
+      state.error = action.payload;
+    },
     getReport: state => {
       state.reportLoader = true;
     },
@@ -496,20 +504,6 @@ const clientSlice = createSlice({
     resetLeadList: state => {
       state.leadList = [];
       state.leadLoader = false;
-    },
-    getTaskHistory: state => {
-      state.TaskHistoryLoader = true;
-    },
-    setTaskHistoryList: (
-      state,
-      action: PayloadAction<ITaskHistoryResponseDatum[]>,
-    ) => {
-      state.TaskHistoryLoader = false;
-      state.TaskHistoryList = action.payload;
-    },
-    resetTaskHistoryList: state => {
-      state.TaskHistoryList = [];
-      state.TaskHistoryLoader = false;
     },
     uploadKycRequest(state, action: PayloadAction<IUploadKycDocumentPayload>) {
       state.loading = true;
@@ -797,7 +791,7 @@ const clientSlice = createSlice({
     setSoftSanctionBnkProLoader: (state, action: PayloadAction<boolean>) => {
       state.SoftSanctionBNKPROLoading = action.payload;
     },
-    getSoftSanctionBnkPro: state => {
+    getSoftSanctionBnkPro: (state, action: PayloadAction<{bank: string; product: string}>) => {
       state.SoftSanctionBNKPROLoading = true;
     },
     setSoftSanctionBnkProList: (
@@ -893,7 +887,7 @@ const clientSlice = createSlice({
       state.softSanctionFieldsLoading = false;
       state.softSanctionFieldsError = null;
     },
-    getSoftSanctionFields: (state, action) => {},
+    getSoftSanctionFields: (state, action: PayloadAction<{bankName: string; productName: string}>) => {},
     bankStatementRequest(state, action: PayloadAction<IBankStatementPayload>) {
       state.BankStatementLoading = true;
       state.BankStatementError = null;
@@ -1002,9 +996,6 @@ export const {
   setLeadList,
   resetLeadList,
   getLeadDesciption,
-  getTaskHistory,
-  setTaskHistoryList,
-  resetTaskHistoryList,
   uploadKycRequest,
   uploadKycSuccess,
   uploadKycFailure,

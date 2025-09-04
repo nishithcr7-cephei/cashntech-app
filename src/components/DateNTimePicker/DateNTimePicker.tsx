@@ -24,6 +24,7 @@ interface DateTimePickerProps {
   value?: string | Date;
   placeholder?: string;
   containerStyle?: ViewStyle;
+  mode?: 'date' | 'datetime';
 }
 
 export const DateNTimePicker: React.FC<DateTimePickerProps> = ({
@@ -33,6 +34,7 @@ export const DateNTimePicker: React.FC<DateTimePickerProps> = ({
   value = '',
   datePickerProps,
   containerStyle,
+  mode = 'datetime',
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const showPicker = () => setIsVisible(true);
@@ -52,6 +54,8 @@ export const DateNTimePicker: React.FC<DateTimePickerProps> = ({
             <Text style={styles.inputText}>
               {typeof value === 'string'
                 ? value
+                : mode === 'date'
+                ? moment(value).format('DD-MM-YYYY')
                 : moment(value).format('DD-MM-YYYY hh:mm A')}
             </Text>
           ) : (
@@ -64,6 +68,7 @@ export const DateNTimePicker: React.FC<DateTimePickerProps> = ({
         isVisible={isVisible}
         onConfirm={handleConfirm}
         onCancel={hidePicker}
+        mode={mode === 'date' ? 'date' : 'datetime'}
         {...datePickerProps}
       />
     </View>

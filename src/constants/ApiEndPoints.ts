@@ -41,7 +41,7 @@ const Endpoints = {
     `/client-info-master/${leadID}/lead-progress`,
 
   // Tasks apis
-  apiGetTaskHistory: '/client-info-master/john.doe@example.com/tasks',
+  apiGetTaskHistory: (userName: string) => `/client-info-master/${userName}/tasks`,
 
   // Kyc Apis --
   // Personal Tab
@@ -110,6 +110,7 @@ const Endpoints = {
   // Filter Box
   apiFilterBox: '/client-info-master/filter',
   apitaskFilterBox: '/client-info-master/filter/task-records',
+  apiTaskRecords: '/client-info-master/task-records',
 
   // Client visit details
   apiGetVisitDetailsList: '/client-info-master/visit-details',

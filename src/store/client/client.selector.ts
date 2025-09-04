@@ -77,6 +77,18 @@ const getTaskHistory = createSelector(
   _state => _state.TaskHistoryList,
 );
 
+const getBasicDetailLoading = createSelector(
+  _selectState,
+  state => state.clientLoader,
+);
+
+const getBasicDetailError = createSelector(
+  _selectState,
+  state => state.clientList,
+);
+
+const getClientId = createSelector(_selectState, state => state.clientId);
+
 const getUploadKycLoading = createSelector(
   _selectState,
   state => state.loading,
@@ -295,7 +307,9 @@ export default {
   getLeadProgress,
   getLeadLoader,
   getTaskHistory,
-
+  getBasicDetailLoading,
+  getBasicDetailError,
+  getClientId,
   getUploadKycLoading,
   getUploadKycData,
   getUploadKycError,

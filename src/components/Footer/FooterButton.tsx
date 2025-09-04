@@ -19,6 +19,7 @@ type FooterButtonProps = {
   onPressSubmit?: () => void;
   showNext?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
+  clearButtonText?: string;
 };
 
 export const FooterButton: React.FC<FooterButtonProps> = ({
@@ -28,12 +29,13 @@ export const FooterButton: React.FC<FooterButtonProps> = ({
   onPressSubmit,
   showNext = true,
   containerStyle,
+  clearButtonText = 'Clear all',
 }) => {
   return (
     <View style={[styles.footerButton, containerStyle]}>
       {onPressClearAll && (
         <TouchableOpacity style={styles.clearButton} onPress={onPressClearAll}>
-          <Text style={styles.clearText}>Clear all</Text>
+          <Text style={styles.clearText}>{clearButtonText}</Text>
         </TouchableOpacity>
       )}
 

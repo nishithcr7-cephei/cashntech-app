@@ -136,4 +136,13 @@ export type DocNavigatorType = {
   PersonalKYCValidation: undefined;
   BusinessKYCValidation: undefined;
   TaskLogTabs: undefined;
+  TaskHistTabs: undefined;
+  TaskUpdate: {
+    taskId: string;
+    task_status?: string;
+    remark?: string;
+    completed_at?: string;
+    task_description?: string;
+    client_name?: string;
+  };
 };

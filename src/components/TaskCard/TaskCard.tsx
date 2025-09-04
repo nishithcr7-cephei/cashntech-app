@@ -3,14 +3,25 @@ import React from 'react';
 import {Colors} from '@constants/index';
 
 interface TaskCardProps {
-  tasktype: string;
+  srNo?: number;
+  firmName?: string;
+  sector?: string;
+  assignedBy?: string;
+  assignedTo?: string;
   taskDescription: string;
-  clientId: string;
-  clientName: string;
+  taskStatus?: string;
+  remarks?: string;
+  createdAt?: string;
+  completedAt?: string;
+  // Keep old props for compatibility
+  tasktype?: string;
+  clientId?: string;
+  clientName?: string;
+  salesman?: string;
   location?: string;
-  referenceDetails: string;
-  sourceDHCO: string;
-  status: 'Warm' | 'Hot' | 'Cold';
+  referenceDetails?: string;
+  sourceDHCO?: string;
+  status?: 'Warm' | 'Hot' | 'Cold';
   historyStatus?: 'Completed' | 'Pending';
   showHistoryStatus?: boolean;
   historyStatusLabel?: string;
@@ -24,10 +35,21 @@ const ChipColors = {
 };
 
 export const TaskCard: React.FC<TaskCardProps> = ({
-  tasktype,
+  srNo,
+  firmName,
+  sector,
+  assignedBy,
+  assignedTo,
   taskDescription,
+  taskStatus,
+  remarks,
+  createdAt,
+  completedAt,
+  // Old props for compatibility
+  tasktype,
   clientId,
   clientName,
+  salesman,
   location,
   referenceDetails,
   sourceDHCO,
@@ -44,27 +66,38 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       </View> */}
 
       {[
-        {label: 'Client ID', value: clientId},
-        {label: 'Client Name', value: clientName},
-        {label: 'Task Type', value: tasktype},
-        {label: 'Task Description', value: taskDescription},
+        ...(srNo ? [{label: 'S.No', value: srNo.toString()}] : []),
+        ...(firmName ? [{label: 'Firm Name', value: firmName}] : []),
+        ...(sector ? [{label: 'Sector', value: sector}] : []),
+        ...(assignedBy ? [{label: 'Assigned By', value: assignedBy}] : []),
+        ...(assignedTo ? [{label: 'Assigned To', value: assignedTo}] : []),
+        ...(taskDescription ? [{label: 'Description', value: taskDescription}] : []),
       ].map((item, index) => (
         <Text style={styles.text} key={index}>
           <Text style={styles.label}>{item.label}: </Text>
           {item.value}
         </Text>
       ))}
-      {typeof location !== 'undefined' && (
+      
+      {/* Status with conditional color */}
+      {taskStatus && (
         <Text style={styles.text}>
-          <Text style={styles.label}>Task Status: </Text>
-          {location}
+          <Text style={styles.label}>Status: </Text>
+          <Text style={[
+            styles.statusValue,
+            {color: taskStatus.toLowerCase() === 'completed' ? '#28a745' : '#6c757d'}
+          ]}>
+            {taskStatus}
+          </Text>
         </Text>
       )}
+      
       {[
-        {label: 'Remark', value: referenceDetails},
-        {label: 'Completed At', value: sourceDHCO},
+        ...(remarks ? [{label: 'Remarks', value: remarks}] : []),
+        ...(createdAt ? [{label: 'Created At', value: createdAt}] : []),
+        ...(completedAt ? [{label: 'Completed At', value: completedAt}] : []),
       ].map((item, index) => (
-        <Text style={styles.text} key={index + 100}>
+        <Text style={styles.text} key={index + 200}>
           <Text style={styles.label}>{item.label}: </Text>
           {item.value}
         </Text>
@@ -108,6 +141,9 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: 'bold',
     color: '#333',
+  },
+  statusValue: {
+    fontWeight: 'bold',
   },
   readMoreButton: {
     position: 'absolute',

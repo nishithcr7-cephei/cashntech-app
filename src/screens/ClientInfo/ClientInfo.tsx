@@ -94,6 +94,204 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
     );
   };
 
+  // Safe search function that handles encrypted fields
+  const searchInClientData = (item: any, query: string) => {
+    try {
+      const searchLower = query.toLowerCase();
+
+      // Search in basic fields
+      if (item.id?.toString().toLowerCase().includes(searchLower)) return true;
+
+      // Search in potentially encrypted fields with safe decryption
+      const clientName = safeDecrypt(item.client_name);
+      if (clientName.toLowerCase().includes(searchLower)) return true;
+
+      const firmName = safeDecrypt(item.firm_name);
+      if (firmName.toLowerCase().includes(searchLower)) return true;
+
+      const city = safeDecrypt(item.city);
+      if (city.toLowerCase().includes(searchLower)) return true;
+
+      const bankName = safeDecrypt(item.bank_name);
+      if (bankName.toLowerCase().includes(searchLower)) return true;
+
+      const location = safeDecrypt(item.location);
+      if (location.toLowerCase().includes(searchLower)) return true;
+
+      // Search in plain text fields
+      if (item.source_of_lead?.toLowerCase().includes(searchLower)) return true;
+      if (item.reference_details?.toLowerCase().includes(searchLower))
+        return true;
+      if (item.monthly_turnover?.toString().includes(searchLower)) return true;
+      if (item.estimated_funding_required?.toString().includes(searchLower))
+        return true;
+      if (item.financier_name?.toLowerCase().includes(searchLower)) return true;
+
+      return false;
+    } catch (error) {
+      console.log('Search error for item:', item.id, error);
+      return false;
+    }
+  };
+
+  // Load data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      callGetClients();
+    }, []),
+  );
+
+  // Keep the visible list in sync with fetched clients when not filtering/searching
+  useEffect(() => {
+    if (!isFilterOpen && !searchQuery) {
+      setFilteredClients(clientsData);
+    }
+  }, [clientsData, isFilterOpen, searchQuery]);
+
+  // Handle back button when Read More is shown
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (stopBackPress.current) {
+          stopBackPress.current = false;
+          return true;
+        }
+        return false;
+      },
+    );
+
+    return () => backHandler.remove();
+  }, []);
+
+  // Update filtered clients when clientsData changes
+  // useEffect(() => {
+  //   setFilteredClients(clientsData);
+
+  //   // Mark that data has been loaded at least once
+  //   if (!loading && !hasLoadedOnce) {
+  //     setHasLoadedOnce(true);
+  //   }
+  // }, [clientsData, loading, hasLoadedOnce]);
+
+  // useEffect(() => {
+  //   if (!isFilterOpen) {
+  //     setFilteredClients(clientsData);
+  //   }
+  // }, [clientsData, isFilterOpen]);
+
+  const handleApplyFilter = async () => {
+    setFilterLoading(true);
+    const payload = {
+      locations: selectedFilters.location ? [selectedFilters.location] : [],
+      firstNames: [],
+      lastNames: [],
+      sourceOfLead: selectedFilters.source ? [selectedFilters.source] : [],
+    };
+    try {
+      const {data} = await clientApi.FilterBox(payload);
+      if (data && data.statusCode === 200 && Array.isArray(data.data)) {
+        setFilteredClients(data.data as any);
+      } else {
+        setFilteredClients([]);
+      }
+    } catch (error) {
+      setFilteredClients([]);
+    } finally {
+      setFilterLoading(false);
+    }
+  };
+
+  const [selectedFilters, setSelectedFilters] = useState({
+    location: '',
+    initiator: '',
+    source: '',
+  });
+
+  const [enabledFilters, setEnabledFilters] = useState({
+    location: false,
+    initiator: false,
+    source: false,
+  });
+
+  const [locationOptions, setLocationOptions] = useState<
+    {label: string; value: string}[]
+  >([]);
+  const [initiatorOptions, setInitiatorOptions] = useState<
+    {label: string; value: string | number}[]
+  >([]);
+  const [sourceOptions, setSourceOptions] = useState<
+    {label: string; value: string}[]
+  >([]);
+
+  const fetchLocations = async () => {
+    try {
+      const response = await clientApi.getLocations();
+      if (response?.data) {
+        const options = response.data
+          .map((enc: string) => ({
+            label: decryptLocation(enc),
+            value: enc,
+          }))
+          .filter((opt: {label: string; value: string}) => opt.label);
+        setLocationOptions(options);
+      }
+    } catch (e) {
+      setLocationOptions([]);
+    }
+  };
+
+  const fetchInitiators = async () => {
+    try {
+      const response = await clientApi.getSalesmanList();
+      if (response?.data) {
+        const options = response.data.map((item: any) => ({
+          label: `${item.first_name} ${item.last_name}`.trim(),
+          value: item.id,
+        }));
+        setInitiatorOptions(options);
+      }
+    } catch (e) {
+      setInitiatorOptions([]);
+    }
+  };
+
+  const fetchSources = async () => {
+    try {
+      const response = await clientApi.getAllClients();
+      const dataArr = response?.data?.data;
+      if (dataArr && Array.isArray(dataArr)) {
+        const uniqueSources = Array.from(
+          new Set(
+            dataArr
+              .map((item: any) => item.source_of_lead)
+              .filter((src: string) => !!src),
+          ),
+        );
+        const options = uniqueSources.map((src: string) => ({
+          label: src,
+          value: src,
+        }));
+        setSourceOptions(options);
+      }
+    } catch (e) {
+      setSourceOptions([]);
+    }
+  };
+
+  useEffect(() => {
+    if (isFilterOpen) {
+      fetchLocations();
+      fetchInitiators();
+      fetchSources();
+    }
+  }, [isFilterOpen]);
+
+  function getDisplayLocation(location: string): string {
+    if (!location) return '';
+    if (/^[a-zA-Z ]+$/.test(location)) return location;
+    return decryptLocation(location);
+  }
   return (
     <Container>
       <AppBar title="Client Information Master" navigation={navigation} />

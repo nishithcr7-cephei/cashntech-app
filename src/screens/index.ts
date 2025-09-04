@@ -46,6 +46,8 @@ export * from './SoftSanctionRuleset/SoftSanctionRuleset';
 export * from './SoftSanctionRulesetTCPD/RulesetTCPD';
 export * from './SplashScreen/SplashScreen';
 export * from './TaskTabs/TaskLogTabs';
+export * from './TaskTabs/TaskHistTabs';
+export * from './TaskTabs/TaskUpdate';
 export * from './TermsOfService/TermsOfService';
 export * from './UdhyamCertificate/UdhyamCertificate';
 export * from './UGRO-PurchaseMethod/UGROPurchaseMethod';

@@ -1,11 +1,5 @@
-import {Filter, RightCheckmark, Search} from '@assets/Icons';
-import {
-  AppBar,
-  Container,
-  CustomDropdown,
-  Input,
-  DateNTimePicker,
-} from '@components/index';
+import {Search, LeftChevronCircle} from '@assets/Icons';
+import {AppBar, Container} from '@components/index';
 import {TaskCard} from '@components/TaskCard/TaskCard';
 import Colors from '@constants/Colors';
 import Fonts from '@constants/Fonts';
@@ -13,9 +7,9 @@ import FontWeight from '@constants/FontWeight';
 import fontWeight from '@constants/FontWeight';
 import {TextInput} from 'react-native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
-import {CompositeNavigationProp, useNavigation} from '@react-navigation/native';
+import {CompositeNavigationProp, useNavigation, useFocusEffect} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {clientActions, clientSelector} from '@store/client';
+import {tasklogActions, tasklogSelector} from '@store/tasklog';
 import {HomeNavigatorType, DocNavigatorType} from '@type/NavigatorTypes';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import React, {useEffect, useState} from 'react';
@@ -24,14 +18,11 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   FlatList,
-  ActivityIndicator,
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
-import {Api} from '@services/api';
-import Toast from 'react-native-toast-message';
 import clientApi from '@services/api/client.api';
+import {decryptConditionally} from '@utils/crypto';
 
 type DocNavigationType = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType>,
@@ -39,16 +30,13 @@ type DocNavigationType = CompositeNavigationProp<
 >;
 
 export const TaskLogTabs = () => {
-  const [activeTab, setActiveTab] = useState<'tasks' | 'update' | 'history'>(
-    'tasks',
-  );
+  const [activeTab, setActiveTab] = useState<'tasks'>('tasks');
   const navigation = useNavigation<DocNavigationType>();
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [startTime, setStartTime] = useState<Date | undefined>();
-  const [schedule, setSchedule] = useState<Date | undefined>();
   const dispatch = useDispatch();
-  const TaskHitoryData = useSelector(clientSelector.getTaskHistory);
-  const reportData = useSelector(clientSelector.getRemarkReport);
+  const TaskHitoryData = useSelector(tasklogSelector.getTaskHistory);
+  const reportData = useSelector(tasklogSelector.getRemarkReport);
   const callgetTaskhistory = () => {
    
     
@@ -57,9 +45,53 @@ export const TaskLogTabs = () => {
     callgetTaskhistory();
   }, []);
 
+  const fetchTaskRecords = async () => {
+    setIsLoading(true);
+    try {
+      const body = {hasTask: true};
+      console.log('=== TASKLOG API CALL ===');
+      console.log('TaskLogTabs: Request Body:', body);
+      console.log('TaskLogTabs: Fetching task records...');
+      
+      const res = await clientApi.getTaskRecords(body);
+      
+      console.log('=== TASKLOG API RESPONSE ===');
+      console.log('TaskLogTabs: Full API Response:', JSON.stringify(res, null, 2));
+      console.log('TaskLogTabs: Response Data:', res?.data);
+      
+      const list = Array.isArray(res?.data?.data)
+        ? res.data.data
+        : Array.isArray(res?.data)
+        ? res.data
+        : [];
+      
+      console.log('TaskLogTabs: Parsed Task Records:', list);
+      console.log('TaskLogTabs: Total Records Count:', list.length);
+      console.log('=== END TASKLOG API RESPONSE ===');
+      
+      setTaskRecords(list);
+    } catch (e) {
+      console.log('=== TASKLOG API ERROR ===');
+      console.error('TaskLogTabs: Error fetching task records:', e);
+      console.error('TaskLogTabs: Error Details:', JSON.stringify(e, null, 2));
+      console.log('=== END TASKLOG API ERROR ===');
+      setTaskRecords([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch on mount
   useEffect(() => {
-    dispatch(clientActions.getReport());
+    fetchTaskRecords();
   }, []);
+
+  // Also refetch whenever the screen gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchTaskRecords();
+    }, []),
+  );
 
   const [salesmanList, setSalesmanList] = useState<
     {label: string; value: string}[]
@@ -79,11 +111,9 @@ export const TaskLogTabs = () => {
   }, []);
 
   const [selectedTask, setSelectedTask] = useState<any>(null);
-  const [remark, setRemark] = useState('');
-  const [taskStatus, setTaskStatus] = useState('');
-  const [completedAt, setCompletedAt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const mapStatus = (apiStatus: string): 'Warm' | 'Hot' | 'Cold' => {
     switch (apiStatus?.toLowerCase()) {
@@ -99,78 +129,103 @@ export const TaskLogTabs = () => {
     }
   };
 
-  const taskList = reportData.flatMap(report =>
-    report.task.map(task => ({
+  const formatToDMY = (iso?: string) => {
+    if (!iso) return 'NA';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return 'NA';
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
+  const formatToMonthYear = (iso?: string) => {
+    if (!iso) return 'NA';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return 'NA';
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    const month = monthNames[d.getMonth()];
+    const year = d.getFullYear();
+    return `${month} ${year}`;
+  };
+
+  const capitalizeFirst = (str: string) =>
+    str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+
+  const [taskRecords, setTaskRecords] = useState<any[]>([]);
+
+  // Log when state updates to verify shape
+  useEffect(() => {
+    console.log('TaskLogTabs: taskRecords state updated:', taskRecords);
+  }, [taskRecords]);
+
+  // Normalize in case we ever receive an object with a nested data property
+  const normalizedRecords = Array.isArray(taskRecords)
+    ? taskRecords
+    : Array.isArray((taskRecords as any)?.data)
+    ? (taskRecords as any).data
+    : [];
+
+  const taskList = normalizedRecords.flatMap((report: any) =>
+    (report.task || []).map((task: any) => ({
       id: task.id,
-      tasktype: task.task_type,
-      taskDescription: task.task_description,
-      clientId: report.id.toString(),
-      clientName: report.client_name,
-      location: 'NA',
-      referenceDetails: task.remark ?? 'NA',
-      sourceDHCO: task.completed_at ?? 'NA',
+      firmName: capitalizeFirst(decryptConditionally(report.firm_name || '')),
+      sector: capitalizeFirst(report.sector || ''),
+      assignedBy: capitalizeFirst(task.assigned_by || ''),
+      assignedTo: capitalizeFirst(task.assigned_to || ''),
+      taskDescription: capitalizeFirst(task.task_description || ''),
+      taskStatus: capitalizeFirst(task.task_status || ''),
+      remarks: capitalizeFirst(task.remark || '') || 'NA',
+      createdAt: formatToMonthYear(task.assigned_at),
+      completedAt: formatToDMY(task.completed_at),
+      // Keep old fields for compatibility
+      tasktype: capitalizeFirst(task.task_type || ''),
+      clientId: String(report.id ?? ''),
+      clientName: capitalizeFirst(decryptConditionally(report.firm_name || '')),
+      salesman: capitalizeFirst(task.assigned_to || ''),
+      location: capitalizeFirst(task.task_status || ''),
+      referenceDetails: capitalizeFirst(task.remark || '') || 'NA',
+      sourceDHCO: formatToDMY(task.completed_at),
       status: mapStatus(task.task_status),
       raw: task,
     })),
-  );
+  ).map((item: any, globalIndex: number) => ({
+    ...item,
+    srNo: globalIndex + 1,
+  }));
 
-  useEffect(() => {
-    if (selectedTask) {
-      setRemark(selectedTask.referenceDetails || '');
-      setTaskStatus(selectedTask.raw?.task_status || '');
-      setCompletedAt(selectedTask.raw?.completed_at || '');
-    } else {
-      setRemark('');
-      setTaskStatus('');
-      setCompletedAt('');
-    }
-  }, [selectedTask]);
+  // Filter tasks based on search query
+  const filteredTaskList = taskList.filter((item: any) => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
+    
+    return (
+      // Search by firm name
+      item.clientName.toLowerCase().includes(query) ||
+      // Search by client ID
+      item.clientId.toLowerCase().includes(query) ||
+      // Search by task type
+      item.tasktype.toLowerCase().includes(query) ||
+      // Search by task status
+      item.location.toLowerCase().includes(query) ||
+      // Search by serial number
+      item.srNo.toString().includes(query)
+    );
+  });
 
-  const handleUpdateSubmit = async () => {
-    if (!selectedTask) return;
-    try {
-      const body: any = {
-        remark,
-        task_status: taskStatus,
-      };
-      if (taskStatus === 'completed') {
-        body.completed_at = completedAt || new Date().toISOString();
-      }
-      setIsSubmitting(true);
-      const res = await clientApi.taskUpdate(selectedTask.id, body);
-      if (res?.data?.statusCode === 201) {
-        Toast.show({
-          type: 'success',
-          text1: res.data.message || 'Task updated successfully',
-          visibilityTime: 2000,
-        });
-        setSelectedTask(null);
-        setActiveTab('tasks');
-        dispatch(clientActions.getReport());
-      } else {
-        Toast.show({
-          type: 'error',
-          text1: res?.data?.message || 'Failed to update task',
-          
-          visibilityTime: 2000,
-        });
-      }
-    } catch (e: any) {
-      let message = 'Failed to update task';
-      if (e?.response?.data?.message) {
-        message = e.response.data.message;
-      } else if (e?.message) {
-        message = e.message;
-      }
-      Toast.show({type: 'error', text1: message, visibilityTime: 2000});
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  useEffect(() => {}, [selectedTask]);
+
+  const handleUpdateSubmit = async () => {};
 
   const renderTabContent = () => {
-    const capitalizeFirst = (str: string) =>
-      str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+    console.log('TaskLogTabs: Rendering tab content, activeTab:', activeTab);
+    console.log('TaskLogTabs: taskList length:', taskList.length);
+    console.log('TaskLogTabs: isLoading:', isLoading);
+    
     switch (activeTab) {
       case 'tasks':
         return (
@@ -179,295 +234,123 @@ export const TaskLogTabs = () => {
               <View style={styles.Subrowcontainer}>
                 <Text style={styles.Subrowcontainertxt}>Task</Text>
                 <View style={styles.Badge}>
-                  <Text style={styles.Badgetext}>{taskList.length}</Text>
+                  <Text style={styles.Badgetext}>{filteredTaskList.length}</Text>
                 </View>
               </View>
               <View style={styles.Searchbox}>
                 <Search height={12} width={12} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Search Clients"
+                  placeholder="Search by Firm name"
                   placeholderTextColor={Colors.balancedGray}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
                 />
               </View>
-
-              <TouchableOpacity>
-                <View style={styles.Filterbox}>
-                  <Filter height={12} width={12} />
-                </View>
-              </TouchableOpacity>
             </View>
-            <View style={styles.Cardlist}>
-              <FlatList
-                data={taskList}
-                keyExtractor={item => item.id.toString()}
-                renderItem={({item}) => (
-                  <View>
-                    <TaskCard
-                      tasktype={item.tasktype}
-                      taskDescription={item.taskDescription}
-                      clientId={item.clientId}
-                      clientName={item.clientName}
-                      location={item.location}
-                      referenceDetails={item.referenceDetails}
-                      sourceDHCO={item.sourceDHCO}
-                      status={item.status}
-                    />
-                    <TouchableOpacity
-                      style={{
-                        alignSelf: 'flex-end',
-                        marginBottom: 8,
-                        backgroundColor: Colors.primaryColor,
-                        paddingHorizontal: 12,
-                        paddingVertical: 4,
-                        borderRadius: 4,
-                      }}
-                      onPress={() => {
-                        setSelectedTask(item);
-                        setActiveTab('update');
-                      }}>
-                      <Text style={{color: '#fff'}}>Edit</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
-                contentContainerStyle={{flexGrow: 1}}
-                ListEmptyComponent={
-                  isLoading ? (
-                    <ActivityIndicator
-                      size="large"
-                      color={Colors.primaryColor}
-                    />
-                  ) : (
-                    <Text style={styles.emptyList}>No Task Found</Text>
-                  )
-                }
-                refreshing={false}
-              />
-            </View>
-          </View>
-        );
-      case 'update':
-        if (!selectedTask) {
-          return (
-            <View style={{padding: 20, alignItems: 'center'}}>
-              <Text style={{color: 'red', fontWeight: 'bold'}}>
-                Please select a task from the list to update.
-              </Text>
-            </View>
-          );
-        }
-        return (
-          <View>
-            <Text style={styles.heading}>Submit Task Update</Text>
-
-            <DateNTimePicker
-              label="Date and Time"
-              value={schedule ? schedule.toISOString() : undefined}
-              onConfirm={setSchedule}
-            />
-
-            <CustomDropdown
-              label="Sales Person Name "
-              data={salesmanList}
-              value={selectedSalesman}
-              onChange={val => setSelectedSalesman(val)}
-              containerStyle={{marginTop: scaleHeight(20)}}
-            />
-
-            <CustomDropdown
-              label="Task Type"
-              data={[
-                {label: 'Call', value: 'call'},
-                {label: 'Email', value: 'email'},
-                {label: 'Meeting', value: 'meeting'},
-              ]}
-              placeholder="Select Task Type"
-              containerStyle={{marginTop: scaleHeight(20)}}
-            />
-
-            <Input
-              label="Task"
-              placeholder="Task info"
-              containerStyle={{marginTop: scaleHeight(20)}}
-              value={selectedTask.taskDescription}
-              editable={false}
-            />
-
-            <CustomDropdown
-              label="Status"
-              data={[
-                {label: 'PENDING', value: 'pending'},
-                {label: 'COMPLETED', value: 'completed'},
-              ]}
-              placeholder="Select Task Status"
-              containerStyle={{marginTop: scaleHeight(20)}}
-              value={taskStatus}
-              onChange={val => {
-                setTaskStatus(val);
-                if (val === 'completed') {
-                  setCompletedAt(new Date().toISOString());
-                } else {
-                  setCompletedAt('');
-                }
-              }}
-            />
-
-            <Input
-              label="Remark"
-              placeholder="Value"
-              containerStyle={{marginTop: scaleHeight(20)}}
-              value={remark}
-              onChangeText={setRemark}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
-
-            <View style={styles.footerButton}>
-              {/* Clear All Button */}
-              <TouchableOpacity
-                style={styles.clearButton}
-                onPress={() => {
-                  setRemark('');
-                  setTaskStatus('');
-                  setCompletedAt('');
-                  setSelectedTask(null);
-                  setActiveTab('tasks');
-                }}>
-                <Text style={styles.clearText}>Clear all</Text>
-              </TouchableOpacity>
-
-
-              {/* Save Button */}
-              <View style={styles.row}>
+                          <FlatList
+              data={filteredTaskList}
+              keyExtractor={item => item.id.toString()}
+              renderItem={({item}) => (
                 <TouchableOpacity
-                  style={styles.saveButton}
-                  activeOpacity={0.7}
-                  onPress={handleUpdateSubmit}
-                  disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <ActivityIndicator size="small" color={Colors.white} />
-                  ) : (
-                    <>
-                      <Text style={styles.saveText}>Submit</Text>
-                      <RightCheckmark width={12} height={12} />
-                    </>
-                  )}
+                  onPress={() => {
+                    // Only navigate if status is Pending
+                    if (item.raw?.task_status?.toLowerCase() === 'pending') {
+                      (navigation as any).navigate('TaskUpdate', {
+                        taskId: String(item.id),
+                        task_status: item.raw?.task_status,
+                        remark:
+                          item.referenceDetails && item.referenceDetails !== 'NA'
+                            ? item.referenceDetails
+                            : '',
+                        completed_at: item.raw?.completed_at,
+                        task_description: item.taskDescription,
+                        client_name: item.clientName,
+                        task_type: item.raw?.task_type,
+                        assigned_to: item.raw?.assigned_to,
+                      });
+                    }
+                    // If status is Completed, do nothing (no navigation)
+                  }}
+                  disabled={item.raw?.task_status?.toLowerCase() === 'completed'}>
+                  <TaskCard
+                    srNo={item.srNo}
+                    firmName={item.firmName}
+                    sector={item.sector}
+                    assignedBy={item.assignedBy}
+                    assignedTo={item.assignedTo}
+                    taskDescription={item.taskDescription}
+                    taskStatus={item.taskStatus}
+                    remarks={item.remarks}
+                    createdAt={item.createdAt}
+                    completedAt={item.completedAt}
+                    // Keep old props for compatibility
+                    salesman={item.salesman}
+                    tasktype={item.tasktype}
+                    clientId={item.clientId}
+                    clientName={item.clientName}
+                    location={item.location}
+                    referenceDetails={item.referenceDetails}
+                    sourceDHCO={item.sourceDHCO}
+                    status={item.status}
+                  />
                 </TouchableOpacity>
-              </View>
-            </View>
+              )}
+              contentContainerStyle={{paddingBottom: 20}}
+              ListEmptyComponent={
+                <Text style={styles.emptyList}>
+                  {searchQuery.trim() ? 'No matching tasks found' : 'No Task Found'}
+                </Text>
+              }
+              refreshing={false}
+              onRefresh={fetchTaskRecords}
+            />
           </View>
         );
-      case 'history':
+      default:
+        console.log('TaskLogTabs: Default case, returning empty view');
         return (
-          <View>
-            <View style={styles.RowContainer}>
-              <View style={styles.Subrowcontainer}>
-                <Text style={styles.Subrowcontainertxt}>Task History</Text>
-                <View style={styles.Badge}>
-                  <Text style={styles.Badgetext}>{TaskHitoryData.length}</Text>
-                </View>
-              </View>
-              <View style={styles.Searchbox}>
-                <Search height={12} width={12} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Search Clients"
-                  placeholderTextColor={Colors.balancedGray}
-                />
-              </View>
-              <View style={styles.Filterbox}>
-                <TouchableOpacity>
-                  <Filter height={12} width={12} />
-                </TouchableOpacity>
-              </View>
-            </View>
-            <View style={styles.Cardlist}>
-              <FlatList
-                data={TaskHitoryData}
-                keyExtractor={item => item.id.toString()}
-                renderItem={({item}) => (
-                  <TaskCard
-                    tasktype={capitalizeFirst(item.task_type || '')}
-                    taskDescription={item.task_description || ''}
-                    clientId={item.client?.toString() ?? ''}
-                    clientName={item.client_name || ''}
-                    location={undefined}
-                    referenceDetails={
-                      item.remark && String(item.remark).trim()
-                        ? String(item.remark)
-                        : 'NA'
-                    }
-                    sourceDHCO={
-                      item.completed_at && String(item.completed_at).trim()
-                        ? String(item.completed_at)
-                        : 'NA'
-                    }
-                    status={mapStatus(item.task_status)}
-                    historyStatus={item.completed_at ? 'Completed' : 'Pending'}
-                    showHistoryStatus={true}
-                    historyStatusLabel="Task Status"
-                    showReadMore={false}
-                  />
-                )}
-                contentContainerStyle={{flexGrow: 1}}
-                onRefresh={callgetTaskhistory}
-                ListEmptyComponent={
-                  isLoading ? (
-                    <ActivityIndicator
-                      size="large"
-                      color={Colors.primaryColor}
-                    />
-                  ) : (
-                    <Text style={styles.emptyList}>No Task History Found</Text>
-                  )
-                }
-                refreshing={false}
-              />
-            </View>
+          <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+            <Text>Loading...</Text>
           </View>
         );
     }
   };
 
+  console.log('TaskLogTabs: Component rendering...');
+
   return (
     <Container>
       <AppBar title="Task Log" navigation={navigation} />
-
+      <View>
+        <View style={styles.subContainer}>
+          <Text style={styles.subheader}>Task List</Text>
+        </View>
+      </View>
       <View style={styles.container}>
         {/* Tabs */}
-        <View style={styles.tabRow}>
-          {['Tasks', 'Update', 'History'].map((label, index) => {
-            const key = label.toLowerCase().split(' ')[0] as
-              | 'tasks'
-              | 'update'
-              | 'history';
-            return (
-              <TouchableOpacity
-                key={label}
-                onPress={() => setActiveTab(key)}
-                style={styles.tab}>
-                <Text
-                  style={[
-                    styles.tabText,
-                    activeTab === key && styles.activeTabText,
-                  ]}>
-                  {label}
-                </Text>
-                {activeTab === key && <View style={styles.activeIndicator} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <View />
 
         {/* Content */}
-        <ScrollView style={styles.content}>{renderTabContent()}</ScrollView>
+        <View style={styles.content}>{renderTabContent()}</View>
       </View>
     </Container>
   );
 };
 
 const styles = StyleSheet.create({
+  subContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.LimeGray,
+    paddingLeft: 16,
+    paddingVertical: 12,
+  },
+  subheader: {
+    fontSize: scaleFont(16),
+    fontWeight: fontWeight.SemiBold,
+    color: Colors.darkblack,
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -609,9 +492,9 @@ const styles = StyleSheet.create({
     gap: scaleWidth(10),
   },
   Searchbox: {
-    flex: 1,
+    flex: 1.5,
     flexDirection: 'row',
-    height: scaleHeight(29),
+    height: scaleHeight(40),
     marginLeft: 5,
     marginTop: 2,
     alignItems: 'center',

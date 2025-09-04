@@ -27,6 +27,7 @@ import {logoutUser} from '@services/api/api';
 
 export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const [isOpen, setIsOpen] = React.useState(false);
+  const [isTaskLogOpen, setIsTaskLogOpen] = React.useState(false);
   const {top, bottom} = useSafeAreaInsets();
   const userInfo = useSelector(userSelector.getUserInfo);
 
@@ -163,20 +164,48 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
               )}
             </View>
 
+            {/* Task Log Dropdown Section */}
             <View>
               <TouchableOpacity
                 style={styles.button}
-                onPress={() =>
-                  navigation.navigate('DocNavigator', {
-                    screen: 'TaskLogTabs',
-                  })
-                }>
+                onPress={() => {
+                  setIsTaskLogOpen(!isTaskLogOpen);
+                }}>
                 <View style={styles.rowCenter}>
-                  <Tasklog height={scaleHeight(20)} width={scaleWidth(20)} />
-                  <Text style={styles.buttonText}>Task log</Text>
+                  <Tasklog
+                    height={scaleHeight(24)}
+                    width={scaleWidth(24)}
+                  />
+                  <Text style={styles.buttonText}>
+                    Task Log
+                  </Text>
                 </View>
+                <UpChevron rotation={isTaskLogOpen ? 0 : 180} />
               </TouchableOpacity>
+              {isTaskLogOpen && (
+                <View style={{marginLeft: scaleWidth(24)}}>
+                  <TouchableOpacity
+                    style={styles.button}
+                    onPress={() =>
+                      navigation.navigate('DocNavigator', {
+                        screen: 'TaskLogTabs',
+                      })
+                    }>
+                    <Text style={styles.buttonText}>Task List</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.button}
+                    onPress={() =>
+                      navigation.navigate('DocNavigator', {
+                        screen: 'TaskHistTabs',
+                      })
+                    }>
+                    <Text style={styles.buttonText}>Task History</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
+
           </ScrollView>
         </View>
         {/* Logout Button*/}

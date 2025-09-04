@@ -7,6 +7,8 @@ import {
   DocValidSelection,
   PersonalKYCValidation,
   TaskLogTabs,
+  TaskHistTabs,
+  TaskUpdate,
 } from '@screens/index';
 import {DocNavigatorType} from '@type/NavigatorTypes';
 
@@ -27,6 +29,8 @@ export const DocNavigator = () => {
         component={BusinessKYCValidation}
       />
       <Stack.Screen name="TaskLogTabs" component={TaskLogTabs} />
+      <Stack.Screen name="TaskHistTabs" component={TaskHistTabs} />
+      <Stack.Screen name="TaskUpdate" component={TaskUpdate} />
     </Stack.Navigator>
   );
 };

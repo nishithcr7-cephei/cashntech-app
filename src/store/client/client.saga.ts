@@ -18,7 +18,6 @@ import {
   getSoftSanction,
   getSoftSanctionBnkPro,
   getSoftSanctionRuleset,
-  getTaskHistory,
   getVendorDetails,
   getVisitDetails,
   prepareClientForEdit,
@@ -68,8 +67,6 @@ import {
   BasicDetailsResponse,
   IBankListResponse,
   ILeadProgressResponse,
-  IRemarkReportResponse,
-  ITaskHistoryResponse,
   IUploadKycDocumentPayload,
   IUploadKycDocumentResponse,
   IKycCheckedResponse,
@@ -96,9 +93,11 @@ import {
   IFilterPayload,
   IBankStatementPayload,
   IKYCBusinessResponse,
+  IRemarkReportResponse,
 } from '.';
 import {Result} from '@utils/TryCatch';
 import clientApi from '@services/api/client.api';
+import taskApi from '@services/api/task.api';
 import {PayloadAction} from '@reduxjs/toolkit';
 import moment from 'moment';
 import {PayloadWithCallback} from '@type/global.types';
@@ -106,6 +105,7 @@ import {
   IFilterResponseDatum,
   ITaskRecordsFilterPayload,
   ITaskReordsFilterResponseDatum,
+  ITaskHistoryResponse,
   BasicDetailsType,
   ClientsDetailsType,
   ClientsDetailsPayload,
@@ -131,6 +131,7 @@ import {AxiosError} from 'axios';
 import {decryptUtility, encryptUtility} from '@utils/crypto';
 import {ProductCategory, UserResponse} from '@screens/index';
 import Cities from '@constants/Cities';
+import {tasklogActions} from '@store/tasklog';
 
 function* handleGetRemarkReport(): unknown {
   const {data, error}: Result<IRemarkReportResponse> = yield call(
@@ -186,13 +187,18 @@ function* handleGetLeadDesProgress({
 }
 
 function* handleGetTaskHistory(): unknown {
+  const {first_name, last_name}: UserState = yield select(
+    userSelector.getUserInfo,
+  );
+  const userName = `${first_name} ${last_name}`;
   const {data, error}: Result<ITaskHistoryResponse> = yield call(
-    clientApi.getTaskHistory,
+    taskApi.getTaskHistory,
+    userName,
   );
   if (!error) {
-    yield put(clientActions.setTaskHistoryList(data.data));
+    yield put(tasklogActions.setTaskHistoryList(data.data));
   } else {
-    yield put(clientActions.setTaskHistoryList([]));
+    yield put(tasklogActions.setTaskHistoryList([]));
   }
 }
 
@@ -631,7 +637,7 @@ function* saveVendorDetailsSaga(): unknown {
     vendor_name: vendor.vendorName.trim(),
     address: vendor.address.trim(),
     city: vendor.city,
-    state: vendor.state ?? '',
+    state: String(vendor.state ?? ''),
     pin_code: vendor.pinCode.trim(),
     vendor_contact_number: vendor.vendorContactNumber.trim(),
     monthly_sales_value: Number(vendor.monthlySalesValue),
@@ -1158,17 +1164,6 @@ function* handleGetBusinessChecked({payload}: PayloadAction<string>): unknown {
   }
 }
 
-function* handleGetSoftSantion(): unknown {
-  const {data, error}: Result<ISoftSanctionResponse> = yield call(
-    ClientApis.getSoftSanction,
-  );
-  if (!error) {
-    yield put(clientActions.setSoftSanctionList(data.data));
-  } else {
-    yield put(clientActions.setSoftSanctionList([]));
-  }
-}
-
 function* handleGetSoftSantionBnkPro(action: {
   payload: {bank: string; product: string};
 }): Generator<any, void, any> {
@@ -1258,7 +1253,7 @@ function* handleGetSoftSanctionClientList() {
   }
 }
 
-function* handleGetSoftSanctionFields(action: any): Generator<any, void, any> {
+function* handleGetSoftSanctionFields(action: PayloadAction<{bankName: string; productName: string}>): Generator<any, void, any> {
   yield put(clientActions.setSoftSanctionFieldsLoading());
   const {bankName, productName} = action.payload;
   const {data, error}: Result<any> = yield call(
@@ -1306,9 +1301,9 @@ function* handleBankStatement(action: PayloadAction<IBankStatementPayload>) {
 
     files.forEach((file, index) => {
       formData.append(`files[${index}]`, {
-        uri: file.uri,
-        name: file.name,
-        type: file.type,
+        uri: (file as any).uri,
+        name: (file as any).name,
+        type: (file as any).type,
       } as any);
     });
 
@@ -1331,7 +1326,7 @@ function* handleBankStatement(action: PayloadAction<IBankStatementPayload>) {
   }
 }
 
-function* handleGetClientDetails(action: PayloadAction<number>) {
+function* handleGetClientDetails(action: PayloadAction<number>): Generator<any, void, any> {
   try {
     const clientId = action.payload;
     console.log('Using axiosInstance baseURL for client details');
@@ -1448,11 +1443,9 @@ export default function* clientSaga() {
   yield takeLatest(getVisitDetails.type, getVisitDetailsFormData);
   yield takeLatest(prepareClientForEdit.type, handlePrepareClientForEdit);
   yield takeLatest(deleteClientRequest.type, handleDeleteClient);
-
   yield takeLatest(getReport.type, handleGetRemarkReport);
   yield takeLatest(getLead.type, handleGetLeadProgress);
   yield takeLatest(getLeadDesciption.type, handleGetLeadDesProgress);
-  yield takeLatest(getTaskHistory.type, handleGetTaskHistory);
 
   yield takeLatest(uploadKycRequest.type, handleUploadKyc);
   yield takeLatest(uploadPanRequest.type, handleUploadPan);
@@ -1467,8 +1460,7 @@ export default function* clientSaga() {
   yield takeLatest(getBankList.type, hnadleGetBankList);
   yield takeLatest(getKycChecked.type, handleGetKycChecked);
   yield takeLatest(getKycBusinessChecked.type, handleGetBusinessChecked);
-  yield takeLatest(getSoftSanction.type, handleGetSoftSantion);
-  yield takeLatest(getSoftSanctionBnkPro.type, handleGetSoftSantionBnkPro);
+  yield takeLatest(getSoftSanctionBnkPro, handleGetSoftSantionBnkPro);
   yield takeLatest(FilterRequest.type, handleFilterbox);
   yield takeLatest(TaskRecordsFilterRequest.type, handleTaskRecordsFilter);
   yield takeLatest(bankStatementRequest.type, handleBankStatement);

@@ -18,14 +18,8 @@ export type ClientState = {
   isSavedVendorDetails: boolean;
   isSavedVisitDetails: boolean;
 
-  reportLoader: boolean;
-  reportList: Array<IRemarkReportResponseDatum>;
-
   leadLoader: boolean;
   leadList: Array<ILeadProgressResponseDatum>;
-
-  TaskHistoryLoader: boolean;
-  TaskHistoryList: Array<ITaskHistoryResponseDatum>;
 
   basicLoader: boolean;
   clientId: null;
@@ -133,6 +127,13 @@ export type ClientState = {
   leadProgressDetails: any[];
   leadProgressDetailsLoading: boolean;
   leadProgressDetailsError: string | null;
+
+  // Report properties
+  reportLoader: boolean;
+  reportList: Array<IRemarkReportResponseDatum>;
+
+  // Task History properties
+  TaskHistoryLoader: boolean;
 };
 
 export type BasicDetailsType = {
@@ -423,6 +424,32 @@ export interface Task {
   task_status: string;
   remark: null;
   completed_at: null;
+}
+
+export interface IClientInfoSuccessResponse {
+  statusCode: number;
+  message: string;
+  data: Array<IClientInfoResponseDatum>;
+}
+
+export interface IClientInfoResponseDatum {
+  reference_details: any;
+  monthly_turnover: any;
+  financier_name: any;
+  id: number;
+  source_of_lead: string;
+  city: string;
+  client_name: string;
+  firm_name: string;
+  bank_name: string;
+  estimated_funding_required: number;
+  user: {id: number; first_name: string; last_name: string} | null;
+  vendor: Array<Vendor>;
+}
+
+export interface Vendor {
+  id: number;
+  monthly_sales_value: number;
 }
 
 export interface ILeadProgressResponse {

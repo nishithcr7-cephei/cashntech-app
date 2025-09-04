@@ -717,6 +717,37 @@ const taskRecordsFilter = async (payload: ITaskRecordsFilterPayload) => {
   };
 };
 
+const getTaskRecords = async (payload: any) => {
+  const {data, error} = await tryCatch<AxiosResponse<any>>(
+    Api.post(Endpoints.apiTaskRecords, payload, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {data: null, error};
+  }
+  return {data: data.data, error: null};
+};
+
+const getTaskHistory = async (userName: string) => {
+  const endpoint = Endpoints.apiGetTaskHistory(userName);
+  console.log('=== CLIENT API GETTASKHISTORY ===');
+  console.log('ClientAPI: UserName received:', userName);
+  console.log('ClientAPI: Endpoint generated:', endpoint);
+  console.log('ClientAPI: Full URL will be constructed by axios');
+  console.log('=== END CLIENT API GETTASKHISTORY ===');
+  
+  const {data, error} = await tryCatch<AxiosResponse<any>>(
+    Api.get(endpoint, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {data: null, error};
+  }
+  return {data: data.data, error: null};
+};
+
 const bankStatement = async (FormData: FormData) => {
   const {data, error} = await tryCatch<AxiosResponse<any>>(
     Api.post(Endpoints.apiBankStatement, FormData, {
@@ -880,7 +911,7 @@ const getSoftSanctionFields = async (bankName: string, productName: string) => {
 
 const taskUpdate = async (taskId: string, body: any) => {
   const {data, error} = await tryCatch<AxiosResponse<any>>(
-    Api.post(`/client-info-master/${taskId}/task-update`, body, {
+    Api.patch(`/client-info-master/${taskId}/task-update`, body, {
       authRequired: true,
     } as CustomRequestConfig),
   );
@@ -943,6 +974,8 @@ export default {
   getLeadProgress,
   getLeadDesProgress,
   getTaskHistory,
+  saveVendorForm,
+  saveVisitForm,
   uploadKycDocument,
   uploadPanDocument,
   uploadAadharDocument,
@@ -973,4 +1006,6 @@ export default {
   taskUpdate,
   getVisitDetailsList,
   getRemarkReportByClient,
+  getTaskRecords,
+  getTaskHistory,
 };
