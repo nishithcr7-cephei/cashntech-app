@@ -1,7 +1,6 @@
 import {call, put, takeLatest} from 'redux-saga/effects';
 import {Result} from '@utils/TryCatch';
 import clientApi from '@services/api/client.api';
-import taskApi from '@services/api/task.api';
 import {
   IRemarkReportResponse,
   ITaskHistoryResponse,
@@ -23,7 +22,8 @@ function* handleGetRemarkReport(): unknown {
 
 function* handleGetTaskHistory(): unknown {
   const {data, error}: Result<ITaskHistoryResponse> = yield call(
-    taskApi.getTaskHistory,
+    clientApi.getTaskRecords,
+    {hasTask: true},
   );
   if (!error) {
     yield put(tasklogActions.setTaskHistoryList(data.data));
@@ -37,7 +37,7 @@ function* handleUpdateTask(action: any): unknown {
   const {taskId, data} = action.payload;
   
   const {data: responseData, error}: Result<ITaskUpdateResponse> = yield call(
-    taskApi.taskUpdate,
+    clientApi.taskUpdate,
     taskId,
     data,
   );
@@ -57,7 +57,7 @@ function* handleGetUserTaskHistory(action: any): unknown {
   const userName = action.payload;
   
   const {data, error}: Result<IUserTaskHistoryResponse> = yield call(
-    taskApi.getTaskHistory,
+    clientApi.getTaskHistory,
     userName,
   );
   

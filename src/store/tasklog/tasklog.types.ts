@@ -84,7 +84,6 @@ export interface ITaskDisplayItem {
   status: 'Warm' | 'Hot' | 'Cold';
   raw: ITaskItem | ITaskHistoryItem; // Original API data
 }
-
 export interface IRemarkReportResponse {
   statusCode: number;
   message: string;
@@ -130,7 +129,6 @@ export interface ITaskHistoryResponseDatum {
 export type ITaskRecordsRequest = {
   hasTask: boolean;
 };
-
 export interface ITaskUpdateRequest {
   task_status: string;
   remark: string;

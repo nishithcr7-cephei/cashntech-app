@@ -23,7 +23,6 @@ import {
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 import clientApi from '@services/api/client.api';
-import taskApi from '@services/api/task.api';
 import {decryptConditionally} from '@utils/crypto';
 
 type DocNavigationType = CompositeNavigationProp<
@@ -51,8 +50,7 @@ export const TaskLogTabs = () => {
     setIsLoading(true);
     try {
       const body = {hasTask: true};
-      
-      const res = await taskApi.getTaskRecords(body);
+      const res = await clientApi.getTaskRecords(body);
       
       const list = Array.isArray(res?.data?.data)
         ? res.data.data
@@ -125,7 +123,6 @@ export const TaskLogTabs = () => {
     const year = d.getFullYear();
     return `${day}-${month}-${year}`;
   };
-
   const formatToMonthYear = (iso?: string) => {
     if (!iso) return 'NA';
     const d = new Date(iso);
@@ -299,6 +296,8 @@ export const TaskLogTabs = () => {
         );
     }
   };
+
+  console.log('TaskLogTabs: Component rendering...');
 
   return (
     <Container>

@@ -451,6 +451,32 @@ export interface Task {
   completed_at: null;
 }
 
+export interface IClientInfoSuccessResponse {
+  statusCode: number;
+  message: string;
+  data: Array<IClientInfoResponseDatum>;
+}
+
+export interface IClientInfoResponseDatum {
+  reference_details: any;
+  monthly_turnover: any;
+  financier_name: any;
+  id: number;
+  source_of_lead: string;
+  city: string;
+  client_name: string;
+  firm_name: string;
+  bank_name: string;
+  estimated_funding_required: number;
+  user: {id: number; first_name: string; last_name: string} | null;
+  vendor: Array<Vendor>;
+}
+
+export interface Vendor {
+  id: number;
+  monthly_sales_value: number;
+}
+
 export interface ILeadProgressResponse {
   statusCode: number;
   message: string;

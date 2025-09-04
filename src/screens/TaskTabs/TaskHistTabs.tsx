@@ -22,7 +22,6 @@ import {
   FlatList,
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
-import taskApi from '@services/api/task.api';
 import {decryptConditionally} from '@utils/crypto';
 import {userSelector} from '@store/user';
 
@@ -150,7 +149,6 @@ export const TaskHistTabs = () => {
     raw: task,
     srNo: globalIndex + 1,
   }));
-
   // Filter tasks based on search query
   const filteredTaskList = taskList.filter((item: ITaskDisplayItem) => {
     if (!searchQuery.trim()) return true;
