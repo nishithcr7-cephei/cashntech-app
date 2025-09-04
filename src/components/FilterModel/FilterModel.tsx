@@ -16,7 +16,7 @@ import {Colors} from '@constants/index';
 type FilterModelProps = {
   visible: boolean;
   onClose: () => void;
-  onApply?: (selectedFilter: {menu: string; option: string | null}) => void;
+  onApply?: (selectedFilter: Record<string, string[]>) => void;
 };
 
 const Data: Record<string, string[]> = {
@@ -32,34 +32,53 @@ export const FilterModel: React.FC<FilterModelProps> = ({
   onClose,
   onApply,
 }) => {
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [selectedMenus, setSelectedMenus] = useState<string>(sideMenu[0]);
+  const [selectedFilters, setSelectedFilters] = useState<
+    Record<string, string[]>
+  >({
+    City: [],
+    Sector: [],
+    Source: [],
+  });
 
   const clearFilters = () => {
-    setSelectedOption(null);
+    setSelectedFilters({City: [], Sector: [], Source: []});
     setSelectedMenus(sideMenu[0]);
   };
 
   const handleApply = () => {
-    onApply && onApply({menu: selectedMenus, option: selectedOption});
+    onApply && onApply(selectedFilters);
     onClose();
+  };
+
+  const toggleOption = (menu: string, option: string) => {
+    setSelectedFilters(prev => {
+      const currentOptions = prev[menu] || [];
+      if (currentOptions.includes(option)) {
+        return {...prev, [menu]: currentOptions.filter(o => o !== option)};
+      } else {
+        return {...prev, [menu]: [...currentOptions, option]};
+      }
+    });
   };
 
   const toggleMenu = (menu: string) => {
     setSelectedMenus(menu);
-    setSelectedOption(null);
   };
 
-  const renderOptionItem = ({item}: {item: string}) => (
-    <TouchableOpacity
-      style={styles.optionRow}
-      onPress={() => setSelectedOption(prev => (prev === item ? null : item))}>
-      <View style={styles.checkbox}>
-        {selectedOption === item && <Tick width={14} height={14} />}
-      </View>
-      <Text style={styles.optionText}>{item}</Text>
-    </TouchableOpacity>
-  );
+  const renderOptionItem = ({item}: {item: string}) => {
+    const isSelected = selectedFilters[selectedMenus]?.includes(item);
+    return (
+      <TouchableOpacity
+        style={styles.optionRow}
+        onPress={() => toggleOption(selectedMenus, item)}>
+        <View style={styles.checkbox}>
+          {isSelected && <Tick width={14} height={14} />}
+        </View>
+        <Text style={styles.optionText}>{item}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <Modal
@@ -79,7 +98,7 @@ export const FilterModel: React.FC<FilterModelProps> = ({
         <View style={styles.content}>
           <View style={styles.sideMenu}>
             {sideMenu.map((menu, index) => {
-              const isSelected = selectedMenus.includes(menu);
+              const isSelected = selectedMenus === menu;
               return (
                 <TouchableOpacity
                   key={index}
