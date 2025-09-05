@@ -11,8 +11,6 @@ import {
   ILeadProgressResponse,
   IRemarkReportResponse,
   ITaskHistoryResponse,
-  IVisitPayload,
-  IvisitResponse,
   IKycCheckedResponse,
   ISoftSanctionResponse,
   IsoftSanctionBankProductResponse,
@@ -25,6 +23,7 @@ import {
   MasterBankResponse,
   FirmDetailsPayload,
   VendorDetailsPayload,
+  VisitDetailsPayload,
 } from '@store/client';
 import {CustomRequestConfig} from './api';
 import {storage} from '@services/localStorage';
@@ -287,9 +286,14 @@ const saveVendorDetailsForm = async (
   };
 };
 
-const saveVisitForm = async (clientId: string, body: IVisitPayload) => {
-  const {data, error} = await tryCatch<AxiosResponse<IvisitResponse>>(
-    Api.post(Endpoints.apiSaveVisitDetails(clientId), body, {
+const saveVisitDetailsForm = async (
+  clientId: string,
+  body: VisitDetailsPayload,
+) => {
+  const {data, error} = await tryCatch<
+    AxiosResponse<{statusCode: number; message: string}>
+  >(
+    Api.post(`${Endpoints.apiSaveVisitDetails}${clientId}`, body, {
       authRequired: true,
     } as CustomRequestConfig),
   );
@@ -820,6 +824,7 @@ export default {
   saveClientsDetailsForm,
   saveFirmDetailsForm,
   saveVendorDetailsForm,
+  saveVisitDetailsForm,
 
   getClientsDetailsForm,
   getMasterBankList,
@@ -828,7 +833,6 @@ export default {
   getLeadProgress,
   getLeadDesProgress,
   getTaskHistory,
-  saveVisitForm,
   uploadKycDocument,
   uploadPanDocument,
   uploadAadharDocument,

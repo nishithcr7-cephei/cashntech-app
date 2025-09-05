@@ -1,5 +1,5 @@
 import Cities from '@constants/Cities';
-import {ProductCategory} from '@screens/index';
+import {IntentType, ProductCategory, UserResponse} from '@screens/index';
 
 export type ClientState = {
   clientLoader: boolean;
@@ -8,12 +8,14 @@ export type ClientState = {
   clientsDetails: ClientsDetailsType;
   firmDetails: FirmDetailsType;
   vendorDetails: VendorDetailsType;
+  visitDetails: VisitDetailsType;
 
   clientFormId: number | undefined;
   masterBankList: Array<{id: number; bank_name: string}>;
   isSavedClientsDetails: boolean;
   isSavedFirmDetails: boolean;
   isSavedVendorDetails: boolean;
+  isSavedVisitDetails: boolean;
 
   reportLoader: boolean;
   reportList: Array<IRemarkReportResponseDatum>;
@@ -181,6 +183,14 @@ export type VendorDetailsType = Array<{
   monthlySalesValue: string;
 }>;
 
+export type VisitDetailsType = {
+  userResponse: UserResponse | undefined;
+  intent: IntentType | undefined;
+  dateOfNextVisit: Date | undefined;
+  interestedFor: string;
+  reasonForNotInterested: string;
+};
+
 export interface ClientsDetailsResponseType {
   statusCode: number;
   data: Array<{
@@ -213,6 +223,20 @@ export type VendorDetailsPayload = Array<{
   vendor_contact_number: string;
   monthly_sales_value: number;
 }>;
+
+export type VisitDetailsPayload =
+  | {
+      client_response: UserResponse.INTERESTED;
+      intent: string;
+      date_of_next_visit: string;
+      created_by: string;
+    }
+  | {
+      client_response: UserResponse.NOT_INTERESTED;
+      reason_for_not_interested: string;
+      are_you_interested_for: string;
+      created_by: string;
+    };
 
 export interface IClientInfoSuccessResponse {
   statusCode: number;
@@ -376,19 +400,6 @@ export type Client = {
   deleted_at: any;
   user: any;
   kyc: any;
-};
-
-export type IVisitPayload = {
-  client_response: string;
-  intent: string;
-  date_of_next_visit: string;
-  reason_for_not_interested: string;
-  are_you_interested_for: string;
-};
-
-export type IvisitResponse = {
-  statusCode: number;
-  message: string;
 };
 
 export interface IUploadKycDocumentPayload {

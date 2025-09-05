@@ -11,6 +11,7 @@ export * from './ClientInfo/BasicDetailForm';
 export * from './ClientInfo/ClientDetailForm';
 export * from './ClientInfo/FirmDetailForm';
 export * from './ClientInfo/VendorDetailForm';
+export * from './ClientInfo/VisitDetailForm';
 
 export * from './ClientLeadInfoTabs/ClientLeadInfoTab';
 export * from './CompanyDocuments/CompanyDocument';

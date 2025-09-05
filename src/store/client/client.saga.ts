@@ -111,11 +111,14 @@ import {
   FirmDetailsPayload,
   VendorDetailsType,
   VendorDetailsPayload,
+  VisitDetailsPayload,
+  VisitDetailsType,
 } from './client.types';
 import Toast from 'react-native-toast-message';
 import {userSelector, UserState} from '@store/user';
 import {AxiosError} from 'axios';
 import {decryptUtility, encryptUtility} from '@utils/crypto';
+import {UserResponse} from '@screens/index';
 
 function* handleGetClient(): unknown {
   console.log('Saga: handleGetClient called');
@@ -370,6 +373,7 @@ function* getClientsDetailsSaga(): unknown {
     ClientsDetailsResponseType,
     AxiosError<{message?: string}>
   > = yield call(ClientApis.getClientsDetailsForm, clientId);
+  yield put(clientActions.setClientLoader(false));
   if (error) {
     Toast.show({
       type: 'error',
@@ -389,7 +393,6 @@ function* getClientsDetailsSaga(): unknown {
     })) || [];
 
   yield put(clientActions.setAllClientsDetails(clientsDetails));
-  yield put(clientActions.setClientLoader(false));
 }
 
 function* handleGetMasterBankList(): unknown {
@@ -399,6 +402,7 @@ function* handleGetMasterBankList(): unknown {
   }: Result<MasterBankResponse, AxiosError<{message?: string}>> = yield call(
     ClientApis.getMasterBankList,
   );
+  yield put(clientActions.setClientLoader(false));
   if (error) {
     Toast.show({
       type: 'error',
@@ -408,7 +412,6 @@ function* handleGetMasterBankList(): unknown {
     return;
   }
   yield put(clientActions.setMasterBankList(data.data));
-  yield put(clientActions.setClientLoader(false));
 }
 
 function* saveFirmDetailsSaga(): unknown {
@@ -440,6 +443,7 @@ function* saveFirmDetailsSaga(): unknown {
     {statusCode: number; message: string},
     AxiosError<{message?: string}>
   > = yield call(ClientApis.saveFirmDetailsForm, clientId, body);
+  yield put(clientActions.setClientLoader(false));
   if (error) {
     Toast.show({
       type: 'error',
@@ -447,7 +451,6 @@ function* saveFirmDetailsSaga(): unknown {
     });
     return;
   }
-  yield put(clientActions.setClientLoader(false));
   yield put(clientActions.setSavedFirmDetailsStatus(true));
   Toast.show({
     type: 'success',
@@ -477,6 +480,7 @@ function* saveVendorDetailsSaga(): unknown {
     {statusCode: number; message: string},
     AxiosError<{message?: string}>
   > = yield call(ClientApis.saveVendorDetailsForm, clientId, body);
+  yield put(clientActions.setClientLoader(false));
   if (error) {
     Toast.show({
       type: 'error',
@@ -486,7 +490,6 @@ function* saveVendorDetailsSaga(): unknown {
     });
     return;
   }
-  yield put(clientActions.setClientLoader(false));
   yield put(clientActions.setSavedVendorDetailsStatus(true));
   Toast.show({
     type: 'success',
@@ -494,43 +497,51 @@ function* saveVendorDetailsSaga(): unknown {
   });
 }
 
-function* savevisit(): unknown {
-  // TODO: update function
-  const clientFormData: any = yield select(clientSelector.getClientFormData);
-  const clientId: number = yield select(clientSelector.getClientFormId);
-  const visitForm = clientFormData.VisitScreen;
+function* saveVisitDetailsSaga(): unknown {
+  const clientId = yield select(clientSelector.getClientFormId);
+  const {first_name, last_name}: UserState = yield select(
+    userSelector.getUserInfo,
+  );
+  const visitDetails: VisitDetailsType = yield select(
+    clientSelector.getVisitDetailsFormData,
+  );
 
-  const body: IVisitPayload = {
-    client_response: visitForm.UserResponse,
-    intent: visitForm.intent,
-    date_of_next_visit: moment(visitForm.nextVisitDate).format('YYYY-MM-DD'),
-    reason_for_not_interested: visitForm.reason,
-    are_you_interested_for: visitForm.interested,
-  };
-
-  try {
-    const {data, error}: Result<IvisitResponse> = yield call(
-      ClientApis.saveVisitForm,
-      String(clientId),
-      body,
-    );
-    if (!error && data) {
-      Toast.show({
-        type: 'success',
-        text1: data.message || 'Visit details saved successfully.',
-      });
-    } else {
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to save visit details.',
-      });
-    }
-  } catch (e: any) {
+  let body: VisitDetailsPayload;
+  if (!visitDetails.userResponse) return;
+  if (visitDetails.userResponse === UserResponse.INTERESTED) {
+    body = {
+      client_response: visitDetails.userResponse,
+      intent: visitDetails.intent ?? '',
+      date_of_next_visit: moment(visitDetails.dateOfNextVisit).toISOString(),
+      created_by: `${first_name} ${last_name}`,
+    };
+  } else {
+    body = {
+      client_response: visitDetails.userResponse,
+      are_you_interested_for: visitDetails.interestedFor,
+      reason_for_not_interested: visitDetails.reasonForNotInterested,
+      created_by: `${first_name} ${last_name}`,
+    };
+  }
+  const {
+    error,
+  }: Result<
+    {statusCode: number; message: string},
+    AxiosError<{message?: string}>
+  > = yield call(ClientApis.saveVisitDetailsForm, clientId, body);
+  yield put(clientActions.setClientLoader(false));
+  if (error) {
     Toast.show({
       type: 'error',
-      text1: 'Failed to save visit details.',
+      text1: error.response?.data?.message || 'Failed to save visit details.',
     });
+    return;
   }
+  yield put(clientActions.setSavedVisitDetailsStatus(true));
+  Toast.show({
+    type: 'success',
+    text1: 'Visit details saved successfully.',
+  });
 }
 
 function* handleUploadKyc(action: PayloadAction<IUploadKycDocumentPayload>) {
@@ -1213,13 +1224,13 @@ export default function* clientSaga() {
   yield takeLatest(getMasterBankList.type, handleGetMasterBankList);
   yield takeLatest(saveFirmDetails.type, saveFirmDetailsSaga);
   yield takeLatest(saveVendorDetails.type, saveVendorDetailsSaga);
+  yield takeLatest(saveVisitDetails.type, saveVisitDetailsSaga);
 
   yield takeLatest(getReport.type, handleGetRemarkReport);
   yield takeLatest(getLead.type, handleGetLeadProgress);
   yield takeLatest(getLeadDesciption.type, handleGetLeadDesProgress);
   yield takeLatest(getTaskHistory.type, handleGetTaskHistory);
 
-  yield takeLatest(saveVisitDetails.type, savevisit);
   yield takeLatest(uploadKycRequest.type, handleUploadKyc);
   yield takeLatest(uploadPanRequest.type, handleUploadPan);
   yield takeLatest(uploadAdharRequest.type, handleUploadAdhar);

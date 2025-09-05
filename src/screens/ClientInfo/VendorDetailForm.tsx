@@ -281,13 +281,12 @@ export const VendorDetailForm = ({navigation}: Props) => {
 
   const handleNext = () => {
     if (isSavedVendorDetails) {
-      // TODO: replace with next form 
-      navigation.navigate(ClientScreens.VendorDetailForm);
+      navigation.navigate(ClientScreens.VisitDetailForm);
     } else {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Please save the vendor details before proceeding.',
+        text2: 'Please save the form before proceeding to next step.',
       });
     }
   };

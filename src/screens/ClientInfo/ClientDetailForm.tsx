@@ -50,9 +50,9 @@ export const ClientDetailForm = ({navigation}: Props) => {
     clientSelector.getClientsDetailsFormStatus,
   );
 
-  function setData<T>(
-    field: keyof ClientsDetailsType[number],
-    value: T,
+  function setData<T extends keyof ClientsDetailsType[number]>(
+    field: T,
+    value: ClientsDetailsType[number][T],
     index: number,
   ) {
     dispatch(clientActions.setClientsDetails([{[field]: value}, index]));
@@ -82,7 +82,7 @@ export const ClientDetailForm = ({navigation}: Props) => {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Please save the client details before proceeding.',
+        text2: 'Please save the form before proceeding to next step.',
       });
     }
   };

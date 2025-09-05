@@ -96,7 +96,10 @@ export const BasicDetailForm = ({navigation}: Props) => {
   const clientLoader = useSelector(clientSelector.getClientLoader);
   const fullName = useSelector(userSelector.getFullName);
 
-  function setData<T>(field: keyof BasicDetailsType, value: T) {
+  function setData<T extends keyof BasicDetailsType>(
+    field: T,
+    value: BasicDetailsType[T],
+  ) {
     dispatch(clientActions.setBasicDetails({[field]: value}));
   }
 
@@ -208,7 +211,7 @@ export const BasicDetailForm = ({navigation}: Props) => {
           <CustomDropdown
             label="State"
             data={listOfStates}
-            onChange={value => setData('state', value)}
+            onChange={value => setData('state', value as keyof typeof Cities)}
             value={state}
           />
           <CustomDropdown

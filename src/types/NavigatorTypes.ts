@@ -66,8 +66,7 @@ export type ClientNavigatorType = {
   ClientDetailForm: undefined;
   FirmDetailForm: undefined;
   VendorDetailForm: undefined;
-  ClientLeadInfoTab: {clientId: number};
-  ClientCardReadMore: undefined;
+  VisitDetailForm: undefined;
 };
 
 export type SoftNavigatorType = {
