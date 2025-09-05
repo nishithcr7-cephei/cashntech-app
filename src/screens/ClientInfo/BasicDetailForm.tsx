@@ -116,6 +116,7 @@ export const BasicDetailForm = ({navigation}: Props) => {
   };
 
   const handleSave = () => {
+    if (!validateForm()) return;
     if (clientFormId) {
       dispatch(clientActions.updateClientBasicDetails());
       return;
@@ -133,6 +134,35 @@ export const BasicDetailForm = ({navigation}: Props) => {
         text2: 'Please save the form before proceeding to next step.',
       });
     }
+  };
+
+  const requiredFields = [
+    {field: sourceOfLead, name: 'Source of Lead'},
+    {field: programType, name: 'Type of Program'},
+    {field: productType, name: 'Product Type'},
+    {field: firmName, name: 'Firm Name'},
+    {field: state, name: 'State'},
+    {field: city, name: 'City'},
+    {field: dateOfVisit, name: 'Date of Visit'},
+    {field: location, name: 'Location'},
+    {field: address, name: 'Address'},
+  ];
+
+  const validateForm = () => {
+    for (let i = 0; i < requiredFields.length; i++) {
+      if (
+        !requiredFields[i].field ||
+        !(requiredFields[i].field ?? '').toString().trim()
+      ) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `Please enter ${requiredFields[i].name}`,
+        });
+        return false;
+      }
+    }
+    return true;
   };
 
   return (

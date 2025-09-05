@@ -46,7 +46,9 @@ export const ClientDetailForm = ({navigation}: Props) => {
   const clientFormId = useSelector(clientSelector.getClientFormId);
   const clientLoader = useSelector(clientSelector.getClientLoader);
   const clientDetails = useSelector(clientSelector.getClientDetailsFormData);
-  const isSavedClientsDetails = useSelector(clientSelector.getClientsDetailsFormStatus);
+  const isSavedClientsDetails = useSelector(
+    clientSelector.getClientsDetailsFormStatus,
+  );
 
   function setData<T>(
     field: keyof ClientsDetailsType[number],
@@ -65,9 +67,10 @@ export const ClientDetailForm = ({navigation}: Props) => {
   };
 
   const handleSave = () => {
+    if (!validateForm()) return;
     if (isSavedClientsDetails) {
       dispatch(clientActions.saveClientsDetails());
-    }else {
+    } else {
       dispatch(clientActions.updateClientsDetails());
     }
   };
@@ -86,6 +89,26 @@ export const ClientDetailForm = ({navigation}: Props) => {
 
   const removeClient = (id: string) => {
     dispatch(clientActions.removeClientDetails(id));
+  };
+
+  const validateForm = () => {
+    for (let i = 0; i < clientDetails.length; i++) {
+      const client = clientDetails[i];
+      if (
+        !client.nameOfClient ||
+        !client.clientType ||
+        !client.contactNumber ||
+        !client.email
+      ) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `Please fill all fields for Client ${i + 1}.`,
+        });
+        return false;
+      }
+    }
+    return true;
   };
 
   return (

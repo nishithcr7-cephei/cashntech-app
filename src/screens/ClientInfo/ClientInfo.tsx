@@ -1,5 +1,5 @@
 import {Filter, Plus, Search} from '@assets/Icons';
-import {AppBar, ClientCard, Container, FilterDropdown} from '@components/index';
+import {AppBar, ClientCard, Container, FilterModel} from '@components/index';
 import {ClientScreens, Colors, FontWeight} from '@constants/index';
 import {DrawerScreenProps} from '@react-navigation/drawer';
 import {CompositeScreenProps} from '@react-navigation/native';
@@ -18,11 +18,9 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
-  TouchableWithoutFeedback,
   BackHandler,
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
-import clientApi from '@services/api/client.api';
 import {decryptLocation} from '@utils/crypto';
 
 type NavigationType = CompositeScreenProps<
@@ -37,19 +35,14 @@ type ClientInfoProps = {
 export const ClientInfo: React.FC<ClientInfoProps> = ({navigation}) => {
   const [showReadMore, setShowReadMore] = useState(false);
   const [readMoreClientId, setReadMoreClientId] = useState<number | null>(null);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-
   const [filteredClients, setFilteredClients] = useState<any[]>([]);
   const [filterLoading, setFilterLoading] = useState(false);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-
   const [searchQuery, setSearchQuery] = useState('');
-
   const stopBackPress = useRef(false);
-
   const dispatch = useDispatch();
   const clientsData = useSelector(clientSelector.getClientList);
   const loading = useSelector(clientSelector.getBasicDetailLoading); // This is actually clientLoader
+  const [showFilterModel, setShowFilterModel] = useState(false);
 
   const callGetClients = () => {
     dispatch(clientActions.getClients());
@@ -163,135 +156,6 @@ export const ClientInfo: React.FC<ClientInfoProps> = ({navigation}) => {
     return () => backHandler.remove();
   }, []);
 
-  // Update filtered clients when clientsData changes
-  // useEffect(() => {
-  //   setFilteredClients(clientsData);
-
-  //   // Mark that data has been loaded at least once
-  //   if (!loading && !hasLoadedOnce) {
-  //     setHasLoadedOnce(true);
-  //   }
-  // }, [clientsData, loading, hasLoadedOnce]);
-
-  // useEffect(() => {
-  //   if (!isFilterOpen) {
-  //     setFilteredClients(clientsData);
-  //   }
-  // }, [clientsData, isFilterOpen]);
-
-  const handleApplyFilter = async () => {
-    setFilterLoading(true);
-    const payload = {
-      locations: selectedFilters.location ? [selectedFilters.location] : [],
-      firstNames: [],
-      lastNames: [],
-      sourceOfLead: selectedFilters.source ? [selectedFilters.source] : [],
-    };
-    try {
-      const {data} = await clientApi.FilterBox(payload);
-      if (data && data.statusCode === 200 && Array.isArray(data.data)) {
-        setFilteredClients(data.data as any);
-      } else {
-        setFilteredClients([]);
-      }
-    } catch (error) {
-      setFilteredClients([]);
-    } finally {
-      setFilterLoading(false);
-    }
-  };
-
-  const [selectedFilters, setSelectedFilters] = useState({
-    location: '',
-    initiator: '',
-    source: '',
-  });
-
-  const [enabledFilters, setEnabledFilters] = useState({
-    location: false,
-    initiator: false,
-    source: false,
-  });
-
-  const [locationOptions, setLocationOptions] = useState<
-    {label: string; value: string}[]
-  >([]);
-  const [initiatorOptions, setInitiatorOptions] = useState<
-    {label: string; value: string | number}[]
-  >([]);
-  const [sourceOptions, setSourceOptions] = useState<
-    {label: string; value: string}[]
-  >([]);
-
-  const fetchLocations = async () => {
-    try {
-      const response = await clientApi.getLocations();
-      if (response?.data) {
-        const options = response.data
-          .map((enc: string) => ({
-            label: decryptLocation(enc),
-            value: enc,
-          }))
-          .filter((opt: {label: string; value: string}) => opt.label);
-        setLocationOptions(options);
-      }
-    } catch (e) {
-      setLocationOptions([]);
-    }
-  };
-
-  const fetchInitiators = async () => {
-    try {
-      const response = await clientApi.getSalesmanList();
-      if (response?.data) {
-        const options = response.data.map((item: any) => ({
-          label: `${item.first_name} ${item.last_name}`.trim(),
-          value: item.id,
-        }));
-        setInitiatorOptions(options);
-      }
-    } catch (e) {
-      setInitiatorOptions([]);
-    }
-  };
-
-  const fetchSources = async () => {
-    try {
-      const response = await clientApi.getAllClients();
-      const dataArr = response?.data?.data;
-      if (dataArr && Array.isArray(dataArr)) {
-        const uniqueSources = Array.from(
-          new Set(
-            dataArr
-              .map((item: any) => item.source_of_lead)
-              .filter((src: string) => !!src),
-          ),
-        );
-        const options = uniqueSources.map((src: string) => ({
-          label: src,
-          value: src,
-        }));
-        setSourceOptions(options);
-      }
-    } catch (e) {
-      setSourceOptions([]);
-    }
-  };
-
-  useEffect(() => {
-    if (isFilterOpen) {
-      fetchLocations();
-      fetchInitiators();
-      fetchSources();
-    }
-  }, [isFilterOpen]);
-
-  function getDisplayLocation(location: string): string {
-    if (!location) return '';
-    if (/^[a-zA-Z ]+$/.test(location)) return location;
-    return decryptLocation(location);
-  }
-
   return (
     <Container>
       <AppBar title="Client Information Master" navigation={navigation} />
@@ -334,12 +198,6 @@ export const ClientInfo: React.FC<ClientInfoProps> = ({navigation}) => {
                           );
                           return searchFiltered.length;
                         }
-                        if (
-                          isFilterOpen ||
-                          filteredClients.length !== clientsData.length
-                        ) {
-                          return filteredClients.length;
-                        }
                         return clientsData.length;
                       })()}
                     </Text>
@@ -355,66 +213,21 @@ export const ClientInfo: React.FC<ClientInfoProps> = ({navigation}) => {
                     onChangeText={setSearchQuery}
                   />
                 </View>
-                <View style={styles.filterBox}>
-                  <TouchableOpacity
-                    onPress={() => setIsFilterOpen(prev => !prev)}>
-                    <Filter height={12} width={12} />
-                  </TouchableOpacity>
-                </View>
-              </View>
 
-              {/* FilterDropdown */}
-              {isFilterOpen && (
-                <TouchableWithoutFeedback
-                  onPress={() => setIsFilterOpen(false)}>
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: 'rgba(0,0,0,0.1)',
-                      zIndex: 999,
-                      justifyContent: 'flex-start',
-                      alignItems: 'flex-end',
-                    }}>
-                    <View
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        position: 'absolute',
-                      }}
-                    />
-                    <View style={{zIndex: 1000}}>
-                      <FilterDropdown
-                        selectedFilters={selectedFilters}
-                        enabledFilters={enabledFilters}
-                        onSetSelectedFilters={setSelectedFilters}
-                        onSetEnabledFilters={setEnabledFilters}
-                        onApply={handleApplyFilter}
-                        onClear={() => {
-                          setSelectedFilters({
-                            location: '',
-                            initiator: '',
-                            source: '',
-                          });
-                          setEnabledFilters({
-                            location: false,
-                            initiator: false,
-                            source: false,
-                          });
-                          callGetClients();
-                        }}
-                        onSetIsFilterOpen={setIsFilterOpen}
-                        locations={locationOptions}
-                        initiators={initiatorOptions}
-                        sources={sourceOptions}
-                      />
-                    </View>
+                <TouchableOpacity onPress={() => setShowFilterModel(true)}>
+                  <View style={styles.filterBox}>
+                    <Filter height={12} width={12} />
                   </View>
-                </TouchableWithoutFeedback>
-              )}
+                </TouchableOpacity>
+              </View>
+              {/* Filter Model */}
+              <FilterModel
+                visible={showFilterModel}
+                onClose={() => setShowFilterModel(false)}
+                onApply={(filters: any) => {
+                  console.log('------->>>>>', filters);
+                }}
+              />
 
               <View style={styles.cardList}>
                 {filterLoading ? (
