@@ -54,7 +54,7 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<ClientNavigatorType, 'VisitDetailForm'>,
   DrawerScreenProps<HomeNavigatorType>
 >;
-export const VisitDetailForm = ({navigation}: Props) => {
+export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
   const dispatch = useDispatch();
   const {
     userResponse,

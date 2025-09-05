@@ -258,7 +258,7 @@ const VendorForm = ({
   );
 };
 
-export const VendorDetailForm = ({navigation}: Props) => {
+export const VendorDetailForm: React.FC<Props> = ({navigation}) => {
   const dispatch = useDispatch();
   const vendorLoader = useSelector(clientSelector.getClientLoader);
   const vendorDetails = useSelector(clientSelector.getVendorDetailsFormData);

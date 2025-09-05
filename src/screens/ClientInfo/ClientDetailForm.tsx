@@ -40,7 +40,7 @@ const listOfTypes = Object.values(ClientType).map(item => ({
 
 type Props = NativeStackScreenProps<ClientNavigatorType, 'ClientDetailForm'>;
 
-export const ClientDetailForm = ({navigation}: Props) => {
+export const ClientDetailForm: React.FC<Props> = ({navigation}) => {
   const dispatch = useDispatch();
 
   const clientFormId = useSelector(clientSelector.getClientFormId);

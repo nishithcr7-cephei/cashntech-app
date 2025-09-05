@@ -78,7 +78,7 @@ type Props = CompositeScreenProps<
   DrawerScreenProps<HomeNavigatorType>
 >;
 
-export const BasicDetailForm = ({navigation}: Props) => {
+export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
   const dispatch = useDispatch();
   const {
     sourceOfLead,

@@ -88,7 +88,7 @@ const listOfCreditPeriodOffer = Object.values(CreditPeriodOffer).map(item => ({
 
 type Props = NativeStackScreenProps<ClientNavigatorType, 'FirmDetailForm'>;
 
-export const FirmDetailForm = ({navigation}: Props) => {
+export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
   const dispatch = useDispatch();
 
   const listOfBanks = useSelector(clientSelector.getMasterBankDropdown);
