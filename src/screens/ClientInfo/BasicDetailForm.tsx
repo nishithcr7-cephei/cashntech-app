@@ -220,7 +220,6 @@ export const BasicDetailForm = ({navigation}: Props) => {
             onChange={value => setData('city', value)}
             value={city}
           />
-
           <DateNTimePicker
             label="Date of visit"
             placeholder="Enter Date of Visit"

@@ -25,7 +25,7 @@ import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
 import Toast from 'react-native-toast-message';
-import { ClientScreens } from '@constants/Screens';
+import {ClientScreens} from '@constants/Screens';
 
 export enum ClientType {
   OWNER = 'Owner',
@@ -76,9 +76,9 @@ export const ClientDetailForm = ({navigation}: Props) => {
   };
 
   const handleNext = () => {
-    if(isSavedClientsDetails){
+    if (isSavedClientsDetails) {
       navigation.navigate(ClientScreens.FirmDetailForm);
-    }else{
+    } else {
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -92,13 +92,16 @@ export const ClientDetailForm = ({navigation}: Props) => {
   };
 
   const validateForm = () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     for (let i = 0; i < clientDetails.length; i++) {
       const client = clientDetails[i];
       if (
         !client.nameOfClient ||
         !client.clientType ||
         !client.contactNumber ||
-        !client.email
+        !client.email ||
+        !emailRegex.test(client.email)
       ) {
         Toast.show({
           type: 'error',
@@ -159,10 +162,11 @@ export const ClientDetailForm = ({navigation}: Props) => {
                 data={listOfTypes}
                 value={client.clientType}
                 onChange={value => setData('clientType', value, index)}
+                showSearch={false}
               />
               <Input
                 label="Contact Number"
-                placeholder="Value"
+                placeholder="Value" 
                 value={client.contactNumber}
                 keyboardType="phone-pad"
                 onChangeText={value => setData('contactNumber', value, index)}

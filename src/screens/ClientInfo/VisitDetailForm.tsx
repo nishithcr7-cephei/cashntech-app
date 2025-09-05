@@ -80,6 +80,7 @@ export const VisitDetailForm = ({navigation}: Props) => {
   };
 
   const handleSave = () => {
+    if (!validateVisitDetails()) return;
     dispatch(clientActions.saveVisitDetails());
   };
 
@@ -101,6 +102,57 @@ export const VisitDetailForm = ({navigation}: Props) => {
         text2: 'Please save the form before proceeding to submit.',
       });
     }
+  };
+
+  const validateVisitDetails = (): boolean => {
+    if (!userResponse) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please select a User Response.',
+      });
+      return false;
+    }
+
+    if (userResponse === UserResponse.INTERESTED) {
+      if (!intent) {
+        Toast.show({
+          type: 'error',
+          text1: 'Validation Error',
+          text2: 'Please select an Intent.',
+        });
+        return false;
+      }
+      if (!dateOfNextVisit) {
+        Toast.show({
+          type: 'error',
+          text1: 'Validation Error',
+          text2: 'Please select a Date of Next Visit.',
+        });
+        return false;
+      }
+    }
+
+    if (userResponse === UserResponse.NOT_INTERESTED) {
+      if (!reasonForNotInterested?.trim()) {
+        Toast.show({
+          type: 'error',
+          text1: 'Validation Error',
+          text2: 'Please provide a Reason for Not Interested.',
+        });
+        return false;
+      }
+      if (!interestedFor?.trim()) {
+        Toast.show({
+          type: 'error',
+          text1: 'Validation Error',
+          text2: 'Please fill the "Are you Interested for?" field.',
+        });
+        return false;
+      }
+    }
+
+    return true;
   };
 
   return (
