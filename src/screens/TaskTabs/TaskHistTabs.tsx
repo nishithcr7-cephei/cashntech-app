@@ -10,6 +10,7 @@ import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {CompositeNavigationProp, useNavigation, useFocusEffect} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {tasklogActions, tasklogSelector} from '@store/tasklog';
+import {ITaskHistoryItem, ITaskDisplayItem} from '@store/tasklog/tasklog.types';
 import {HomeNavigatorType, DocNavigatorType} from '@type/NavigatorTypes';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import React, {useEffect, useState} from 'react';
@@ -21,6 +22,7 @@ import {
   FlatList,
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
+import taskApi from '@services/api/task.api';
 import {decryptConditionally} from '@utils/crypto';
 import {userSelector} from '@store/user';
 
@@ -52,14 +54,6 @@ export const TaskHistTabs = () => {
   const fetchTaskRecords = () => {
     // Get user's full name from userInfo (from signin page)
     const userName = `${userInfo.first_name} ${userInfo.last_name}`.trim();
-    console.log('=== TASKHISTTABS FULL URL ===');
-    console.log('TaskHistTabs: Original User Name:', userName);
-    console.log('TaskHistTabs: User Name Length:', userName.length);
-    console.log('TaskHistTabs: User Name Characters:', userName.split('').map(c => `'${c}'`).join(', '));
-    console.log('TaskHistTabs: Desired URL:', `client-info-master/${userName}/tasks`);
-    console.log('TaskHistTabs: Full API URL:', `https://losapiuat.cashntech.com/client-info-master/${userName}/tasks`);
-    console.log('TaskHistTabs: Dispatching getUserTaskHistory with userName:', userName);
-    console.log('=== END TASKHISTTABS FULL URL ===');
     dispatch(tasklogActions.getUserTaskHistory(userName));
   };
 
@@ -126,17 +120,14 @@ export const TaskHistTabs = () => {
 
   // Log when state updates to verify shape
   useEffect(() => {
-    console.log('TaskHistTabs: taskRecords state updated:', taskRecords);
+    // State logging removed
   }, [taskRecords]);
 
   // Normalize task records - TaskHistTabs has different format than TaskLogTabs
-  const normalizedRecords = Array.isArray(taskRecords) ? taskRecords : [];
-  
-  console.log('TaskHistTabs: Normalized Records:', normalizedRecords);
-  console.log('TaskHistTabs: Records Length:', normalizedRecords.length);
+  const normalizedRecords: ITaskHistoryItem[] = Array.isArray(taskRecords) ? taskRecords : [];
 
   // TaskHistTabs response format: direct array of tasks (not nested like TaskLogTabs)
-  const taskList = normalizedRecords.map((task: any, globalIndex: number) => ({
+  const taskList: ITaskDisplayItem[] = normalizedRecords.map((task: ITaskHistoryItem, globalIndex: number) => ({
     id: task.id,
     firmName: capitalizeFirst(decryptConditionally(task.firm_name || '')),
     sector: 'N/A', // Not available in this API response
@@ -144,27 +135,24 @@ export const TaskHistTabs = () => {
     assignedTo: capitalizeFirst(task.assigned_to || ''),
     taskDescription: capitalizeFirst(task.task_description || ''),
     taskStatus: capitalizeFirst(task.task_status || ''),
-    remarks: capitalizeFirst(task.remark || '') || 'NA',
+    remarks: task.remark ? capitalizeFirst(task.remark) : 'N/A',
     createdAt: formatToMonthYear(task.assigned_at),
-    completedAt: formatToDMY(task.completed_at),
+    completedAt: formatToDMY(task.completed_at || undefined),
     // Keep old fields for compatibility
     tasktype: capitalizeFirst(task.task_type || ''),
     clientId: String(task.client ?? ''),
     clientName: capitalizeFirst(decryptConditionally(task.firm_name || '')),
     salesman: capitalizeFirst(task.assigned_to || ''),
     location: capitalizeFirst(task.task_status || ''),
-    referenceDetails: capitalizeFirst(task.remark || '') || 'NA',
-    sourceDHCO: formatToDMY(task.completed_at),
+    referenceDetails: task.remark ? capitalizeFirst(task.remark) : 'N/A',
+    sourceDHCO: formatToDMY(task.completed_at || undefined),
     status: mapStatus(task.task_status),
     raw: task,
     srNo: globalIndex + 1,
   }));
-  
-  console.log('TaskHistTabs: Processed Task List:', taskList);
-  console.log('TaskHistTabs: Task List Length:', taskList.length);
 
   // Filter tasks based on search query
-  const filteredTaskList = taskList.filter((item: any) => {
+  const filteredTaskList = taskList.filter((item: ITaskDisplayItem) => {
     if (!searchQuery.trim()) return true;
     
     const query = searchQuery.toLowerCase();
@@ -188,10 +176,6 @@ export const TaskHistTabs = () => {
   const handleUpdateSubmit = async () => {};
 
   const renderTabContent = () => {
-    console.log('TaskHistTabs: Rendering tab content, activeTab:', activeTab);
-    console.log('TaskHistTabs: taskList length:', taskList.length);
-    console.log('TaskHistTabs: isLoading:', isLoading);
-    
     switch (activeTab) {
       case 'tasks':
         return (
@@ -281,7 +265,6 @@ export const TaskHistTabs = () => {
           </View>
         );
       default:
-        console.log('TaskHistTabs: Default case, returning empty view');
         return (
           <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
             <Text>Loading...</Text>
@@ -289,8 +272,6 @@ export const TaskHistTabs = () => {
         );
     }
   };
-
-  console.log('TaskHistTabs: Component rendering...');
 
   return (
     <Container>

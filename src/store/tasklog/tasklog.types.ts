@@ -6,13 +6,83 @@ export interface ITaskLogState {
   TaskHistoryLoader: boolean;
   TaskHistoryList: Array<ITaskHistoryResponseDatum>;
   taskRecordsLoader?: boolean;
-  taskRecordsList?: Array<any>;
+  taskRecordsList?: Array<ITaskRecord>;
   taskUpdateLoader?: boolean;
   taskUpdateSuccess?: string;
   taskUpdateError?: string;
   userTaskHistoryLoader?: boolean;
-  userTaskHistoryList?: Array<any>;
+  userTaskHistoryList?: Array<ITaskHistoryItem>;
   userTaskHistoryError?: string;
+}
+
+// API Response Types
+export interface ITaskRecordsResponse {
+  statusCode: number;
+  data: Array<ITaskRecord>;
+}
+
+export interface ITaskRecord {
+  id: number;
+  firm_name: string; // Encrypted
+  sector: string;
+  task: Array<ITaskItem>;
+}
+
+export interface ITaskItem {
+  id: number;
+  assigned_by: string;
+  assigned_to: string;
+  assigned_at: string; // ISO date string
+  task_type: string;
+  task_description: string;
+  task_status: 'pending' | 'completed' | 'cancelled';
+  remark: string | null;
+  completed_at: string | null; // ISO date string
+}
+
+// Task History API Response
+export interface IUserTaskHistoryResponse {
+  statusCode: number;
+  data: Array<ITaskHistoryItem>;
+}
+
+export interface ITaskHistoryItem {
+  id: number;
+  assigned_by: string;
+  assigned_to: string;
+  assigned_at: string; // ISO date string
+  task_type: string;
+  task_description: string;
+  task_status: 'pending' | 'completed' | 'cancelled';
+  remark: string | null;
+  completed_at: string | null; // ISO date string
+  client: number;
+  firm_name: string; // Encrypted
+}
+
+// UI Display Types (processed data for components)
+export interface ITaskDisplayItem {
+  id: number;
+  srNo: number;
+  firmName: string; // Decrypted and formatted
+  sector: string;
+  assignedBy: string;
+  assignedTo: string;
+  taskDescription: string;
+  taskStatus: string;
+  remarks: string; // Will be 'N/A' if null
+  createdAt: string; // Formatted as "Mon YYYY"
+  completedAt: string; // Formatted as "dd-mm-yyyy" or 'N/A'
+  // Legacy fields for compatibility
+  tasktype: string;
+  clientId: string;
+  clientName: string;
+  salesman: string;
+  location: string;
+  referenceDetails: string;
+  sourceDHCO: string;
+  status: 'Warm' | 'Hot' | 'Cold';
+  raw: ITaskItem | ITaskHistoryItem; // Original API data
 }
 
 export interface IRemarkReportResponse {
@@ -61,11 +131,6 @@ export type ITaskRecordsRequest = {
   hasTask: boolean;
 };
 
-export type ITaskRecordsResponse = {
-  statusCode: number;
-  data: Array<any>;
-};
-
 export interface ITaskUpdateRequest {
   task_status: string;
   remark: string;
@@ -80,9 +145,4 @@ export interface ITaskUpdateResponse {
 
 export interface IUserTaskHistoryRequest {
   userName: string;
-}
-
-export interface IUserTaskHistoryResponse {
-  statusCode: number;
-  data: Array<any>;
 }

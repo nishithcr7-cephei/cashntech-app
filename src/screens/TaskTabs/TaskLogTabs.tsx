@@ -10,6 +10,7 @@ import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {CompositeNavigationProp, useNavigation, useFocusEffect} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {tasklogActions, tasklogSelector} from '@store/tasklog';
+import {ITaskRecord, ITaskItem, ITaskDisplayItem} from '@store/tasklog/tasklog.types';
 import {HomeNavigatorType, DocNavigatorType} from '@type/NavigatorTypes';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import React, {useEffect, useState} from 'react';
@@ -22,6 +23,7 @@ import {
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 import clientApi from '@services/api/client.api';
+import taskApi from '@services/api/task.api';
 import {decryptConditionally} from '@utils/crypto';
 
 type DocNavigationType = CompositeNavigationProp<
@@ -49,15 +51,8 @@ export const TaskLogTabs = () => {
     setIsLoading(true);
     try {
       const body = {hasTask: true};
-      console.log('=== TASKLOG API CALL ===');
-      console.log('TaskLogTabs: Request Body:', body);
-      console.log('TaskLogTabs: Fetching task records...');
       
-      const res = await clientApi.getTaskRecords(body);
-      
-      console.log('=== TASKLOG API RESPONSE ===');
-      console.log('TaskLogTabs: Full API Response:', JSON.stringify(res, null, 2));
-      console.log('TaskLogTabs: Response Data:', res?.data);
+      const res = await taskApi.getTaskRecords(body);
       
       const list = Array.isArray(res?.data?.data)
         ? res.data.data
@@ -65,16 +60,8 @@ export const TaskLogTabs = () => {
         ? res.data
         : [];
       
-      console.log('TaskLogTabs: Parsed Task Records:', list);
-      console.log('TaskLogTabs: Total Records Count:', list.length);
-      console.log('=== END TASKLOG API RESPONSE ===');
-      
       setTaskRecords(list);
     } catch (e) {
-      console.log('=== TASKLOG API ERROR ===');
-      console.error('TaskLogTabs: Error fetching task records:', e);
-      console.error('TaskLogTabs: Error Details:', JSON.stringify(e, null, 2));
-      console.log('=== END TASKLOG API ERROR ===');
       setTaskRecords([]);
     } finally {
       setIsLoading(false);
@@ -155,22 +142,22 @@ export const TaskLogTabs = () => {
   const capitalizeFirst = (str: string) =>
     str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
 
-  const [taskRecords, setTaskRecords] = useState<any[]>([]);
+  const [taskRecords, setTaskRecords] = useState<ITaskRecord[]>([]);
 
   // Log when state updates to verify shape
   useEffect(() => {
-    console.log('TaskLogTabs: taskRecords state updated:', taskRecords);
+    // State logging removed
   }, [taskRecords]);
 
   // Normalize in case we ever receive an object with a nested data property
-  const normalizedRecords = Array.isArray(taskRecords)
+  const normalizedRecords: ITaskRecord[] = Array.isArray(taskRecords)
     ? taskRecords
     : Array.isArray((taskRecords as any)?.data)
     ? (taskRecords as any).data
     : [];
 
-  const taskList = normalizedRecords.flatMap((report: any) =>
-    (report.task || []).map((task: any) => ({
+  const taskList: ITaskDisplayItem[] = normalizedRecords.flatMap((report: ITaskRecord) =>
+    (report.task || []).map((task: ITaskItem) => ({
       id: task.id,
       firmName: capitalizeFirst(decryptConditionally(report.firm_name || '')),
       sector: capitalizeFirst(report.sector || ''),
@@ -178,27 +165,28 @@ export const TaskLogTabs = () => {
       assignedTo: capitalizeFirst(task.assigned_to || ''),
       taskDescription: capitalizeFirst(task.task_description || ''),
       taskStatus: capitalizeFirst(task.task_status || ''),
-      remarks: capitalizeFirst(task.remark || '') || 'NA',
+      remarks: task.remark ? capitalizeFirst(task.remark) : 'N/A',
       createdAt: formatToMonthYear(task.assigned_at),
-      completedAt: formatToDMY(task.completed_at),
+      completedAt: formatToDMY(task.completed_at || undefined),
       // Keep old fields for compatibility
       tasktype: capitalizeFirst(task.task_type || ''),
       clientId: String(report.id ?? ''),
       clientName: capitalizeFirst(decryptConditionally(report.firm_name || '')),
       salesman: capitalizeFirst(task.assigned_to || ''),
       location: capitalizeFirst(task.task_status || ''),
-      referenceDetails: capitalizeFirst(task.remark || '') || 'NA',
-      sourceDHCO: formatToDMY(task.completed_at),
+      referenceDetails: task.remark ? capitalizeFirst(task.remark) : 'N/A',
+      sourceDHCO: formatToDMY(task.completed_at || undefined),
       status: mapStatus(task.task_status),
       raw: task,
+      srNo: 0, // Will be set in the next map
     })),
-  ).map((item: any, globalIndex: number) => ({
+  ).map((item, globalIndex: number) => ({
     ...item,
     srNo: globalIndex + 1,
   }));
 
   // Filter tasks based on search query
-  const filteredTaskList = taskList.filter((item: any) => {
+  const filteredTaskList = taskList.filter((item: ITaskDisplayItem) => {
     if (!searchQuery.trim()) return true;
     
     const query = searchQuery.toLowerCase();
@@ -222,10 +210,6 @@ export const TaskLogTabs = () => {
   const handleUpdateSubmit = async () => {};
 
   const renderTabContent = () => {
-    console.log('TaskLogTabs: Rendering tab content, activeTab:', activeTab);
-    console.log('TaskLogTabs: taskList length:', taskList.length);
-    console.log('TaskLogTabs: isLoading:', isLoading);
-    
     switch (activeTab) {
       case 'tasks':
         return (
@@ -308,7 +292,6 @@ export const TaskLogTabs = () => {
           </View>
         );
       default:
-        console.log('TaskLogTabs: Default case, returning empty view');
         return (
           <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
             <Text>Loading...</Text>
@@ -316,8 +299,6 @@ export const TaskLogTabs = () => {
         );
     }
   };
-
-  console.log('TaskLogTabs: Component rendering...');
 
   return (
     <Container>
