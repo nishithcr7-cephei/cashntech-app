@@ -13,7 +13,7 @@ import {
 import {useSelector} from 'react-redux';
 import {clientSelector} from '@store/client';
 import Toast from 'react-native-toast-message';
-import { ClientScreens } from '@constants/Screens';
+import {ClientScreens} from '@constants/Screens';
 
 const Strings = {
   appBarTitle: 'Client Information Master',
@@ -47,6 +47,9 @@ export const FormSelectionScreen: React.FC<FormSelectionProps> = ({
     }
     if (item.screen === 'VendorDetails') {
       navigation.navigate(ClientScreens.VendorDetailForm);
+    }
+    if (item.screen === 'VisitDetails') {
+      navigation.navigate(ClientScreens.VisitDetailForm);
     }
   };
 

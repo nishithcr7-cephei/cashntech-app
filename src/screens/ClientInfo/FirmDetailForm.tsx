@@ -113,7 +113,7 @@ export const FirmDetailForm = ({navigation}: Props) => {
     clientSelector.getFirmDetailsFormStatus,
   );
 
-  function setData<T>(field: keyof FirmDetailsType, value: T) {
+  function setData<T extends keyof FirmDetailsType>(field: T, value: FirmDetailsType[T]) {
     dispatch(clientActions.setFirmDetails({[field]: value}));
   }
 

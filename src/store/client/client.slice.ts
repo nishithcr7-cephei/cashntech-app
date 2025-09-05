@@ -40,6 +40,7 @@ import {
   IUploadUdhyamPayload,
   IUploadUdhyamResponse,
   VendorDetailsType,
+  VisitDetailsType,
 } from './client.types';
 import {PayloadWithCallback} from '@type/global.types';
 
@@ -96,6 +97,14 @@ const vendorDetails: VendorDetailsType = [
   },
 ];
 
+const visitDetails: VisitDetailsType = {
+  dateOfNextVisit: undefined,
+  intent: undefined,
+  reasonForNotInterested: '',
+  interestedFor: '',
+  userResponse: undefined,
+};
+
 const initialState: ClientState = {
   // Client Info List screen
   clientLoader: false,
@@ -106,11 +115,13 @@ const initialState: ClientState = {
   basicDetails: basicDetails,
   firmDetails: firmDetails,
   vendorDetails: vendorDetails,
+  visitDetails: visitDetails,
 
   clientsDetails: clientsDetails,
   isSavedClientsDetails: false,
   isSavedFirmDetails: false,
   isSavedVendorDetails: false,
+  isSavedVisitDetails: false,
 
   //Remark Report fields
   reportLoader: false,
@@ -247,6 +258,8 @@ const clientSlice = createSlice({
       state.isSavedFirmDetails = initialState.isSavedFirmDetails;
       state.vendorDetails = initialState.vendorDetails;
       state.isSavedVendorDetails = initialState.isSavedVendorDetails;
+      state.visitDetails = initialState.visitDetails;
+      state.isSavedVisitDetails = initialState.isSavedVisitDetails;
       state.clientFormId = undefined;
     },
     // Basic Details
@@ -354,11 +367,11 @@ const clientSlice = createSlice({
     addNewVendorDetails: state => {
       state.vendorDetails.push({
         key: Math.random().toString(36).substring(7),
-        productCategory: '',
+        productCategory: undefined,
         productType: '',
         vendorName: '',
         address: '',
-        state: '',
+        state: undefined,
         city: '',
         pinCode: '',
         monthlySalesValue: '',
@@ -376,10 +389,26 @@ const clientSlice = createSlice({
     setSavedVendorDetailsStatus: (state, action: PayloadAction<boolean>) => {
       state.isSavedVendorDetails = action.payload;
     },
+    // Visit Details
+    setVisitDetails: (
+      state,
+      action: PayloadAction<Partial<VisitDetailsType>>,
+    ) => {
+      state.visitDetails = {...state.visitDetails, ...action.payload};
+    },
+    clearVisitDetails: state => {
+      state.visitDetails = initialState.visitDetails;
+    },
+    setSavedVisitDetailsStatus: (state, action: PayloadAction<boolean>) => {
+      state.isSavedVisitDetails = action.payload;
+    },
 
     // Set Client Form Data,
     saveVisitDetails: state => {
       state.clientLoader = false;
+    },
+    updateVisitDetails: state => {
+      state.clientLoader = true;
     },
     deleteClientRequest: (state, action) => {},
     deleteClientSuccess: (state, action) => {
@@ -911,9 +940,14 @@ export const {
   saveVendorDetails,
   setSavedVendorDetailsStatus,
 
+  saveVisitDetails,
+  updateVisitDetails,
+  setVisitDetails,
+  clearVisitDetails,
+  setSavedVisitDetailsStatus,
+
   resetAllClientFormData,
 
-  saveVisitDetails,
   getReport,
   setReportList,
   resetReportList,
