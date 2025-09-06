@@ -174,6 +174,7 @@ export const VisitDetailForm = ({navigation}: Props) => {
             data={listOfUserResponse}
             value={userResponse}
             onChange={value => setData('userResponse', value as UserResponse)}
+            showSearch={false}
           />
 
           {userResponse === UserResponse.INTERESTED && (
@@ -183,6 +184,7 @@ export const VisitDetailForm = ({navigation}: Props) => {
                 data={listOfIntentTypes}
                 value={intent}
                 onChange={value => setData('intent', value as IntentType)}
+                showSearch={false}
               />
               <DateNTimePicker
                 label="Date of Next Visit"
