@@ -27,7 +27,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
 import Toast from 'react-native-toast-message';
 import {ClientScreens} from '@constants/Screens';
-import {formatIndianNumber} from '@utils/numberFormatter';
+import {formatIndianNumber} from '@utils/Utils';
 
 export enum ProductCategory {
   PERSONAL_CARE_HYGIENE = 'Personal Care & Hygiene',

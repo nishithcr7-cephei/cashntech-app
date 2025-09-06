@@ -25,7 +25,7 @@ import {useDispatch, useSelector} from 'react-redux';
 import {clientActions, clientSelector, FirmDetailsType} from '@store/client';
 import Toast from 'react-native-toast-message';
 import {ClientScreens} from '@constants/Screens';
-import {formatIndianNumber} from '@utils/numberFormatter';
+import {formatIndianNumber} from '@utils/Utils';
 
 export enum FirmType {
   CHARITY = 'CHARITY',

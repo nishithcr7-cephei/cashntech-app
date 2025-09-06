@@ -68,10 +68,11 @@ export const ClientDetailForm = ({navigation}: Props) => {
 
   const handleSave = () => {
     if (!validateForm()) return;
+
     if (isSavedClientsDetails) {
-      dispatch(clientActions.saveClientsDetails());
-    } else {
       dispatch(clientActions.updateClientsDetails());
+    } else {
+      dispatch(clientActions.saveClientsDetails());
     }
   };
 
@@ -96,21 +97,53 @@ export const ClientDetailForm = ({navigation}: Props) => {
 
     for (let i = 0; i < clientDetails.length; i++) {
       const client = clientDetails[i];
-      if (
-        !client.nameOfClient?.trim() ||
-        !client.clientType?.trim() ||
-        !client.contactNumber?.trim() ||
-        !client.email?.trim() ||
-        !emailRegex.test(client.email.trim())
-      ) {
+
+      if (!client.nameOfClient?.trim()) {
         Toast.show({
           type: 'error',
           text1: 'Error',
-          text2: `Please fill all fields for Client ${i + 1}.`,
+          text2: `Please enter Name for Client ${i + 1}.`,
+        });
+        return false;
+      }
+
+      if (!client.clientType?.trim()) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `Please select Client Type for Client ${i + 1}.`,
+        });
+        return false;
+      }
+
+      if (!client.contactNumber?.trim()) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `Please enter Contact Number for Client ${i + 1}.`,
+        });
+        return false;
+      }
+
+      if (!client.email?.trim()) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `Please enter Email for Client ${i + 1}.`,
+        });
+        return false;
+      }
+
+      if (!emailRegex.test(client.email.trim())) {
+        Toast.show({
+          type: 'error',
+          text1: 'Invalid Email',
+          text2: `Please enter a valid Email Address for Client ${i + 1}.`,
         });
         return false;
       }
     }
+
     return true;
   };
 

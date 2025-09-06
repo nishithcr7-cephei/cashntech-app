@@ -66,7 +66,6 @@ import {
   ITaskHistoryResponse,
   IUploadKycDocumentPayload,
   IUploadKycDocumentResponse,
-  IvisitResponse,
   IKycCheckedResponse,
   IUploadPanDocumentsPayload,
   IUploadPanDocumentsResponse,
@@ -88,7 +87,6 @@ import {
   IUploadCompanyInfoResponse,
   ISoftSanctionResponse,
   BasicDetailsPayload,
-  IVisitPayload,
   IFilterPayload,
   IBankStatementPayload,
   IKYCBusinessResponse,
@@ -210,11 +208,11 @@ function* saveBasicDetails(): unknown {
     userSelector.getUserInfo,
   );
   const body: BasicDetailsPayload = {
-    source_of_lead: basicDetailForm.sourceOfLead,
-    location: encryptUtility(basicDetailForm.location),
+    source_of_lead: basicDetailForm.sourceOfLead.trim(),
+    location: encryptUtility(basicDetailForm.location.trim()),
     city: encryptUtility(basicDetailForm.city),
     state: encryptUtility(basicDetailForm.state ?? ''),
-    address: encryptUtility(basicDetailForm.address),
+    address: encryptUtility(basicDetailForm.address.trim()),
     created_by: `${first_name} ${last_name}`,
     date_of_visit: moment(basicDetailForm.dateOfVisit).toISOString(),
     firm_name: encryptUtility(basicDetailForm.firmName),
@@ -291,9 +289,9 @@ function* saveClientsDetailsSaga(): unknown {
   const clientId = yield select(clientSelector.getClientFormId);
   const body: ClientsDetailsPayload = clientDetails.map(client => ({
     client_type: client.clientType,
-    name_of_client: client.nameOfClient,
-    contact_number: client.contactNumber,
-    email: client.email,
+    name_of_client: client.nameOfClient.trim(),
+    contact_number: client.contactNumber.trim(),
+    email: client.email.trim(),
     created_by: `${first_name} ${last_name}`,
   }));
   const {
