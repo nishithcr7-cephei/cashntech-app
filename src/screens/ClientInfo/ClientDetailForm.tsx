@@ -97,11 +97,11 @@ export const ClientDetailForm = ({navigation}: Props) => {
     for (let i = 0; i < clientDetails.length; i++) {
       const client = clientDetails[i];
       if (
-        !client.nameOfClient ||
-        !client.clientType ||
-        !client.contactNumber ||
-        !client.email ||
-        !emailRegex.test(client.email)
+        !client.nameOfClient?.trim() ||
+        !client.clientType?.trim() ||
+        !client.contactNumber?.trim() ||
+        !client.email?.trim() ||
+        !emailRegex.test(client.email.trim())
       ) {
         Toast.show({
           type: 'error',
@@ -166,7 +166,7 @@ export const ClientDetailForm = ({navigation}: Props) => {
               />
               <Input
                 label="Contact Number"
-                placeholder="Value" 
+                placeholder="Value"
                 value={client.contactNumber}
                 keyboardType="phone-pad"
                 onChangeText={value => setData('contactNumber', value, index)}

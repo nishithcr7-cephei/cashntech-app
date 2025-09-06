@@ -27,6 +27,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
 import Toast from 'react-native-toast-message';
 import {ClientScreens} from '@constants/Screens';
+import {formatIndianNumber} from '@utils/numberFormatter';
 
 export enum ProductCategory {
   PERSONAL_CARE_HYGIENE = 'Personal Care & Hygiene',
@@ -174,13 +175,6 @@ const VendorForm = ({
     dispatch(clientActions.removeVendorDetails(id));
   };
 
-  const formatIndianNumber = (value: string) => {
-    if (!value) return '';
-    const num = Number(value.replace(/,/g, ''));
-    if (isNaN(num)) return value;
-    return new Intl.NumberFormat('en-IN').format(num);
-  };
-
   return (
     <View key={vendor.key} style={{marginBottom: 20}}>
       <View style={styles.inputContainer}>
@@ -307,15 +301,15 @@ export const VendorDetailForm = ({navigation}: Props) => {
     for (let i = 0; i < vendorDetails.length; i++) {
       const vendor = vendorDetails[i];
       if (
-        !vendor.productCategory ||
-        !vendor.productType ||
-        !vendor.vendorName ||
-        !vendor.address ||
-        !vendor.state ||
-        !vendor.city ||
-        !vendor.pinCode ||
-        !vendor.vendorContactNumber ||
-        !vendor.monthlySalesValue
+        !vendor.productCategory?.trim() ||
+        !vendor.productType?.trim() ||
+        !vendor.vendorName?.trim() ||
+        !vendor.address?.trim() ||
+        !vendor.state?.trim() ||
+        !vendor.city?.trim() ||
+        !vendor.pinCode?.trim() ||
+        !vendor.vendorContactNumber?.trim() ||
+        !vendor.monthlySalesValue?.trim()
       ) {
         Toast.show({
           type: 'error',
