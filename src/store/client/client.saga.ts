@@ -203,15 +203,12 @@ function* handleGetClientsFilter(): unknown {
 }
 
 function* handleGetCityList(): unknown {
-  const {
-    data,
-    error,
-  }: Result<{
-    data: Array<string>;
-  }> = yield call(ClientApis.getCityList);
+  const {data, error}: Result<Array<string>> = yield call(
+    ClientApis.getCityList,
+  );
   yield put(clientActions.setClientLoader(false));
   if (!error) {
-    yield put(clientActions.setCityList(data.data));
+    yield put(clientActions.setCityList(data));
   }
 }
 
