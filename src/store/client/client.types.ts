@@ -4,6 +4,7 @@ import {IntentType, ProductCategory, UserResponse} from '@screens/index';
 export type ClientState = {
   clientLoader: boolean;
   clientList: Array<ClientsFilterResponseDatum>;
+  cityList: Array<string>;
   basicDetails: BasicDetailsType;
   clientsDetails: ClientsDetailsType;
   firmDetails: FirmDetailsType;

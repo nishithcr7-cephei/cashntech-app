@@ -29,6 +29,7 @@ import {CustomRequestConfig} from './api';
 import {storage} from '@services/localStorage';
 import {Config} from '@config/index';
 import StorageKeys from '@constants/StorageKeys';
+import {decryptUtility} from '@utils/crypto';
 
 const getRemarkReport = async () => {
   const {data, error} = await tryCatch<AxiosResponse<IRemarkReportResponse>>(
@@ -145,6 +146,27 @@ const getClientsFilter = async () => {
   }
   return {
     data: data.data,
+    error: null,
+  };
+};
+
+const getCityList = async () => {
+  const {data: cityData, error} = await tryCatch<
+    AxiosResponse<{statusCode: number; data: Array<string>}>
+  >(
+    Api.get(Endpoints.apiGetCityList, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  const apiData = cityData.data;
+  return {
+    data: apiData.data.map((city: string) => decryptUtility(city)),
     error: null,
   };
 };
@@ -808,6 +830,7 @@ const getVisitDetailsList = async () => {
 
 export default {
   getClientsFilter,
+  getCityList,
 
   saveBasicDetailForm,
   saveClientsDetailsForm,

@@ -109,6 +109,7 @@ const initialState: ClientState = {
   // Client Info List screen
   clientLoader: false,
   clientList: [],
+  cityList: [],
   // Client Information Form Data
   clientFormId: undefined,
   masterBankList: [],
@@ -233,6 +234,13 @@ const clientSlice = createSlice({
     // Set Client Loader
     setClientLoader: (state, action: PayloadAction<boolean>) => {
       state.clientLoader = action.payload;
+    },
+    // City List
+    getCityList: state => {
+      state.clientLoader = true;
+    },
+    setCityList: (state, action: PayloadAction<Array<string>>) => {
+      state.cityList = action.payload;
     },
     // Get Client from api
     getClients: state => {
@@ -909,6 +917,9 @@ export const {
   setClientLoader,
   setClientList,
   saveClientFormId,
+
+  getCityList,
+  setCityList,
 
   setBasicDetails,
   clearBasicDetails,
