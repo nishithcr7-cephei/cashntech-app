@@ -127,6 +127,15 @@ export const FirmDetailForm = ({navigation}: Props) => {
 
   const handleSave = () => {
     if (!validateForm()) return;
+    const strip = (s: string | undefined) =>
+      s ? s.toString().replace(/,/g, '') : '';
+    dispatch(
+      clientActions.setFirmDetails({
+        monthlyTurnover: strip(monthlyTurnover),
+        existingFundingSanctionedAmount: strip(existingFundingSanctionedAmount),
+        estimatedFundingRequired: strip(estimatedFundingRequired),
+      }),
+    );
     dispatch(clientActions.saveFirmDetails());
   };
 
