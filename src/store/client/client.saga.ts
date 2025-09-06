@@ -111,30 +111,13 @@ import {
   VendorDetailsPayload,
   VisitDetailsPayload,
   VisitDetailsType,
+  ClientsFilterResponse,
 } from './client.types';
 import Toast from 'react-native-toast-message';
 import {userSelector, UserState} from '@store/user';
 import {AxiosError} from 'axios';
 import {decryptUtility, encryptUtility} from '@utils/crypto';
 import {UserResponse} from '@screens/index';
-
-function* handleGetClient(): unknown {
-  console.log('Saga: handleGetClient called');
-  const {data, error}: Result<IClientInfoSuccessResponse> = yield call(
-    ClientApis.getAllClients,
-  );
-  console.log('Saga: API response:', {
-    data: data?.data?.length || 0,
-    error: !!error,
-  });
-  if (!error) {
-    yield put(clientActions.setClientList(data.data));
-    console.log('Saga: Client list set successfully');
-  } else {
-    yield put(clientActions.setClientList([]));
-    console.log('Saga: Error occurred, setting empty list');
-  }
-}
 
 function* handleGetRemarkReport(): unknown {
   const {data, error}: Result<IRemarkReportResponse> = yield call(
@@ -198,6 +181,24 @@ function* handleGetTaskHistory(): unknown {
   } else {
     yield put(clientActions.setTaskHistoryList([]));
   }
+}
+
+function* handleGetClientsFilter(): unknown {
+  const {
+    data,
+    error,
+  }: Result<ClientsFilterResponse, AxiosError<{message: string}>> = yield call(
+    ClientApis.getClientsFilter,
+  );
+  yield put(clientActions.setClientLoader(false));
+  if (error) {
+    Toast.show({
+      type: 'error',
+      text1: error.response?.data?.message || 'Failed to fetch client list.',
+    });
+    return;
+  }
+  yield put(clientActions.setClientList(data.data));
 }
 
 function* saveBasicDetails(): unknown {
@@ -1213,7 +1214,7 @@ function* handleGetLeadProgressDetails(action: PayloadAction<number>) {
 }
 
 export default function* clientSaga() {
-  yield takeLatest(getClients.type, handleGetClient);
+  yield takeLatest(getClients.type, handleGetClientsFilter);
   yield takeLatest(saveClientBasicDetails.type, saveBasicDetails);
   yield takeLatest(updateClientBasicDetails.type, updateBasicDetails);
   yield takeLatest(saveClientsDetails.type, saveClientsDetailsSaga);

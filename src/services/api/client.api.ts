@@ -7,7 +7,6 @@ import {
   BasicDetailsPayload,
   IBankListResponse,
   BasicDetailsResponse,
-  IClientInfoSuccessResponse,
   ILeadProgressResponse,
   IRemarkReportResponse,
   ITaskHistoryResponse,
@@ -24,41 +23,12 @@ import {
   FirmDetailsPayload,
   VendorDetailsPayload,
   VisitDetailsPayload,
+  ClientsFilterResponse,
 } from '@store/client';
 import {CustomRequestConfig} from './api';
 import {storage} from '@services/localStorage';
 import {Config} from '@config/index';
 import StorageKeys from '@constants/StorageKeys';
-
-const getAllClients = async () => {
-  console.log('API: getAllClients called');
-  const {data, error} = await tryCatch<
-    AxiosResponse<IClientInfoSuccessResponse>
-  >(
-    Api.get(Endpoints.apiGetAllClients, {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  console.log('API: getAllClients response:', {
-    hasData: !!data,
-    hasError: !!error,
-  });
-  if (error) {
-    console.log('API: getAllClients error:', error);
-    return {
-      data: null,
-      error: error,
-    };
-  }
-  console.log(
-    'API: getAllClients success, data length:',
-    data?.data?.length || 0,
-  );
-  return {
-    data: data.data,
-    error: null,
-  };
-};
 
 const getRemarkReport = async () => {
   const {data, error} = await tryCatch<AxiosResponse<IRemarkReportResponse>>(
@@ -145,6 +115,25 @@ const getLeadDesProgress = async (leadID: string) => {
 const getTaskHistory = async () => {
   const {data, error} = await tryCatch<AxiosResponse<ITaskHistoryResponse>>(
     Api.get(Endpoints.apiGetTaskHistory, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  return {
+    data: data.data,
+    error: null,
+  };
+};
+
+// Client Filter API
+const getClientsFilter = async () => {
+  const {data, error} = await tryCatch<AxiosResponse<ClientsFilterResponse>>(
+    Api.post(Endpoints.apiGetClientsFilter, {}, {
       authRequired: true,
     } as CustomRequestConfig),
   );
@@ -818,7 +807,7 @@ const getVisitDetailsList = async () => {
 };
 
 export default {
-  getAllClients,
+  getClientsFilter,
 
   saveBasicDetailForm,
   saveClientsDetailsForm,

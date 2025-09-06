@@ -26,12 +26,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
 import Toast from 'react-native-toast-message';
 import {ClientScreens} from '@constants/Screens';
-
-export enum ClientType {
-  OWNER = 'Owner',
-  DIRECTOR = 'Director',
-  DESIGNATED_PARTNER = 'Designated Partner',
-}
+import {ClientType} from './ClientInfo.type';
 
 const listOfTypes = Object.values(ClientType).map(item => ({
   label: item,

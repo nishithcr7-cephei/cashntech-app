@@ -2,11 +2,11 @@ import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {
   BasicDetailsType,
   ClientsDetailsType,
+  ClientsFilterResponseDatum,
   ClientState,
   FirmDetailsType,
   IBankListResponseDatum,
   IBankStatementPayload,
-  IClientInfoResponseDatum,
   IFilterPayload,
   IFilterResponseDatum,
   IKycBusinessResponseDatum,
@@ -240,9 +240,8 @@ const clientSlice = createSlice({
     },
     setClientList: (
       state,
-      action: PayloadAction<Array<IClientInfoResponseDatum>>,
+      action: PayloadAction<Array<ClientsFilterResponseDatum>>,
     ) => {
-      state.clientLoader = false;
       state.clientList = action.payload;
     },
     saveClientFormId: (state, action: PayloadAction<number>) => {

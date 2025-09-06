@@ -31,32 +31,9 @@ import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
 import {DrawerScreenProps} from 'node_modules/@react-navigation/drawer/lib/typescript/module/src/types';
 import {CompositeScreenProps} from '@react-navigation/native';
 import {ClientScreens} from '@constants/Screens';
+import {LeadSourceType, ProductType, ProgramType} from './ClientInfo.type';
 
 // Static Data
-export enum LeadSourceType {
-  MARKET_KNOWLEDGE = 'Market Knowledge (D)',
-  CUSTOMER_REFERENCE = 'Customer Reference (C)',
-  TELECALLING = 'Telecalling (H)',
-  OUTSOURCED_AGENCY = 'Outsourced Agency (H)',
-  CHARETRED_ACCOUNTANT = 'Chartered Accountant (A)',
-  INSURANCE = 'Insurance (I)',
-  WEALTH_AND_INVESTMENT = 'Wealth & Investment (W)',
-}
-
-export enum ProgramType {
-  STAND_ALONE = 'Stand-Alone',
-  ANCHOR_BASED = 'Anchor-Based',
-}
-
-export enum ProductType {
-  VF = 'VF',
-  DF = 'DF',
-  CF = 'CF',
-  PID = 'PID',
-  SID = 'SID',
-  DYNAMIC_DISCOUNTING = 'Dynamic Discounting',
-}
-
 const listOfLeadSources = Object.values(LeadSourceType).map(item => {
   return {label: item, value: item};
 });

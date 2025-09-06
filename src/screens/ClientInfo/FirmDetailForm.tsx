@@ -26,45 +26,12 @@ import {clientActions, clientSelector, FirmDetailsType} from '@store/client';
 import Toast from 'react-native-toast-message';
 import {ClientScreens} from '@constants/Screens';
 import {formatIndianNumber} from '@utils/Utils';
-
-export enum FirmType {
-  CHARITY = 'CHARITY',
-  EDUCATIONAL_INSTITUTE = 'EDUCATIONAL_INSTITUTE',
-  GOVERNMENT = 'GOVERNMENT',
-  HUF = 'HUF',
-  INDIVIDUAL_SALARIED = 'INDIVIDUAL/SALARIED',
-  LIMITED_LIABILITY_PARTNERSHIP = 'LIMITED LIABILITY PARTNERSHIP',
-  MNC = 'MNC',
-  NON_GOVERNMENT_ORGANIZATION = 'NON GOVERNMENT ORGANIZATION',
-  PARTNERSHIP = 'Partnership',
-  PRIVATE_LTD = 'Private Ltd',
-  PROPRIETORSHIP = 'Proprietorship',
-  PUBLIC_LTD = 'Public Ltd',
-  TRUST = 'TRUST',
-}
-
-export enum SectorType {
-  FMCG = 'FMCG',
-  PAINT = 'Paint',
-  MANUFACTURING = 'Manufacturing',
-  PHARMA = 'Pharma',
-  ELECTRONIC = 'Electronic',
-}
-
-export enum FacilityType {
-  OD = 'OD - Overdraft',
-  CC = 'CC - Cash Credit',
-  WCTL = 'WCTL - Working Capital Term Loan',
-  CF = 'CF - Cashn Flow',
-  OTHERS = 'Others',
-}
-
-export enum CreditPeriodOffer {
-  DAYS_30 = '30',
-  DAYS_45 = '45',
-  DAYS_60 = '60',
-  DAYS_90 = '90',
-}
+import {
+  CreditPeriodOffer,
+  FacilityType,
+  FirmType,
+  SectorType,
+} from './ClientInfo.type';
 
 const listOfFirmTypes = Object.values(FirmType).map(item => ({
   label: item,

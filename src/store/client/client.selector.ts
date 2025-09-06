@@ -26,9 +26,8 @@ const getClientsDetailsFormStatus = createSelector(
   _state => _state.isSavedClientsDetails,
 );
 
-const getMasterBankDropdown = createSelector(
-  _selectState,
-  _state => _state.masterBankList.map(item => ({
+const getMasterBankDropdown = createSelector(_selectState, _state =>
+  _state.masterBankList.map(item => ({
     label: item.bank_name,
     value: item.bank_name,
   })),
@@ -36,7 +35,7 @@ const getMasterBankDropdown = createSelector(
 
 const getFirmDetailsFormData = createSelector(
   _selectState,
-  _state => _state.firmDetails
+  _state => _state.firmDetails,
 );
 
 const getFirmDetailsFormStatus = createSelector(
@@ -46,22 +45,22 @@ const getFirmDetailsFormStatus = createSelector(
 
 const getVendorDetailsFormData = createSelector(
   _selectState,
-  _state => _state.vendorDetails
+  _state => _state.vendorDetails,
 );
 
 const getVendorDetailsFormStatus = createSelector(
   _selectState,
-  _state => _state.isSavedVendorDetails
+  _state => _state.isSavedVendorDetails,
 );
 
 const getVisitDetailsFormData = createSelector(
   _selectState,
-  _state => _state.visitDetails
+  _state => _state.visitDetails,
 );
 
 const getSavedVisitDetailsStatus = createSelector(
   _selectState,
-  _state => _state.isSavedVisitDetails
+  _state => _state.isSavedVisitDetails,
 );
 
 const getRemarkReport = createSelector(
@@ -76,18 +75,6 @@ const getTaskHistory = createSelector(
   _selectState,
   _state => _state.TaskHistoryList,
 );
-
-const getBasicDetailLoading = createSelector(
-  _selectState,
-  state => state.clientLoader,
-);
-
-const getBasicDetailError = createSelector(
-  _selectState,
-  state => state.clientList,
-);
-
-const getClientId = createSelector(_selectState, state => state.clientId);
 
 const getUploadKycLoading = createSelector(
   _selectState,
@@ -288,6 +275,8 @@ const getLeadProgressDetailsError = createSelector(
 export default {
   getClientLoader,
   getClientList,
+  getClientFormId,
+
   getBasicDetailFormData,
   getClientDetailsFormData,
   getVendorDetailsFormData,
@@ -299,16 +288,12 @@ export default {
   getVendorDetailsFormStatus,
   getSavedVisitDetailsStatus,
   getMasterBankDropdown,
-  
 
-  getClientFormId,
   getRemarkReport,
   getLeadProgress,
   getLeadLoader,
   getTaskHistory,
-  getBasicDetailLoading,
-  getBasicDetailError,
-  getClientId,
+
   getUploadKycLoading,
   getUploadKycData,
   getUploadKycError,

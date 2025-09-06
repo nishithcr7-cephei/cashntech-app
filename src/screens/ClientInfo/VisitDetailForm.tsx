@@ -26,19 +26,9 @@ import moment from 'moment';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
 import Toast from 'react-native-toast-message';
-import {CompositeScreenProps} from 'node_modules/@react-navigation/core/lib/typescript/module/src/types';
 import {DrawerScreenProps} from '@react-navigation/drawer';
-
-export enum IntentType {
-  HIGH = 'High',
-  LOW = 'Low',
-  MEDIUM = 'Medium',
-}
-
-export enum UserResponse {
-  INTERESTED = 'Interested',
-  NOT_INTERESTED = 'Not Interested',
-}
+import {IntentType, UserResponse} from './ClientInfo.type';
+import { CompositeScreenProps } from '@react-navigation/native';
 
 const listOfUserResponse = Object.values(UserResponse).map(item => ({
   label: item,
