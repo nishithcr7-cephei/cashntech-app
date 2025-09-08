@@ -215,7 +215,7 @@ function* saveBasicDetails(): unknown {
     address: encryptUtility(basicDetailForm.address.trim()),
     created_by: `${first_name} ${last_name}`,
     date_of_visit: moment(basicDetailForm.dateOfVisit).toISOString(),
-    firm_name: encryptUtility(basicDetailForm.firmName),
+    firm_name: encryptUtility(basicDetailForm.firmName.trim()),
     program_type: basicDetailForm.programType,
     product_type: basicDetailForm.productType,
     userId: id,
@@ -248,14 +248,14 @@ function* updateBasicDetails(): unknown {
   );
   const clientId = yield select(clientSelector.getClientFormId);
   const body: BasicDetailsPayload = {
-    source_of_lead: basicDetailForm.sourceOfLead,
-    location: encryptUtility(basicDetailForm.location),
+    source_of_lead: basicDetailForm.sourceOfLead.trim(),
+    location: encryptUtility(basicDetailForm.location.trim()),
     city: encryptUtility(basicDetailForm.city),
     state: encryptUtility(basicDetailForm.state ?? ''),
-    address: encryptUtility(basicDetailForm.address),
+    address: encryptUtility(basicDetailForm.address.trim()),
     created_by: `${first_name} ${last_name}`,
     date_of_visit: moment(basicDetailForm.dateOfVisit).toISOString(),
-    firm_name: encryptUtility(basicDetailForm.firmName),
+    firm_name: encryptUtility(basicDetailForm.firmName.trim()),
     program_type: basicDetailForm.programType,
     product_type: basicDetailForm.productType,
     userId: id,
@@ -328,9 +328,9 @@ function* updateClientsDetailsSaga(): unknown {
   const clientId = yield select(clientSelector.getClientFormId);
   const body: ClientsDetailsPayload = clientDetails.map(client => ({
     client_type: client.clientType,
-    name_of_client: client.nameOfClient,
-    contact_number: client.contactNumber,
-    email: client.email,
+    name_of_client: client.nameOfClient.trim(),
+    contact_number: client.contactNumber.trim(),
+    email: client.email.trim(),
     created_by: `${first_name} ${last_name}`,
     ...(client.id && {client_detail_id: client.id}),
   }));
@@ -422,8 +422,8 @@ function* saveFirmDetailsSaga(): unknown {
   );
   const body: FirmDetailsPayload = {
     firm_type: firmDetails.firmType,
-    bank_name: encryptUtility(firmDetails.bankName),
-    business_vintage: firmDetails.businessVintage,
+    bank_name: encryptUtility(firmDetails.bankName.trim()),
+    business_vintage: firmDetails.businessVintage.trim(),
     sector: firmDetails.sector,
     facility_type: firmDetails.facilityType,
     cibil_score: Number(firmDetails.cibilScore),
@@ -464,12 +464,12 @@ function* saveVendorDetailsSaga(): unknown {
   const body: VendorDetailsPayload = vendorDetails.map(vendor => ({
     product_category: vendor.productCategory ?? '',
     product_type: vendor.productType,
-    vendor_name: vendor.vendorName,
-    address: encryptUtility(vendor.address),
+    vendor_name: vendor.vendorName.trim(),
+    address: encryptUtility(vendor.address.trim()),
     city: encryptUtility(vendor.city),
     state: encryptUtility(vendor.state ?? ''),
-    pin_code: vendor.pinCode,
-    vendor_contact_number: vendor.vendorContactNumber,
+    pin_code: vendor.pinCode.trim(),
+    vendor_contact_number: vendor.vendorContactNumber.trim(),
     monthly_sales_value: Number(vendor.monthlySalesValue),
   }));
   const {
@@ -509,15 +509,15 @@ function* saveVisitDetailsSaga(): unknown {
   if (visitDetails.userResponse === UserResponse.INTERESTED) {
     body = {
       client_response: visitDetails.userResponse,
-      intent: visitDetails.intent ?? '',
+      intent: visitDetails.intent ?? ''.trim(),
       date_of_next_visit: moment(visitDetails.dateOfNextVisit).toISOString(),
       created_by: `${first_name} ${last_name}`,
     };
   } else {
     body = {
       client_response: visitDetails.userResponse,
-      are_you_interested_for: visitDetails.interestedFor,
-      reason_for_not_interested: visitDetails.reasonForNotInterested,
+      are_you_interested_for: visitDetails.interestedFor.trim(),
+      reason_for_not_interested: visitDetails.reasonForNotInterested.trim(),
       created_by: `${first_name} ${last_name}`,
     };
   }
