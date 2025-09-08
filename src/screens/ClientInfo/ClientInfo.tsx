@@ -31,11 +31,19 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
   const [appliedFilters, setAppliedFilters] = useState<
     Record<string, string[]>
   >({});
-
   const dispatch = useDispatch();
   const clientsData = useSelector(clientSelector.getClientList);
   const cityList = useSelector(clientSelector.getCityList);
   const loading = useSelector(clientSelector.getClientLoader);
+
+  const filteredClients = useMemo(() => {
+    if (!searchQuery) return clientsData;
+    const lowerCaseQuery = searchQuery.toLowerCase();
+    return clientsData.filter(client => {
+      const firmName = client.firm_name ?? '';
+      return firmName.toString().toLowerCase().includes(lowerCaseQuery);
+    });
+  }, [clientsData, searchQuery]);
 
   const filterData = useMemo(() => {
     const listOfSectors = Object.values(SectorType);
@@ -65,7 +73,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
   };
 
   const onPressCard = (clientId: number) => {
-    // TODO: Navigate to Client Details Screen
+    navigation.navigate(ClientScreens.ProfileScreen, {clientId});
   };
 
   const onEdit = (clientId: number) => {
@@ -109,7 +117,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
         {/* Client List */}
         <View style={styles.cardList}>
           <FlatList
-            data={clientsData}
+            data={filteredClients}
             contentContainerStyle={{paddingBottom: scaleHeight(56)}}
             renderItem={({item}) => (
               <ClientCard
