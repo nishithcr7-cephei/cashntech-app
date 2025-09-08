@@ -25,7 +25,7 @@ import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
 import Toast from 'react-native-toast-message';
-import { ClientScreens } from '@constants/Screens';
+import {ClientScreens} from '@constants/Screens';
 
 export enum ClientType {
   OWNER = 'Owner',
@@ -68,17 +68,18 @@ export const ClientDetailForm = ({navigation}: Props) => {
 
   const handleSave = () => {
     if (!validateForm()) return;
+
     if (isSavedClientsDetails) {
-      dispatch(clientActions.saveClientsDetails());
-    } else {
       dispatch(clientActions.updateClientsDetails());
+    } else {
+      dispatch(clientActions.saveClientsDetails());
     }
   };
 
   const handleNext = () => {
-    if(isSavedClientsDetails){
+    if (isSavedClientsDetails) {
       navigation.navigate(ClientScreens.FirmDetailForm);
-    }else{
+    } else {
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -92,22 +93,57 @@ export const ClientDetailForm = ({navigation}: Props) => {
   };
 
   const validateForm = () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     for (let i = 0; i < clientDetails.length; i++) {
       const client = clientDetails[i];
-      if (
-        !client.nameOfClient ||
-        !client.clientType ||
-        !client.contactNumber ||
-        !client.email
-      ) {
+
+      if (!client.nameOfClient?.trim()) {
         Toast.show({
           type: 'error',
           text1: 'Error',
-          text2: `Please fill all fields for Client ${i + 1}.`,
+          text2: `Please enter Name for Client ${i + 1}.`,
+        });
+        return false;
+      }
+
+      if (!client.clientType?.trim()) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `Please select Client Type for Client ${i + 1}.`,
+        });
+        return false;
+      }
+
+      if (!client.contactNumber?.trim()) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `Please enter Contact Number for Client ${i + 1}.`,
+        });
+        return false;
+      }
+
+      if (!client.email?.trim()) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `Please enter Email for Client ${i + 1}.`,
+        });
+        return false;
+      }
+
+      if (!emailRegex.test(client.email.trim())) {
+        Toast.show({
+          type: 'error',
+          text1: 'Invalid Email',
+          text2: `Please enter a valid Email Address for Client ${i + 1}.`,
         });
         return false;
       }
     }
+
     return true;
   };
 
@@ -159,6 +195,7 @@ export const ClientDetailForm = ({navigation}: Props) => {
                 data={listOfTypes}
                 value={client.clientType}
                 onChange={value => setData('clientType', value, index)}
+                showSearch={false}
               />
               <Input
                 label="Contact Number"

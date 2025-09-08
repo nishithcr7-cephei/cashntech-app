@@ -24,7 +24,8 @@ import {ClientNavigatorType} from '@type/NavigatorTypes';
 import {useDispatch, useSelector} from 'react-redux';
 import {clientActions, clientSelector, FirmDetailsType} from '@store/client';
 import Toast from 'react-native-toast-message';
-import { ClientScreens } from '@constants/Screens';
+import {ClientScreens} from '@constants/Screens';
+import {formatIndianNumber} from '@utils/Utils';
 
 export enum FirmType {
   CHARITY = 'CHARITY',
@@ -113,7 +114,10 @@ export const FirmDetailForm = ({navigation}: Props) => {
     clientSelector.getFirmDetailsFormStatus,
   );
 
-  function setData<T extends keyof FirmDetailsType>(field: T, value: FirmDetailsType[T]) {
+  function setData<T extends keyof FirmDetailsType>(
+    field: T,
+    value: FirmDetailsType[T],
+  ) {
     dispatch(clientActions.setFirmDetails({[field]: value}));
   }
 
@@ -122,6 +126,16 @@ export const FirmDetailForm = ({navigation}: Props) => {
   };
 
   const handleSave = () => {
+    if (!validateForm()) return;
+    const strip = (s: string | undefined) =>
+      s ? s.toString().replace(/,/g, '') : '';
+    dispatch(
+      clientActions.setFirmDetails({
+        monthlyTurnover: strip(monthlyTurnover),
+        existingFundingSanctionedAmount: strip(existingFundingSanctionedAmount),
+        estimatedFundingRequired: strip(estimatedFundingRequired),
+      }),
+    );
     dispatch(clientActions.saveFirmDetails());
   };
 
@@ -135,6 +149,37 @@ export const FirmDetailForm = ({navigation}: Props) => {
         text2: 'Please save the form before proceeding to next step.',
       });
     }
+  };
+
+  const requiredFields = [
+    {field: firmType, name: 'Type of Firm'},
+    {field: businessVintage, name: 'Business Vintage'},
+    {field: sector, name: 'Sector'},
+    {field: bankName, name: 'Bank Name'},
+    {field: monthlyTurnover, name: 'Monthly Turnover'},
+    {field: cibilScore, name: 'CIBIL Score'},
+    {field: facilityType, name: 'Facility Type'},
+    {
+      field: existingFundingSanctionedAmount,
+      name: 'Existing Funding Sanctioned Amt',
+    },
+    {field: estimatedFundingRequired, name: 'Estimated Funding Required'},
+    {field: creditPeriodOffer, name: 'Credit Period Offer (In Days)'},
+  ];
+
+  const validateForm = () => {
+    for (let i = 0; i < requiredFields.length; i++) {
+      const {field, name} = requiredFields[i];
+      if (!field || (typeof field === 'string' && !field.trim())) {
+        Toast.show({
+          type: 'error',
+          text1: 'Validation Error',
+          text2: `Please enter/select ${name}`,
+        });
+        return false;
+      }
+    }
+    return true;
   };
 
   return (
@@ -177,7 +222,7 @@ export const FirmDetailForm = ({navigation}: Props) => {
           <Input
             label="Monthly Turnover"
             placeholder="Enter Monthly Turnover"
-            value={monthlyTurnover}
+            value={formatIndianNumber(monthlyTurnover)}
             onChangeText={value => setData('monthlyTurnover', value)}
           />
           <Input
@@ -195,7 +240,7 @@ export const FirmDetailForm = ({navigation}: Props) => {
           <Input
             label="Existing Funding Sanctioned Amt"
             placeholder="Enter Funding Amount"
-            value={existingFundingSanctionedAmount}
+            value={formatIndianNumber(existingFundingSanctionedAmount)}
             onChangeText={value =>
               setData('existingFundingSanctionedAmount', value)
             }
@@ -203,15 +248,16 @@ export const FirmDetailForm = ({navigation}: Props) => {
           <Input
             label="Estimated Funding Required"
             placeholder="Enter funding required"
-            value={estimatedFundingRequired}
+            value={formatIndianNumber(estimatedFundingRequired)}
             onChangeText={value => setData('estimatedFundingRequired', value)}
           />
           <CustomDropdown
             label="Credit Period Offer (In Days)"
             data={listOfCreditPeriodOffer}
             value={creditPeriodOffer}
-            dropdownPosition='top'
+            dropdownPosition="top"
             onChange={value => setData('creditPeriodOffer', value)}
+            showSearch={false}
           />
         </View>
       </KeyboardAvoidingScrollView>

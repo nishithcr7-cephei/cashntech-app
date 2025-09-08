@@ -26,7 +26,8 @@ import FontAwesome6 from '@react-native-vector-icons/fontawesome6';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
 import Toast from 'react-native-toast-message';
-import { ClientScreens } from '@constants/Screens';
+import {ClientScreens} from '@constants/Screens';
+import {formatIndianNumber} from '@utils/Utils';
 
 export enum ProductCategory {
   PERSONAL_CARE_HYGIENE = 'Personal Care & Hygiene',
@@ -246,8 +247,11 @@ const VendorForm = ({
         <Input
           label="Monthly Sales Value"
           placeholder="Enter Monthly sales value"
-          value={vendor.monthlySalesValue.toString()}
-          onChangeText={value => setData('monthlySalesValue', value, index)}
+          value={formatIndianNumber(vendor.monthlySalesValue.toString())}
+          keyboardType="numeric"
+          onChangeText={value =>
+            setData('monthlySalesValue', value.replace(/,/g, ''), index)
+          }
         />
       </View>
     </View>
@@ -276,6 +280,8 @@ export const VendorDetailForm = ({navigation}: Props) => {
   };
 
   const handleSave = () => {
+    if (!validateForm()) return;
+
     dispatch(clientActions.saveVendorDetails());
   };
 
@@ -289,6 +295,31 @@ export const VendorDetailForm = ({navigation}: Props) => {
         text2: 'Please save the form before proceeding to next step.',
       });
     }
+  };
+
+  const validateForm = () => {
+    for (let i = 0; i < vendorDetails.length; i++) {
+      const vendor = vendorDetails[i];
+      if (
+        !vendor.productCategory?.trim() ||
+        !vendor.productType?.trim() ||
+        !vendor.vendorName?.trim() ||
+        !vendor.address?.trim() ||
+        !vendor.state?.trim() ||
+        !vendor.city?.trim() ||
+        !vendor.pinCode?.trim() ||
+        !vendor.vendorContactNumber?.trim() ||
+        !vendor.monthlySalesValue?.trim()
+      ) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: `Please fill all the fields for Vendor ${i + 1}`,
+        });
+        return false;
+      }
+    }
+    return true;
   };
 
   return (

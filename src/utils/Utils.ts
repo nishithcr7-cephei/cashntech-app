@@ -144,7 +144,6 @@ export interface JWTData {
   mobile_number: string;
 }
 
-
 /**
  * Decodes a JSON Web Token (JWT) and returns its payload.
  *
@@ -174,4 +173,17 @@ export const getUserFullName = (): string => {
   }
 
   return 'Test_firstname Test_lastname';
+};
+
+/**
+ * Formats a number according to the Indian numbering system.
+ *
+ * @param value - The number to format, as a string (can include commas).
+ * @returns The formatted number as a string, or an empty string if the input is invalid.
+ */
+export const formatIndianNumber = (value: string) => {
+  if (!value) return '';
+  const num = Number(value.replace(/,/g, ''));
+  if (isNaN(num)) return value;
+  return new Intl.NumberFormat('en-IN').format(num);
 };
