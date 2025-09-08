@@ -2,11 +2,11 @@ import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {
   BasicDetailsType,
   ClientsDetailsType,
+  ClientsFilterResponseDatum,
   ClientState,
   FirmDetailsType,
   IBankListResponseDatum,
   IBankStatementPayload,
-  IClientInfoResponseDatum,
   IFilterPayload,
   IFilterResponseDatum,
   IKycBusinessResponseDatum,
@@ -109,6 +109,7 @@ const initialState: ClientState = {
   // Client Info List screen
   clientLoader: false,
   clientList: [],
+  cityList: [],
   // Client Information Form Data
   clientFormId: undefined,
   masterBankList: [],
@@ -234,15 +235,21 @@ const clientSlice = createSlice({
     setClientLoader: (state, action: PayloadAction<boolean>) => {
       state.clientLoader = action.payload;
     },
+    // City List
+    getCityList: state => {
+      state.clientLoader = true;
+    },
+    setCityList: (state, action: PayloadAction<Array<string>>) => {
+      state.cityList = action.payload;
+    },
     // Get Client from api
-    getClients: state => {
+    getClients: (state, _action: PayloadAction<Record<string, string[]>>) => {
       state.clientLoader = true;
     },
     setClientList: (
       state,
-      action: PayloadAction<Array<IClientInfoResponseDatum>>,
+      action: PayloadAction<Array<ClientsFilterResponseDatum>>,
     ) => {
-      state.clientLoader = false;
       state.clientList = action.payload;
     },
     saveClientFormId: (state, action: PayloadAction<number>) => {
@@ -910,6 +917,9 @@ export const {
   setClientLoader,
   setClientList,
   saveClientFormId,
+
+  getCityList,
+  setCityList,
 
   setBasicDetails,
   clearBasicDetails,

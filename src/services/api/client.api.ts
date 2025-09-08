@@ -7,7 +7,6 @@ import {
   BasicDetailsPayload,
   IBankListResponse,
   BasicDetailsResponse,
-  IClientInfoSuccessResponse,
   ILeadProgressResponse,
   IRemarkReportResponse,
   ITaskHistoryResponse,
@@ -24,41 +23,13 @@ import {
   FirmDetailsPayload,
   VendorDetailsPayload,
   VisitDetailsPayload,
+  ClientsFilterResponse,
 } from '@store/client';
 import {CustomRequestConfig} from './api';
 import {storage} from '@services/localStorage';
 import {Config} from '@config/index';
 import StorageKeys from '@constants/StorageKeys';
-
-const getAllClients = async () => {
-  console.log('API: getAllClients called');
-  const {data, error} = await tryCatch<
-    AxiosResponse<IClientInfoSuccessResponse>
-  >(
-    Api.get(Endpoints.apiGetAllClients, {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  console.log('API: getAllClients response:', {
-    hasData: !!data,
-    hasError: !!error,
-  });
-  if (error) {
-    console.log('API: getAllClients error:', error);
-    return {
-      data: null,
-      error: error,
-    };
-  }
-  console.log(
-    'API: getAllClients success, data length:',
-    data?.data?.length || 0,
-  );
-  return {
-    data: data.data,
-    error: null,
-  };
-};
+import {decryptUtility} from '@utils/crypto';
 
 const getRemarkReport = async () => {
   const {data, error} = await tryCatch<AxiosResponse<IRemarkReportResponse>>(
@@ -156,6 +127,46 @@ const getTaskHistory = async () => {
   }
   return {
     data: data.data,
+    error: null,
+  };
+};
+
+// Client Filter API
+const getClientsFilter = async (payload: Record<string, string[]>) => {
+  const {data, error} = await tryCatch<AxiosResponse<ClientsFilterResponse>>(
+    Api.post(Endpoints.apiGetClientsFilter, payload, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  return {
+    data: data.data,
+    error: null,
+  };
+};
+
+const getCityList = async () => {
+  const {data: cityData, error} = await tryCatch<
+    AxiosResponse<{statusCode: number; data: Array<string>}>
+  >(
+    Api.get(Endpoints.apiGetCityList, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  const apiData = cityData.data;
+  return {
+    data: apiData.data.map(city => decryptUtility(city)),
     error: null,
   };
 };
@@ -818,7 +829,8 @@ const getVisitDetailsList = async () => {
 };
 
 export default {
-  getAllClients,
+  getClientsFilter,
+  getCityList,
 
   saveBasicDetailForm,
   saveClientsDetailsForm,

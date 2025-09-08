@@ -13,37 +13,30 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import fontWeight from '@constants/FontWeight';
 import {Colors} from '@constants/index';
 
-type FilterModelProps = {
+type FilterModalProps = {
   visible: boolean;
   onClose: () => void;
   onApply?: (selectedFilter: Record<string, string[]>) => void;
+  filterData: Record<string, string[]>;
+  appliedFilters: Record<string, string[]>;
 };
 
-const Data: Record<string, string[]> = {
-  City: ['Mumbai', 'Delhi', 'Bangalore'],
-  Sector: ['FMCG', 'Pharma', 'Manufacturing'],
-  Source: ['Market Knowledge', 'Customer Reference', 'Telecalling'],
-};
-
-const sideMenu = ['City', 'Sector', 'Source'];
-
-export const FilterModel: React.FC<FilterModelProps> = ({
+export const FilterModal: React.FC<FilterModalProps> = ({
   visible,
   onClose,
   onApply,
+  filterData,
+  appliedFilters,
 }) => {
-  const [selectedMenus, setSelectedMenus] = useState<string>(sideMenu[0]);
-  const [selectedFilters, setSelectedFilters] = useState<
-    Record<string, string[]>
-  >({
-    City: [],
-    Sector: [],
-    Source: [],
-  });
+  const [selectedMenu, setSelectedMenu] = useState<string>(
+    Object.keys(filterData)[0],
+  );
+  const [selectedFilters, setSelectedFilters] =
+    useState<Record<string, string[]>>(appliedFilters);
 
   const clearFilters = () => {
-    setSelectedFilters({City: [], Sector: [], Source: []});
-    setSelectedMenus(sideMenu[0]);
+    setSelectedFilters({});
+    setSelectedMenu(Object.keys(filterData)[0]);
   };
 
   const handleApply = () => {
@@ -53,7 +46,7 @@ export const FilterModel: React.FC<FilterModelProps> = ({
 
   const toggleOption = (menu: string, option: string) => {
     setSelectedFilters(prev => {
-      const currentOptions = prev[menu] || [];
+      const currentOptions = prev[menu] ?? [];
       if (currentOptions.includes(option)) {
         return {...prev, [menu]: currentOptions.filter(o => o !== option)};
       } else {
@@ -63,17 +56,17 @@ export const FilterModel: React.FC<FilterModelProps> = ({
   };
 
   const toggleMenu = (menu: string) => {
-    setSelectedMenus(menu);
+    setSelectedMenu(menu);
   };
 
   const renderOptionItem = ({item}: {item: string}) => {
-    const isSelected = selectedFilters[selectedMenus]?.includes(item);
+    const isSelected = selectedFilters[selectedMenu]?.includes(item);
     return (
       <TouchableOpacity
         style={styles.optionRow}
-        onPress={() => toggleOption(selectedMenus, item)}>
-        <View style={styles.checkbox}>
-          {isSelected && <Tick width={14} height={14} />}
+        onPress={() => toggleOption(selectedMenu, item)}>
+        <View style={[styles.checkbox, isSelected && styles.checked]}>
+          {isSelected && <Tick width={14} height={14} stroke={Colors.white} />}
         </View>
         <Text style={styles.optionText}>{item}</Text>
       </TouchableOpacity>
@@ -90,15 +83,15 @@ export const FilterModel: React.FC<FilterModelProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.backButton}>
-            <LeftChevron width={12} height={12} />
+            <LeftChevron width={14} height={14} />
             <Text style={styles.headerTitle}>Filters</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.content}>
           <View style={styles.sideMenu}>
-            {sideMenu.map((menu, index) => {
-              const isSelected = selectedMenus === menu;
+            {Object.keys(filterData).map((menu, index) => {
+              const isSelected = selectedMenu === menu;
               return (
                 <TouchableOpacity
                   key={index}
@@ -114,7 +107,7 @@ export const FilterModel: React.FC<FilterModelProps> = ({
           </View>
           <View style={styles.optionsContainer}>
             <FlatList
-              data={Data[selectedMenus] || []}
+              data={filterData[selectedMenu]}
               keyExtractor={item => item}
               renderItem={renderOptionItem}
             />
@@ -156,10 +149,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: scaleFont(18),
     fontWeight: fontWeight.Bold,
-    marginLeft: scaleWidth(8),
+    marginLeft: scaleWidth(12),
   },
   clearText: {
-    color: Colors.lightGray,
+    color: Colors.gray400,
+    textDecorationLine: 'underline',
+    fontWeight: fontWeight.SemiBold,
     fontSize: scaleFont(14),
   },
   content: {
@@ -226,6 +221,7 @@ const styles = StyleSheet.create({
   },
   checked: {
     backgroundColor: Colors.primaryColor,
+    borderColor: Colors.primaryColor,
   },
   optionText: {
     fontSize: scaleFont(15),

@@ -26,12 +26,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
 import Toast from 'react-native-toast-message';
 import {ClientScreens} from '@constants/Screens';
-
-export enum ClientType {
-  OWNER = 'Owner',
-  DIRECTOR = 'Director',
-  DESIGNATED_PARTNER = 'Designated Partner',
-}
+import {ClientType} from './ClientInfo.type';
 
 const listOfTypes = Object.values(ClientType).map(item => ({
   label: item,
@@ -40,7 +35,7 @@ const listOfTypes = Object.values(ClientType).map(item => ({
 
 type Props = NativeStackScreenProps<ClientNavigatorType, 'ClientDetailForm'>;
 
-export const ClientDetailForm = ({navigation}: Props) => {
+export const ClientDetailForm: React.FC<Props> = ({navigation}) => {
   const dispatch = useDispatch();
 
   const clientFormId = useSelector(clientSelector.getClientFormId);

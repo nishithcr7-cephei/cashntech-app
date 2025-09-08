@@ -3,6 +3,7 @@ import {
   bankStatementRequest,
   FilterRequest,
   getBankList,
+  getCityList,
   getClients,
   getClientsDetails,
   getKycBusinessChecked,
@@ -111,30 +112,13 @@ import {
   VendorDetailsPayload,
   VisitDetailsPayload,
   VisitDetailsType,
+  ClientsFilterResponse,
 } from './client.types';
 import Toast from 'react-native-toast-message';
 import {userSelector, UserState} from '@store/user';
 import {AxiosError} from 'axios';
 import {decryptUtility, encryptUtility} from '@utils/crypto';
 import {UserResponse} from '@screens/index';
-
-function* handleGetClient(): unknown {
-  console.log('Saga: handleGetClient called');
-  const {data, error}: Result<IClientInfoSuccessResponse> = yield call(
-    ClientApis.getAllClients,
-  );
-  console.log('Saga: API response:', {
-    data: data?.data?.length || 0,
-    error: !!error,
-  });
-  if (!error) {
-    yield put(clientActions.setClientList(data.data));
-    console.log('Saga: Client list set successfully');
-  } else {
-    yield put(clientActions.setClientList([]));
-    console.log('Saga: Error occurred, setting empty list');
-  }
-}
 
 function* handleGetRemarkReport(): unknown {
   const {data, error}: Result<IRemarkReportResponse> = yield call(
@@ -197,6 +181,52 @@ function* handleGetTaskHistory(): unknown {
     yield put(clientActions.setTaskHistoryList(data.data));
   } else {
     yield put(clientActions.setTaskHistoryList([]));
+  }
+}
+
+function* handleGetClientsFilter(
+  action: PayloadAction<Record<string, string[]>>,
+): unknown {
+  // TODO: Apply payload after filter API fix from backend
+  // const byCity = (action.payload?.['City'] ?? []).map(city =>
+  //   encryptUtility(city),
+  // );
+  // const payload = {
+  //   ...(byCity.length && {byCity}),
+  //   ...(action.payload?.['Sector'] &&
+  //     action.payload['Sector'].length && {
+  //       bySector: action.payload['Sector'],
+  //     }),
+  //   ...(action.payload?.['Source of lead'] &&
+  //     action.payload['Source of lead'].length && {
+  //       bySource: action.payload['Source of lead'],
+  //     }),
+  // };
+  const {
+    data,
+    error,
+  }: Result<ClientsFilterResponse, AxiosError<{message: string}>> = yield call(
+    ClientApis.getClientsFilter,
+    {},
+  );
+  yield put(clientActions.setClientLoader(false));
+  if (error) {
+    Toast.show({
+      type: 'error',
+      text1: error.response?.data?.message || 'Failed to fetch client list.',
+    });
+    return;
+  }
+  yield put(clientActions.setClientList(data.data));
+}
+
+function* handleGetCityList(): unknown {
+  const {data, error}: Result<Array<string>> = yield call(
+    ClientApis.getCityList,
+  );
+  yield put(clientActions.setClientLoader(false));
+  if (!error) {
+    yield put(clientActions.setCityList(data));
   }
 }
 
@@ -1213,7 +1243,8 @@ function* handleGetLeadProgressDetails(action: PayloadAction<number>) {
 }
 
 export default function* clientSaga() {
-  yield takeLatest(getClients.type, handleGetClient);
+  yield takeLatest(getClients.type, handleGetClientsFilter);
+  yield takeLatest(getCityList.type, handleGetCityList);
   yield takeLatest(saveClientBasicDetails.type, saveBasicDetails);
   yield takeLatest(updateClientBasicDetails.type, updateBasicDetails);
   yield takeLatest(saveClientsDetails.type, saveClientsDetailsSaga);

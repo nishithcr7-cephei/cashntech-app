@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, {use, useCallback, useEffect, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import Colors from '@constants/Colors';
 import fontWeight from '@constants/FontWeight';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -28,100 +28,7 @@ import {ClientNavigatorType} from '@type/NavigatorTypes';
 import Toast from 'react-native-toast-message';
 import {ClientScreens} from '@constants/Screens';
 import {formatIndianNumber} from '@utils/Utils';
-
-export enum ProductCategory {
-  PERSONAL_CARE_HYGIENE = 'Personal Care & Hygiene',
-  HOUSEHOLD_CLEANING = 'Household Cleaning',
-  PACKAGED_FOODS = 'Packaged Foods',
-  BEVERAGES = 'Beverages',
-  DAIRY_FROZEN_FOODS = 'Dairy & Frozen Foods',
-  CONFECTIONERY = 'Confectionery',
-  STAPLE_GROCERY = 'Staple & Grocery',
-  PAPER_DISPOSABLE = 'Paper & Disposable',
-}
-
-export const productTypeOptions: Record<ProductCategory, string[]> = {
-  [ProductCategory.PERSONAL_CARE_HYGIENE]: [
-    'Toothpaste',
-    'Toothbrush',
-    'Shampoo',
-    'Conditioner',
-    'Soap',
-    'Body wash',
-    'Face wash',
-    'Face cream',
-    'Deodorants',
-    'Perfumes',
-    'Shaving creams',
-    'Razors',
-    'Sanitary napkins',
-    'Baby diapers',
-  ],
-  [ProductCategory.HOUSEHOLD_CLEANING]: [
-    'Detergents (powder/liquid)',
-    'Dishwashing bars/liquids',
-    'Floor cleaners',
-    'Toilet cleaners',
-    'Air fresheners',
-    'Mosquito repellents',
-  ],
-  [ProductCategory.PACKAGED_FOODS]: [
-    'Biscuits',
-    'Cookies',
-    'Chips',
-    'Namkeen',
-    'Instant noodles',
-    'Pasta',
-    'Breakfast cereals',
-    'Bakery items',
-    'Ready-to-eat meals',
-  ],
-  [ProductCategory.BEVERAGES]: [
-    'Packaged drinking water',
-    'Soft drinks',
-    'Juices',
-    'Energy drinks',
-    'Tea',
-    'Coffee',
-  ],
-  [ProductCategory.DAIRY_FROZEN_FOODS]: [
-    'Milk',
-    'Butter',
-    'Cheese',
-    'Paneer',
-    'Ice cream',
-    'Frozen desserts',
-    'Yogurt',
-    'Curd',
-    'Frozen snacks',
-  ],
-  [ProductCategory.CONFECTIONERY]: [
-    'Chocolates',
-    'Chewing gum',
-    'Candies',
-    'Toffees',
-    'Lollipops',
-  ],
-  [ProductCategory.STAPLE_GROCERY]: [
-    'Salt',
-    'Sugar',
-    'Edible oils',
-    'Atta',
-    'Rice',
-    'Spices & masalas',
-    'Pulses',
-    'Lentils',
-  ],
-  [ProductCategory.PAPER_DISPOSABLE]: [
-    'Tissues',
-    'Napkins',
-    'Toilet rolls',
-    'Aluminum foil',
-    'Cling film',
-    'Disposable plates',
-    'Cups',
-  ],
-};
+import {ProductCategory, productTypeOptions} from './ClientInfo.type';
 
 const listOfProductCategories = Object.values(ProductCategory).map(item => ({
   label: item,
@@ -258,7 +165,7 @@ const VendorForm = ({
   );
 };
 
-export const VendorDetailForm = ({navigation}: Props) => {
+export const VendorDetailForm: React.FC<Props> = ({navigation}) => {
   const dispatch = useDispatch();
   const vendorLoader = useSelector(clientSelector.getClientLoader);
   const vendorDetails = useSelector(clientSelector.getVendorDetailsFormData);

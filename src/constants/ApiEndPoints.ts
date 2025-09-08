@@ -13,9 +13,10 @@ const Endpoints = {
 
   // Bank List
   apiGetMasterBank: '/client-info-master/bankmaster-list',
+  apiGetCityList: '/client-info-master/cities',
 
   // Client apis
-  apiGetAllClients: '/client-info-master/list',
+  apiGetClientsFilter: '/client-info-master/filter/',
   apiSaveBasicDetails: '/client-info-master/basic-details',
   apiSaveClientsDetails: '/client-info-master/client-details/',
   apiGetClientsDetails: 'client-info-master/details/',

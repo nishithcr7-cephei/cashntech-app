@@ -3,7 +3,8 @@ import {IntentType, ProductCategory, UserResponse} from '@screens/index';
 
 export type ClientState = {
   clientLoader: boolean;
-  clientList: Array<IClientInfoResponseDatum>;
+  clientList: Array<ClientsFilterResponseDatum>;
+  cityList: Array<string>;
   basicDetails: BasicDetailsType;
   clientsDetails: ClientsDetailsType;
   firmDetails: FirmDetailsType;
@@ -237,6 +238,36 @@ export type VisitDetailsPayload =
       are_you_interested_for: string;
       created_by: string;
     };
+
+export type ClientsFilterResponse = {
+  statusCode: number;
+  data: Array<ClientsFilterResponseDatum>;
+};
+
+export type ClientsFilterResponseDatum = {
+  id: number;
+  source_of_lead: string;
+  city: string;
+  firm_name: string;
+  monthly_turnover: number | null;
+  sector: null | string;
+  existing_funding_sanctioned_amount: number | null;
+  estimated_funding_required: number | null;
+  created_at: string;
+  user: User | null;
+  leadProgress: Array<LeadProgress>;
+};
+
+export type LeadProgress = {
+  id: number;
+  lead_progress_status: string;
+};
+
+export type User = {
+  id: number;
+  first_name: string;
+  last_name: string;
+};
 
 export interface IClientInfoSuccessResponse {
   statusCode: number;
