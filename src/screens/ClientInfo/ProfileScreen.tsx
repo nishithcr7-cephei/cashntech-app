@@ -16,17 +16,17 @@ import Colors from '@constants/Colors';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import FontWeight from '@constants/FontWeight';
 import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
+import {ClientScreens} from '@constants/Screens';
+import {UserImg} from '@assets/Images';
 
 type NavigationType = CompositeScreenProps<
-  NativeStackScreenProps<ClientNavigatorType, keyof ClientNavigatorType>,
+  NativeStackScreenProps<ClientNavigatorType, ClientScreens.ProfileScreen>,
   DrawerScreenProps<HomeNavigatorType>
 >;
 
-type ClientInfoProps = {
+export const ProfileScreen: React.FC<{
   navigation: NavigationType['navigation'];
-};
-
-export const ProfileScreen: React.FC<ClientInfoProps> = ({navigation}) => {
+}> = ({navigation}) => {
   const [expanded, setExpanded] = useState<string | null>(null);
   const toggleSection = (key: string) => {
     setExpanded(expanded === key ? null : key);
@@ -39,10 +39,7 @@ export const ProfileScreen: React.FC<ClientInfoProps> = ({navigation}) => {
         {/* User Image Circle */}
         <View style={[styles.sectionContainer, styles.imageContainer]}>
           <View style={styles.imageCircle}>
-            <Image
-              source={require('@assets/Images/User.png')}
-              style={styles.userImage}
-            />
+            <Image source={UserImg} style={styles.userImage} />
           </View>
           <Text style={styles.profileName}>John Doe</Text>
           <Text style={styles.profileId}>ID: CL001</Text>

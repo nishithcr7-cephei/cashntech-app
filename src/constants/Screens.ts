@@ -22,6 +22,7 @@ enum ClientScreens {
   VendorDetailForm = 'VendorDetailForm',
   VisitDetailForm = 'VisitDetailForm',
   ClientLeadInfoTab = 'ClientLeadInfoTab',
+  ProfileScreen = 'ProfileScreen',
 }
 
 export {AuthScreens, DrawerScreens, ClientScreens};

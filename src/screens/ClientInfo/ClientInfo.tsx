@@ -24,7 +24,7 @@ import {useDispatch, useSelector} from 'react-redux';
 import {decryptLocation} from '@utils/crypto';
 
 type NavigationType = CompositeScreenProps<
-  NativeStackScreenProps<ClientNavigatorType, keyof ClientNavigatorType>,
+  NativeStackScreenProps<ClientNavigatorType, ClientScreens.ClientInfo>,
   DrawerScreenProps<HomeNavigatorType>
 >;
 

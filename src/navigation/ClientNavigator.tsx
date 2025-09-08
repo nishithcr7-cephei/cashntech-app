@@ -21,7 +21,7 @@ export const ClientNavigator = () => {
       <Stack.Screen name={ClientScreens.ClientInfo} component={ClientInfo} />
       <Stack.Screen
         name={ClientScreens.FormSelectionScreen}
-        component={ProfileScreen}
+        component={FormSelectionScreen}
       />
       <Stack.Screen
         name={ClientScreens.BasicDetailForm}
@@ -42,6 +42,10 @@ export const ClientNavigator = () => {
       <Stack.Screen
         name={ClientScreens.VisitDetailForm}
         component={VisitDetailForm}
+      />
+      <Stack.Screen
+        name={ClientScreens.ProfileScreen}
+        component={ProfileScreen}
       />
     </Stack.Navigator>
   );
