@@ -243,7 +243,7 @@ const clientSlice = createSlice({
       state.cityList = action.payload;
     },
     // Get Client from api
-    getClients: state => {
+    getClients: (state, _action: PayloadAction<Record<string, string[]>>) => {
       state.clientLoader = true;
     },
     setClientList: (

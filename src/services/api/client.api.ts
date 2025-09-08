@@ -132,9 +132,9 @@ const getTaskHistory = async () => {
 };
 
 // Client Filter API
-const getClientsFilter = async () => {
+const getClientsFilter = async (payload: Record<string, string[]>) => {
   const {data, error} = await tryCatch<AxiosResponse<ClientsFilterResponse>>(
-    Api.post(Endpoints.apiGetClientsFilter, {}, {
+    Api.post(Endpoints.apiGetClientsFilter, payload, {
       authRequired: true,
     } as CustomRequestConfig),
   );

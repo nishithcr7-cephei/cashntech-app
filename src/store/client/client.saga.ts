@@ -184,12 +184,30 @@ function* handleGetTaskHistory(): unknown {
   }
 }
 
-function* handleGetClientsFilter(): unknown {
+function* handleGetClientsFilter(
+  action: PayloadAction<Record<string, string[]>>,
+): unknown {
+  // TODO: Apply payload after filter API fix from backend
+  // const byCity = (action.payload?.['City'] ?? []).map(city =>
+  //   encryptUtility(city),
+  // );
+  // const payload = {
+  //   ...(byCity.length && {byCity}),
+  //   ...(action.payload?.['Sector'] &&
+  //     action.payload['Sector'].length && {
+  //       bySector: action.payload['Sector'],
+  //     }),
+  //   ...(action.payload?.['Source of lead'] &&
+  //     action.payload['Source of lead'].length && {
+  //       bySource: action.payload['Source of lead'],
+  //     }),
+  // };
   const {
     data,
     error,
   }: Result<ClientsFilterResponse, AxiosError<{message: string}>> = yield call(
     ClientApis.getClientsFilter,
+    {},
   );
   yield put(clientActions.setClientLoader(false));
   if (error) {
