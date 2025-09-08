@@ -1,4 +1,3 @@
-
 import {Country} from 'react-native-country-picker-modal';
 
 export type AuthNavigatorType = {
@@ -67,18 +66,21 @@ export type ClientNavigatorType = {
   FirmDetailForm: undefined;
   VendorDetailForm: undefined;
   VisitDetailForm: undefined;
+  ProfileScreen: undefined;
 };
 
 export type SoftNavigatorType = {
   Softsanction: undefined;
   SoftsanctionProcess: undefined;
-  SoftSanctionRuleset: {
-    bankName?: string;
-    product?: string;
-    configRules?: any[];
-    clientName?: string;
-    clientId?: string;
-  } | undefined;
+  SoftSanctionRuleset:
+    | {
+        bankName?: string;
+        product?: string;
+        configRules?: any[];
+        clientName?: string;
+        clientId?: string;
+      }
+    | undefined;
   RulesetTCPD: undefined;
   UGROTurnoverMethod: {
     clientId: string;
@@ -86,16 +88,18 @@ export type SoftNavigatorType = {
     bank: string;
   };
   UGROPurchaseMethod: undefined;
-  RulesetView: {
-    rulesetData: any[];
-    bankName?: string;
-    productName?: string;
-    rulesetId?: string;
-    methodName?: string;
-    clientId?: string;
-    clientName?: string;
-    location?: string;
-  } | undefined;
+  RulesetView:
+    | {
+        rulesetData: any[];
+        bankName?: string;
+        productName?: string;
+        rulesetId?: string;
+        methodName?: string;
+        clientId?: string;
+        clientName?: string;
+        location?: string;
+      }
+    | undefined;
 };
 
 export type LeadNavigatorType = {
