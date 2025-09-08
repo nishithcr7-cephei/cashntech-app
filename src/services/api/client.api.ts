@@ -166,7 +166,7 @@ const getCityList = async () => {
   }
   const apiData = cityData.data;
   return {
-    data: apiData.data.map((city: string) => decryptUtility(city)),
+    data: apiData.data.map(city => decryptUtility(city)),
     error: null,
   };
 };

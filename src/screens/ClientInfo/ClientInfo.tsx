@@ -45,15 +45,15 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
       Sector: listOfSectors,
       'Source of lead': listOfLeadSources,
     };
-  }, [cityList?.length]);
+  }, [cityList]);
 
   useEffect(() => {
     dispatch(clientActions.getCityList());
-  }, []);
+  }, [dispatch]);
 
   useEffect(() => {
     callGetClients();
-  }, [appliedFilters]);
+  }, [appliedFilters, dispatch]);
 
   const callGetClients = () => {
     dispatch(clientActions.getClients(appliedFilters));
@@ -87,7 +87,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
           <View style={styles.subRowContainer}>
             <Text style={styles.subRowContainerTxt}>Clients</Text>
             <View style={styles.Badge}>
-              <Text style={styles.badgeText}>{cityList.length}</Text>
+              <Text style={styles.badgeText}>{clientsData.length}</Text>
             </View>
           </View>
           <View style={styles.Searchbox}>

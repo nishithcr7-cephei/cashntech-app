@@ -135,13 +135,11 @@ export const ClientCard: React.FC<ClientCardProps> = ({
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.currentStatus}</Text>
-          {data.leadProgress[0].lead_progress_status || 'N/A'}
+          {data.leadProgress?.[0]?.lead_progress_status ?? 'N/A'}
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.existingFunding}</Text>
-          {data.existing_funding_sanctioned_amount
-            ? data.existing_funding_sanctioned_amount
-            : 'N/A'}
+          {data.existing_funding_sanctioned_amount ?? 'N/A'}
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.estimatedFundingRequired}</Text>
@@ -149,11 +147,11 @@ export const ClientCard: React.FC<ClientCardProps> = ({
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.monthlyTurnover}</Text>
-          {data.monthly_turnover || 'N/A'}
+          {data.monthly_turnover ?? 'N/A'}
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.monthlyTurnover}</Text>
-          {data.monthly_turnover || 'N/A'}
+          {data.monthly_turnover ?? 'N/A'}
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.createdAt}</Text>

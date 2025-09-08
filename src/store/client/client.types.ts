@@ -253,8 +253,8 @@ export type ClientsFilterResponseDatum = {
   sector: null | string;
   existing_funding_sanctioned_amount: number | null;
   estimated_funding_required: number | null;
-  created_at: Date;
-  user: User;
+  created_at: string;
+  user: User | null;
   leadProgress: Array<LeadProgress>;
 };
 
