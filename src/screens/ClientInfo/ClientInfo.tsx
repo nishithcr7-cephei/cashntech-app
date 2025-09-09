@@ -90,7 +90,6 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
         deleted_by: first_name + ' ' + last_name,
       }),
     );
-    console.log('-------->>>>>>', clientId);
   };
 
   return (

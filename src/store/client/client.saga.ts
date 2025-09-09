@@ -114,6 +114,7 @@ import {
   VisitDetailsType,
   ClientsFilterResponse,
   IDeleteResponse,
+  ClientsFilterResponseDatum,
 } from './client.types';
 import Toast from 'react-native-toast-message';
 import {userSelector, UserState} from '@store/user';
@@ -233,23 +234,29 @@ function* handleGetCityList(): unknown {
 
 function* handleDeleteClient(
   action: PayloadAction<{id: number; deleted_by: string}>,
-) {
-  try {
-    const {id, deleted_by} = action.payload;
-    const {
-      data,
-      error,
-    }: {data: IDeleteResponse | null; error: AxiosError | null} = yield call(
-      clientApi.deleteClient,
-      id,
-      {deleted_by},
+): unknown {
+  const {id, deleted_by} = action.payload;
+  const currentClientList: Array<ClientsFilterResponseDatum> = yield select(
+    clientSelector.getClientList,
+  );
+  const {
+    error,
+  }: Result<IDeleteResponse, AxiosError<{message?: string}>> = yield call(
+    clientApi.deleteClient,
+    id,
+    {deleted_by},
+  );
+  yield put(clientActions.setClientLoader(false));
+  if (error) {
+    Toast.show({
+      type: 'error',
+      text1: error.response?.data?.message || 'Failed to delete client.',
+    });
+  } else {
+    const updatedClientList = currentClientList.filter(
+      client => client.id !== id,
     );
-    if (!error && data) {
-    } else {
-      console.error(error?.message || 'Delete failed');
-    }
-  } catch (err: any) {
-    console.error('Delete error:', err.message);
+    yield put(clientActions.setClientList(updatedClientList));
   }
 }
 
