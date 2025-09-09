@@ -169,7 +169,7 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             onChange={value => setData('firmType', value)}
           />
           <Input
-            label="Business Vintage"
+            label="Business Vintage (in Years)"
             placeholder="Enter Business vintage"
             value={businessVintage}
             onChangeText={value => setData('businessVintage', value)}

@@ -24,6 +24,8 @@ import {
   VendorDetailsPayload,
   VisitDetailsPayload,
   ClientsFilterResponse,
+  IDeleteResponse,
+  IDeletePayload,
 } from '@store/client';
 import {CustomRequestConfig} from './api';
 import {storage} from '@services/localStorage';
@@ -86,10 +88,7 @@ const getLeadProgress = async () => {
       error: error,
     };
   }
-  console.log(
-    'API: getLeadProgress success, data length:',
-    data?.data?.length || 0,
-  );
+
   return {
     data: data.data,
     error: null,
@@ -828,9 +827,23 @@ const getVisitDetailsList = async () => {
   return {data: data.data, error: null};
 };
 
+export const deleteClient = async (id: number, payload: IDeletePayload) => {
+  const {data, error} = await tryCatch<AxiosResponse<IDeleteResponse>>(
+    Api.post(Endpoints.apiDeleteClient(id), payload, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+
+  if (error) {
+    return {data: null, error};
+  }
+  return {data: data.data, error: null};
+};
+
 export default {
   getClientsFilter,
   getCityList,
+  deleteClient,
 
   saveBasicDetailForm,
   saveClientsDetailsForm,

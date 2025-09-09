@@ -269,6 +269,15 @@ const clientSlice = createSlice({
       state.isSavedVisitDetails = initialState.isSavedVisitDetails;
       state.clientFormId = undefined;
     },
+
+    // Delete function
+    deleteClientRequest: (
+      state,
+      action: PayloadAction<{id: number; deleted_by: string}>,
+    ) => {
+      state.clientLoader = true;
+    },
+
     // Basic Details
     setBasicDetails: (
       state,
@@ -416,15 +425,6 @@ const clientSlice = createSlice({
     },
     updateVisitDetails: state => {
       state.clientLoader = true;
-    },
-    deleteClientRequest: (state, action) => {},
-    deleteClientSuccess: (state, action) => {
-      state.clientList = state.clientList.filter(
-        client => client.id !== action.payload,
-      );
-    },
-    deleteClientFailure: (state, action) => {
-      state.error = action.payload;
     },
     getReport: state => {
       state.reportLoader = true;
@@ -810,7 +810,7 @@ const clientSlice = createSlice({
       action: PayloadAction<ITaskReordsFilterResponseDatum>,
     ) {
       state.TaskRecordsFilterLoading = false;
-      state.TaskRecordsFilterError = action.payload;
+      state.TaskRecordsFilterData = action.payload;
     },
     TaskRecordsFailure(state, action: PayloadAction<string>) {
       state.TaskRecordsFilterLoading = false;
@@ -917,6 +917,7 @@ export const {
   setClientLoader,
   setClientList,
   saveClientFormId,
+  deleteClientRequest,
 
   getCityList,
   setCityList,
@@ -1060,11 +1061,3 @@ export const {
   setLeadProgressDetailsError,
 } = clientSlice.actions;
 export default clientSlice.reducer;
-
-export function getFilteredClients(filters: {
-  client_name: string;
-  location: string;
-  source_of_lead: string;
-}): any {
-  throw new Error('Function not implemented.');
-}

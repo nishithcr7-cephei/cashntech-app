@@ -814,3 +814,12 @@ export interface ITaskReordsFilterResponseDatum {
   reference_details: any;
   source_of_lead: string;
 }
+
+export interface IDeletePayload {
+  deleted_by: string;
+}
+
+export interface IDeleteResponse {
+  statusCode: number;
+  message: string;
+}

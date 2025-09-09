@@ -1,6 +1,7 @@
 import {call, put, select, takeLatest} from 'redux-saga/effects';
 import {
   bankStatementRequest,
+  deleteClientRequest,
   FilterRequest,
   getBankList,
   getCityList,
@@ -61,7 +62,6 @@ import {
   clientSelector,
   BasicDetailsResponse,
   IBankListResponse,
-  IClientInfoSuccessResponse,
   ILeadProgressResponse,
   IRemarkReportResponse,
   ITaskHistoryResponse,
@@ -113,6 +113,8 @@ import {
   VisitDetailsPayload,
   VisitDetailsType,
   ClientsFilterResponse,
+  IDeleteResponse,
+  ClientsFilterResponseDatum,
 } from './client.types';
 import Toast from 'react-native-toast-message';
 import {userSelector, UserState} from '@store/user';
@@ -227,6 +229,34 @@ function* handleGetCityList(): unknown {
   yield put(clientActions.setClientLoader(false));
   if (!error) {
     yield put(clientActions.setCityList(data));
+  }
+}
+
+function* handleDeleteClient(
+  action: PayloadAction<{id: number; deleted_by: string}>,
+): unknown {
+  const {id, deleted_by} = action.payload;
+  const currentClientList: Array<ClientsFilterResponseDatum> = yield select(
+    clientSelector.getClientList,
+  );
+  const {
+    error,
+  }: Result<IDeleteResponse, AxiosError<{message?: string}>> = yield call(
+    clientApi.deleteClient,
+    id,
+    {deleted_by},
+  );
+  yield put(clientActions.setClientLoader(false));
+  if (error) {
+    Toast.show({
+      type: 'error',
+      text1: error.response?.data?.message || 'Failed to delete client.',
+    });
+  } else {
+    const updatedClientList = currentClientList.filter(
+      client => client.id !== id,
+    );
+    yield put(clientActions.setClientList(updatedClientList));
   }
 }
 
@@ -1254,7 +1284,7 @@ export default function* clientSaga() {
   yield takeLatest(saveFirmDetails.type, saveFirmDetailsSaga);
   yield takeLatest(saveVendorDetails.type, saveVendorDetailsSaga);
   yield takeLatest(saveVisitDetails.type, saveVisitDetailsSaga);
-
+  yield takeLatest(deleteClientRequest.type, handleDeleteClient);
   yield takeLatest(getReport.type, handleGetRemarkReport);
   yield takeLatest(getLead.type, handleGetLeadProgress);
   yield takeLatest(getLeadDesciption.type, handleGetLeadDesProgress);
