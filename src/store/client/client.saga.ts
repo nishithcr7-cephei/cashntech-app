@@ -62,7 +62,6 @@ import {
   clientSelector,
   BasicDetailsResponse,
   IBankListResponse,
-  IClientInfoSuccessResponse,
   ILeadProgressResponse,
   IRemarkReportResponse,
   ITaskHistoryResponse,
@@ -94,7 +93,7 @@ import {
   IKYCBusinessResponse,
 } from '.';
 import {Result} from '@utils/TryCatch';
-import clientApi, {deleteClient} from '@services/api/client.api';
+import clientApi from '@services/api/client.api';
 import {PayloadAction} from '@reduxjs/toolkit';
 import moment from 'moment';
 import {PayloadWithCallback} from '@type/global.types';
@@ -121,7 +120,6 @@ import {userSelector, UserState} from '@store/user';
 import {AxiosError} from 'axios';
 import {decryptUtility, encryptUtility} from '@utils/crypto';
 import {UserResponse} from '@screens/index';
-import api from '@services/api/api';
 
 function* handleGetRemarkReport(): unknown {
   const {data, error}: Result<IRemarkReportResponse> = yield call(
@@ -238,19 +236,20 @@ function* handleDeleteClient(
 ) {
   try {
     const {id, deleted_by} = action.payload;
-    const {data, error}: {data: IDeleteResponse | null; error: any} =
-      yield call(deleteClient, id, {deleted_by});
-
-    if (error || !data) {
-      yield put(
-        clientActions.deleteClientFailure(error?.message || 'Delete failed'),
-      );
-      return;
+    const {
+      data,
+      error,
+    }: {data: IDeleteResponse | null; error: AxiosError | null} = yield call(
+      clientApi.deleteClient,
+      id,
+      {deleted_by},
+    );
+    if (!error && data) {
+    } else {
+      console.error(error?.message || 'Delete failed');
     }
-
-    yield put(clientActions.deleteClientSuccess(id));
   } catch (err: any) {
-    yield put(clientActions.deleteClientFailure(err.message));
+    console.error('Delete error:', err.message);
   }
 }
 

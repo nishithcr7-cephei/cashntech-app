@@ -277,14 +277,6 @@ const clientSlice = createSlice({
     ) => {
       state.clientLoader = true;
     },
-    deleteClientSuccess: (state, action: PayloadAction<number>) => {
-      state.clientLoader = false;
-      state.clientList = state.clientList.filter(c => c.id !== action.payload);
-    },
-    deleteClientFailure: (state, action: PayloadAction<string>) => {
-      state.clientLoader = false;
-      state.error = action.payload;
-    },
 
     // Basic Details
     setBasicDetails: (
@@ -926,8 +918,6 @@ export const {
   setClientList,
   saveClientFormId,
   deleteClientRequest,
-  deleteClientSuccess,
-  deleteClientFailure,
 
   getCityList,
   setCityList,
@@ -1071,18 +1061,3 @@ export const {
   setLeadProgressDetailsError,
 } = clientSlice.actions;
 export default clientSlice.reducer;
-
-export function getFilteredClients(filters: {
-  client_name: string;
-  location: string;
-  source_of_lead: string;
-}): any {
-  throw new Error('Function not implemented.');
-}
-
-export function deleteClient(
-  clientId: number,
-  callGetClients: () => void,
-): any {
-  throw new Error('Function not implemented.');
-}
