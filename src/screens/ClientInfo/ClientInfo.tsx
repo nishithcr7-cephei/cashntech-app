@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 import {LeadSourceType, SectorType} from './ClientInfo.type';
+import {userSelector, UserState} from '@store/user';
 
 type NavigationType = CompositeScreenProps<
   NativeStackScreenProps<ClientNavigatorType, ClientScreens.ClientInfo>,
@@ -26,6 +27,9 @@ type NavigationType = CompositeScreenProps<
 >;
 
 export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
+  const {first_name, last_name}: UserState = useSelector(
+    userSelector.getUserInfo,
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<
@@ -80,7 +84,13 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
     // TODO: Edit Client Details
   };
   const onDelete = (clientId: number) => {
-    // TODO: Delete Client
+    dispatch(
+      clientActions.deleteClientRequest({
+        id: clientId,
+        deleted_by: first_name + ' ' + last_name,
+      }),
+    );
+    console.log('-------->>>>>>', clientId);
   };
 
   return (

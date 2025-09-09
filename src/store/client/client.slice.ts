@@ -269,6 +269,23 @@ const clientSlice = createSlice({
       state.isSavedVisitDetails = initialState.isSavedVisitDetails;
       state.clientFormId = undefined;
     },
+
+    // Delete function
+    deleteClientRequest: (
+      state,
+      action: PayloadAction<{id: number; deleted_by: string}>,
+    ) => {
+      state.clientLoader = true;
+    },
+    deleteClientSuccess: (state, action: PayloadAction<number>) => {
+      state.clientLoader = false;
+      state.clientList = state.clientList.filter(c => c.id !== action.payload);
+    },
+    deleteClientFailure: (state, action: PayloadAction<string>) => {
+      state.clientLoader = false;
+      state.error = action.payload;
+    },
+
     // Basic Details
     setBasicDetails: (
       state,
@@ -416,15 +433,6 @@ const clientSlice = createSlice({
     },
     updateVisitDetails: state => {
       state.clientLoader = true;
-    },
-    deleteClientRequest: (state, action) => {},
-    deleteClientSuccess: (state, action) => {
-      state.clientList = state.clientList.filter(
-        client => client.id !== action.payload,
-      );
-    },
-    deleteClientFailure: (state, action) => {
-      state.error = action.payload;
     },
     getReport: state => {
       state.reportLoader = true;
@@ -810,7 +818,7 @@ const clientSlice = createSlice({
       action: PayloadAction<ITaskReordsFilterResponseDatum>,
     ) {
       state.TaskRecordsFilterLoading = false;
-      state.TaskRecordsFilterError = action.payload;
+      state.TaskRecordsFilterData = action.payload;
     },
     TaskRecordsFailure(state, action: PayloadAction<string>) {
       state.TaskRecordsFilterLoading = false;
@@ -917,6 +925,9 @@ export const {
   setClientLoader,
   setClientList,
   saveClientFormId,
+  deleteClientRequest,
+  deleteClientSuccess,
+  deleteClientFailure,
 
   getCityList,
   setCityList,
@@ -1066,5 +1077,12 @@ export function getFilteredClients(filters: {
   location: string;
   source_of_lead: string;
 }): any {
+  throw new Error('Function not implemented.');
+}
+
+export function deleteClient(
+  clientId: number,
+  callGetClients: () => void,
+): any {
   throw new Error('Function not implemented.');
 }

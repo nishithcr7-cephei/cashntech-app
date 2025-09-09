@@ -183,6 +183,13 @@ export enum IntentType {
   MEDIUM = 'Medium',
 }
 
+export enum ReasonNotInterested {
+  INSUREANCE = 'Insurance',
+  ACCOUNTING = 'Accounting',
+  CA_CONSULTING = 'CA Consulting',
+  WEALTH_MANAGEMENT = 'Wealth (Fixed Deposit, Mutual Funds etc)',
+}
+
 export enum UserResponse {
   INTERESTED = 'Interested',
   NOT_INTERESTED = 'Not Interested',

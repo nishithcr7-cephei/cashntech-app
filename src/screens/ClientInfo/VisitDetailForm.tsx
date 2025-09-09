@@ -27,8 +27,8 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
 import Toast from 'react-native-toast-message';
 import {DrawerScreenProps} from '@react-navigation/drawer';
-import {IntentType, UserResponse} from './ClientInfo.type';
-import { CompositeScreenProps } from '@react-navigation/native';
+import {IntentType, ReasonNotInterested, UserResponse} from './ClientInfo.type';
+import {CompositeScreenProps} from '@react-navigation/native';
 
 const listOfUserResponse = Object.values(UserResponse).map(item => ({
   label: item,
@@ -36,6 +36,11 @@ const listOfUserResponse = Object.values(UserResponse).map(item => ({
 }));
 
 const listOfIntentTypes = Object.values(IntentType).map(item => ({
+  label: item,
+  value: item,
+}));
+
+const listInterestedFor = Object.values(ReasonNotInterested).map(item => ({
   label: item,
   value: item,
 }));
@@ -196,11 +201,12 @@ export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
                 value={reasonForNotInterested}
                 onChangeText={value => setData('reasonForNotInterested', value)}
               />
-              <Input
+              <CustomDropdown
                 label="Are you Interested for ?"
-                placeholder="Are you Interested for ?"
+                data={listInterestedFor}
                 value={interestedFor}
-                onChangeText={value => setData('interestedFor', value)}
+                onChange={value => setData('interestedFor', value as string)}
+                showSearch={false}
               />
             </>
           )}
