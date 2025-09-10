@@ -204,7 +204,7 @@ export const ClientDetailForm: React.FC<Props> = ({navigation}) => {
               <Input
                 label="Email"
                 placeholder="Value"
-                maxLength={30}
+                maxLength={50}
                 value={client.email}
                 keyboardType="email-address"
                 onChangeText={value => setData('email', value, index)}

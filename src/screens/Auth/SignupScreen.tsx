@@ -141,19 +141,21 @@ export const SignupScreen: React.FC<Props> = ({
             <Input
               label={Strings.firstNameLabel}
               value={firstName}
+              maxLength={20}
               onChangeText={setFirstName}
               editable={!isLoading}
             />
             <Input
               label={Strings.lastNameLabel}
               value={lastName}
+              maxLength={20}
               onChangeText={setLastName}
               containerStyle={styles.inputMargin}
               editable={!isLoading}
             />
             <Input
               label={Strings.emailLabel}
-              maxLength={32}
+              maxLength={50}
               value={email}
               onChangeText={value => {
                 setEmail(value);
