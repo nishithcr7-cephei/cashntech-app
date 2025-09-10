@@ -270,6 +270,10 @@ const clientSlice = createSlice({
       state.isSavedVisitDetails = initialState.isSavedVisitDetails;
       state.clientFormId = undefined;
     },
+    // Edit function
+    prepareClientForEdit: (state, _action: PayloadAction<number>) => {
+      state.clientLoader = true;
+    },
     // Delete function
     deleteClientRequest: (
       state,
@@ -933,6 +937,7 @@ export const {
   setClientLoader,
   setClientList,
   saveClientFormId,
+  prepareClientForEdit,
   deleteClientRequest,
 
   getCityList,

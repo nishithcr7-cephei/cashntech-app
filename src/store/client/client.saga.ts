@@ -1,4 +1,4 @@
-import {call, put, select, takeLatest} from 'redux-saga/effects';
+import {all, call, put, select, takeLatest} from 'redux-saga/effects';
 import {
   bankStatementRequest,
   deleteClientRequest,
@@ -21,6 +21,7 @@ import {
   getTaskHistory,
   getVendorDetails,
   getVisitDetails,
+  prepareClientForEdit,
   saveClientBasicDetails,
   saveClientsDetails,
   saveFirmDetails,
@@ -278,6 +279,24 @@ function* handleDeleteClient(
     );
     yield put(clientActions.setClientList(updatedClientList));
   }
+}
+
+function* handlePrepareClientForEdit(action: PayloadAction<number>) {
+  const clientId = action.payload;
+  yield put(clientActions.resetAllClientFormData());
+  yield put(clientActions.saveClientFormId(clientId));
+  yield all([
+    put(clientActions.getClientBasicDetails(clientId)),
+    put(clientActions.getClientsDetails(clientId)),
+    put(clientActions.getFirmDetails(clientId)),
+    put(clientActions.getVendorDetails(clientId)),
+    put(clientActions.getVisitDetails(clientId)),
+  ]);
+  yield put(clientActions.setSavedClientsDetailsStatus(true));
+  yield put(clientActions.setSavedFirmDetailsStatus(true));
+  yield put(clientActions.setSavedVendorDetailsStatus(true));
+  yield put(clientActions.setSavedVisitDetailsStatus(true));
+  yield put(clientActions.setClientLoader(false));
 }
 
 function* saveBasicDetails(): unknown {
@@ -1425,7 +1444,9 @@ export default function* clientSaga() {
   yield takeLatest(getVendorDetails.type, getVendorDetailsSaga);
   yield takeLatest(saveVisitDetails.type, saveVisitDetailsSaga);
   yield takeLatest(getVisitDetails.type, getVisitDetailsFormData);
+  yield takeLatest(prepareClientForEdit.type, handlePrepareClientForEdit);
   yield takeLatest(deleteClientRequest.type, handleDeleteClient);
+
   yield takeLatest(getReport.type, handleGetRemarkReport);
   yield takeLatest(getLead.type, handleGetLeadProgress);
   yield takeLatest(getLeadDesciption.type, handleGetLeadDesProgress);
