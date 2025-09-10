@@ -183,6 +183,7 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
             label="Firm Name"
             placeholder="Enter Firm Name"
             value={firmName}
+            maxLength={50}
             onChangeText={value => setData('firmName', value)}
           />
           <CustomDropdown
@@ -201,11 +202,12 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
             label="Date of visit"
             placeholder="Enter Date of Visit"
             value={dateOfVisit ? moment(dateOfVisit).format('DD/MM/YYYY') : ''}
-            onConfirm={date => setData('dateOfVisit', date)}
+            onConfirm={date => setData('dateOfVisit', date.toISOString())}
           />
           <Input
             label="Location"
             placeholder="Enter Location"
+            maxLength={50}
             value={location}
             onChangeText={value => setData('location', value)}
           />
@@ -213,6 +215,7 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
             label="Address"
             placeholder="Enter Address"
             value={address}
+             maxLength={100}
             onChangeText={value => setData('address', value)}
           />
           <Input
