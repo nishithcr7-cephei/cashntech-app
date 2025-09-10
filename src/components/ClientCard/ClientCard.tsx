@@ -184,8 +184,8 @@ const styles = StyleSheet.create({
   },
   dropdownMenu: {
     position: 'absolute',
-    top: 40,
-    right: 10,
+    top: 50,
+    right: 20,
     backgroundColor: '#fff',
     borderRadius: 6,
     paddingVertical: 8,

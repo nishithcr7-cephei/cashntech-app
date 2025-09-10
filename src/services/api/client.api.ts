@@ -26,6 +26,7 @@ import {
   ClientsFilterResponse,
   IDeleteResponse,
   IDeletePayload,
+  ClientsFilterPayload,
 } from '@store/client';
 import {CustomRequestConfig} from './api';
 import {storage} from '@services/localStorage';
@@ -131,7 +132,7 @@ const getTaskHistory = async () => {
 };
 
 // Client Filter API
-const getClientsFilter = async (payload: Record<string, string[]>) => {
+const getClientsFilter = async (payload: ClientsFilterPayload) => {
   const {data, error} = await tryCatch<AxiosResponse<ClientsFilterResponse>>(
     Api.post(Endpoints.apiGetClientsFilter, payload, {
       authRequired: true,

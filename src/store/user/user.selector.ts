@@ -4,8 +4,8 @@ import {RootState} from '@store/app/store';
 const _selectState = (state: RootState) => state.user;
 
 const getUserInfo = createSelector(
-  _selectState,
-  (user) => user
+  (state: RootState) => state,
+  (state) => state.user
 );
 
 const getFullName = createSelector(

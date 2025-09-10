@@ -239,6 +239,19 @@ export type VisitDetailsPayload =
       created_by: string;
     };
 
+export type ClientsFilterPayload = {
+  bySource?: {
+    source_of_lead: string[];
+  };
+  bySector?: {
+    sector: string[];
+  };
+  byCity?: {
+    city: string[];
+  };
+}
+
+
 export type ClientsFilterResponse = {
   statusCode: number;
   data: Array<ClientsFilterResponseDatum>;

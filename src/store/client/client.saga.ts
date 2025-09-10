@@ -189,30 +189,41 @@ function* handleGetTaskHistory(): unknown {
 function* handleGetClientsFilter(
   action: PayloadAction<Record<string, string[]>>,
 ): unknown {
-  // TODO: Apply payload after filter API fix from backend
-  // const byCity = (action.payload?.['City'] ?? []).map(city =>
-  //   encryptUtility(city),
-  // );
-  // const payload = {
-  //   ...(byCity.length && {byCity}),
-  //   ...(action.payload?.['Sector'] &&
-  //     action.payload['Sector'].length && {
-  //       bySector: action.payload['Sector'],
-  //     }),
-  //   ...(action.payload?.['Source of lead'] &&
-  //     action.payload['Source of lead'].length && {
-  //       bySource: action.payload['Source of lead'],
-  //     }),
-  // };
+  const city = (action.payload?.['City'] ?? []).map(city =>
+    encryptUtility(city),
+  );
+  const sector = action.payload?.['Sector'] ?? [];
+  const source_of_lead = action.payload?.['Source of lead'] ?? [];
+  const payload = {
+    ...(city.length && {
+      byCity: {
+        city,
+      },
+    }),
+    ...(sector.length && {
+      bySector: {
+        sector,
+      },
+    }),
+    ...(source_of_lead.length && {
+      bySource: {
+        source_of_lead,
+      },
+    }),
+  };
   const {
     data,
     error,
   }: Result<ClientsFilterResponse, AxiosError<{message: string}>> = yield call(
     ClientApis.getClientsFilter,
-    {},
+    payload,
   );
   yield put(clientActions.setClientLoader(false));
   if (error) {
+    if(error.status === 404){
+      yield put(clientActions.setClientList([]));
+      return;
+    }
     Toast.show({
       type: 'error',
       text1: error.response?.data?.message || 'Failed to fetch client list.',

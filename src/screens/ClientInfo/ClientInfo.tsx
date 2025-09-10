@@ -130,6 +130,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
             contentContainerStyle={{paddingBottom: scaleHeight(56)}}
             renderItem={({item}) => (
               <ClientCard
+                key={item.id.toString()}
                 data={item}
                 onPressCard={onPressCard}
                 onEdit={onEdit}
