@@ -283,8 +283,6 @@ function* handleDeleteClient(
 
 function* handlePrepareClientForEdit(action: PayloadAction<number>) {
   const clientId = action.payload;
-  yield put(clientActions.resetAllClientFormData());
-  yield put(clientActions.saveClientFormId(clientId));
   yield all([
     put(clientActions.getClientBasicDetails(clientId)),
     put(clientActions.getClientsDetails(clientId)),
@@ -296,7 +294,6 @@ function* handlePrepareClientForEdit(action: PayloadAction<number>) {
   yield put(clientActions.setSavedFirmDetailsStatus(true));
   yield put(clientActions.setSavedVendorDetailsStatus(true));
   yield put(clientActions.setSavedVisitDetailsStatus(true));
-  yield put(clientActions.setClientLoader(false));
 }
 
 function* saveBasicDetails(): unknown {

@@ -44,7 +44,7 @@ export function isValidEmail(email: string) {
  */
 export function isValidMobile(mobile: string, countryCode: string) {
   if (countryCode === '91') {
-    return /[6-9]\d{9}/.test(mobile);
+    return /^[6-9]\d{9}$/.test(mobile);
   } else {
     return parsePhoneNumber(`+${countryCode}${mobile}`).valid;
   }
