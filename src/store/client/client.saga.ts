@@ -5,8 +5,10 @@ import {
   FilterRequest,
   getBankList,
   getCityList,
+  getClientBasicDetails,
   getClients,
   getClientsDetails,
+  getFirmDetails,
   getKycBusinessChecked,
   getKycChecked,
   getLead,
@@ -17,6 +19,8 @@ import {
   getSoftSanctionBnkPro,
   getSoftSanctionRuleset,
   getTaskHistory,
+  getVendorDetails,
+  getVisitDetails,
   saveClientBasicDetails,
   saveClientsDetails,
   saveFirmDetails,
@@ -115,12 +119,17 @@ import {
   ClientsFilterResponse,
   IDeleteResponse,
   ClientsFilterResponseDatum,
+  GetBasicDetailsData,
+  FirmDetailsData,
+  VisitDetailsData,
+  VendorDetailsDatum,
 } from './client.types';
 import Toast from 'react-native-toast-message';
 import {userSelector, UserState} from '@store/user';
 import {AxiosError} from 'axios';
 import {decryptUtility, encryptUtility} from '@utils/crypto';
-import {UserResponse} from '@screens/index';
+import {ProductCategory, UserResponse} from '@screens/index';
+import Cities from '@constants/Cities';
 
 function* handleGetRemarkReport(): unknown {
   const {data, error}: Result<IRemarkReportResponse> = yield call(
@@ -220,7 +229,7 @@ function* handleGetClientsFilter(
   );
   yield put(clientActions.setClientLoader(false));
   if (error) {
-    if(error.status === 404){
+    if (error.status === 404) {
       yield put(clientActions.setClientList([]));
       return;
     }
@@ -350,6 +359,36 @@ function* updateBasicDetails(): unknown {
   });
 }
 
+function* getBasicDetailsSaga(action: PayloadAction<number>): unknown {
+  const clientId = action.payload;
+  const {data, error}: Result<GetBasicDetailsData> = yield call(
+    ClientApis.getBasicDetailForm,
+    clientId,
+  );
+  yield put(clientActions.setClientLoader(false));
+  if (error) {
+    Toast.show({
+      type: 'error',
+      text1: 'Failed to get basic details.',
+    });
+    return;
+  }
+  yield put(
+    clientActions.setBasicDetails({
+      sourceOfLead: data.source_of_lead,
+      firmName: decryptUtility(data.firm_name),
+      location: decryptUtility(data.location),
+      state: decryptUtility(data.state) as keyof typeof Cities,
+      city: decryptUtility(data.city),
+      dateOfVisit: data.date_of_visit,
+      address: decryptUtility(data.address),
+      productType: data.product_type,
+      programType: data.program_type,
+      filedBy: data.file_by,
+    }),
+  );
+}
+
 function* saveClientsDetailsSaga(): unknown {
   const clientDetails: ClientsDetailsType = yield select(
     clientSelector.getClientDetailsFormData,
@@ -380,7 +419,7 @@ function* saveClientsDetailsSaga(): unknown {
     });
     return;
   }
-  yield put(clientActions.getClientsDetails());
+  yield put(clientActions.getClientsDetails(clientId));
   yield put(clientActions.setClientLoader(false));
   yield put(clientActions.setSavedClientsDetailsStatus(true));
   Toast.show({
@@ -421,7 +460,7 @@ function* updateClientsDetailsSaga(): unknown {
     });
     return;
   }
-  yield put(clientActions.getClientsDetails());
+  yield put(clientActions.getClientsDetails(clientId));
   yield put(clientActions.setClientLoader(false));
   yield put(clientActions.setSavedClientsDetailsStatus(true));
   Toast.show({
@@ -430,8 +469,8 @@ function* updateClientsDetailsSaga(): unknown {
   });
 }
 
-function* getClientsDetailsSaga(): unknown {
-  const clientId = yield select(clientSelector.getClientFormId);
+function* getClientsDetailsSaga(action: PayloadAction<number>): unknown {
+  const clientId = action.payload.toString();
   const {first_name, last_name}: UserState = yield select(
     userSelector.getUserInfo,
   );
@@ -527,6 +566,39 @@ function* saveFirmDetailsSaga(): unknown {
   });
 }
 
+function* getFirmDetailsSaga(action: PayloadAction<number>): unknown {
+  const clientId = action.payload;
+  const {data, error}: Result<FirmDetailsData> = yield call(
+    ClientApis.getFirmDetailsForm,
+    clientId,
+  );
+  yield put(clientActions.setClientLoader(false));
+  if (error) {
+    Toast.show({
+      type: 'error',
+      text1: 'Failed to get firm details.',
+    });
+    return;
+  }
+  if (data) {
+    const firmDetails: Partial<FirmDetailsType> = {
+      firmType: data.firm_type,
+      bankName: decryptUtility(data.bank_name),
+      businessVintage: data.business_vintage,
+      sector: data.sector,
+      facilityType: data.facility_type,
+      cibilScore: data.cibil_score?.toString() ?? '',
+      creditPeriodOffer: data.credit_period_offer?.toString() ?? '',
+      estimatedFundingRequired:
+        data.estimated_funding_required?.toString() ?? '',
+      existingFundingSanctionedAmount:
+        data.existing_funding_sanctioned_amount?.toString() ?? '',
+      monthlyTurnover: data.monthly_turnover?.toString() ?? '',
+    };
+    yield put(clientActions.setFirmDetails(firmDetails));
+  }
+}
+
 function* saveVendorDetailsSaga(): unknown {
   const clientId = yield select(clientSelector.getClientFormId);
   const vendorDetails: VendorDetailsType = yield select(
@@ -536,9 +608,9 @@ function* saveVendorDetailsSaga(): unknown {
     product_category: vendor.productCategory ?? '',
     product_type: vendor.productType,
     vendor_name: vendor.vendorName.trim(),
-    address: encryptUtility(vendor.address.trim()),
-    city: encryptUtility(vendor.city),
-    state: encryptUtility(vendor.state ?? ''),
+    address: vendor.address.trim(),
+    city: vendor.city,
+    state: vendor.state ?? '',
     pin_code: vendor.pinCode.trim(),
     vendor_contact_number: vendor.vendorContactNumber.trim(),
     monthly_sales_value: Number(vendor.monthlySalesValue),
@@ -564,6 +636,35 @@ function* saveVendorDetailsSaga(): unknown {
     type: 'success',
     text1: 'Vendor details saved/updated successfully.',
   });
+}
+
+function* getVendorDetailsSaga(action: PayloadAction<number>): unknown {
+  const clientId = action.payload;
+  const {data, error}: Result<Array<VendorDetailsDatum>> = yield call(
+    ClientApis.getVendorDetailsForm,
+    clientId,
+  );
+  yield put(clientActions.setClientLoader(false));
+  if (error) {
+    Toast.show({
+      type: 'error',
+      text1: 'Failed to get vendor details.',
+    });
+    return;
+  }
+  const vendorDetails: VendorDetailsType = data.map(vendor => ({
+    productCategory: vendor.product_category as ProductCategory,
+    productType: vendor.product_type,
+    vendorName: decryptUtility(vendor.vendor_name),
+    address: decryptUtility(vendor.vendor_address),
+    city: decryptUtility(vendor.vendor_city),
+    state: decryptUtility(vendor.vendor_state) as keyof typeof Cities,
+    pinCode: decryptUtility(vendor.vendor_pin_code),
+    vendorContactNumber: vendor.vendor_contact_number,
+    monthlySalesValue: vendor.monthly_sales_value.toString(),
+    key: Math.random().toString(36).substring(7),
+  }));
+  yield put(clientActions.setAllVendorDetails(vendorDetails));
 }
 
 function* saveVisitDetailsSaga(): unknown {
@@ -611,6 +712,30 @@ function* saveVisitDetailsSaga(): unknown {
     type: 'success',
     text1: 'Visit details saved successfully.',
   });
+}
+
+function* getVisitDetailsFormData(action: PayloadAction<number>): unknown {
+  const clientId = action.payload;
+  const {data, error}: Result<VisitDetailsData> = yield call(
+    ClientApis.getVisitDetailsForm,
+    clientId,
+  );
+  if (error) {
+    yield put(clientActions.setClientLoader(false));
+    Toast.show({
+      type: 'error',
+      text1: 'Failed to get visit details.',
+    });
+    return;
+  }
+  let dataToSet: Partial<VisitDetailsType> = {
+    userResponse: data.client_response ?? undefined,
+    intent: data.intent ?? undefined,
+    dateOfNextVisit: data.date_of_next_visit ?? undefined,
+    interestedFor: data.are_you_interested_for ?? undefined,
+    reasonForNotInterested: data.reason_for_not_interested ?? undefined,
+  };
+  yield put(clientActions.setVisitDetails(dataToSet));
 }
 
 function* handleUploadKyc(action: PayloadAction<IUploadKycDocumentPayload>) {
@@ -1288,13 +1413,17 @@ export default function* clientSaga() {
   yield takeLatest(getCityList.type, handleGetCityList);
   yield takeLatest(saveClientBasicDetails.type, saveBasicDetails);
   yield takeLatest(updateClientBasicDetails.type, updateBasicDetails);
+  yield takeLatest(getClientBasicDetails.type, getBasicDetailsSaga);
   yield takeLatest(saveClientsDetails.type, saveClientsDetailsSaga);
   yield takeLatest(updateClientsDetails.type, updateClientsDetailsSaga);
   yield takeLatest(getClientsDetails.type, getClientsDetailsSaga);
   yield takeLatest(getMasterBankList.type, handleGetMasterBankList);
   yield takeLatest(saveFirmDetails.type, saveFirmDetailsSaga);
+  yield takeLatest(getFirmDetails.type, getFirmDetailsSaga);
   yield takeLatest(saveVendorDetails.type, saveVendorDetailsSaga);
+  yield takeLatest(getVendorDetails.type, getVendorDetailsSaga);
   yield takeLatest(saveVisitDetails.type, saveVisitDetailsSaga);
+  yield takeLatest(getVisitDetails.type, getVisitDetailsFormData);
   yield takeLatest(deleteClientRequest.type, handleDeleteClient);
   yield takeLatest(getReport.type, handleGetRemarkReport);
   yield takeLatest(getLead.type, handleGetLeadProgress);

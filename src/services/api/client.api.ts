@@ -27,6 +27,10 @@ import {
   IDeleteResponse,
   IDeletePayload,
   ClientsFilterPayload,
+  GetBasicDetailsResponse,
+  FirmDetailsResponse,
+  VisitDetailsResponse,
+  VendorDetailsResponse,
 } from '@store/client';
 import {CustomRequestConfig} from './api';
 import {storage} from '@services/localStorage';
@@ -190,6 +194,26 @@ const saveBasicDetailForm = async (body: BasicDetailsPayload) => {
   };
 };
 
+const getBasicDetailForm = async (clientId: number) => {
+  const {data: basicDetails, error} = await tryCatch<
+    AxiosResponse<GetBasicDetailsResponse>
+  >(
+    Api.get(`${Endpoints.apiGetBasicDetails}${clientId}`, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  return {
+    data: basicDetails.data.data,
+    error: null,
+  };
+};
+
 const saveClientsDetailsForm = async (
   clientFormId: string,
   body: ClientsDetailsPayload,
@@ -274,6 +298,26 @@ const saveFirmDetailsForm = async (
   };
 };
 
+const getFirmDetailsForm = async (clientFormId: number) => {
+  const {data: firmDetails, error} = await tryCatch<
+    AxiosResponse<FirmDetailsResponse>
+  >(
+    Api.get(`${Endpoints.apiGetFirmDetails}${clientFormId}`, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  return {
+    data: firmDetails.data.data,
+    error: null,
+  };
+};
+
 const saveVendorDetailsForm = async (
   clientId: string,
   body: VendorDetailsPayload,
@@ -297,6 +341,24 @@ const saveVendorDetailsForm = async (
   };
 };
 
+const getVendorDetailsForm = async (clientFormId: number) => {
+  const {data, error} = await tryCatch<AxiosResponse<VendorDetailsResponse>>(
+    Api.get(`${Endpoints.apiGetVendorDetails}${clientFormId}`, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  return {
+    data: data.data.data,
+    error: null,
+  };
+};
+
 const saveVisitDetailsForm = async (
   clientId: string,
   body: VisitDetailsPayload,
@@ -309,6 +371,24 @@ const saveVisitDetailsForm = async (
     } as CustomRequestConfig),
   );
   return {data: data?.data ?? null, error};
+};
+
+const getVisitDetailsForm = async (clientFormId: number) => {
+  const {data, error} = await tryCatch<AxiosResponse<VisitDetailsResponse>>(
+    Api.get(`${Endpoints.apiGetVisitDetails}${clientFormId}`, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  return {
+    data: data.data.data,
+    error: null,
+  };
 };
 
 const uploadKycDocument = async (formData: FormData) => {
@@ -830,7 +910,7 @@ const getVisitDetailsList = async () => {
 
 export const deleteClient = async (id: number, payload: IDeletePayload) => {
   const {data, error} = await tryCatch<AxiosResponse<IDeleteResponse>>(
-    Api.post(Endpoints.apiDeleteClient(id), payload, {
+    Api.post(`${Endpoints.apiDeleteClient}${id}`, payload, {
       authRequired: true,
     } as CustomRequestConfig),
   );
@@ -852,7 +932,11 @@ export default {
   saveVendorDetailsForm,
   saveVisitDetailsForm,
 
+  getBasicDetailForm,
   getClientsDetailsForm,
+  getFirmDetailsForm,
+  getVendorDetailsForm,
+  getVisitDetailsForm,
   getMasterBankList,
 
   getRemarkReport,

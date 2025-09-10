@@ -54,6 +54,7 @@ const basicDetails: BasicDetailsType = {
   productType: '',
   programType: '',
   address: '',
+  filedBy: '',
 };
 
 const clientsDetails: ClientsDetailsType = [
@@ -269,15 +270,13 @@ const clientSlice = createSlice({
       state.isSavedVisitDetails = initialState.isSavedVisitDetails;
       state.clientFormId = undefined;
     },
-
     // Delete function
     deleteClientRequest: (
       state,
-      action: PayloadAction<{id: number; deleted_by: string}>,
+      _action: PayloadAction<{id: number; deleted_by: string}>,
     ) => {
       state.clientLoader = true;
     },
-
     // Basic Details
     setBasicDetails: (
       state,
@@ -292,6 +291,9 @@ const clientSlice = createSlice({
       state.clientLoader = true;
     },
     updateClientBasicDetails: state => {
+      state.clientLoader = true;
+    },
+    getClientBasicDetails: (state, _action: PayloadAction<number>) => {
       state.clientLoader = true;
     },
     // Client Details
@@ -338,7 +340,7 @@ const clientSlice = createSlice({
     updateClientsDetails: state => {
       state.clientLoader = true;
     },
-    getClientsDetails: state => {
+    getClientsDetails: (state, _action: PayloadAction<number>) => {
       state.clientLoader = true;
     },
     // Firm Details
@@ -367,7 +369,16 @@ const clientSlice = createSlice({
     setSavedFirmDetailsStatus: (state, action: PayloadAction<boolean>) => {
       state.isSavedFirmDetails = action.payload;
     },
+    getFirmDetails: (state, _action: PayloadAction<number>) => {
+      state.clientLoader = true;
+    },
     // Vendor Details
+    setAllVendorDetails: (
+      state,
+      action: PayloadAction<VendorDetailsType>,
+    ) => {
+      state.vendorDetails = action.payload;
+    },
     setVendorDetails: (
       state,
       action: PayloadAction<[Partial<VendorDetailsType[number]>, number]>,
@@ -405,6 +416,9 @@ const clientSlice = createSlice({
     setSavedVendorDetailsStatus: (state, action: PayloadAction<boolean>) => {
       state.isSavedVendorDetails = action.payload;
     },
+    getVendorDetails: (state, _action: PayloadAction<number>) => {
+      state.clientLoader = true;
+    },
     // Visit Details
     setVisitDetails: (
       state,
@@ -418,7 +432,9 @@ const clientSlice = createSlice({
     setSavedVisitDetailsStatus: (state, action: PayloadAction<boolean>) => {
       state.isSavedVisitDetails = action.payload;
     },
-
+    getVisitDetails: (state, _action: PayloadAction<number>) => {
+      state.clientLoader = true;
+    },
     // Set Client Form Data,
     saveVisitDetails: state => {
       state.clientLoader = false;
@@ -926,6 +942,7 @@ export const {
   clearBasicDetails,
   saveClientBasicDetails,
   updateClientBasicDetails,
+  getClientBasicDetails,
 
   setAllClientsDetails,
   setClientsDetails,
@@ -943,19 +960,23 @@ export const {
   clearFirmDetails,
   saveFirmDetails,
   setSavedFirmDetailsStatus,
+  getFirmDetails,
 
+  setAllVendorDetails,
   setVendorDetails,
   clearVendorDetails,
   addNewVendorDetails,
   removeVendorDetails,
   saveVendorDetails,
   setSavedVendorDetailsStatus,
+  getVendorDetails,
 
   saveVisitDetails,
   updateVisitDetails,
   setVisitDetails,
   clearVisitDetails,
   setSavedVisitDetailsStatus,
+  getVisitDetails,
 
   resetAllClientFormData,
 
