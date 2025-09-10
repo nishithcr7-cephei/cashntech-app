@@ -720,6 +720,7 @@ function* getVisitDetailsFormData(action: PayloadAction<number>): unknown {
     ClientApis.getVisitDetailsForm,
     clientId,
   );
+  yield put(clientActions.setClientLoader(false));
   if (error) {
     yield put(clientActions.setClientLoader(false));
     Toast.show({

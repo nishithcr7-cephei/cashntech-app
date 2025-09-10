@@ -54,14 +54,19 @@ export const ProfileScreen: React.FC<NavigationType> = ({
       dispatch(clientActions.getVendorDetails(id));
       dispatch(clientActions.getVisitDetails(id));
     }
-  }, [dispatch]);
+  }, [dispatch, route.params?.clientId]);
 
   const toggleSection = (key: string) => {
     setExpanded(expanded === key ? null : key);
   };
 
-  const t = (value: string | null | undefined) =>
-    value && value.trim() !== '' ? value : '-';
+  const t = (value: unknown) => {
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'string') return value.trim() || '-';
+    if (typeof value === 'number')
+      return Number.isFinite(value) ? String(value) : '-';
+    return String(value);
+  };
 
   return (
     <Container>
@@ -78,7 +83,7 @@ export const ProfileScreen: React.FC<NavigationType> = ({
           <View style={styles.imageCircle}>
             <Image source={UserImg} style={styles.userImage} />
           </View>
-          <Text style={styles.profileName}>John Doe</Text>
+          <Text style={styles.profileName}>{t(basicDetails.firmName)}</Text>
           <Text style={styles.profileId}>
             ID: {route.params?.clientId ?? '-'}
           </Text>
@@ -156,7 +161,9 @@ export const ProfileScreen: React.FC<NavigationType> = ({
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Date of Visit</Text>
                 <Text style={styles.detailValue}>
-                  {t(moment(basicDetails.dateOfVisit).format('DD/MM/YYYY'))}
+                  {basicDetails.dateOfVisit
+                    ? moment(basicDetails.dateOfVisit).format('DD/MM/YYYY')
+                    : '-'}
                 </Text>
               </View>
               <View style={styles.detailRow}>
@@ -440,9 +447,11 @@ export const ProfileScreen: React.FC<NavigationType> = ({
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Date of Next Visit</Text>
                     <Text style={styles.detailValue}>
-                      {moment(visitDetails.dateOfNextVisit).format(
-                        'DD/MM/YYYY',
-                      )}
+                      {visitDetails.dateOfNextVisit
+                        ? moment(visitDetails.dateOfNextVisit).format(
+                            'DD/MM/YYYY',
+                          )
+                        : '-'}
                     </Text>
                   </View>
                 </>
