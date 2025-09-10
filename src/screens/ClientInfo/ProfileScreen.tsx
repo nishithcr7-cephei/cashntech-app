@@ -45,10 +45,7 @@ export const ProfileScreen: React.FC<NavigationType> = ({
   const visitDetails = useSelector(clientSelector.getVisitDetailsFormData);
 
   useEffect(() => {
-<<<<<<< HEAD
     dispatch(clientActions.resetAllClientFormData());
-=======
->>>>>>> 4572029 (Add Api and saga for client details)
     if (route.params?.clientId) {
       const id = route.params.clientId;
       dispatch(clientActions.getClientBasicDetails(id));
@@ -57,17 +54,12 @@ export const ProfileScreen: React.FC<NavigationType> = ({
       dispatch(clientActions.getVendorDetails(id));
       dispatch(clientActions.getVisitDetails(id));
     }
-<<<<<<< HEAD
   }, [dispatch, route.params?.clientId]);
-=======
-  }, [dispatch]);
->>>>>>> 4572029 (Add Api and saga for client details)
 
   const toggleSection = (key: string) => {
     setExpanded(expanded === key ? null : key);
   };
 
-<<<<<<< HEAD
   const t = (value: unknown) => {
     if (value === null || value === undefined) return '-';
     if (typeof value === 'string') return value.trim() || '-';
@@ -75,20 +67,13 @@ export const ProfileScreen: React.FC<NavigationType> = ({
       return Number.isFinite(value) ? String(value) : '-';
     return String(value);
   };
-=======
-  const t = (value: string | null | undefined) =>
-    value && value.trim() !== '' ? value : '-';
->>>>>>> 4572029 (Add Api and saga for client details)
 
   return (
     <Container>
       <AppBar
         title="Client Details"
         onPressLeftIcon={() => navigation.goBack()}
-<<<<<<< HEAD
-        leftIconProps={{hitSlop: {top: 8, right: 8, bottom: 8, left: 8}}}
-=======
->>>>>>> 4572029 (Add Api and saga for client details)
+        leftIconContainerStyle={{padding: scaleWidth(4)}}
         renderLeftIcon={
           <LeftChevron height={scaleWidth(16)} width={scaleHeight(16)} />
         }
@@ -99,11 +84,7 @@ export const ProfileScreen: React.FC<NavigationType> = ({
           <View style={styles.imageCircle}>
             <Image source={UserImg} style={styles.userImage} />
           </View>
-<<<<<<< HEAD
           <Text style={styles.profileName}>{t(basicDetails.firmName)}</Text>
-=======
-          <Text style={styles.profileName}>John Doe</Text>
->>>>>>> 4572029 (Add Api and saga for client details)
           <Text style={styles.profileId}>
             ID: {route.params?.clientId ?? '-'}
           </Text>
@@ -181,13 +162,9 @@ export const ProfileScreen: React.FC<NavigationType> = ({
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Date of Visit</Text>
                 <Text style={styles.detailValue}>
-<<<<<<< HEAD
                   {basicDetails.dateOfVisit
                     ? moment(basicDetails.dateOfVisit).format('DD/MM/YYYY')
                     : '-'}
-=======
-                  {t(moment(basicDetails.dateOfVisit).format('DD/MM/YYYY'))}
->>>>>>> 4572029 (Add Api and saga for client details)
                 </Text>
               </View>
               <View style={styles.detailRow}>
@@ -471,17 +448,11 @@ export const ProfileScreen: React.FC<NavigationType> = ({
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Date of Next Visit</Text>
                     <Text style={styles.detailValue}>
-<<<<<<< HEAD
                       {visitDetails.dateOfNextVisit
                         ? moment(visitDetails.dateOfNextVisit).format(
                             'DD/MM/YYYY',
                           )
                         : '-'}
-=======
-                      {moment(visitDetails.dateOfNextVisit).format(
-                        'DD/MM/YYYY',
-                      )}
->>>>>>> 4572029 (Add Api and saga for client details)
                     </Text>
                   </View>
                 </>
