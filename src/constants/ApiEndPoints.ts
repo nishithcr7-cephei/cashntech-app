@@ -17,25 +17,18 @@ const Endpoints = {
 
   // Client apis
   apiGetClientsFilter: '/client-info-master/filter/',
-  apiSaveBasicDetails: '/client-info-master/basic-details',
+  apiSaveBasicDetails: '/client-info-master/basic-details/',
+  apiGetBasicDetails: '/client-info-master/basic/',
   apiSaveClientsDetails: '/client-info-master/client-details/',
   apiGetClientsDetails: 'client-info-master/details/',
   apiSaveFirmDetails: `/client-info-master/client-firm-details/`,
+  apiGetFirmDetails: `/client-info-master/client-firm/`,
   apiSaveVendorDetails: `/client-info-master/vendor-details/`,
+  apiGetVendorDetails: `/client-info-master/vendor/`,
   apiSaveVisitDetails: `/client-info-master/follow-up/`,
-  
-  apiDeleteClient: (clientId: string | number) =>
-    `/client-info-master/delete/${clientId}`,
+  apiGetVisitDetails: `/client-info-master/follow-up/`,
 
-  // Methods: Get | Client Form apis
-  apiGetBasicDetails: (clientId: string) =>
-    `/client-info-master/basic/${clientId}`,
-  apiGetClientFirmDetails: (clientId: string) =>
-    `/client-info-master/client-firm/${clientId}`,
-  apiGetVendorDetails: (clientId: string) =>
-    `/client-info-master/vendor/${clientId}`,
-  apiGetVistiDetails: (clientId: string) =>
-    `/client-info-master/follow-up/${clientId}`,
+  apiDeleteClient: `/client-info-master/delete/`,
 
   // Report apis
   apiGetReport: '/client-info-master/remark-reports',

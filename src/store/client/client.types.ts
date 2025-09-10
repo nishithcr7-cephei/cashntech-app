@@ -141,10 +141,11 @@ export type BasicDetailsType = {
   location: string;
   state: keyof typeof Cities | undefined;
   city: string;
-  dateOfVisit: Date | undefined;
+  dateOfVisit: string | undefined;
   address: string;
   programType: string;
   productType: string;
+  filedBy: string;
 };
 
 export type ClientsDetailsType = Array<{
@@ -187,12 +188,12 @@ export type VendorDetailsType = Array<{
 export type VisitDetailsType = {
   userResponse: UserResponse | undefined;
   intent: IntentType | undefined;
-  dateOfNextVisit: Date | undefined;
+  dateOfNextVisit: string | undefined;
   interestedFor: string;
   reasonForNotInterested: string;
 };
 
-export interface ClientsDetailsResponseType {
+export type ClientsDetailsResponseType = {
   statusCode: number;
   data: Array<{
     id: number;
@@ -203,7 +204,7 @@ export interface ClientsDetailsResponseType {
     client: number;
   }>;
   message: string;
-}
+};
 
 export type MasterBankResponse = {
   statusCode: number;
@@ -249,8 +250,7 @@ export type ClientsFilterPayload = {
   byCity?: {
     city: string[];
   };
-}
-
+};
 
 export type ClientsFilterResponse = {
   statusCode: number;
@@ -271,6 +271,127 @@ export type ClientsFilterResponseDatum = {
   leadProgress: Array<LeadProgress>;
 };
 
+export type BasicDetailsPayload = {
+  source_of_lead: string;
+  created_by: string;
+  userId: number;
+  date_of_visit: string;
+  location: string;
+  city: string;
+  state: string;
+  firm_name: string;
+  address: string;
+  program_type: string;
+  product_type: string;
+  clientId?: number;
+};
+
+export type BasicDetailsResponse = {
+  statusCode: number;
+  message: string;
+  data: number;
+};
+
+export type GetBasicDetailsResponse = {
+  statusCode: number;
+  data: GetBasicDetailsData;
+  message: string;
+};
+
+export type GetBasicDetailsData = {
+  id: number;
+  source_of_lead: string;
+  program_type: string;
+  product_type: string;
+  pin_code: null;
+  location: string;
+  city: string;
+  address: string;
+  state: string;
+  file_by: string;
+  date_of_visit: string;
+  firm_name: string;
+};
+
+export type ClientsDetailsPayload = Array<{
+  client_type: string;
+  name_of_client: string;
+  contact_number: string;
+  email: string;
+  created_by: string;
+  client_detail_id?: number;
+}>;
+
+export type FirmDetailsPayload = {
+  firm_type: string;
+  business_vintage: string;
+  sector: string;
+  bank_name: string;
+  cibil_score: number;
+  monthly_turnover: number;
+  facility_type: string;
+  existing_funding_sanctioned_amount: number;
+  estimated_funding_required: number;
+  credit_period_offer: number;
+  created_by: string;
+};
+
+export type FirmDetailsResponse = {
+  statusCode: number;
+  data: FirmDetailsData;
+  message: string;
+};
+
+export type FirmDetailsData = {
+  id: number;
+  monthly_turnover: number;
+  firm_type: string;
+  business_vintage: string;
+  sector: string;
+  bank_name: string;
+  cibil_score: number;
+  facility_type: string;
+  existing_funding_sanctioned_amount: number;
+  estimated_funding_required: number;
+  credit_period_offer: number;
+};
+
+export type VisitDetailsResponse = {
+  statusCode: number;
+  data: VisitDetailsData;
+  message: string;
+};
+
+export type VisitDetailsData = {
+  id: number;
+  client_response: null | UserResponse;
+  intent: null | IntentType;
+  date_of_next_visit: null | string;
+  reason_for_not_interested: null | string;
+  are_you_interested_for: null | string;
+};
+
+export type VendorDetailsResponse = {
+  statusCode: number;
+  data: VendorDetailsDatum[];
+  message: string;
+};
+
+export type VendorDetailsDatum = {
+  id: number;
+  product_category: string;
+  product_type: string;
+  vendor_name: string;
+  vendor_address: string;
+  vendor_city: string;
+  vendor_state: string;
+  vendor_pin_code: string;
+  vendor_contact_number: string;
+  vendor_contact_email: null;
+  monthly_sales_value: number;
+  client: number;
+};
+
 export type LeadProgress = {
   id: number;
   lead_progress_status: string;
@@ -281,32 +402,6 @@ export type User = {
   first_name: string;
   last_name: string;
 };
-
-export interface IClientInfoSuccessResponse {
-  statusCode: number;
-  message: string;
-  data: Array<IClientInfoResponseDatum>;
-}
-
-export interface IClientInfoResponseDatum {
-  reference_details: any;
-  monthly_turnover: any;
-  financier_name: any;
-  id: number;
-  source_of_lead: string;
-  city: string;
-  client_name: string;
-  firm_name: string;
-  bank_name: string;
-  estimated_funding_required: number;
-  user: {id: number; first_name: string; last_name: string} | null;
-  vendor: Array<Vendor>;
-}
-
-export interface Vendor {
-  id: number;
-  monthly_sales_value: number;
-}
 
 export interface IRemarkReportResponse {
   statusCode: number;
@@ -368,83 +463,6 @@ export interface ITaskHistoryResponseDatum {
   completed_at: null;
   client: number;
 }
-
-export type BasicDetailsPayload = {
-  source_of_lead: string;
-  created_by: string;
-  userId: number;
-  date_of_visit: string;
-  location: string;
-  city: string;
-  state: string;
-  firm_name: string;
-  address: string;
-  program_type: string;
-  product_type: string;
-  clientId?: number;
-};
-
-export type BasicDetailsResponse = {
-  statusCode: number;
-  message: string;
-  data: number;
-};
-
-export type ClientsDetailsPayload = Array<{
-  client_type: string;
-  name_of_client: string;
-  contact_number: string;
-  email: string;
-  created_by: string;
-  client_detail_id?: number;
-}>;
-
-export type FirmDetailsPayload = {
-  firm_type: string;
-  business_vintage: string;
-  sector: string;
-  bank_name: string;
-  cibil_score: number;
-  monthly_turnover: number;
-  facility_type: string;
-  existing_funding_sanctioned_amount: number;
-  estimated_funding_required: number;
-  credit_period_offer: number;
-  created_by: string;
-};
-
-export type Client = {
-  id: number;
-  source_of_lead: string;
-  location: string;
-  city: string;
-  state: string;
-  type_of_visit: string;
-  visit: number;
-  date_of_visit: string;
-  client_name: string;
-  firm_name: string;
-  monthly_turnover: any;
-  contact_number: string;
-  firm_type: string;
-  business_vintage: string;
-  sector: string;
-  bank_name: string;
-  cibil_score: number;
-  facility_type: string;
-  existing_funding_sanctioned_amount: number;
-  estimated_funding_required: number;
-  credit_period_offer: number;
-  client_response: any;
-  intent: any;
-  date_of_next_visit: any;
-  reason_for_not_interested: any;
-  are_you_interested_for: any;
-  created_at: string;
-  deleted_at: any;
-  user: any;
-  kyc: any;
-};
 
 export interface IUploadKycDocumentPayload {
   doc: {

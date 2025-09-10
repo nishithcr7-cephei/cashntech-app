@@ -1,48 +1,92 @@
 import {
+  ActivityIndicator,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {CompositeScreenProps} from '@react-navigation/native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {DrawerScreenProps} from '@react-navigation/drawer';
 import {AppBar, Container} from '@components/index';
-import {UpChevron} from '@assets/Icons';
+import {LeftChevron, UpChevron} from '@assets/Icons';
 import Colors from '@constants/Colors';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import FontWeight from '@constants/FontWeight';
 import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
 import {ClientScreens} from '@constants/Screens';
 import {UserImg} from '@assets/Images';
+import {useDispatch, useSelector} from 'react-redux';
+import {clientActions, clientSelector} from '@store/client';
+import moment from 'moment';
+import {formatIndianNumber} from '@utils/Utils';
+import {UserResponse} from './ClientInfo.type';
 
 type NavigationType = CompositeScreenProps<
   NativeStackScreenProps<ClientNavigatorType, ClientScreens.ProfileScreen>,
   DrawerScreenProps<HomeNavigatorType>
 >;
 
-export const ProfileScreen: React.FC<{
-  navigation: NavigationType['navigation'];
-}> = ({navigation}) => {
+export const ProfileScreen: React.FC<NavigationType> = ({
+  navigation,
+  route,
+}) => {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const dispatch = useDispatch();
+  const loader = useSelector(clientSelector.getClientLoader);
+  const basicDetails = useSelector(clientSelector.getBasicDetailFormData);
+  const clientDetails = useSelector(clientSelector.getClientDetailsFormData);
+  const firmDetails = useSelector(clientSelector.getFirmDetailsFormData);
+  const venderDetails = useSelector(clientSelector.getVendorDetailsFormData);
+  const visitDetails = useSelector(clientSelector.getVisitDetailsFormData);
+
+  useEffect(() => {
+    dispatch(clientActions.resetAllClientFormData());
+    if (route.params?.clientId) {
+      const id = route.params.clientId;
+      dispatch(clientActions.getClientBasicDetails(id));
+      dispatch(clientActions.getClientsDetails(id));
+      dispatch(clientActions.getFirmDetails(id));
+      dispatch(clientActions.getVendorDetails(id));
+      dispatch(clientActions.getVisitDetails(id));
+    }
+  }, [dispatch, route.params?.clientId]);
+
   const toggleSection = (key: string) => {
     setExpanded(expanded === key ? null : key);
   };
 
+  const t = (value: unknown) => {
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'string') return value.trim() || '-';
+    if (typeof value === 'number')
+      return Number.isFinite(value) ? String(value) : '-';
+    return String(value);
+  };
+
   return (
     <Container>
-      <AppBar title="Profile" navigation={navigation} />
+      <AppBar
+        title="Client Details"
+        onPressLeftIcon={() => navigation.goBack()}
+        renderLeftIcon={
+          <LeftChevron height={scaleWidth(16)} width={scaleHeight(16)} />
+        }
+      />
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* User Image Circle */}
         <View style={[styles.sectionContainer, styles.imageContainer]}>
           <View style={styles.imageCircle}>
             <Image source={UserImg} style={styles.userImage} />
           </View>
-          <Text style={styles.profileName}>John Doe</Text>
-          <Text style={styles.profileId}>ID: CL001</Text>
+          <Text style={styles.profileName}>{t(basicDetails.firmName)}</Text>
+          <Text style={styles.profileId}>
+            ID: {route.params?.clientId ?? '-'}
+          </Text>
         </View>
 
         {/* Basic Details Section */}
@@ -72,35 +116,61 @@ export const ProfileScreen: React.FC<{
             <View style={styles.sectionContent}>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Source of Lead</Text>
-                <Text style={styles.detailValue}>Market Knowledge (D)</Text>
+                <Text style={styles.detailValue}>
+                  {t(basicDetails.sourceOfLead)}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Firm Name</Text>
-                <Text style={styles.detailValue}>ABC Corporation</Text>
+                <Text style={styles.detailValue}>
+                  {t(basicDetails.firmName)}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Program Type</Text>
+                <Text style={styles.detailValue}>
+                  {t(basicDetails.programType)}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Product Type</Text>
+                <Text style={styles.detailValue}>
+                  {t(basicDetails.productType)}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>State</Text>
-                <Text style={styles.detailValue}>Maharashtra</Text>
+                <Text style={styles.detailValue}>{t(basicDetails.state)}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>City</Text>
-                <Text style={styles.detailValue}>Mumbai</Text>
+                <Text style={styles.detailValue}>{t(basicDetails.city)}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Location</Text>
-                <Text style={styles.detailValue}>Andheri East</Text>
+                <Text style={styles.detailValue}>
+                  {t(basicDetails.location)}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Address</Text>
-                <Text style={styles.detailValue}>12, XYZ Street</Text>
+                <Text style={styles.detailValue}>
+                  {t(basicDetails.address)}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Date of Visit</Text>
-                <Text style={styles.detailValue}>2025-08-29</Text>
+                <Text style={styles.detailValue}>
+                  {basicDetails.dateOfVisit
+                    ? moment(basicDetails.dateOfVisit).format('DD/MM/YYYY')
+                    : '-'}
+                </Text>
               </View>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Fill By</Text>
-                <Text style={styles.detailValue}>John Doe</Text>
+                <Text style={styles.detailLabel}>Filed by</Text>
+                <Text style={styles.detailValue}>
+                  {t(basicDetails.filedBy)}
+                </Text>
               </View>
             </View>
           )}
@@ -129,26 +199,32 @@ export const ProfileScreen: React.FC<{
             </View>
           </TouchableOpacity>
 
-          {expanded === 'client' && (
-            <View style={styles.sectionContent}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Name of Client</Text>
-                <Text style={styles.detailValue}>Jane Smith</Text>
+          {expanded === 'client' &&
+            clientDetails.map((client, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.sectionContent,
+                  index !== clientDetails.length - 1 && styles.bottomBorder,
+                ]}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Name of Client</Text>
+                  <Text style={styles.detailValue}>{client.nameOfClient}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Type</Text>
+                  <Text style={styles.detailValue}>{client.clientType}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Contact Number</Text>
+                  <Text style={styles.detailValue}>{client.contactNumber}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Email</Text>
+                  <Text style={styles.detailValue}>{client.email}</Text>
+                </View>
               </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Type</Text>
-                <Text style={styles.detailValue}>Owner</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Contact Number</Text>
-                <Text style={styles.detailValue}>9876543210</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Email</Text>
-                <Text style={styles.detailValue}>jane.smith@example.com</Text>
-              </View>
-            </View>
-          )}
+            ))}
         </View>
 
         {/* Firm Details Section */}
@@ -178,55 +254,73 @@ export const ProfileScreen: React.FC<{
             <View style={styles.sectionContent}>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Type of Firm</Text>
-                <Text style={styles.detailValue}>Private Ltd</Text>
+                <Text style={styles.detailValue}>
+                  {t(firmDetails.firmType)}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>
                   Business Vintage (In years)
                 </Text>
-                <Text style={styles.detailValue}>10</Text>
+                <Text style={styles.detailValue}>
+                  {t(firmDetails.businessVintage)}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Sector</Text>
-                <Text style={styles.detailValue}>FMCG</Text>
+                <Text style={styles.detailValue}>{t(firmDetails.sector)}</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Bank Name</Text>
-                <Text style={styles.detailValue}>HDFC Bank</Text>
+                <Text style={styles.detailValue}>
+                  {t(firmDetails.bankName)}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>
                   Monthly Turnover (Rs. Lacs)
                 </Text>
-                <Text style={styles.detailValue}>120</Text>
+                <Text style={styles.detailValue}>
+                  {formatIndianNumber(t(firmDetails.monthlyTurnover))}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>CIBIL Score</Text>
-                <Text style={styles.detailValue}>750</Text>
+                <Text style={styles.detailValue}>
+                  {t(firmDetails.cibilScore)}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Facility Type</Text>
                 <Text style={styles.detailValue}>
-                  WCTL - Working Capital Term Loan
+                  {t(firmDetails.facilityType)}
                 </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>
                   Existing Funding Sanctioned Amt
                 </Text>
-                <Text style={styles.detailValue}>50</Text>
+                <Text style={styles.detailValue}>
+                  {formatIndianNumber(
+                    t(firmDetails.existingFundingSanctionedAmount),
+                  )}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>
                   Estimated Funding Required
                 </Text>
-                <Text style={styles.detailValue}>80</Text>
+                <Text style={styles.detailValue}>
+                  {formatIndianNumber(t(firmDetails.estimatedFundingRequired))}
+                </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>
                   Credit Period Offer (In Days)
                 </Text>
-                <Text style={styles.detailValue}>60</Text>
+                <Text style={styles.detailValue}>
+                  {t(firmDetails.creditPeriodOffer)}
+                </Text>
               </View>
             </View>
           )}
@@ -255,46 +349,60 @@ export const ProfileScreen: React.FC<{
             </View>
           </TouchableOpacity>
 
-          {expanded === 'vendor' && (
-            <View style={styles.sectionContent}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Product Category</Text>
-                <Text style={styles.detailValue}>Personal Care & Hygiene</Text>
+          {expanded === 'vendor' &&
+            venderDetails.map((vendor, index) => (
+              <View
+                style={[
+                  styles.sectionContent,
+                  index !== venderDetails.length - 1 && styles.bottomBorder,
+                ]}
+                key={index}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Product Category</Text>
+                  <Text style={styles.detailValue}>
+                    {t(vendor.productCategory)}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Product Type</Text>
+                  <Text style={styles.detailValue}>
+                    {t(vendor.productType)}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Vendor Name</Text>
+                  <Text style={styles.detailValue}>{t(vendor.vendorName)}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Address</Text>
+                  <Text style={styles.detailValue}>{t(vendor.address)}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>State</Text>
+                  <Text style={styles.detailValue}>{t(vendor.state)}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>City</Text>
+                  <Text style={styles.detailValue}>{t(vendor.city)}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Pincode</Text>
+                  <Text style={styles.detailValue}>{t(vendor.pinCode)}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Vendor Contact number</Text>
+                  <Text style={styles.detailValue}>
+                    {t(vendor.vendorContactNumber)}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Monthly Sales Value</Text>
+                  <Text style={styles.detailValue}>
+                    {formatIndianNumber(t(vendor.monthlySalesValue))}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Product Type</Text>
-                <Text style={styles.detailValue}>Shampoo, conditioner</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Vendor Name</Text>
-                <Text style={styles.detailValue}>XYZ Distributors</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Address</Text>
-                <Text style={styles.detailValue}>123, Market Road</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>State</Text>
-                <Text style={styles.detailValue}>Maharashtra</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>City</Text>
-                <Text style={styles.detailValue}>Mumbai</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Pincode</Text>
-                <Text style={styles.detailValue}>400093</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Vendor Contact number</Text>
-                <Text style={styles.detailValue}>9876543210</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Monthly Sales Value</Text>
-                <Text style={styles.detailValue}>25</Text>
-              </View>
-            </View>
-          )}
+            ))}
         </View>
 
         {/* Visit Details Section */}
@@ -324,30 +432,60 @@ export const ProfileScreen: React.FC<{
             <View style={styles.sectionContent}>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>User Response</Text>
-                <Text style={styles.detailValue}>Interested</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Intent</Text>
-                <Text style={styles.detailValue}>High</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Date of Next Visit</Text>
-                <Text style={styles.detailValue}>2025-09-15</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>
-                  Reason for Not Interested
+                <Text style={styles.detailValue}>
+                  {t(visitDetails.userResponse)}
                 </Text>
-                <Text style={styles.detailValue}>N/A</Text>
               </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Are you interested for?</Text>
-                <Text style={styles.detailValue}>Insurance</Text>
-              </View>
+              {visitDetails.userResponse === UserResponse.INTERESTED && (
+                <>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Intent</Text>
+                    <Text style={styles.detailValue}>
+                      {t(visitDetails.intent)}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Date of Next Visit</Text>
+                    <Text style={styles.detailValue}>
+                      {visitDetails.dateOfNextVisit
+                        ? moment(visitDetails.dateOfNextVisit).format(
+                            'DD/MM/YYYY',
+                          )
+                        : '-'}
+                    </Text>
+                  </View>
+                </>
+              )}
+
+              {visitDetails.userResponse === UserResponse.NOT_INTERESTED && (
+                <>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>
+                      Reason for Not Interested
+                    </Text>
+                    <Text style={styles.detailValue}>
+                      {t(visitDetails.reasonForNotInterested)}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>
+                      Are you interested for?
+                    </Text>
+                    <Text style={styles.detailValue}>
+                      {t(visitDetails.interestedFor)}
+                    </Text>
+                  </View>
+                </>
+              )}
             </View>
           )}
         </View>
       </ScrollView>
+      <Modal transparent visible={loader}>
+        <View style={styles.loader}>
+          <ActivityIndicator size="large" color={Colors.primaryColor} />
+        </View>
+      </Modal>
     </Container>
   );
 };
@@ -462,5 +600,15 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
     flexWrap: 'wrap',
+  },
+  bottomBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.LimeGray,
+  },
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
 });
