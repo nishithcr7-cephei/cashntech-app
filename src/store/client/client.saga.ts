@@ -20,7 +20,10 @@ import {
   getSoftSanctionRuleset,
   getVendorDetails,
   getVisitDetails,
+<<<<<<< HEAD
   prepareClientForEdit,
+=======
+>>>>>>> 4572029 (Add Api and saga for client details)
   saveClientBasicDetails,
   saveClientsDetails,
   saveFirmDetails,
@@ -637,7 +640,11 @@ function* saveVendorDetailsSaga(): unknown {
     vendor_name: vendor.vendorName.trim(),
     address: vendor.address.trim(),
     city: vendor.city,
+<<<<<<< HEAD
     state: String(vendor.state ?? ''),
+=======
+    state: vendor.state ?? '',
+>>>>>>> 4572029 (Add Api and saga for client details)
     pin_code: vendor.pinCode.trim(),
     vendor_contact_number: vendor.vendorContactNumber.trim(),
     monthly_sales_value: Number(vendor.monthlySalesValue),
@@ -747,7 +754,10 @@ function* getVisitDetailsFormData(action: PayloadAction<number>): unknown {
     ClientApis.getVisitDetailsForm,
     clientId,
   );
+<<<<<<< HEAD
   yield put(clientActions.setClientLoader(false));
+=======
+>>>>>>> 4572029 (Add Api and saga for client details)
   if (error) {
     yield put(clientActions.setClientLoader(false));
     Toast.show({
@@ -1441,7 +1451,10 @@ export default function* clientSaga() {
   yield takeLatest(getVendorDetails.type, getVendorDetailsSaga);
   yield takeLatest(saveVisitDetails.type, saveVisitDetailsSaga);
   yield takeLatest(getVisitDetails.type, getVisitDetailsFormData);
+<<<<<<< HEAD
   yield takeLatest(prepareClientForEdit.type, handlePrepareClientForEdit);
+=======
+>>>>>>> 4572029 (Add Api and saga for client details)
   yield takeLatest(deleteClientRequest.type, handleDeleteClient);
   yield takeLatest(getReport.type, handleGetRemarkReport);
   yield takeLatest(getLead.type, handleGetLeadProgress);

@@ -270,6 +270,7 @@ const clientSlice = createSlice({
       state.isSavedVisitDetails = initialState.isSavedVisitDetails;
       state.clientFormId = undefined;
     },
+<<<<<<< HEAD
     // Edit function
     prepareClientForEdit: (state, action: PayloadAction<number>) => {
       state.clientLoader = true;
@@ -284,6 +285,8 @@ const clientSlice = createSlice({
       state.visitDetails = initialState.visitDetails;
       state.isSavedVisitDetails = initialState.isSavedVisitDetails;
     },
+=======
+>>>>>>> 4572029 (Add Api and saga for client details)
     // Delete function
     deleteClientRequest: (
       state,

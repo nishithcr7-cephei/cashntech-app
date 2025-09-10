@@ -405,6 +405,7 @@ export type User = {
 };
 
 export interface IRemarkReportResponse {
+<<<<<<< HEAD
   statusCode: number;
   message: string;
   data: Array<IRemarkReportResponseDatum>;
@@ -427,29 +428,27 @@ export interface Task {
 }
 
 export interface IClientInfoSuccessResponse {
+=======
+>>>>>>> 4572029 (Add Api and saga for client details)
   statusCode: number;
   message: string;
-  data: Array<IClientInfoResponseDatum>;
+  data: Array<IRemarkReportResponseDatum>;
 }
 
-export interface IClientInfoResponseDatum {
-  reference_details: any;
-  monthly_turnover: any;
-  financier_name: any;
+export interface IRemarkReportResponseDatum {
   id: number;
-  source_of_lead: string;
-  city: string;
   client_name: string;
-  firm_name: string;
-  bank_name: string;
-  estimated_funding_required: number;
-  user: {id: number; first_name: string; last_name: string} | null;
-  vendor: Array<Vendor>;
+  user: null;
+  task: Array<Task>;
 }
 
-export interface Vendor {
+export interface Task {
   id: number;
-  monthly_sales_value: number;
+  task_type: string;
+  task_description: string;
+  task_status: string;
+  remark: null;
+  completed_at: null;
 }
 
 export interface ILeadProgressResponse {
