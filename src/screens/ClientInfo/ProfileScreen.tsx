@@ -73,6 +73,7 @@ export const ProfileScreen: React.FC<NavigationType> = ({
       <AppBar
         title="Client Details"
         onPressLeftIcon={() => navigation.goBack()}
+        leftIconProps={{hitSlop: {top: 8, right: 8, bottom: 8, left: 8}}}
         renderLeftIcon={
           <LeftChevron height={scaleWidth(16)} width={scaleHeight(16)} />
         }

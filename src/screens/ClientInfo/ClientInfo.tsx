@@ -81,8 +81,10 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
   };
 
   const onEdit = (clientId: number) => {
-    // TODO: Edit Client Details
+    dispatch(clientActions.prepareClientForEdit(clientId));
+    navigation.navigate(ClientScreens.FormSelectionScreen);
   };
+  
   const onDelete = (clientId: number) => {
     dispatch(
       clientActions.deleteClientRequest({
