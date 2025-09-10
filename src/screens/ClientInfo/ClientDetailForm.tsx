@@ -182,6 +182,7 @@ export const ClientDetailForm: React.FC<Props> = ({navigation}) => {
               <Input
                 label="Name of Client"
                 placeholder="Name of Client"
+                maxLength={50}
                 value={client.nameOfClient}
                 onChangeText={value => setData('nameOfClient', value, index)}
               />
@@ -195,6 +196,7 @@ export const ClientDetailForm: React.FC<Props> = ({navigation}) => {
               <Input
                 label="Contact Number"
                 placeholder="Value"
+                maxLength={10}
                 value={client.contactNumber}
                 keyboardType="phone-pad"
                 onChangeText={value => setData('contactNumber', value, index)}
@@ -202,6 +204,7 @@ export const ClientDetailForm: React.FC<Props> = ({navigation}) => {
               <Input
                 label="Email"
                 placeholder="Value"
+                maxLength={30}
                 value={client.email}
                 keyboardType="email-address"
                 onChangeText={value => setData('email', value, index)}

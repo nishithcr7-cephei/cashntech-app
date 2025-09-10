@@ -56,12 +56,14 @@ axiosInstance.interceptors.request.use(
     if (!config.isFormData && config.headers) {
       config.headers['Content-Type'] = 'application/json';
     }
-    console.group('=========== API REQUEST CONFIG ===========');
-    console.log('URL: ', config.url);
-    console.log('Method: ', config.method);
-    console.log('Headers: ', config.headers);
-    console.log('Data: ', config.data);
-    console.groupEnd();
+    if (__DEV__) {
+      console.group('=========== API REQUEST CONFIG ===========');
+      console.log('URL: ', config.url);
+      console.log('Method: ', config.method);
+      console.log('Headers: ', config.headers);
+      console.log('Data: ', config.data);
+      console.groupEnd();
+    }
     return config;
   },
 );
@@ -75,10 +77,12 @@ axiosInstance.interceptors.request.use(
  */
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
-    console.group('=========== API REQUEST RESPONSE ===========');
-    console.log('request: ', response.request.responseURL);
-    console.log('response: ', response.data);
-    console.groupEnd();
+    if (__DEV__) {
+      console.group('=========== API REQUEST RESPONSE ===========');
+      console.log('request: ', response.request.responseURL);
+      console.log('response: ', response.data);
+      console.groupEnd();
+    }
     return response;
   },
   /**
@@ -88,24 +92,22 @@ axiosInstance.interceptors.response.use(
    * @returns {Promise<never>} The error object.
    */
   async (error: AxiosError): Promise<never> => {
-    console.group('=========== API REQUEST ERROR ===========');
-    console.log(
-      'Request URL: ',
-      error.request?.responseURL || error.config?.url,
-    );
-    console.log('Request Method: ', error.config?.method);
-    console.log('Request Headers: ', error.config?.headers);
-    console.log('Request Data: ', error.config?.data);
-    console.log('Response Status: ', error.response?.status);
-    console.log('Response Headers: ', error.response?.headers);
-    console.log('Response Data: ', error.response?.data);
-    console.log('Error Message: ', error.message);
-    console.log('Error Code: ', error.code);
-    console.log('Error Config: ', error.config);
-    console.groupEnd();
+    if (__DEV__) {
+      console.group('=========== API REQUEST ERROR ===========');
+      console.log(
+        'Request URL: ',
+        error.request?.responseURL || error.config?.url,
+      );
+      console.log('Request Method: ', error.config?.method);
+      console.log('Request Headers: ', error.config?.headers);
+      console.log('Request Data: ', error.config?.data);
+      console.log('Response Data: ', error.response?.data);
+      console.groupEnd();
+    }
 
     // Check if the error is a token expiration error
-    if (error.response?.status === 401) {
+    const url = error.request?.responseURL ?? error.config?.url ?? '';
+    if (error.response?.status === 401 && !url.includes('/auth/')) {
       Alert.alert('Error', 'Token expired..');
       logoutUser();
     }

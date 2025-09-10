@@ -16,6 +16,7 @@ import {useDispatch, useSelector} from 'react-redux';
 import {signupRequest} from '@store/auth/auth.slice';
 import {authSelector} from '@store/auth';
 import {setStorage} from '@services/localStorage';
+import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
 
 const Strings = {
   welcomeTitle: 'Welcome to CashnTech',
@@ -133,82 +134,84 @@ export const SignupScreen: React.FC<Props> = ({
 
   return (
     <Container>
-      <View style={styles.flex1}>
-        <Header title={Strings.welcomeTitle} subtitle={Strings.subtitle} />
-        <View style={styles.inputContainer}>
-          <Input
-            label={Strings.firstNameLabel}
-            value={firstName}
-            onChangeText={setFirstName}
-            editable={!isLoading}
-          />
-          <Input
-            label={Strings.lastNameLabel}
-            value={lastName}
-            onChangeText={setLastName}
-            containerStyle={styles.inputMargin}
-            editable={!isLoading}
-          />
-          <Input
-            label={Strings.emailLabel}
-            maxLength={32}
-            value={email}
-            onChangeText={value => {
-              setEmail(value);
-              setStorage('user_email', value.trim());
-            }}
-            keyboardType={'email-address'}
-            editable={!isLoading}
-            containerStyle={styles.inputMargin}
-          />
-          <Input
-            label={Strings.mobileLabel}
-            renderLeftIcon={
-              <View style={styles.countryCodeContainer}>
-                <CountryPicker
-                  visible={showCountryModal}
-                  countryCode={country.cca2}
-                  onSelect={item => {
-                    setShowCountryModal(false);
-                    setCountry(item);
-                  }}
-                  withEmoji
-                  withFlag
-                  withCallingCode
-                  withAlphaFilter
-                  withFilter
-                  withFlagButton
-                  withCallingCodeButton
-                />
-              </View>
-            }
-            leftIconStyle={styles.leftIcon}
-            onPressLeftIcon={() => setShowCountryModal(prv => !prv)}
-            maxLength={15}
-            value={mobileNumber}
-            onChangeText={setMobileNumber}
-            keyboardType="number-pad"
-            editable={!isLoading}
-            containerStyle={styles.inputMargin}
-          />
-          <Button
-            buttonText={Strings.getVerificationCodeButtonText}
-            style={styles.buttonMargin}
-            onPress={onPressVerify}
-            showLoader={isLoading}
-            disabled={isLoading}
-          />
+      <KeyboardAvoidingScrollView>
+        <View style={styles.flex1}>
+          <Header title={Strings.welcomeTitle} subtitle={Strings.subtitle} />
+          <View style={styles.inputContainer}>
+            <Input
+              label={Strings.firstNameLabel}
+              value={firstName}
+              onChangeText={setFirstName}
+              editable={!isLoading}
+            />
+            <Input
+              label={Strings.lastNameLabel}
+              value={lastName}
+              onChangeText={setLastName}
+              containerStyle={styles.inputMargin}
+              editable={!isLoading}
+            />
+            <Input
+              label={Strings.emailLabel}
+              maxLength={32}
+              value={email}
+              onChangeText={value => {
+                setEmail(value);
+                setStorage('user_email', value.trim());
+              }}
+              keyboardType={'email-address'}
+              editable={!isLoading}
+              containerStyle={styles.inputMargin}
+            />
+            <Input
+              label={Strings.mobileLabel}
+              renderLeftIcon={
+                <View style={styles.countryCodeContainer}>
+                  <CountryPicker
+                    visible={showCountryModal}
+                    countryCode={country.cca2}
+                    onSelect={item => {
+                      setShowCountryModal(false);
+                      setCountry(item);
+                    }}
+                    withEmoji
+                    withFlag
+                    withCallingCode
+                    withAlphaFilter
+                    withFilter
+                    withFlagButton
+                    withCallingCodeButton
+                  />
+                </View>
+              }
+              leftIconStyle={styles.leftIcon}
+              onPressLeftIcon={() => setShowCountryModal(prv => !prv)}
+              maxLength={15}
+              value={mobileNumber}
+              onChangeText={setMobileNumber}
+              keyboardType="number-pad"
+              editable={!isLoading}
+              containerStyle={styles.inputMargin}
+            />
+            <Button
+              buttonText={Strings.getVerificationCodeButtonText}
+              style={styles.buttonMargin}
+              onPress={onPressVerify}
+              showLoader={isLoading}
+              disabled={isLoading}
+            />
 
-          <View style={styles.accountContainer}>
-            <Text style={styles.accountText}>{Strings.accountText}</Text>
-            <TouchableOpacity onPress={onPressLogin}>
-              <Text style={[styles.accountText, styles.accountLinkText]}>
-                {Strings.accountLinkText}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.accountContainer}>
+              <Text style={styles.accountText}>{Strings.accountText}</Text>
+              <TouchableOpacity onPress={onPressLogin}>
+                <Text style={[styles.accountText, styles.accountLinkText]}>
+                  {Strings.accountLinkText}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingScrollView>
       <TnCFooter navigation={navigation} />
     </Container>
   );

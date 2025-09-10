@@ -115,12 +115,14 @@ const VendorForm = ({
         <Input
           label="Vendor Name"
           placeholder="Enter Vendor Name"
+          maxLength={50}
           value={vendor.vendorName}
           onChangeText={value => setData('vendorName', value, index)}
         />
         <Input
           label="Address"
           placeholder="Enter Address"
+          maxLength={100}
           value={vendor.address}
           onChangeText={value => setData('address', value, index)}
         />
@@ -142,12 +144,16 @@ const VendorForm = ({
         <Input
           label="Pincode"
           placeholder="Enter Pincode"
+          keyboardType="numeric"
+          maxLength={6}
           value={vendor.pinCode}
           onChangeText={value => setData('pinCode', value, index)}
         />
         <Input
           label="Vendor Contact Number"
           placeholder="Enter Contact number"
+          keyboardType="phone-pad"
+          maxLength={10}
           value={vendor.vendorContactNumber}
           onChangeText={value => setData('vendorContactNumber', value, index)}
         />
@@ -156,6 +162,7 @@ const VendorForm = ({
           placeholder="Enter Monthly sales value"
           value={formatIndianNumber(vendor.monthlySalesValue.toString())}
           keyboardType="numeric"
+          maxLength={10}
           onChangeText={value =>
             setData('monthlySalesValue', value.replace(/,/g, ''), index)
           }

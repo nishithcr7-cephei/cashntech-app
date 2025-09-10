@@ -189,7 +189,9 @@ export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
                     ? moment(dateOfNextVisit).format('DD/MM/YYYY')
                     : ''
                 }
-                onConfirm={date => setData('dateOfNextVisit', date)}
+                onConfirm={date =>
+                  setData('dateOfNextVisit', date.toISOString())
+                }
               />
             </>
           )}
@@ -198,6 +200,7 @@ export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
               <Input
                 label="Reason for Not Interested"
                 placeholder="value"
+                maxLength={100}
                 value={reasonForNotInterested}
                 onChangeText={value => setData('reasonForNotInterested', value)}
               />
@@ -205,7 +208,7 @@ export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
                 label="Are you Interested for ?"
                 data={listInterestedFor}
                 value={interestedFor}
-                onChange={value => setData('interestedFor', value as string)}
+                onChange={value => setData('interestedFor', value)}
                 showSearch={false}
               />
             </>

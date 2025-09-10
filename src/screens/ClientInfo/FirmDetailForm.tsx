@@ -172,6 +172,8 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             label="Business Vintage (in Years)"
             placeholder="Enter Business vintage"
             value={businessVintage}
+            keyboardType="numeric"
+            maxLength={3}
             onChangeText={value => setData('businessVintage', value)}
           />
           <CustomDropdown
@@ -189,6 +191,8 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
           <Input
             label="Monthly Turnover"
             placeholder="Enter Monthly Turnover"
+            keyboardType="numeric"
+            maxLength={10}
             value={formatIndianNumber(monthlyTurnover)}
             onChangeText={value => setData('monthlyTurnover', value)}
           />
@@ -196,6 +200,8 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             label="CIBIL Score"
             placeholder="Enter CIBIL score"
             value={cibilScore}
+            keyboardType="numeric"
+            maxLength={3}
             onChangeText={value => setData('cibilScore', value)}
           />
           <CustomDropdown
@@ -207,6 +213,8 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
           <Input
             label="Existing Funding Sanctioned Amt"
             placeholder="Enter Funding Amount"
+            keyboardType="numeric"
+            maxLength={10}
             value={formatIndianNumber(existingFundingSanctionedAmount)}
             onChangeText={value =>
               setData('existingFundingSanctionedAmount', value)
@@ -215,6 +223,8 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
           <Input
             label="Estimated Funding Required"
             placeholder="Enter funding required"
+            keyboardType="numeric"
+            maxLength={10}
             value={formatIndianNumber(estimatedFundingRequired)}
             onChangeText={value => setData('estimatedFundingRequired', value)}
           />

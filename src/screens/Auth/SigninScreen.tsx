@@ -13,6 +13,7 @@ import {Feather} from '@react-native-vector-icons/feather';
 import {useDispatch, useSelector} from 'react-redux';
 import {signinRequest} from '@store/auth/auth.slice';
 import {setStorage} from '@services/localStorage';
+import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
 
 type SigninProps = NativeStackScreenProps<
   AuthNavigatorType,
@@ -111,68 +112,70 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
 
   return (
     <Container>
-      <Header
-        title={Strings.welcomeBackTitle}
-        subtitle={Strings.loginSubtitle}
-      />
-      <View style={styles.inputContainer}>
-        <Input
-          label={Strings.emailLabel}
-          leftIconStyle={styles.leftIcon}
-          maxLength={32}
-          value={email}
-          onChangeText={setEmail}
-          editable={!isLoading}
-          keyboardType={'email-address'}
+      <KeyboardAvoidingScrollView>
+        <Header
+          title={Strings.welcomeBackTitle}
+          subtitle={Strings.loginSubtitle}
         />
-        <Input
-          label={Strings.passwordLabel}
-          onChangeText={setPassword}
-          value={passwordValue}
-          renderRightIcon={
-            showPassword ? (
-              <EyeOpen style={styles.icon} />
-            ) : (
-              <EyeClose style={styles.icon} />
-            )
-          }
-          onPressRightIcon={() => setShowPassword(prv => !prv)}
-          secureTextEntry={!showPassword}
-          editable={!isLoading}
-          containerStyle={styles.passwordInputContainer}
-        />
-        <View style={styles.extraInfoContainer}>
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => setRememberMe(pre => !pre)}>
-            <Feather
-              name={rememberMe ? 'check-square' : 'square'}
-              size={scaleWidth(12)}
-              color={Colors.gray300}
-            />
-            <Text style={styles.rememberText}>{Strings.rememberMe}</Text>
-          </TouchableOpacity>
+        <View style={styles.inputContainer}>
+          <Input
+            label={Strings.emailLabel}
+            leftIconStyle={styles.leftIcon}
+            maxLength={32}
+            value={email}
+            onChangeText={setEmail}
+            editable={!isLoading}
+            keyboardType={'email-address'}
+          />
+          <Input
+            label={Strings.passwordLabel}
+            onChangeText={setPassword}
+            value={passwordValue}
+            renderRightIcon={
+              showPassword ? (
+                <EyeOpen style={styles.icon} />
+              ) : (
+                <EyeClose style={styles.icon} />
+              )
+            }
+            onPressRightIcon={() => setShowPassword(prv => !prv)}
+            secureTextEntry={!showPassword}
+            editable={!isLoading}
+            containerStyle={styles.passwordInputContainer}
+          />
+          <View style={styles.extraInfoContainer}>
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => setRememberMe(pre => !pre)}>
+              <Feather
+                name={rememberMe ? 'check-square' : 'square'}
+                size={scaleWidth(12)}
+                color={Colors.gray300}
+              />
+              <Text style={styles.rememberText}>{Strings.rememberMe}</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={onPressForgotPassword}>
-            <Text style={styles.forgotPasswordText}>
-              {Strings.forgotPassword}
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity onPress={onPressForgotPassword}>
+              <Text style={styles.forgotPasswordText}>
+                {Strings.forgotPassword}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <Button
+            buttonText={Strings.getVerificationCode}
+            onPress={onPressVerify}
+            showLoader={isLoading}
+          />
+          <View style={styles.accountContainer}>
+            <Text style={styles.accountText}>{Strings.noAccountText}</Text>
+            <TouchableOpacity onPress={onPressSignup}>
+              <Text style={[styles.accountText, styles.accountLinkText]}>
+                {Strings.signupLinkText}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        <Button
-          buttonText={Strings.getVerificationCode}
-          onPress={onPressVerify}
-          showLoader={isLoading}
-        />
-        <View style={styles.accountContainer}>
-          <Text style={styles.accountText}>{Strings.noAccountText}</Text>
-          <TouchableOpacity onPress={onPressSignup}>
-            <Text style={[styles.accountText, styles.accountLinkText]}>
-              {Strings.signupLinkText}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      </KeyboardAvoidingScrollView>
       <TnCFooter navigation={navigation} />
     </Container>
   );
