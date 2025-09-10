@@ -45,6 +45,7 @@ export const ProfileScreen: React.FC<NavigationType> = ({
   const visitDetails = useSelector(clientSelector.getVisitDetailsFormData);
 
   useEffect(() => {
+    dispatch(clientActions.resetAllClientFormData());
     if (route.params?.clientId) {
       const id = route.params.clientId;
       dispatch(clientActions.getClientBasicDetails(id));
