@@ -150,10 +150,6 @@ export const ClientCard: React.FC<ClientCardProps> = ({
           {data.monthly_turnover ?? 'N/A'}
         </Text>
         <Text style={styles.label}>
-          <Text style={styles.bold}>{Strings.monthlyTurnover}</Text>
-          {data.monthly_turnover ?? 'N/A'}
-        </Text>
-        <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.createdAt}</Text>
           {data.created_at
             ? moment(data.created_at).format('MMMM YYYY')

@@ -231,7 +231,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   input: {
+    flex: 1,
     fontSize: scaleFont(12),
+    lineHeight: scaleFont(14),
+    includeFontPadding: false,
+    paddingVertical: 0,
   },
   cardList: {
     flex: 1,
