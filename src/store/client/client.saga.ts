@@ -240,7 +240,12 @@ function* handleGetClientsFilter(
     });
     return;
   }
-  yield put(clientActions.setClientList(data.data));
+  const clientList = data.data.map(client => ({
+      ...client,
+      firm_name: decryptUtility(client.firm_name),
+      city: decryptUtility(client.city),
+    }))
+  yield put(clientActions.setClientList(clientList));
 }
 
 function* handleGetCityList(): unknown {

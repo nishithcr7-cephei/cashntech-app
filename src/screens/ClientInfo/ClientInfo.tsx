@@ -20,7 +20,6 @@ import {
 import {useDispatch, useSelector} from 'react-redux';
 import {LeadSourceType, SectorType} from './ClientInfo.type';
 import {userSelector, UserState} from '@store/user';
-import {decryptConditionally} from '@utils/crypto';
 
 type NavigationType = CompositeScreenProps<
   NativeStackScreenProps<ClientNavigatorType, ClientScreens.ClientInfo>,
@@ -40,20 +39,15 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
   const clientsData = useSelector(clientSelector.getClientList);
   const cityList = useSelector(clientSelector.getCityList);
   const loading = useSelector(clientSelector.getClientLoader);
-  const decryptedClients = useMemo(() => {
-    return clientsData.map(client => ({
-      ...client,
-      decryptedFirmName: decryptConditionally(client.firm_name ?? ''),
-    }));
-  }, [clientsData]);
 
   const filteredClients = useMemo(() => {
-    if (!searchQuery) return decryptedClients;
-    const lowerCaseQuery = searchQuery.toLowerCase().trim();
-    return decryptedClients.filter(client =>
-      client.decryptedFirmName.toLowerCase().includes(lowerCaseQuery),
-    );
-  }, [decryptedClients, searchQuery]);
+    if (!searchQuery) return clientsData;
+    const lowerCaseQuery = searchQuery.toLowerCase();
+    return clientsData.filter(client => {
+      const firmName = client.firm_name ?? '';
+      return firmName.toString().toLowerCase().includes(lowerCaseQuery);
+    });
+  }, [clientsData, searchQuery]);
 
   const filterData = useMemo(() => {
     const listOfSectors = Object.values(SectorType);
@@ -90,7 +84,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
     dispatch(clientActions.prepareClientForEdit(clientId));
     navigation.navigate(ClientScreens.FormSelectionScreen);
   };
-
+  
   const onDelete = (clientId: number) => {
     dispatch(
       clientActions.deleteClientRequest({

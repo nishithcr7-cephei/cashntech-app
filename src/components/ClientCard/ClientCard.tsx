@@ -4,7 +4,6 @@ import {Colors} from '@constants/index';
 import {ClientsFilterResponseDatum} from '@store/client';
 import {Dots} from '@assets/Icons';
 import {scaleHeight, scaleWidth} from '@utils/Scale';
-import {decryptUtility} from '@utils/crypto';
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 
@@ -111,7 +110,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.firmName}</Text>
-          {data.firm_name ? decryptUtility(data.firm_name) ?? '' : 'N/A'}
+          {data.firm_name ?? 'N/A'}
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.sector}</Text>
@@ -119,7 +118,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.location}</Text>
-          {data.city ? decryptUtility(data.city) ?? '' : 'N/A'}
+          {data.city ?? 'N/A'}
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.initiator}</Text>
