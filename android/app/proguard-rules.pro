@@ -11,3 +11,4 @@
 -keep class com.facebook.hermes.** { *; }
 -keepclassmembers class com.facebook.hermes.** { *; }
 -dontwarn com.facebook.hermes.**
+-keep public class **.BuildConfig { *; }

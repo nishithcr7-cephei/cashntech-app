@@ -13,7 +13,7 @@ export const MainNavigator = () => {
   }
 
   const linking = {
-    prefixes: ['cashntech://'],
+    prefixes: ['cashntech://', 'https://losapidev.cashntech.com/'],
     config: {
       screens: {
         PasswordScreen: {
