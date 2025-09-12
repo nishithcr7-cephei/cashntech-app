@@ -108,13 +108,13 @@ const getBusinessChecked = createSelector(_selectState, _state =>
   _state.KycBusinessList.map(value => value.document_type),
 );
 
-const getUplaodpanLoading = createSelector(
+const getUploadPanLoading = createSelector(
   _selectState,
   state => state.panLoading,
 );
 
-const getUplaodpanData = createSelector(_selectState, state => state.panData);
-const getUplaodpanError = createSelector(_selectState, state => state.panError);
+const getUploadPanData = createSelector(_selectState, state => state.panData);
+const getUploadPanError = createSelector(_selectState, state => state.panError);
 
 const getUploadAdharLoading = createSelector(
   _selectState,
@@ -131,15 +131,15 @@ const getUploadAdharError = createSelector(
   state => state.adharError,
 );
 
-const getUplaodResidenceLoading = createSelector(
+const getUploadResidenceLoading = createSelector(
   _selectState,
   state => state.residenceLoading,
 );
-const getUplaodResidenceData = createSelector(
+const getUploadResidenceData = createSelector(
   _selectState,
   state => state.residenceData,
 );
-const getUplaodResidenceError = createSelector(
+const getUploadResidenceError = createSelector(
   _selectState,
   state => state.residenceError,
 );
@@ -316,15 +316,15 @@ export default {
   getBankList,
   getkycChecked,
   getBusinessChecked,
-  getUplaodpanLoading,
-  getUplaodpanData,
-  getUplaodpanError,
+  getUploadPanLoading,
+  getUploadPanData,
+  getUploadPanError,
   getUploadAdharLoading,
   getUploadAdharData,
   getUploadAdharError,
-  getUplaodResidenceLoading,
-  getUplaodResidenceData,
-  getUplaodResidenceError,
+  getUploadResidenceLoading,
+  getUploadResidenceData,
+  getUploadResidenceError,
   getUdhyamLoading,
   getUdhyamData,
   getUdhyamError,

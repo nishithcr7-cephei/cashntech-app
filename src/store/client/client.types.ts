@@ -128,12 +128,13 @@ export type ClientState = {
   leadProgressDetailsLoading: boolean;
   leadProgressDetailsError: string | null;
 
-  // Report properties
+  // Remark Report fields
   reportLoader: boolean;
   reportList: Array<IRemarkReportResponseDatum>;
 
-  // Task History properties
+  // Task History fields
   TaskHistoryLoader: boolean;
+  TaskHistoryList: Array<ITaskHistoryResponseDatum>;
 };
 
 export type BasicDetailsType = {
@@ -405,31 +406,6 @@ export type User = {
 };
 
 export interface IRemarkReportResponse {
-<<<<<<< HEAD
-  statusCode: number;
-  message: string;
-  data: Array<IRemarkReportResponseDatum>;
-}
-
-export interface IRemarkReportResponseDatum {
-  id: number;
-  client_name: string;
-  user: null;
-  task: Array<Task>;
-}
-
-export interface Task {
-  id: number;
-  task_type: string;
-  task_description: string;
-  task_status: string;
-  remark: null;
-  completed_at: null;
-}
-
-export interface IClientInfoSuccessResponse {
-=======
->>>>>>> 4572029 (Add Api and saga for client details)
   statusCode: number;
   message: string;
   data: Array<IRemarkReportResponseDatum>;
