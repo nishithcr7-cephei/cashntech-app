@@ -23,3 +23,6 @@ export * from './ThreeDotsDropdown/ThreeDotsDropdown';
 export * from './FilterBox/FilterDropdown';
 export * from './TaskFilter/TaskFilterDropdown';
 export * from './FilterModal/FilterModal';
+export * from './TaskCard/TaskCard';
+export * from './TaskFilterModal/TaskFilterModal';
+export * from './ManageTaskHeader/ManageTaskHeader';

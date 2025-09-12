@@ -1,158 +1,90 @@
-import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import React from 'react';
-import {Colors} from '@constants/index';
+import { View, Text, StyleSheet } from 'react-native';
+import { TaskRecordItem } from '@store/mng';
+import { decryptLocation } from '@utils/crypto';
+import Colors from '@constants/Colors';
+import { scaleFont } from '@utils/Scale';
 
 interface TaskCardProps {
-  srNo?: number;
-  firmName?: string;
-  sector?: string;
-  assignedBy?: string;
-  assignedTo?: string;
-  taskDescription: string;
-  taskStatus?: string;
-  remarks?: string;
-  createdAt?: string;
-  completedAt?: string;
-  // Keep old props for compatibility
-  tasktype?: string;
-  clientId?: string;
-  clientName?: string;
-  salesman?: string;
-  location?: string;
-  referenceDetails?: string;
-  sourceDHCO?: string;
-  status?: 'Warm' | 'Hot' | 'Cold';
-  historyStatus?: 'Completed' | 'Pending';
-  showHistoryStatus?: boolean;
-  historyStatusLabel?: string;
-  showReadMore?: boolean;
+  item: TaskRecordItem;
+  index: number;
 }
 
-const ChipColors = {
-  Warm: '#FFC107',
-  Hot: '#FF5656',
-  Cold: Colors.tertiaryBlue,
-};
+const TaskCard: React.FC<TaskCardProps> = ({ item, index }) => {
+  const getDisplayTask = (tasks: any[] = []) => {
+    if (!Array.isArray(tasks) || tasks.length === 0) return null;
+    return tasks[0];
+  };
 
-export const TaskCard: React.FC<TaskCardProps> = ({
-  srNo,
-  firmName,
-  sector,
-  assignedBy,
-  assignedTo,
-  taskDescription,
-  taskStatus,
-  remarks,
-  createdAt,
-  completedAt,
-  // Old props for compatibility
-  tasktype,
-  clientId,
-  clientName,
-  salesman,
-  location,
-  referenceDetails,
-  sourceDHCO,
-  status,
-  historyStatus,
-  showHistoryStatus,
-  historyStatusLabel,
-  showReadMore = true,
-}) => {
+  const formatDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('en-GB') : 'N/A');
+
+  const capitalizeFirst = (str?: string) => {
+    const s = (str || '').toString().trim();
+    if (!s) return 'N/A';
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  };
+
+  const task = getDisplayTask(item.task || []);
+  const firmName = capitalizeFirst(decryptLocation(item.firm_name || ''));
+  const salesman = capitalizeFirst(
+    item.user ? `${item.user.first_name || ''} ${item.user.last_name || ''}`.trim() : '',
+  );
+  const sector = capitalizeFirst(item.sector || '');
+  const taskType = capitalizeFirst(task?.task_type);
+  const taskDesc = capitalizeFirst(task?.task_description);
+  const remark = task?.remark && String(task.remark).trim() ? capitalizeFirst(task.remark) : 'NA';
+  const status = capitalizeFirst(task?.task_status);
+  const isCompleted = (task?.task_status || '').toString().trim().toLowerCase() === 'completed';
+
   return (
     <View style={styles.card}>
-      {/* <View style={[styles.statusBadge, {backgroundColor: ChipColors[status]}]}>
-        <Text style={styles.statusText}>{status}</Text>
-      </View> */}
-
-      {[
-        ...(srNo ? [{label: 'S.No', value: srNo.toString()}] : []),
-        ...(firmName ? [{label: 'Firm Name', value: firmName}] : []),
-        ...(sector ? [{label: 'Sector', value: sector}] : []),
-        ...(assignedBy ? [{label: 'Assigned By', value: assignedBy}] : []),
-        ...(assignedTo ? [{label: 'Assigned To', value: assignedTo}] : []),
-        ...(taskDescription ? [{label: 'Description', value: taskDescription}] : []),
-      ].map((item, index) => (
-        <Text style={styles.text} key={index}>
-          <Text style={styles.label}>{item.label}: </Text>
-          {item.value}
-        </Text>
-      ))}
-      
-      {/* Status with conditional color */}
-      {taskStatus && (
-        <Text style={styles.text}>
-          <Text style={styles.label}>Status: </Text>
-          <Text style={[
-            styles.statusValue,
-            {color: taskStatus.toLowerCase() === 'completed' ? '#28a745' : '#6c757d'}
-          ]}>
-            {taskStatus}
-          </Text>
-        </Text>
-      )}
-      
-      {[
-        ...(remarks ? [{label: 'Remarks', value: remarks}] : []),
-        ...(createdAt ? [{label: 'Created At', value: createdAt}] : []),
-        ...(completedAt ? [{label: 'Completed At', value: completedAt}] : []),
-      ].map((item, index) => (
-        <Text style={styles.text} key={index + 200}>
-          <Text style={styles.label}>{item.label}: </Text>
-          {item.value}
-        </Text>
-      ))}
-      {showHistoryStatus && historyStatus && (
-        <Text style={styles.text}>
-          <Text style={styles.label}>{historyStatusLabel ?? 'Status'}: </Text>
-          {historyStatus}
-        </Text>
-      )}
+      <Text style={styles.label}>
+        <Text style={styles.bold}>S.no :</Text> <Text style={styles.value}>{index + 1}</Text>
+      </Text>
+      <Text style={styles.label}>
+        <Text style={styles.bold}>Firm Name :</Text> <Text style={styles.value}>{firmName}</Text>
+      </Text>
+      <Text style={styles.label}>
+        <Text style={styles.bold}>Completed At :</Text> <Text style={styles.value}>{formatDate(task?.completed_at)}</Text>
+      </Text>
+      <Text style={styles.label}>
+        <Text style={styles.bold}>Salesman :</Text> <Text style={styles.value}>{salesman}</Text>
+      </Text>
+      <Text style={styles.label}>
+        <Text style={styles.bold}>Sector :</Text> <Text style={styles.value}>{sector}</Text>
+      </Text>
+      <Text style={styles.label}>
+        <Text style={styles.bold}>Task Type :</Text> <Text style={styles.value}>{taskType}</Text>
+      </Text>
+      <Text style={styles.label}>
+        <Text style={styles.bold}>Task Description :</Text> <Text style={styles.value}>{taskDesc}</Text>
+      </Text>
+      <Text style={styles.label}>
+        <Text style={styles.bold}>Remark :</Text> <Text style={styles.value}>{remark}</Text>
+      </Text>
+      <Text style={styles.label}>
+        <Text style={styles.bold}>Status :</Text>{' '}
+        <Text style={[styles.value, isCompleted ? styles.statusCompleted : undefined]}>{status}</Text>
+      </Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.LimeGray,
-    marginVertical: 10,
-    padding: 16,
+    backgroundColor: '#F9F9F9',
     borderRadius: 8,
-    borderColor: '#eee',
-    borderWidth: 1,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  statusBadge: {
-    backgroundColor: '#FFC107',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-  },
-  statusText: {
-    fontWeight: 'bold',
-    fontSize: 12,
-    color: '#FFFFFF',
-  },
-  text: {
-    color: '#555',
-    marginBottom: 4,
-  },
-  label: {
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  statusValue: {
-    fontWeight: 'bold',
-  },
-  readMoreButton: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-  },
-  readMoreText: {
-    color: Colors.tertiaryBlue,
-    textDecorationLine: 'underline',
-    fontWeight: 'bold',
-  },
+  label: { fontSize: 14, color: '#515151', marginBottom: 6 },
+  bold: { fontWeight: 'bold' },
+  value: { color: '#515151' },
+  statusCompleted: { color: Colors.green },
 });
+
+export default TaskCard;
