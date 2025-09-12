@@ -42,10 +42,10 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
 
   const filteredClients = useMemo(() => {
     if (!searchQuery) return clientsData;
-    const lowerCaseQuery = searchQuery.toLowerCase();
+    const lowerCaseQuery = searchQuery.trim().toLowerCase();
     return clientsData.filter(client => {
       const firmName = client.firm_name ?? '';
-      return firmName.toString().toLowerCase().includes(lowerCaseQuery);
+      return firmName.trim().toLowerCase().includes(lowerCaseQuery);
     });
   }, [clientsData, searchQuery]);
 
