@@ -25,6 +25,7 @@ import {useDispatch, useSelector} from 'react-redux';
 import clientApi from '@services/api/client.api';
 import taskApi from '@services/api/task.api';
 import {decryptConditionally} from '@utils/crypto';
+import {capitalizeFirst, formatTaskDescription, formatTaskRemark, formatTaskStatus} from '@utils/taskUtils';
 
 type DocNavigationType = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType>,
@@ -137,9 +138,6 @@ export const TaskLogTabs = () => {
     return `${month} ${year}`;
   };
 
-  const capitalizeFirst = (str: string) =>
-    str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-
   const [taskRecords, setTaskRecords] = useState<ITaskRecord[]>([]);
 
   // Log when state updates to verify shape
@@ -161,9 +159,9 @@ export const TaskLogTabs = () => {
       sector: capitalizeFirst(report.sector || ''),
       assignedBy: capitalizeFirst(task.assigned_by || ''),
       assignedTo: capitalizeFirst(task.assigned_to || ''),
-      taskDescription: capitalizeFirst(task.task_description || ''),
-      taskStatus: capitalizeFirst(task.task_status || ''),
-      remarks: task.remark ? capitalizeFirst(task.remark) : 'N/A',
+      taskDescription: formatTaskDescription(task.task_description),
+      taskStatus: formatTaskStatus(task.task_status),
+      remarks: formatTaskRemark(task.remark),
       createdAt: formatToMonthYear(task.assigned_at),
       completedAt: formatToDMY(task.completed_at || undefined),
       // Keep old fields for compatibility
@@ -172,7 +170,7 @@ export const TaskLogTabs = () => {
       clientName: capitalizeFirst(decryptConditionally(report.firm_name || '')),
       salesman: capitalizeFirst(task.assigned_to || ''),
       location: capitalizeFirst(task.task_status || ''),
-      referenceDetails: task.remark ? capitalizeFirst(task.remark) : 'N/A',
+      referenceDetails: formatTaskRemark(task.remark),
       sourceDHCO: formatToDMY(task.completed_at || undefined),
       status: mapStatus(task.task_status),
       raw: task,
