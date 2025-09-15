@@ -1,4 +1,5 @@
 import {call, put, takeLatest} from 'redux-saga/effects';
+import {PayloadAction} from '@reduxjs/toolkit';
 import {Result} from '@utils/TryCatch';
 import clientApi from '@services/api/client.api';
 import taskApi from '@services/api/task.api';
@@ -7,6 +8,9 @@ import {
   ITaskHistoryResponse,
   ITaskUpdateResponse,
   IUserTaskHistoryResponse,
+  ITaskUpdateRequest,
+  IUserTaskHistoryRequest,
+  ITaskRecordsResponse,
 } from './tasklog.types';
 import * as tasklogActions from './tasklog.slice';
 
@@ -22,17 +26,18 @@ function* handleGetRemarkReport(): unknown {
 }
 
 function* handleGetTaskHistory(): unknown {
-  const {data, error}: Result<ITaskHistoryResponse> = yield call(
-    taskApi.getTaskHistory,
+  const {data, error}: Result<ITaskRecordsResponse> = yield call(
+    taskApi.getTaskRecords,
+    {hasTask: true},
   );
   if (!error) {
-    yield put(tasklogActions.setTaskHistoryList(data.data));
+    yield put(tasklogActions.setTaskRecordsList(data.data));
   } else {
-    yield put(tasklogActions.setTaskHistoryList([]));
+    yield put(tasklogActions.setTaskRecordsList([]));
   }
 }
 
-function* handleUpdateTask(action: any): unknown {
+function* handleUpdateTask(action: PayloadAction<{taskId: string; data: ITaskUpdateRequest}>): unknown {
   yield put(tasklogActions.setTaskUpdateLoader(true));
   const {taskId, data} = action.payload;
   
@@ -52,9 +57,9 @@ function* handleUpdateTask(action: any): unknown {
   }
 }
 
-function* handleGetUserTaskHistory(action: any): unknown {
+function* handleGetUserTaskHistory(action: PayloadAction<IUserTaskHistoryRequest>): unknown {
   yield put(tasklogActions.setUserTaskHistoryLoader(true));
-  const userName = action.payload;
+  const {userName} = action.payload;
   
   const {data, error}: Result<IUserTaskHistoryResponse> = yield call(
     taskApi.getTaskHistory,
@@ -69,7 +74,7 @@ function* handleGetUserTaskHistory(action: any): unknown {
       : [];
     yield put(tasklogActions.setUserTaskHistoryList(taskList));
   } else {
-    const errorMessage = error?.message || 'Failed to fetch user task history';
+    const errorMessage = (error as any)?.response?.data?.message || error?.message || 'Failed to fetch user task history';
     yield put(tasklogActions.setUserTaskHistoryError(errorMessage));
   }
 }

@@ -4,6 +4,8 @@ import {
   IRemarkReportResponseDatum,
   ITaskHistoryResponseDatum,
   ITaskUpdateRequest,
+  ITaskHistoryItem,
+  ITaskRecord,
 } from './tasklog.types';
 
 const initialState: ITaskLogState = {
@@ -70,7 +72,7 @@ const tasklogSlice = createSlice({
     setUserTaskHistoryLoader: (state, action: PayloadAction<boolean>) => {
       state.userTaskHistoryLoader = action.payload;
     },
-    setUserTaskHistoryList: (state, action: PayloadAction<Array<any>>) => {
+    setUserTaskHistoryList: (state, action: PayloadAction<Array<ITaskHistoryItem>>) => {
       state.userTaskHistoryLoader = false;
       state.userTaskHistoryList = action.payload;
       state.userTaskHistoryError = undefined;
@@ -83,6 +85,17 @@ const tasklogSlice = createSlice({
       state.userTaskHistoryList = [];
       state.userTaskHistoryLoader = false;
       state.userTaskHistoryError = undefined;
+    },
+    getTaskRecords: state => {
+      state.taskRecordsLoader = true;
+    },
+    setTaskRecordsList: (state, action: PayloadAction<ITaskRecord[]>) => {
+      state.taskRecordsLoader = false;
+      state.taskRecordsList = action.payload;
+    },
+    resetTaskRecordsList: state => {
+      state.taskRecordsList = [];
+      state.taskRecordsLoader = false;
     },
   },
 });
@@ -103,6 +116,9 @@ export const {
   setUserTaskHistoryList,
   setUserTaskHistoryError,
   resetUserTaskHistory,
+  getTaskRecords,
+  setTaskRecordsList,
+  resetTaskRecordsList,
 } = tasklogSlice.actions;
 
 export default tasklogSlice.reducer;

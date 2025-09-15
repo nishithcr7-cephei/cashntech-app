@@ -17,6 +17,18 @@ export const isTaskCompleted = (taskStatus?: string) => {
   return (taskStatus || '').toString().trim().toLowerCase() === 'completed';
 };
 
+export const formatTaskDescription = (taskDescription?: string) => {
+  return capitalizeFirst(taskDescription);
+};
+
+export const formatTaskRemark = (remark?: string | null) => {
+  return remark && String(remark).trim() ? capitalizeFirst(remark) : 'NA';
+};
+
+export const formatTaskStatus = (taskStatus?: string) => {
+  return capitalizeFirst(taskStatus);
+};
+
 export const buildFilterOptions = (taskRecordsList: TaskRecordItem[]) => {
   const taskTypes = new Set<string>();
   const statuses = new Set<string>();

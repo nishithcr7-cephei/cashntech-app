@@ -24,6 +24,7 @@ import {
 import {useDispatch, useSelector} from 'react-redux';
 import taskApi from '@services/api/task.api';
 import {decryptConditionally} from '@utils/crypto';
+import {capitalizeFirst, formatTaskDescription, formatTaskRemark, formatTaskStatus} from '@utils/taskUtils';
 import {userSelector} from '@store/user';
 
 type DocNavigationType = CompositeNavigationProp<
@@ -115,9 +116,6 @@ export const TaskHistTabs = () => {
     return `${month} ${year}`;
   };
 
-  const capitalizeFirst = (str: string) =>
-    str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-
   // Log when state updates to verify shape
   useEffect(() => {
     // State logging removed
@@ -133,9 +131,9 @@ export const TaskHistTabs = () => {
     sector: 'N/A', // Not available in this API response
     assignedBy: capitalizeFirst(task.assigned_by || ''),
     assignedTo: capitalizeFirst(task.assigned_to || ''),
-    taskDescription: capitalizeFirst(task.task_description || ''),
-    taskStatus: capitalizeFirst(task.task_status || ''),
-    remarks: task.remark ? capitalizeFirst(task.remark) : 'N/A',
+    taskDescription: formatTaskDescription(task.task_description),
+    taskStatus: formatTaskStatus(task.task_status),
+    remarks: formatTaskRemark(task.remark),
     createdAt: formatToMonthYear(task.assigned_at),
     completedAt: formatToDMY(task.completed_at || undefined),
     // Keep old fields for compatibility
@@ -144,7 +142,7 @@ export const TaskHistTabs = () => {
     clientName: capitalizeFirst(decryptConditionally(task.firm_name || '')),
     salesman: capitalizeFirst(task.assigned_to || ''),
     location: capitalizeFirst(task.task_status || ''),
-    referenceDetails: task.remark ? capitalizeFirst(task.remark) : 'N/A',
+    referenceDetails: formatTaskRemark(task.remark),
     sourceDHCO: formatToDMY(task.completed_at || undefined),
     status: mapStatus(task.task_status),
     raw: task,

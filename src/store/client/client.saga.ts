@@ -173,7 +173,7 @@ function* handleGetLeadProgress(): unknown {
 
 function* handleGetLeadDesProgress({
   payload,
-}: PayloadAction<PayloadWithCallback<string, [Array<any>]>>): unknown {
+}: PayloadAction<PayloadWithCallback<string, [Array<ILeadProgressResponseDatum>]>>): unknown {
   const {data, error}: Result<ILeadProgressResponse> = yield call(
     clientApi.getLeadDesProgress,
     payload.payload,
@@ -1166,9 +1166,7 @@ function* handleGetBusinessChecked({payload}: PayloadAction<string>): unknown {
   }
 }
 
-function* handleGetSoftSantionBnkPro(action: {
-  payload: {bank: string; product: string};
-}): Generator<any, void, any> {
+function* handleGetSoftSantionBnkPro(action: PayloadAction<{bank: string; product: string}>): Generator<any, void, any> {
   const {bank, product} = action.payload;
   const {data, error}: Result<any> = yield call(
     clientApi.getSoftSanctionProductBank,
@@ -1184,16 +1182,16 @@ function* handleGetSoftSantionBnkPro(action: {
 
 function* handleFilterbox(action: PayloadAction<IFilterPayload>) {
   try {
-    const {data, error}: {data: IFilterResponseDatum | null; error: any} =
+    const {data, error}: {data: IFilterResponseDatum | null; error: AxiosError<{message?: string}> | null} =
       yield call(clientApi.FilterBox, action.payload);
 
     if (data) {
       yield put(clientActions.FilterSucess(data));
     } else {
-      yield put(clientActions.FilterFailure(error?.message || 'Unknown error'));
+      yield put(clientActions.FilterFailure(error?.response?.data?.message || error?.message || 'Unknown error'));
     }
-  } catch (error: any) {
-    yield put(clientActions.FilterFailure(error.message || 'Unexpected error'));
+  } catch (error: AxiosError<{message?: string}>) {
+    yield put(clientActions.FilterFailure(error.response?.data?.message || error.message || 'Unexpected error'));
   }
 }
 

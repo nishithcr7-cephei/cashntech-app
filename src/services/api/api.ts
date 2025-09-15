@@ -30,6 +30,48 @@ export type CustomRequestConfig = InternalAxiosRequestConfig & {
 const cancelTokens: Array<AbortController> = [];
 
 /**
+ * Whitelist of authentication endpoints that should not trigger logout on 401 errors.
+ * These endpoints handle authentication failures internally and should not cause
+ * the user to be logged out.
+ */
+const AUTH_ENDPOINTS_WHITELIST = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/refresh-token',
+  '/auth/verify-email',
+  '/auth/resend-verification',
+  '/auth/logout',
+];
+
+/**
+ * Checks if the given URL is an authentication endpoint that should be excluded
+ * from triggering logout on 401 errors.
+ * 
+ * @param {string} url - The request URL to check
+ * @returns {boolean} True if the URL is an auth endpoint, false otherwise
+ */
+const isAuthEndpoint = (url: string): boolean => {
+  if (!url) return false;
+  
+  try {
+    // Extract the path from the full URL
+    const urlPath = new URL(url).pathname;
+    
+    // Check if the path matches any whitelisted auth endpoint
+    return AUTH_ENDPOINTS_WHITELIST.some(endpoint => 
+      urlPath === endpoint || urlPath.startsWith(endpoint + '/')
+    );
+  } catch (error) {
+    // If URL parsing fails, fall back to simple string matching for safety
+    // This ensures we don't accidentally allow logout on malformed URLs
+    console.warn('Failed to parse URL for auth endpoint check:', url, error);
+    return false;
+  }
+};
+
+/**
  * Request interceptor to add the access token to the authorization header
  * if the authRequired flag is set.
  *
@@ -107,7 +149,7 @@ axiosInstance.interceptors.response.use(
 
     // Check if the error is a token expiration error
     const url = error.request?.responseURL ?? error.config?.url ?? '';
-    if (error.response?.status === 401 && !url.includes('/auth/')) {
+    if (error.response?.status === 401 && !isAuthEndpoint(url)) {
       Alert.alert('Error', 'Token expired..');
       logoutUser();
     }

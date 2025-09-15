@@ -138,7 +138,12 @@ export interface ITaskUpdateRequest {
 export interface ITaskUpdateResponse {
   statusCode: number;
   message: string;
-  data: any;
+  data: {
+    id: number;
+    task_status: string;
+    remark: string;
+    completed_at: string;
+  };
 }
 
 export interface IUserTaskHistoryRequest {

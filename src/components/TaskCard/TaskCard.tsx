@@ -4,6 +4,15 @@ import { TaskRecordItem } from '@store/mng';
 import { decryptLocation } from '@utils/crypto';
 import Colors from '@constants/Colors';
 import { scaleFont } from '@utils/Scale';
+import { 
+  getDisplayTask, 
+  formatDate, 
+  capitalizeFirst, 
+  isTaskCompleted, 
+  formatTaskDescription, 
+  formatTaskRemark, 
+  formatTaskStatus 
+} from '@utils/taskUtils';
 
 interface TaskCardProps {
   item: TaskRecordItem;
@@ -11,19 +20,6 @@ interface TaskCardProps {
 }
 
 const TaskCard: React.FC<TaskCardProps> = ({ item, index }) => {
-  const getDisplayTask = (tasks: any[] = []) => {
-    if (!Array.isArray(tasks) || tasks.length === 0) return null;
-    return tasks[0];
-  };
-
-  const formatDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('en-GB') : 'N/A');
-
-  const capitalizeFirst = (str?: string) => {
-    const s = (str || '').toString().trim();
-    if (!s) return 'N/A';
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  };
-
   const task = getDisplayTask(item.task || []);
   const firmName = capitalizeFirst(decryptLocation(item.firm_name || ''));
   const salesman = capitalizeFirst(
@@ -31,10 +27,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ item, index }) => {
   );
   const sector = capitalizeFirst(item.sector || '');
   const taskType = capitalizeFirst(task?.task_type);
-  const taskDesc = capitalizeFirst(task?.task_description);
-  const remark = task?.remark && String(task.remark).trim() ? capitalizeFirst(task.remark) : 'NA';
-  const status = capitalizeFirst(task?.task_status);
-  const isCompleted = (task?.task_status || '').toString().trim().toLowerCase() === 'completed';
+  const taskDesc = formatTaskDescription(task?.task_description);
+  const remark = formatTaskRemark(task?.remark);
+  const status = formatTaskStatus(task?.task_status);
+  const isCompleted = isTaskCompleted(task?.task_status);
 
   return (
     <View style={styles.card}>
