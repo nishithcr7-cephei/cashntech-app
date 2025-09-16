@@ -141,6 +141,7 @@ export type BasicDetailsType = {
   location: string;
   state: keyof typeof Cities | undefined;
   city: string;
+  pincode: string;
   dateOfVisit: string | undefined;
   address: string;
   programType: string;
@@ -279,6 +280,7 @@ export type BasicDetailsPayload = {
   location: string;
   city: string;
   state: string;
+  pin_code: string;
   firm_name: string;
   address: string;
   program_type: string;
@@ -303,7 +305,7 @@ export type GetBasicDetailsData = {
   source_of_lead: string;
   program_type: string;
   product_type: string;
-  pin_code: null;
+  pin_code: string;
   location: string;
   city: string;
   address: string;

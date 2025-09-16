@@ -67,6 +67,7 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
     address,
     productType,
     programType,
+    pincode,
   } = useSelector(clientSelector.getBasicDetailFormData);
 
   const clientFormId = useSelector(clientSelector.getClientFormId);
@@ -123,6 +124,7 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
     {field: firmName, name: 'Firm Name'},
     {field: state, name: 'State'},
     {field: city, name: 'City'},
+    {field: pincode, name: 'Pincode'},
     {field: dateOfVisit, name: 'Date of Visit'},
     {field: location, name: 'Location'},
     {field: address, name: 'Address'},
@@ -197,6 +199,13 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
             data={listOfCities}
             onChange={value => setData('city', value)}
             value={city}
+          />
+           <Input
+            label="Pincode"
+            placeholder="Enter Pincode"
+            value={pincode}
+            maxLength={6}
+            onChangeText={value => setData('pincode', value)}
           />
           <DateNTimePicker
             label="Date of visit"

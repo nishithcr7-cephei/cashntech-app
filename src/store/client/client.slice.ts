@@ -49,6 +49,7 @@ const basicDetails: BasicDetailsType = {
   firmName: '',
   city: '',
   state: undefined,
+  pincode: '',
   location: '',
   dateOfVisit: undefined,
   productType: '',
