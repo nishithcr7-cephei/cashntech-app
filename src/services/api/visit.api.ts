@@ -30,6 +30,7 @@ const getVisitDetailsList = async () => {
       authRequired: true,
     } as CustomRequestConfig),
   );
+  
   if (error) {
     return {data: null, error};
   }
@@ -37,15 +38,24 @@ const getVisitDetailsList = async () => {
 };
 
 const postVisitDetailsList = async (payload?: any) => {
-  const {data, error} = await tryCatch<AxiosResponse<any>>(
-    Api.post('/client-info-master/visit-details', payload || {}, {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  if (error) {
-    return {data: null, error};
+  try {
+    const {data, error} = await tryCatch<AxiosResponse<any>>(
+      Api.post('/client-info-master/visit-details', payload || {hasVisit: true}, {
+        authRequired: true,
+        timeout: 10000, // 10 second timeout
+      } as CustomRequestConfig),
+    );
+    
+    if (error) {
+      return {data: null, error};
+    }
+    
+    // Handle both 200 and 201 status codes
+    // The response comes as {data: {data: [...], statusCode: 200/201}}
+    return {data: data?.data?.data || [], error: null};
+  } catch (exception) {
+    return {data: null, error: exception};
   }
-  return {data: data.data, error: null};
 };
 
 const getSalesmanList = async () => {

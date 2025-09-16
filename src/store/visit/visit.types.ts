@@ -29,6 +29,7 @@ export type VisitDetailsItem = {
     source_of_lead?: string;
     city?: string;
     sector?: string | null;
+    created_at?: string;
   };
 };
 

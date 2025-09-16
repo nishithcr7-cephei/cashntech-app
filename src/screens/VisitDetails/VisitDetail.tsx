@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useEffect, useState, useCallback, useMemo} from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,30 @@ import {
   FlatList,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
+import {useSelector, useDispatch} from 'react-redux';
 import {Container, AppBar, FilterModal} from '@components/index';
 import Colors from '@constants/Colors';
 import {Filter, Search} from '@assets/Icons';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import FontWeight from '@constants/FontWeight';
-import visitApi from '@services/api/visit.api';
 import {decryptLocation} from '@utils/crypto';
-import {dropDownData} from '@screens/CreateClientForm/CreateClientForm.type';
+import {
+  getVisitDetailsListRequest,
+  getSalesmanListRequest,
+  getLocationsListRequest,
+} from '@store/visit/visit.slice';
+import {
+  selectVisitDetailsList,
+  selectVisitDetailsLoading,
+  selectVisitDetailsError,
+  selectSalesmanList,
+  selectSalesmanLoading,
+  selectSalesmanError,
+  selectLocationsList,
+  selectLocationsLoading,
+  selectLocationsError,
+} from '@store/visit/visit.selector';
+import {RootState} from '@store/app/store';
 
 type VisitItem = {
   id: number;
@@ -27,15 +43,33 @@ type VisitItem = {
   visit_number?: number;
   visit_remark?: string;
   sector?: string | null;
-  client?: { id?: number; source_of_lead?: string; city?: string; sector?: string | null };
+  client?: { 
+    id?: number; 
+    source_of_lead?: string; 
+    city?: string; 
+    sector?: string | null;
+    created_at?: string;
+  };
 };
 
 export const VisitDetail = () => {
   const navigation = useNavigation();
+  const dispatch = useDispatch();
+  
+  // Redux selectors
+  const visitDetailsList = useSelector(selectVisitDetailsList);
+  const visitDetailsLoading = useSelector(selectVisitDetailsLoading);
+  const visitDetailsError = useSelector(selectVisitDetailsError);
+  const salesmanList = useSelector(selectSalesmanList);
+  const salesmanLoading = useSelector(selectSalesmanLoading);
+  const salesmanError = useSelector(selectSalesmanError);
+  const locationsList = useSelector(selectLocationsList);
+  const locationsLoading = useSelector(selectLocationsLoading);
+  const locationsError = useSelector(selectLocationsError);
+  
+  
+  // Local state for UI
   const [searchText, setSearchText] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState<VisitItem[]>([]);
-  const [filtered, setFiltered] = useState<VisitItem[]>([]);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
   const [cityOptions, setCityOptions] = useState<string[]>([]);
@@ -43,163 +77,206 @@ export const VisitDetail = () => {
   const [sourceOptions, setSourceOptions] = useState<string[]>([]);
   const [sectorOptions, setSectorOptions] = useState<string[]>([]);
 
-  const fetchList = async () => {
-    setLoading(true);
-    try {
-      const {data} = await visitApi.postVisitDetailsList();
-      const raw = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
-      const list: VisitItem[] = normalizeVisitItems(raw);
-      setRows(list);
-      setFiltered(list);
-    } finally {
-      setLoading(false);
-    }
+  // Dispatch actions to fetch data
+  const fetchList = () => {
+    dispatch(getVisitDetailsListRequest());
   };
 
+  const fetchLocations = () => {
+    dispatch(getLocationsListRequest());
+  };
+
+  const fetchInitiators = () => {
+    dispatch(getSalesmanListRequest());
+  };
+
+
+  // Dispatch actions on component mount
   useEffect(() => {
     fetchList();
-  }, []);
-
-  const fetchLocations = async () => {
-    try {
-      const response = await visitApi.getLocations();
-      const raw = response?.data;
-      const arr = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
-      const options = (arr as string[])
-        .map((enc: string) => decryptLocation(enc))
-        .filter((label: string) => label);
-      setCityOptions(options);
-    } catch (e) {
-      setCityOptions([]);
-    }
-  };
-
-  const fetchInitiators = async () => {
-    try {
-      const response = await visitApi.getSalesmanList();
-      const raw = response?.data;
-      const arr = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
-      const options = (arr as any[]).map((item: any) => {
-        const name = `${item.first_name || ''} ${item.last_name || ''}`.trim();
-        return name;
-      }).filter((name: string) => name);
-      setInitiatorOptions(options);
-    } catch (e) {
-      setInitiatorOptions([]);
-    }
-  };
-
-  const fetchSources = () => {
-    const options = dropDownData.sourceOfLead as {label: string; value: string}[];
-    const sourceList = (options || []).map(opt => opt.label);
-    setSourceOptions(sourceList);
-  };
-
-  const fetchSectors = () => {
-    const sectorList = dropDownData.sector.map(opt => opt.label);
-    setSectorOptions(sectorList);
-  };
-
-  useEffect(() => {
     fetchLocations();
     fetchInitiators();
-    fetchSources();
-    fetchSectors();
   }, []);
 
-  const filterData = {
-    City: cityOptions,
-    Initiator: initiatorOptions,
-    Source: sourceOptions,
-    Sector: sectorOptions,
-  };
-
-  useEffect(() => {
-    if (!searchText && Object.keys(appliedFilters).length === 0) {
-      setFiltered(rows);
-    } else {
-      let filteredData = rows;
-      
-      // Apply search filter
-      if (searchText) {
-        const term = searchText.toLowerCase();
-        filteredData = filteredData.filter(it => {
-          const firm = decryptLocation(it.client_firm_name || '').toLowerCase();
-          const city = decryptLocation(it.client?.city || '').toLowerCase();
-          const visitNo = (it.visit_number != null ? String(it.visit_number) : '').toLowerCase();
-          return firm.includes(term) || city.includes(term) || visitNo.includes(term);
-        });
-      }
-      
-      // Apply other filters
-      if (appliedFilters.City && appliedFilters.City.length > 0) {
-        filteredData = filteredData.filter(it => {
-          const city = decryptLocation(it.client?.city || '');
-          return appliedFilters.City.includes(city);
-        });
-      }
-      
-      if (appliedFilters.Initiator && appliedFilters.Initiator.length > 0) {
-        filteredData = filteredData.filter(it => {
-          const initiator = it.salesperson || '';
-          return appliedFilters.Initiator.includes(initiator);
-        });
-      }
-      
-      if (appliedFilters.Source && appliedFilters.Source.length > 0) {
-        filteredData = filteredData.filter(it => {
-          const source = it.client?.source_of_lead || '';
-          return appliedFilters.Source.includes(source);
-        });
-      }
-      
-      if (appliedFilters.Sector && appliedFilters.Sector.length > 0) {
-        filteredData = filteredData.filter(it => {
-          const sector = (it.sector ?? it.client?.sector ?? '').toString().trim();
-          return appliedFilters.Sector.includes(sector);
-        });
-      }
-      
-      setFiltered(filteredData);
-    }
-  }, [searchText, rows, appliedFilters]);
-
-  const formatDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('en-GB') : 'N/A');
-
+  // Helper function to normalize visit items
   const normalizeVisitItems = (items: any[]): VisitItem[] => {
     if (!Array.isArray(items)) return [];
-    return items.map(rec => {
+    
+    const flattenedItems: VisitItem[] = [];
+    
+    items.forEach((rec) => {
       if (Array.isArray(rec?.visit) && rec.visit.length > 0) {
-        const v0 = rec.visit[0] || {};
-        return {
-          id: v0.id ?? rec.id,
-          visit_date_time: v0.visit_date_time,
-          salesperson: v0.salesperson,
-          client_firm_name: v0.client_firm_name,
-          visit_type: v0.visit_type,
-          visit_number: v0.visit_number,
-          visit_remark: v0.visit_remark,
+        // Create a separate item for each visit
+        rec.visit.forEach((visit: any) => {
+          flattenedItems.push({
+            id: visit.id ?? rec.id,
+            visit_date_time: visit.visit_date_time,
+            salesperson: visit.salesperson,
+            client_firm_name: visit.client_firm_name,
+            visit_type: visit.visit_type,
+            visit_number: visit.visit_number,
+            visit_remark: visit.visit_remark,
+            sector: rec.sector ?? null,
+            client: {
+              id: rec.id,
+              source_of_lead: rec.source_of_lead,
+              city: rec.city,
+              sector: rec.sector ?? null,
+              created_at: rec.created_at,
+            },
+          } as VisitItem);
+        });
+      } else {
+        // Handle records without visit array (fallback)
+        flattenedItems.push({
+          id: rec.id,
+          visit_date_time: rec.visit_date_time,
+          salesperson: rec.salesperson,
+          client_firm_name: rec.client_firm_name,
+          visit_type: rec.visit_type,
+          visit_number: rec.visit_number,
+          visit_remark: rec.visit_remark,
           sector: rec.sector ?? null,
           client: {
-            id: rec.id,
-            source_of_lead: rec.source_of_lead,
-            city: rec.city,
-            sector: rec.sector ?? null,
+            ...rec.client,
+            created_at: rec.created_at,
           },
-        } as VisitItem;
+        } as VisitItem);
       }
-      return {
-        id: rec.id,
-        visit_date_time: rec.visit_date_time,
-        salesperson: rec.salesperson,
-        client_firm_name: rec.client_firm_name,
-        visit_type: rec.visit_type,
-        visit_number: rec.visit_number,
-        visit_remark: rec.visit_remark,
-        sector: rec.sector ?? null,
-        client: rec.client,
-      } as VisitItem;
     });
+    
+    return flattenedItems;
+  };
+
+  // Prepare filter data
+  const filterData = {
+    'City': cityOptions,
+    'Initiator': initiatorOptions,
+    'Source': sourceOptions,
+    'Sector': sectorOptions,
+    'Month/Year': [], // Will be handled specially
+  };
+
+  // Filtered records based on search and filters (similar to ManageTask pattern)
+  const filteredVisitDetails = useMemo(() => {
+    if (!visitDetailsList || visitDetailsList.length === 0) return [];
+    
+    let filtered = normalizeVisitItems(visitDetailsList);
+    
+    // Apply search filter
+    if (searchText) {
+      const term = searchText.toLowerCase();
+      filtered = filtered.filter((it: VisitItem) => {
+        const firm = decryptLocation(it.client_firm_name || '').toLowerCase();
+        const city = decryptLocation(it.client?.city || '').toLowerCase();
+        const visitNo = (it.visit_number != null ? String(it.visit_number) : '').toLowerCase();
+        const salesperson = (it.salesperson || '').toLowerCase();
+        const visitType = (it.visit_type || '').toLowerCase();
+        const remark = (it.visit_remark || '').toLowerCase();
+        
+        return (
+          firm.includes(term) ||
+          city.includes(term) ||
+          visitNo.includes(term) ||
+          salesperson.includes(term) ||
+          visitType.includes(term) ||
+          remark.includes(term)
+        );
+      });
+    }
+    
+    // Apply other filters
+    if (appliedFilters['City'] && appliedFilters['City'].length > 0) {
+      filtered = filtered.filter((it: VisitItem) => {
+        const city = decryptLocation(it.client?.city || '');
+        return appliedFilters['City'].includes(city);
+      });
+    }
+    
+    if (appliedFilters['Initiator'] && appliedFilters['Initiator'].length > 0) {
+      filtered = filtered.filter((it: VisitItem) => {
+        const initiator = it.salesperson || '';
+        return appliedFilters['Initiator'].includes(initiator);
+      });
+    }
+    
+    if (appliedFilters['Source'] && appliedFilters['Source'].length > 0) {
+      filtered = filtered.filter((it: VisitItem) => {
+        const source = it.client?.source_of_lead || '';
+        return appliedFilters['Source'].includes(source);
+      });
+    }
+    
+    if (appliedFilters['Sector'] && appliedFilters['Sector'].length > 0) {
+      filtered = filtered.filter((it: VisitItem) => {
+        const sector = (it.sector ?? it.client?.sector ?? '').toString().trim();
+        return appliedFilters['Sector'].includes(sector);
+      });
+    }
+    
+    if (appliedFilters['Month/Year'] && appliedFilters['Month/Year'].length > 0) {
+      filtered = filtered.filter((it: VisitItem) => {
+        // Use visit_date_time if available, otherwise fall back to created_at
+        const dateToUse = it.visit_date_time || it.client?.created_at;
+        if (!dateToUse) return false;
+        
+        const visitDate = new Date(dateToUse);
+        const visitYear = visitDate.getFullYear();
+        const visitMonth = visitDate.getMonth() + 1; // getMonth() returns 0-11
+        
+        return appliedFilters['Month/Year'].some((monthYear: string) => {
+          // monthYear format: "2025-08" (year-month)
+          const [year, month] = monthYear.split('-').map(Number);
+          return visitYear === year && visitMonth === month;
+        });
+      });
+    }
+    
+    return filtered;
+  }, [visitDetailsList, searchText, appliedFilters]);
+
+  // Build filter options from visit details (similar to ManageTask pattern)
+  useEffect(() => {
+    if (visitDetailsList && visitDetailsList.length > 0) {
+      const list: VisitItem[] = normalizeVisitItems(visitDetailsList);
+      
+      // Build dynamic filter options from actual data
+      const cities = new Set<string>();
+      const initiators = new Set<string>();
+      const sources = new Set<string>();
+      const sectors = new Set<string>();
+      
+      list.forEach((item: VisitItem) => {
+        // Add cities
+        const city = decryptLocation(item.client?.city || '');
+        if (city) cities.add(city);
+        
+        // Add initiators
+        if (item.salesperson) initiators.add(item.salesperson);
+        
+        // Add sources
+        if (item.client?.source_of_lead) sources.add(item.client.source_of_lead);
+        
+        // Add sectors
+        const sector = (item.sector ?? item.client?.sector ?? '').toString().trim();
+        if (sector) sectors.add(sector);
+      });
+      
+      setCityOptions(Array.from(cities));
+      setInitiatorOptions(Array.from(initiators));
+      setSourceOptions(Array.from(sources));
+      setSectorOptions(Array.from(sectors));
+    }
+  }, [visitDetailsList]);
+
+  const formatDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('en-GB') : 'N/A');
+  
+  const formatCreatedAt = (iso?: string) => {
+    if (!iso) return 'N/A';
+    const date = new Date(iso);
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const year = date.getFullYear();
+    return `${month} ${year}`;
   };
 
   const VisitCard = React.memo(({item, index}: {item: VisitItem; index: number}) => {
@@ -211,16 +288,16 @@ export const VisitDetail = () => {
     return (
       <View style={styles.card}>
         <Text style={styles.label}>
-          <Text style={styles.bold}>ID :</Text> 
-          <Text style={styles.value}>{item.id ?? 'N/A'}</Text>
-        </Text>
-        <Text style={styles.label}>
-          <Text style={styles.bold}>S.no :</Text> 
+          <Text style={styles.bold}>Sr.No :</Text> 
           <Text style={styles.value}>{index + 1}</Text>
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>Firm Name :</Text> 
           <Text style={styles.value}>{firmName}</Text>
+        </Text>
+        <Text style={styles.label}>
+          <Text style={styles.bold}>Sector :</Text> 
+          <Text style={styles.value}>{sector}</Text>
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>City :</Text> 
@@ -229,10 +306,6 @@ export const VisitDetail = () => {
         <Text style={styles.label}>
           <Text style={styles.bold}>Source(D/H/C/O) :</Text> 
           <Text style={styles.value}>{source}</Text>
-        </Text>
-        <Text style={styles.label}>
-          <Text style={styles.bold}>Sector :</Text> 
-          <Text style={styles.value}>{sector}</Text>
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>Initiator :</Text> 
@@ -253,6 +326,10 @@ export const VisitDetail = () => {
         <Text style={styles.label}>
           <Text style={styles.bold}>Remark :</Text> 
           <Text style={styles.value}>{item.visit_remark || 'N/A'}</Text>
+        </Text>
+        <Text style={styles.label}>
+          <Text style={styles.bold}>Created At :</Text> 
+          <Text style={styles.value}>{formatCreatedAt(item.client?.created_at)}</Text>
         </Text>
       </View>
     );
@@ -277,10 +354,10 @@ export const VisitDetail = () => {
         <Text style={styles.Subheader}>Assign Visit</Text>
       </View>
       <View style={styles.headerRow}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Visit Details</Text>
-          <View style={styles.badge}><Text style={styles.badgeText}>{filtered.length}</Text></View>
-        </View>
+               <View style={styles.headerLeft}>
+                 <Text style={styles.headerTitle}>Visit Details</Text>
+                 <View style={styles.badge}><Text style={styles.badgeText}>{filteredVisitDetails.length}</Text></View>
+               </View>
         <View style={styles.searchBox}>
           <Search height={12} width={12} />
           <TextInput style={styles.input} placeholder="Search by Firm name" placeholderTextColor={Colors.balancedGray} value={searchText} onChangeText={setSearchText} />
@@ -299,22 +376,22 @@ export const VisitDetail = () => {
         filterData={filterData}
       />
 
-      {loading ? (
+      {visitDetailsLoading ? (
         <View style={styles.loadingContainer}><ActivityIndicator size="large" color={Colors.primaryColor} /></View>
       ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          contentContainerStyle={{padding: 16}}
-          ListEmptyComponent={<Text style={styles.empty}>No Visit Details Found</Text>}
-          onRefresh={fetchList}
-          refreshing={loading}
-          removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
-          windowSize={10}
-          initialNumToRender={10}
-        />
+               <FlatList
+                 data={filteredVisitDetails}
+                 keyExtractor={keyExtractor}
+                 renderItem={renderItem}
+                 contentContainerStyle={{padding: 16}}
+                 ListEmptyComponent={<Text style={styles.empty}>No Visit Details Found</Text>}
+                 onRefresh={fetchList}
+                 refreshing={visitDetailsLoading}
+                 removeClippedSubviews={true}
+                 maxToRenderPerBatch={10}
+                 windowSize={10}
+                 initialNumToRender={10}
+               />
       )}
     </Container>
   );

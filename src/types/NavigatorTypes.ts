@@ -66,6 +66,7 @@ export type ClientNavigatorType = {
   FirmDetailForm: undefined;
   VendorDetailForm: undefined;
   VisitDetailForm: undefined;
+  VisitDetail: undefined;
   ProfileScreen: {clientId: number};
 };
 

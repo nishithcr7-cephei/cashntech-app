@@ -18,7 +18,8 @@ import {
 // Visit Details List Saga
 function* getVisitDetailsListSaga() {
   try {
-    const {data, error} = yield call(visitApi.getVisitDetailsList);
+    const {data, error} = yield call(visitApi.postVisitDetailsList);
+    
     if (error) {
       yield put(getVisitDetailsListFailure(error.message || 'Failed to fetch visit details'));
     } else {

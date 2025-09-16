@@ -111,7 +111,9 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                   <TouchableOpacity
                     style={styles.button}
                     onPress={() =>
-                      navigation.navigate('VisitDetail', {} as any)
+                      navigation.navigate('ClientNavigator', {
+                        screen: 'VisitDetail',
+                      })
                     }>
                     <Text style={styles.buttonText}>Visit Details</Text>
                   </TouchableOpacity>
