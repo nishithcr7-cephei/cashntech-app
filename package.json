@@ -7,7 +7,9 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "encrypt-env": "node script/encrypt.js",
+    "decrypt-env": "node script/decrypt.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.1.2",
