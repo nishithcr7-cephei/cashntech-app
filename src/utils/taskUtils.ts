@@ -5,27 +5,108 @@ export const getDisplayTask = (tasks: any[] = []) => {
   return tasks[0];
 };
 
-export const formatDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('en-GB') : 'N/A');
-
-export const capitalizeFirst = (str?: string) => {
-  const s = (str || '').toString().trim();
-  if (!s) return 'N/A';
-  return s.charAt(0).toUpperCase() + s.slice(1);
+export const formatDate = (iso?: string | number | Date | null) => {
+  if (!iso) return 'N/A';
+  
+  try {
+    // Handle different input types
+    let date: Date;
+    if (iso instanceof Date) {
+      date = iso;
+    } else if (typeof iso === 'number') {
+      date = new Date(iso);
+    } else if (typeof iso === 'string') {
+      date = new Date(iso);
+    } else {
+      return 'N/A';
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'N/A';
+    }
+    
+    return date.toLocaleDateString('en-GB');
+  } catch (error) {
+    return 'N/A';
+  }
 };
 
-export const isTaskCompleted = (taskStatus?: string) => {
-  return (taskStatus || '').toString().trim().toLowerCase() === 'completed';
+export const formatMonthYear = (iso?: string | number | Date | null) => {
+  if (!iso) return 'N/A';
+  
+  try {
+    // Handle different input types
+    let date: Date;
+    if (iso instanceof Date) {
+      date = iso;
+    } else if (typeof iso === 'number') {
+      date = new Date(iso);
+    } else if (typeof iso === 'string') {
+      date = new Date(iso);
+    } else {
+      return 'N/A';
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return 'N/A';
+    }
+    
+    // Format as "Sep 2025" (Month Year)
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    
+    const month = monthNames[date.getMonth()];
+    const year = date.getFullYear();
+    
+    return `${month} ${year}`;
+  } catch (error) {
+    return 'N/A';
+  }
 };
 
-export const formatTaskDescription = (taskDescription?: string) => {
+export const capitalizeFirst = (str?: string | number | null) => {
+  if (str === null || str === undefined) return 'N/A';
+  
+  try {
+    const s = String(str).trim();
+    if (!s) return 'N/A';
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  } catch (error) {
+    return 'N/A';
+  }
+};
+
+export const isTaskCompleted = (taskStatus?: string | number | null) => {
+  if (taskStatus === null || taskStatus === undefined) return false;
+  
+  try {
+    const status = String(taskStatus).trim().toLowerCase();
+    return status === 'completed';
+  } catch (error) {
+    return false;
+  }
+};
+
+export const formatTaskDescription = (taskDescription?: string | number | null) => {
   return capitalizeFirst(taskDescription);
 };
 
-export const formatTaskRemark = (remark?: string | null) => {
-  return remark && String(remark).trim() ? capitalizeFirst(remark) : 'NA';
+export const formatTaskRemark = (remark?: string | number | null) => {
+  if (remark === null || remark === undefined) return 'NA';
+  
+  try {
+    const remarkStr = String(remark).trim();
+    return remarkStr ? capitalizeFirst(remarkStr) : 'NA';
+  } catch (error) {
+    return 'NA';
+  }
 };
 
-export const formatTaskStatus = (taskStatus?: string) => {
+export const formatTaskStatus = (taskStatus?: string | number | null) => {
   return capitalizeFirst(taskStatus);
 };
 

@@ -7,7 +7,7 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {clientActions, clientSelector} from '@store/client';
 import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import React, {useState, useEffect, useMemo} from 'react';
+import React, {useState, useEffect, useMemo, useCallback, useRef} from 'react';
 import {
   FlatList,
   StyleSheet,
@@ -16,10 +16,14 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  BackHandler,
 } from 'react-native';
+import {useFocusEffect} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
 import {LeadSourceType, SectorType} from './ClientInfo.type';
 import {userSelector, UserState} from '@store/user';
+import {decryptLocation, decryptConditionally} from '@utils/crypto';
+import ClientApis from '@services/api/client.api';
 
 type NavigationType = CompositeScreenProps<
   NativeStackScreenProps<ClientNavigatorType, ClientScreens.ClientInfo>,
@@ -35,19 +39,27 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
   const [appliedFilters, setAppliedFilters] = useState<
     Record<string, string[]>
   >({});
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [apiFilteredClients, setApiFilteredClients] = useState<any[]>([]);
+  const [filterLoading, setFilterLoading] = useState(false);
+  const stopBackPress = useRef(false);
+  const clientApi = ClientApis;
   const dispatch = useDispatch();
   const clientsData = useSelector(clientSelector.getClientList);
   const cityList = useSelector(clientSelector.getCityList);
   const loading = useSelector(clientSelector.getClientLoader);
 
   const filteredClients = useMemo(() => {
-    if (!searchQuery) return clientsData;
+    // Use API filtered results if available, otherwise use clientsData
+    const baseData = apiFilteredClients.length > 0 ? apiFilteredClients : clientsData;
+    
+    if (!searchQuery) return baseData;
     const lowerCaseQuery = searchQuery.trim().toLowerCase();
-    return clientsData.filter(client => {
+    return baseData.filter(client => {
       const firmName = client.firm_name ?? '';
       return firmName.trim().toLowerCase().includes(lowerCaseQuery);
     });
-  }, [clientsData, searchQuery]);
+  }, [clientsData, searchQuery, apiFilteredClients]);
 
   const filterData = useMemo(() => {
     const listOfSectors = Object.values(SectorType);
@@ -103,19 +115,19 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
       if (item.id?.toString().toLowerCase().includes(searchLower)) return true;
 
       // Search in potentially encrypted fields with safe decryption
-      const clientName = safeDecrypt(item.client_name);
+      const clientName = decryptConditionally(item.client_name || '');
       if (clientName.toLowerCase().includes(searchLower)) return true;
 
-      const firmName = safeDecrypt(item.firm_name);
+      const firmName = decryptConditionally(item.firm_name || '');
       if (firmName.toLowerCase().includes(searchLower)) return true;
 
-      const city = safeDecrypt(item.city);
+      const city = decryptConditionally(item.city || '');
       if (city.toLowerCase().includes(searchLower)) return true;
 
-      const bankName = safeDecrypt(item.bank_name);
+      const bankName = decryptConditionally(item.bank_name || '');
       if (bankName.toLowerCase().includes(searchLower)) return true;
 
-      const location = safeDecrypt(item.location);
+      const location = decryptConditionally(item.location || '');
       if (location.toLowerCase().includes(searchLower)) return true;
 
       // Search in plain text fields
@@ -142,11 +154,11 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
   );
 
   // Keep the visible list in sync with fetched clients when not filtering/searching
-  useEffect(() => {
-    if (!isFilterOpen && !searchQuery) {
-      setFilteredClients(clientsData);
-    }
-  }, [clientsData, isFilterOpen, searchQuery]);
+  // useEffect(() => {
+  //   if (!isFilterOpen && !searchQuery) {
+  //     setFilteredClients(clientsData);
+  //   }
+  // }, [clientsData, isFilterOpen, searchQuery]);
 
   // Handle back button when Read More is shown
   useEffect(() => {
@@ -191,12 +203,12 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
     try {
       const {data} = await clientApi.FilterBox(payload);
       if (data && data.statusCode === 200 && Array.isArray(data.data)) {
-        setFilteredClients(data.data as any);
+        setApiFilteredClients(data.data as any);
       } else {
-        setFilteredClients([]);
+        setApiFilteredClients([]);
       }
     } catch (error) {
-      setFilteredClients([]);
+      setApiFilteredClients([]);
     } finally {
       setFilterLoading(false);
     }
@@ -258,7 +270,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
 
   const fetchSources = async () => {
     try {
-      const response = await clientApi.getAllClients();
+      const response = await clientApi.getClientsFilter({});
       const dataArr = response?.data?.data;
       if (dataArr && Array.isArray(dataArr)) {
         const uniqueSources = Array.from(

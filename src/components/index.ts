@@ -25,4 +25,4 @@ export * from './TaskFilter/TaskFilterDropdown';
 export * from './FilterModal/FilterModal';
 export * from './TaskCard/TaskCard';
 export * from './TaskFilterModal/TaskFilterModal';
-export * from './ManageTaskHeader/ManageTaskHeader';
+export * from './MonthYearFilter/MonthYearFilter';

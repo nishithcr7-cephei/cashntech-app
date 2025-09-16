@@ -36,6 +36,7 @@ export * from './KYCUploadDoc/KycUploadDoc';
 export * from './KYCUploadPan/KycUploadPan';
 export * from './LeadProgress/LeadProgress';
 export * from './LeadProgressInfo/LeadProgressInfo';
+export * from './ManageTask/ManageTask';
 export * from './PersonalKYCValidation/PersonalKYCValidation';
 export * from './ReadMore/ClientCardReadMore';
 export * from './Report/Report';

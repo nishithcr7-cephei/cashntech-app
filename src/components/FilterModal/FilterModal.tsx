@@ -12,6 +12,7 @@ import {LeftChevron, Tick} from '@assets/Icons';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import fontWeight from '@constants/FontWeight';
 import {Colors} from '@constants/index';
+import MonthYearFilter from '../MonthYearFilter/MonthYearFilter';
 
 type FilterModalProps = {
   visible: boolean;
@@ -106,11 +107,23 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             })}
           </View>
           <View style={styles.optionsContainer}>
-            <FlatList
-              data={filterData[selectedMenu]}
-              keyExtractor={item => item}
-              renderItem={renderOptionItem}
-            />
+            {selectedMenu === 'Month/Year' ? (
+              <MonthYearFilter
+                selectedMonths={selectedFilters['Month/Year'] || []}
+                onSelectionChange={(months) => {
+                  setSelectedFilters(prev => ({
+                    ...prev,
+                    'Month/Year': months
+                  }));
+                }}
+              />
+            ) : (
+              <FlatList
+                data={filterData[selectedMenu]}
+                keyExtractor={item => item}
+                renderItem={renderOptionItem}
+              />
+            )}
           </View>
         </View>
 

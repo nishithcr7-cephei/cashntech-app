@@ -10,6 +10,7 @@ import {LeadNavigator} from './LeadNavigator';
 import {ReportNavigator} from './ReportNavigator';
 import {KycNavigator} from './KycNavigator';
 import {DocNavigator} from './DocNavigator';
+import {ManageTask} from '@screens/index';
 
 const Drawer = createDrawerNavigator<HomeNavigatorType>();
 
@@ -31,6 +32,7 @@ export const HomeNavigator = () => {
       <Drawer.Screen name="ReportNavigator" component={ReportNavigator} />
       <Drawer.Screen name="KycNavigator" component={KycNavigator} />
       <Drawer.Screen name="DocNavigator" component={DocNavigator} />
+      <Drawer.Screen name="ManageTask" component={ManageTask} />
     </Drawer.Navigator>
   );
 };

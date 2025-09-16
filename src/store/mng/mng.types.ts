@@ -17,18 +17,21 @@ export interface MngState {
 export interface TaskRecordItem {
   id: number;
   firm_name?: string;
+  created_at?: string;
   user?: { 
     first_name?: string; 
     last_name?: string; 
   };
   task?: Array<{
     id?: number;
+    assigned_by?: string;
+    assigned_to?: string;
+    assigned_at?: string;
     task_type?: string;
     task_description?: string;
     task_status?: string;
     remark?: string;
     completed_at?: string;
-    assigned_to?: string;
   }>;
   sector?: string | null;
   assigned_to?: string;

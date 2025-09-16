@@ -42,6 +42,8 @@ export const ManageTask = () => {
     'Task Type': taskTypeOptions,
     'Salesman': salesmanOptions,
     'Status': statusOptions,
+    'Sector': ['FMCG', 'Paint', 'Manufacturing', 'Pharma', 'Electronic'],
+    'Month/Year': [], // Will be handled specially
   };
 
   // Filtered records based on search and filters
@@ -84,6 +86,31 @@ export const ManageTask = () => {
       filtered = filtered.filter((it: TaskRecordItem) => {
         const statuses = (it.task || []).map((t: any) => t.task_status || '').filter(Boolean);
         return appliedFilters['Status'].some(status => statuses.includes(status));
+      });
+    }
+    
+    if (appliedFilters['Sector'] && appliedFilters['Sector'].length > 0) {
+      filtered = filtered.filter((it: TaskRecordItem) => {
+        const sector = it.sector || '';
+        return appliedFilters['Sector'].includes(sector);
+      });
+    }
+    
+    if (appliedFilters['Month/Year'] && appliedFilters['Month/Year'].length > 0) {
+      filtered = filtered.filter((it: TaskRecordItem) => {
+        // Use created_at if available, otherwise fall back to first task's assigned_at
+        const dateToUse = it.created_at || it.task?.[0]?.assigned_at;
+        if (!dateToUse) return false;
+        
+        const taskDate = new Date(dateToUse);
+        const taskYear = taskDate.getFullYear();
+        const taskMonth = taskDate.getMonth() + 1; // getMonth() returns 0-11
+        
+        return appliedFilters['Month/Year'].some((monthYear: string) => {
+          // monthYear format: "2025-08" (year-month)
+          const [year, month] = monthYear.split('-').map(Number);
+          return taskYear === year && taskMonth === month;
+        });
       });
     }
     

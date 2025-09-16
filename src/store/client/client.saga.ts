@@ -14,6 +14,7 @@ import {
   getLead,
   getLeadDesciption,
   getMasterBankList,
+  getReport,
   getSoftSanction,
   getSoftSanctionBnkPro,
   getSoftSanctionRuleset,
