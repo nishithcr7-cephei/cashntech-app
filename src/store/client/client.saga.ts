@@ -404,7 +404,7 @@ function* getBasicDetailsSaga(action: PayloadAction<number>): unknown {
       state: decryptUtility(data.state) as keyof typeof Cities,
       city: decryptUtility(data.city),
       dateOfVisit: data.date_of_visit,
-      pincode: data.pin_code,
+      pincode: decryptUtility(data.pin_code),
       address: decryptUtility(data.address),
       productType: data.product_type,
       programType: data.program_type,

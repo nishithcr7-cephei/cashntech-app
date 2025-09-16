@@ -205,6 +205,7 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
             placeholder="Enter Pincode"
             value={pincode}
             maxLength={6}
+            keyboardType="numeric"
             onChangeText={value => setData('pincode', value)}
           />
           <DateNTimePicker
