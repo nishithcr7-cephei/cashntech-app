@@ -15,9 +15,6 @@ import {
   getLeadDesciption,
   getMasterBankList,
   getReport,
-  getSoftSanction,
-  getSoftSanctionBnkPro,
-  getSoftSanctionRuleset,
   getVendorDetails,
   getVisitDetails,
   prepareClientForEdit,
@@ -88,7 +85,6 @@ import {
   IUploadAdharDocumentResponse,
   IUploadCompanyInfoPayload,
   IUploadCompanyInfoResponse,
-  ISoftSanctionResponse,
   BasicDetailsPayload,
   IFilterPayload,
   IBankStatementPayload,
@@ -1167,19 +1163,6 @@ function* handleGetBusinessChecked({payload}: PayloadAction<string>): unknown {
   }
 }
 
-function* handleGetSoftSantionBnkPro(action: PayloadAction<{bank: string; product: string}>): Generator<any, void, any> {
-  const {bank, product} = action.payload;
-  const {data, error}: Result<any> = yield call(
-    clientApi.getSoftSanctionProductBank,
-    bank,
-    product,
-  );
-  if (!error) {
-    yield put(clientActions.setSoftSanctionBnkProList(data || []));
-  } else {
-    yield put(clientActions.setSoftSanctionBnkProList([]));
-  }
-}
 
 function* handleFilterbox(action: PayloadAction<IFilterPayload>) {
   try {
@@ -1221,64 +1204,6 @@ function* handleTaskRecordsFilter(
   }
 }
 
-function* handleGetSoftSanctionRuleset(
-  action: PayloadAction<{bank: string; product: string}>,
-) {
-  const {bank, product} = action.payload;
-  const {data, error}: Result<any> = yield call(
-    clientApi.getSoftSanctionRuleset,
-    bank,
-    product,
-  );
-  if (!error) {
-    yield put(clientActions.setSoftSanctionRuleset(data || []));
-  } else {
-    yield put(
-      clientActions.setSoftSanctionRulesetError('Failed to fetch ruleset'),
-    );
-  }
-}
-
-function* handleGetSoftSanctionClientList() {
-  const {data, error}: Result<any> = yield call(
-    clientApi.getSoftSanctionClientList,
-  );
-  if (!error) {
-    yield put(clientActions.setSoftSanctionClientList(data || []));
-  } else {
-    yield put(
-      clientActions.setSoftSanctionClientListError(
-        'Failed to fetch client list',
-      ),
-    );
-  }
-}
-
-function* handleGetSoftSanctionFields(action: PayloadAction<{bankName: string; productName: string}>): Generator<any, void, any> {
-  yield put(clientActions.setSoftSanctionFieldsLoading());
-  const {bankName, productName} = action.payload;
-  const {data, error}: Result<any> = yield call(
-    clientApi.getSoftSanctionFields,
-    bankName,
-    productName,
-  );
-  if (!error) {
-    if (Array.isArray(data)) {
-      const grouped: Record<string, any[]> = {};
-      data.forEach((item: any) => {
-        if (!grouped[item.method_name]) grouped[item.method_name] = [];
-        grouped[item.method_name].push(item);
-      });
-      yield put(clientActions.setSoftSanctionFields(grouped));
-    } else {
-      yield put(clientActions.setSoftSanctionFieldsError('No fields found'));
-    }
-  } else {
-    yield put(
-      clientActions.setSoftSanctionFieldsError('Failed to fetch fields'),
-    );
-  }
-}
 
 function* handleBankStatement(action: PayloadAction<IBankStatementPayload>) {
   try {
@@ -1461,19 +1386,9 @@ export default function* clientSaga() {
   yield takeLatest(getBankList.type, hnadleGetBankList);
   yield takeLatest(getKycChecked.type, handleGetKycChecked);
   yield takeLatest(getKycBusinessChecked.type, handleGetBusinessChecked);
-  yield takeLatest(getSoftSanctionBnkPro, handleGetSoftSantionBnkPro);
   yield takeLatest(FilterRequest.type, handleFilterbox);
   yield takeLatest(TaskRecordsFilterRequest.type, handleTaskRecordsFilter);
   yield takeLatest(bankStatementRequest.type, handleBankStatement);
-  yield takeLatest(getSoftSanctionRuleset.type, handleGetSoftSanctionRuleset);
-  yield takeLatest(
-    clientActions.getSoftSanctionClientList.type,
-    handleGetSoftSanctionClientList,
-  );
-  yield takeLatest(
-    clientActions.getSoftSanctionFields.type,
-    handleGetSoftSanctionFields,
-  );
   yield takeLatest(clientActions.getClientDetails.type, handleGetClientDetails);
   yield takeLatest(
     clientActions.getLeadProgressDetails.type,

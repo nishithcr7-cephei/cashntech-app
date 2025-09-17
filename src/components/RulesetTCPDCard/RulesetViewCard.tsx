@@ -3,34 +3,32 @@ import React from 'react';
 import {Colors} from '@constants/index';
 
 type RulesetViewProps = {
-  RulesetView: {
-    basis: string;
-    creditperiod: string;
-    methodName: string;
-    tpwAmount: string;
-    finallimit: string;
-    
-  };
+  // Accept any object and render its key/value pairs dynamically
+  data: Record<string, any>;
 };
 
-export const RulesetViewCard: React.FC<RulesetViewProps> = ({RulesetView: RulesetView}) => {
+export const RulesetViewCard: React.FC<RulesetViewProps> = ({data}) => {
+  // Normalize and pretty-print label from key (e.g., final_limit -> Final Limit)
+  const formatLabel = (key: string): string =>
+    key
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
+
+  // Prepare ordered keys: try to keep 'method' first, then others
+  const keys = Object.keys(data || {});
+  const orderedKeys = [
+    ...keys.filter(k => k === 'method'),
+    ...keys.filter(k => k !== 'method'),
+  ];
+
   return (
     <View style={styles.card}>
-      <Text style={styles.text}>
-        <Text style={styles.label}>Method Name :</Text> {RulesetView.methodName}
-      </Text>
-      <Text style={styles.text}>
-        <Text style={styles.label}>Basis :</Text>
-        {RulesetView.basis}
-      </Text>
-      <Text style={styles.text}>
-        <Text style={styles.label}>Credit Period :</Text> {RulesetView.creditperiod}
-      </Text>
-      <Text style={styles.text}>
-        <Text style={styles.label}>Final Limit :</Text>
-        {RulesetView.finallimit}
-      </Text>
-      
+      {orderedKeys.map(key => (
+        <Text key={key} style={styles.text}>
+          <Text style={styles.label}>{formatLabel(key)} :</Text>{' '}
+          {String(data[key])}
+        </Text>
+      ))}
     </View>
   );
 };

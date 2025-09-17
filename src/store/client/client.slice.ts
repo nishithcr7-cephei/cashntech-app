@@ -13,9 +13,6 @@ import {
   IKycCheckedResponseDatum,
   ILeadProgressResponseDatum,
   IRemarkReportResponseDatum,
-  IsoftSanctionBankProductDatum,
-  IsoftSanctionMethodDatum,
-  ISoftSanctionPayload,
   ITaskHistoryResponseDatum,
   ITaskRecordsFilterPayload,
   ITaskReordsFilterResponseDatum,
@@ -186,14 +183,6 @@ const initialState: ClientState = {
   CompanyInfoLoading: false,
   CompanyInfoData: null,
   CompanyInfoError: null,
-  // SoftSanction Bank Method
-  SoftSanctionLoading: false,
-  SoftSanctionData: [],
-  SoftSanctionError: null,
-  // SoftSanction BNKPRO
-  SoftSanctionBNKPROLoading: false,
-  SoftSanctionBNKPROData: [],
-  SoftSanctionBNKPROError: null,
   // Filterbox
   FilterboxLoading: false,
   FilterboxData: null,
@@ -202,18 +191,6 @@ const initialState: ClientState = {
   TaskRecordsFilterLoading: false,
   TaskRecordsFilterData: null,
   TaskRecordsFilterError: null,
-  // Ruleset SoftSanction
-  rulesetLoading: false,
-  rulesetData: [],
-  rulesetError: null,
-  // SoftSanction Client
-  softSanctionClientLoading: false,
-  softSanctionClientList: [],
-  softSanctionClientError: null,
-  // SoftSanction
-  softSanctionFields: {},
-  softSanctionFieldsLoading: false,
-  softSanctionFieldsError: null,
   // Bank Statement
   BankStatementLoading: false,
   BankStatementData: null,
@@ -755,46 +732,6 @@ const clientSlice = createSlice({
       state.CompanyInfoData = null;
       state.CompanyInfoError = null;
     },
-    setSoftSanctionLoader: (state, action: PayloadAction<boolean>) => {
-      state.SoftSanctionLoading = action.payload;
-    },
-    getSoftSanctionRequest: (
-      state,
-      _action: PayloadAction<ISoftSanctionPayload>,
-    ) => {
-      state.SoftSanctionLoading = true;
-    },
-    getSoftSanction: state => {
-      state.SoftSanctionLoading = true;
-    },
-    setSoftSanctionList: (
-      state,
-      action: PayloadAction<Array<IsoftSanctionMethodDatum>>,
-    ) => {
-      state.SoftSanctionLoading = false;
-      state.SoftSanctionData = action.payload;
-    },
-    resetSoftSanction: state => {
-      state.SoftSanctionData = [];
-      state.SoftSanctionLoading = false;
-    },
-    setSoftSanctionBnkProLoader: (state, action: PayloadAction<boolean>) => {
-      state.SoftSanctionBNKPROLoading = action.payload;
-    },
-    getSoftSanctionBnkPro: (state, action: PayloadAction<{bank: string; product: string}>) => {
-      state.SoftSanctionBNKPROLoading = true;
-    },
-    setSoftSanctionBnkProList: (
-      state,
-      action: PayloadAction<Array<IsoftSanctionBankProductDatum>>,
-    ) => {
-      state.SoftSanctionBNKPROLoading = false;
-      state.SoftSanctionBNKPROData = action.payload;
-    },
-    resetSoftSanctionBnkPro: state => {
-      state.SoftSanctionBNKPROData = [];
-      state.SoftSanctionBNKPROLoading = false;
-    },
     FilterRequest(state, action: PayloadAction<IFilterPayload>) {
       state.FilterboxLoading = true;
       state.FilterboxError = null;
@@ -835,49 +772,6 @@ const clientSlice = createSlice({
       state.TaskRecordsFilterData = null;
       state.TaskRecordsFilterError = null;
     },
-    getSoftSanctionRuleset: (state, _action) => {
-      state.rulesetLoading = true;
-      state.rulesetError = null;
-    },
-    setSoftSanctionRuleset: (state, action) => {
-      state.rulesetLoading = false;
-      state.rulesetData = action.payload;
-    },
-    setSoftSanctionRulesetError: (state, action) => {
-      state.rulesetLoading = false;
-      state.rulesetError = action.payload;
-    },
-    getSoftSanctionClientList: state => {
-      state.softSanctionClientLoading = true;
-      state.softSanctionClientError = null;
-    },
-    setSoftSanctionClientList: (state, action) => {
-      state.softSanctionClientLoading = false;
-      state.softSanctionClientList = action.payload;
-    },
-    setSoftSanctionClientListError: (state, action) => {
-      state.softSanctionClientLoading = false;
-      state.softSanctionClientError = action.payload;
-    },
-    setSoftSanctionFields: (state, action) => {
-      state.softSanctionFields = action.payload;
-      state.softSanctionFieldsLoading = false;
-      state.softSanctionFieldsError = null;
-    },
-    setSoftSanctionFieldsLoading: state => {
-      state.softSanctionFieldsLoading = true;
-      state.softSanctionFieldsError = null;
-    },
-    setSoftSanctionFieldsError: (state, action) => {
-      state.softSanctionFieldsLoading = false;
-      state.softSanctionFieldsError = action.payload;
-    },
-    clearSoftSanctionFields: state => {
-      state.softSanctionFields = {};
-      state.softSanctionFieldsLoading = false;
-      state.softSanctionFieldsError = null;
-    },
-    getSoftSanctionFields: (state, action: PayloadAction<{bankName: string; productName: string}>) => {},
     bankStatementRequest(state, action: PayloadAction<IBankStatementPayload>) {
       state.BankStatementLoading = true;
       state.BankStatementError = null;
@@ -1038,15 +932,6 @@ export const {
   uploadCompanyInfoSuccess,
   uploadCompanyInfoFailure,
   clearCompanyInfo,
-  setSoftSanctionLoader,
-  getSoftSanctionRequest,
-  getSoftSanction,
-  setSoftSanctionList,
-  resetSoftSanction,
-  setSoftSanctionBnkProLoader,
-  getSoftSanctionBnkPro,
-  setSoftSanctionBnkProList,
-  resetSoftSanctionBnkPro,
   FilterRequest,
   FilterSucess,
   FilterFailure,
@@ -1055,17 +940,6 @@ export const {
   TaskRecordsFilterSucess,
   TaskRecordsFailure,
   clearTaskRecordsFilter,
-  getSoftSanctionRuleset,
-  setSoftSanctionRuleset,
-  setSoftSanctionRulesetError,
-  getSoftSanctionClientList,
-  setSoftSanctionClientList,
-  setSoftSanctionClientListError,
-  setSoftSanctionFields,
-  setSoftSanctionFieldsLoading,
-  setSoftSanctionFieldsError,
-  clearSoftSanctionFields,
-  getSoftSanctionFields,
   bankStatementRequest,
   bankStatementSuccess,
   bankStatementFailure,

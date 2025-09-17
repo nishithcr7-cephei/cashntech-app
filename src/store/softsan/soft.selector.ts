@@ -39,12 +39,35 @@ export const getSoftSanctionClientError = createSelector(
   _state => _state.softSanctionClientError,
 );
 
-export const getSoftSanctionFields = (state: any) =>
-  (state.softsan?.softSanctionFields as Record<string, any[]>) || {};
-export const getSoftSanctionFieldsLoading = (state: any) =>
-  state.softsan?.softSanctionFieldsLoading;
-export const getSoftSanctionFieldsError = (state: any) =>
-  state.softsan?.softSanctionFieldsError;
+export const getSoftSanctionFields = createSelector(
+  _selectState,
+  _state => (_state.softSanctionFields as Record<string, any[]>) || {},
+);
+
+export const getSoftSanctionFieldsLoading = createSelector(
+  _selectState,
+  _state => _state.softSanctionFieldsLoading,
+);
+
+export const getSoftSanctionFieldsError = createSelector(
+  _selectState,
+  _state => _state.softSanctionFieldsError,
+);
+
+export const getSoftSanctionResult = createSelector(
+  _selectState,
+  _state => _state.softSanctionResult,
+);
+
+export const getSoftSanctionResultLoading = createSelector(
+  _selectState,
+  _state => _state.softSanctionResultLoading,
+);
+
+export const getSoftSanctionResultError = createSelector(
+  _selectState,
+  _state => _state.softSanctionResultError,
+);
 
 const softSelector = {
   getSoftSanctionMethod,
@@ -58,8 +81,9 @@ const softSelector = {
   getSoftSanctionFields,
   getSoftSanctionFieldsLoading,
   getSoftSanctionFieldsError,
+  getSoftSanctionResult,
+  getSoftSanctionResultLoading,
+  getSoftSanctionResultError,
 };
 
 export default softSelector;
-
-

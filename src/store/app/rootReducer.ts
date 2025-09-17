@@ -5,6 +5,7 @@ import {clientReducer} from '@store/client';
 import tasklogReducer from '@store/tasklog/tasklog.slice';
 import mngReducer from '@store/mng/mng.slice';
 import {visitReducer} from '@store/visit';
+import {softReducer} from '@store/softsan';
 
 
 const rootReducer = combineReducers({
@@ -14,6 +15,7 @@ const rootReducer = combineReducers({
   tasklog: tasklogReducer,
   mng: mngReducer,
   visit: visitReducer,
+  softsan: softReducer,
 });
 
 export default rootReducer;

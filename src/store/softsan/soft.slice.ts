@@ -27,6 +27,11 @@ const initialState: SoftState = {
   softSanctionFields: {},
   softSanctionFieldsLoading: false,
   softSanctionFieldsError: null,
+
+  // Dynamic API call result
+  softSanctionResult: null,
+  softSanctionResultLoading: false,
+  softSanctionResultError: null,
 };
 
 const softSlice = createSlice({
@@ -82,7 +87,7 @@ const softSlice = createSlice({
     },
     setSoftSanctionRuleset: (state, action: PayloadAction<ISoftSanctionRuleset[]>) => {
       state.rulesetLoading = false;
-      state.rulesetData = action.payload as any;
+      state.rulesetData = action.payload;
     },
     setSoftSanctionRulesetError: (state, action: PayloadAction<string>) => {
       state.rulesetLoading = false;
@@ -96,7 +101,7 @@ const softSlice = createSlice({
     },
     setSoftSanctionClientList: (state, action: PayloadAction<ISoftSanctionClient[]>) => {
       state.softSanctionClientLoading = false;
-      state.softSanctionClientList = action.payload as any;
+      state.softSanctionClientList = action.payload;
     },
     setSoftSanctionClientListError: (state, action: PayloadAction<string>) => {
       state.softSanctionClientLoading = false;
@@ -123,7 +128,30 @@ const softSlice = createSlice({
       state.softSanctionFieldsError = null;
     },
     getSoftSanctionFields: (state, _action: PayloadAction<{bankName: string; productName: string; methodName?: string}>) => {},
-    
+
+    // Dynamic API call actions
+    runSoftSanction: (state, _action: PayloadAction<{url: string; payload: any}>) => {
+      state.softSanctionResultLoading = true;
+      state.softSanctionResultError = null;
+    },
+    setSoftSanctionResult: (state, action: PayloadAction<any>) => {
+      state.softSanctionResultLoading = false;
+      state.softSanctionResult = action.payload;
+      state.softSanctionResultError = null;
+    },
+    setSoftSanctionResultError: (state, action: PayloadAction<string>) => {
+      state.softSanctionResultLoading = false;
+      state.softSanctionResultError = action.payload;
+    },
+    clearSoftSanctionResult: (state) => {
+      state.softSanctionResult = null;
+      state.softSanctionResultLoading = false;
+      state.softSanctionResultError = null;
+    },
+    getSoftSanctionResult: (state, _action: PayloadAction<{clientId: string; method: string; bank: string}>) => {
+      state.softSanctionResultLoading = true;
+      state.softSanctionResultError = null;
+    },
   },
 });
 
@@ -147,8 +175,11 @@ export const {
   setSoftSanctionFieldsError,
   clearSoftSanctionFields,
   getSoftSanctionFields,
+  runSoftSanction,
+  setSoftSanctionResult,
+  setSoftSanctionResultError,
+  clearSoftSanctionResult,
+  getSoftSanctionResult,
 } = softSlice.actions;
 
 export default softSlice.reducer;
-
-

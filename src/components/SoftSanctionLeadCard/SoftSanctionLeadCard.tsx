@@ -14,11 +14,8 @@ import {
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 import {clientActions} from '@store/client';
-import {
-  getSoftSanctionFields,
-  getSoftSanctionFieldsLoading,
-  getSoftSanctionFieldsError,
-} from '@store/client/client.selector';
+import softSelector from '@store/softsan/soft.selector';
+import {getSoftSanctionFields, clearSoftSanctionFields, runSoftSanction, clearSoftSanctionResult} from '@store/softsan/soft.slice';
 import clientApi from '@services/api/client.api';
 import {Config} from '@config/index';
 import Endpoints from '@constants/ApiEndPoints';
@@ -28,6 +25,8 @@ import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {HomeNavigatorType, SoftNavigatorType} from '@type/NavigatorTypes';
 import {decryptUtility} from '@utils/crypto';
+import StorageKeys from '@constants/StorageKeys';
+import {getStorage} from '@services/localStorage';
 
 type SoftInfoNavigationType = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType>,
@@ -41,6 +40,7 @@ type LeadProps = {
     location: string;
     initiator: string;
     turnover: string;
+    estimatedFunding: string;
     creditPeriod: string;
   };
   bankName: string;
@@ -57,83 +57,329 @@ export const LeadCard: React.FC<LeadProps> = ({
   rulesetId,
 }) => {
   const [showModal, setShowModal] = useState(false);
-  const [inputValues, setInputValues] = useState<{[key: string]: string}>({
-    'Existing W/C Limits': '10000000',
-    Stock: '13207177',
-    'Debtors (upto 150 days)': '3438200',
-    'Less Creditors': '2160108',
-    'Last 12 M Purchases of brand 1': '405282552',
-  });
+  // 1. Clean up initial state to use only IDs
+  const [inputValues, setInputValues] = useState<{[key: string]: string}>({});
   const dispatch = useDispatch();
   const navigation = useNavigation<SoftInfoNavigationType>();
-  const fields = useSelector(getSoftSanctionFields) || {};
-  const loading = useSelector(getSoftSanctionFieldsLoading);
-  const error = useSelector(getSoftSanctionFieldsError);
+  const fields = useSelector(softSelector.getSoftSanctionFields) || {};
+  const loading = useSelector(softSelector.getSoftSanctionFieldsLoading);
+  const error = useSelector(softSelector.getSoftSanctionFieldsError);
+  
+  // New selectors for dynamic API result
+  const softSanctionResult = useSelector(softSelector.getSoftSanctionResult);
+  const softSanctionResultLoading = useSelector(softSelector.getSoftSanctionResultLoading);
+  const softSanctionResultError = useSelector(softSelector.getSoftSanctionResultError);
 
-  const handleOpenModal = () => {
-    setShowModal(true);
-    dispatch(clientActions.getSoftSanctionFields({bankName, productName}));
-  };
+  // Handle the result from Redux
+  useEffect(() => {
+    if (softSanctionResult) {
+      
+      // Navigate based on result
+      if (softSanctionResult.statusCode === 500 || softSanctionResult?.error || softSanctionResult?.message) {
+        setShowModal(false);
+        dispatch(clearSoftSanctionFields());
+        navigation.navigate('RulesetView', {
+          rulesetData: [],
+          location: lead.location ? decryptUtility(lead.location) : '',
+          clientName: lead.clientName || '',
+          clientId: lead.clientId,
+          errorMessage: softSanctionResult?.message || softSanctionResult?.error || 'API Error occurred',
+        } as any);
+      } else {
+        setShowModal(false);
+        dispatch(clearSoftSanctionFields());
+        navigation.navigate('RulesetView', {
+          rulesetData: softSanctionResult?.data || [],
+          location: lead.location ? decryptUtility(lead.location) : '',
+          clientName: lead.clientName || '',
+          clientId: lead.clientId,
+        } as any);
+      }
+      
+      // Clear the result after handling
+      dispatch(clearSoftSanctionResult());
+    }
+  }, [softSanctionResult, dispatch, navigation, lead, setShowModal]);
 
-  const handleInputChange = (id: string, value: string) => {
-    setInputValues(prev => ({...prev, [id]: value}));
-  };
-
-  const handleRun = async () => {
-    const payload: any = {
-      bank_name: bankName,
-
-      'Existing W/C Limits': Number(inputValues['Existing W/C Limits'] || 0),
-      Stock: Number(inputValues['Stock'] || 0),
-      'Debtors (upto 150 days)': Number(
-        inputValues['Debtors (upto 150 days)'] || 0,
-      ),
-      'Less Creditors': Number(inputValues['Less Creditors'] || 0),
-      'Last 12 M Purchases of brand 1': Number(
-        inputValues['Last 12 M Purchases of brand 1'] || 0,
-      ),
-      Dependency: 0.9884,
-    };
-
-    const apiUrl = `${Config.API_URL}${Endpoints.apiSoftSanctionCalculate(
-      lead.clientId,
-    )}`;
-
-    try {
-      const res = await clientApi.softSanctionCalculate(payload, lead.clientId);
-      console.log('Soft sanction API response:', res);
-
+  // Handle errors from Redux
+  useEffect(() => {
+    if (softSanctionResultError) {
       setShowModal(false);
-      dispatch(clientActions.clearSoftSanctionFields());
+      dispatch(clearSoftSanctionFields());
       navigation.navigate('RulesetView', {
-        rulesetData: res?.data?.data || [],
+        rulesetData: [],
         location: lead.location ? decryptUtility(lead.location) : '',
         clientName: lead.clientName || '',
         clientId: lead.clientId,
-      });
-    } catch (e) {
-      console.log('Soft sanction API error:', e);
-
-      Alert.alert('API Error', `Error: ${JSON.stringify(e, null, 2)}`, [
-        {
-          text: 'OK',
-          onPress: () => {
-            setShowModal(false);
-            dispatch(clientActions.clearSoftSanctionFields());
-          },
-        },
-      ]);
+        errorMessage: softSanctionResultError,
+      } as any);
+      dispatch(clearSoftSanctionResult());
     }
+  }, [softSanctionResultError, dispatch, navigation, lead, setShowModal]);
+
+  const handleOpenModal = () => {
+    setShowModal(true);
+    // Debug log to see what methodName is being passed
+    
+    // Build the full URL to show in alert
+    let fullUrl = `/client-info-master/soft-sanction/inputs?bank=${encodeURIComponent(bankName)}&product=${encodeURIComponent(productName)}`;
+    if (methodName) {
+      const methods = methodName.split(',');
+      methods.forEach(m => {
+        fullUrl += `&methods=${encodeURIComponent(m.trim())}`;
+      });
+    }
+    
+    // Show alert with full URL
+    
+    // Use the methodName passed from SoftsanctionProcess.tsx (already comma-separated)
+    dispatch(getSoftSanctionFields({bankName, productName, methodName}));
+  };
+
+  const handleInputChange = (id: string, value: string) => {
+    
+    // Find the field to check if it's a dependency/percentage field
+    let isPercentageField = false;
+    let fieldLabel = '';
+    Object.keys(fields).forEach(method => {
+      (fields as Record<string, any[]>)[method].forEach((field: any) => {
+        if (field.id === id) {
+          fieldLabel = field.label || '';
+          const label = fieldLabel.toLowerCase();
+          isPercentageField = label.includes('dependency') || label.includes('dependancy') || label.includes('percentage') || label.includes('%');
+        }
+      });
+    });
+    
+    if (isPercentageField) {
+      // For dependency/percentage fields: ONLY allow numbers and ONE decimal point
+      // Examples: "98", "98.22", "100.5" - NO commas, NO other formatting
+      const cleanValue = value.replace(/[^\d.]/g, '');
+      
+      // Ensure only one decimal point
+      const parts = cleanValue.split('.');
+      if (parts.length > 2) {
+        return; // Don't update if more than one decimal point
+      }
+      
+      // Limit to 2 decimal places
+      if (parts[1] && parts[1].length > 2) {
+        return; // Don't update if more than 2 decimal places
+      }
+      
+      setInputValues(prev => {
+        const newValues = { ...prev, [id]: cleanValue };
+        return newValues;
+      });
+    } else {
+      // For regular numeric fields, use Indian financial formatting
+      const numericValue = value.replace(/[^\d,]/g, '');
+      const cleanValue = numericValue.replace(/,/g, '');
+      const formattedValue = formatIndianNumber(cleanValue);
+      
+      setInputValues(prev => {
+        const newValues = { ...prev, [id]: formattedValue };
+        return newValues;
+      });
+    }
+  };
+
+  // Helper function to format numbers with Indian financial formatting
+  const formatIndianNumber = (num: string): string => {
+    if (!num) return '';
+    
+    const number = parseInt(num, 10);
+    if (isNaN(number)) return '';
+    
+    // Convert to string and reverse for easier processing
+    const numStr = number.toString();
+    const reversed = numStr.split('').reverse();
+    
+    let formatted = '';
+    for (let i = 0; i < reversed.length; i++) {
+      if (i === 3 || i === 5 || i === 7 || i === 9) {
+        formatted = ',' + formatted;
+      }
+      formatted = reversed[i] + formatted;
+    }
+    
+    return formatted;
+  };
+
+  const handleRun = async () => {
+    // Validation: Check if any required fields are empty
+    const emptyFields: string[] = [];
+    
+    Object.keys(fields).forEach(method => {
+      (fields as Record<string, any[]>)[method].forEach((field: any) => {
+        const value = inputValues[field.id];
+        if (!value || value.trim() === '' || value === '0') {
+          emptyFields.push(field.label);
+        }
+      });
+    });
+    
+    if (emptyFields.length > 0) {
+      Alert.alert(
+        'Validation Error',
+        `Please fill in the following fields:\n\n${emptyFields.join('\n')}`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Additional validation rules between methods (apply only when both methods are present and Turnover value is entered)
+    try {
+      const methodKeys = Object.keys(fields || {});
+      const findMethodKey = (name: string) =>
+        methodKeys.find(k => k?.toLowerCase() === name.toLowerCase());
+
+      const turnoverKey = findMethodKey('Turnover');
+      const purchaseKey = findMethodKey('Purchase');
+
+      // Only enforce if both TURNOVER and PURCHASE sections exist
+      if (turnoverKey && purchaseKey) {
+        const turnoverFields = (fields as Record<string, any[]>)[turnoverKey] || [];
+        const turnoverCPField = turnoverFields.find(
+          f => (f?.label || '').trim().toLowerCase() === 'credit period offered'
+        );
+        const turnoverCreditPeriodValue = turnoverCPField
+          ? (inputValues[turnoverCPField.id] || '').replace(/,/g, '').trim()
+          : '';
+
+        // If user didn't enter Turnover CREDIT PERIOD, skip cross-checks
+        if (turnoverCreditPeriodValue) {
+          const purchaseFields = (fields as Record<string, any[]>)[purchaseKey] || [];
+          const purchaseWcField = purchaseFields.find(
+            f => (f?.label || '').trim().toLowerCase() === 'existing w/c limits'
+          );
+          const purchaseCpField = purchaseFields.find(
+            f => (f?.label || '').trim().toLowerCase() === 'credit period offered'
+          );
+
+          const purchaseWcVal = purchaseWcField
+            ? (inputValues[purchaseWcField.id] || '').replace(/,/g, '').trim()
+            : '';
+          const purchaseCpVal = purchaseCpField
+            ? (inputValues[purchaseCpField.id] || '').replace(/,/g, '').trim()
+            : '';
+
+          if (purchaseWcVal && purchaseWcVal !== turnoverCreditPeriodValue) {
+            Alert.alert(
+              'Validation Error',
+              'In PURCHASE Method, Existing W/C Limits must be the same as TURNOVER Method CREDIT PERIOD Offered value',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+
+          if (purchaseCpVal && purchaseCpVal !== turnoverCreditPeriodValue) {
+            Alert.alert(
+              'Validation Error',
+              'In PURCHASE Method, CREDIT PERIOD Offered must be the same as TURNOVER Method CREDIT PERIOD Offered value',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+        }
+      }
+    } catch (e) {
+    }
+
+    
+
+
+    // Build POST body dynamically using EXACT modal labels as keys
+    const payload: Record<string, any> = { bank_name: bankName };
+    const displayBody: Record<string, string> = {};
+
+    Object.keys(fields).forEach(method => {
+      (fields as Record<string, any[]>)[method].forEach((field: any) => {
+        const rawValue = inputValues[field.id] ?? '';
+        displayBody[field.label] = rawValue;
+        
+        // Check if this is a percentage field
+        const isPercentageField = field.label.toLowerCase().includes('dependency') || 
+                                 field.label.toLowerCase().includes('dependancy') || 
+                                 field.label.toLowerCase().includes('percentage') || 
+                                 field.label.toLowerCase().includes('%');
+        
+        let cleanedValue;
+        if (isPercentageField) {
+          // For percentage fields, just remove any non-numeric characters except decimal point
+          cleanedValue = rawValue.toString().replace(/[^\d.]/g, '').trim();
+        } else {
+          // For regular fields, remove commas (Indian formatting)
+          cleanedValue = rawValue.toString().replace(/,/g, '').trim();
+        }
+        
+        // Use the label as the POST body key
+        payload[field.label] = cleanedValue === '' ? 0 : Number(cleanedValue);
+        
+        // Also alias known variant to expected key if needed
+        if (field.label === 'Limit from banks') {
+          payload['Existing W/C Limits'] = payload[field.label];
+        }
+      });
+    });
+
+
+    // Validate: if any field value is missing, show alert with that label and stop
+    const missingLabels: string[] = [];
+    Object.keys(fields).forEach(method => {
+      (fields as Record<string, any[]>)[method].forEach((field: any) => {
+        const val = (displayBody[field.label] || '').toString().trim();
+        if (val === '' || val === '0') {
+          missingLabels.push(field.label);
+        }
+      });
+    });
+
+    if (missingLabels.length > 0) {
+      Alert.alert(
+        'Please enter values',
+        missingLabels.map(l => `- ${l}`).join('\n')
+      );
+      return;
+    }
+
+
+    // Construct the dynamic URL with actual values
+    const dynamicApiUrl = `${Config.API_URL}/client-info-master/soft-sanction/calculate/${lead.clientId}?bank=${encodeURIComponent(bankName)}&product=${encodeURIComponent(productName)}&methods=${encodeURIComponent(methodName)}`;
+
+    
+    const getFieldIdByLabel = (label: string): string | undefined => {
+      let foundId: string | undefined;
+      Object.keys(fields || {}).forEach(method => {
+        (fields as Record<string, any[]>)[method].forEach((field: any) => {
+          if (!foundId && field?.label === label) {
+            foundId = field.id;
+          }
+        });
+      });
+      return foundId;
+    };
+
+    const existingWcId = getFieldIdByLabel('Limit from banks') || getFieldIdByLabel('Existing W/C Limits');
+    const stockId = getFieldIdByLabel('Stock');
+
+    
+
+    // Use Redux action instead of direct fetch
+    dispatch(runSoftSanction({
+      url: dynamicApiUrl,
+      payload
+    }));
   };
 
   return (
     <>
       <View style={styles.card}>
         <Text style={styles.text}>
-          <Text style={styles.label}>Client ID :</Text> {lead.clientId}
+          <Text style={styles.label}>ID :</Text> {lead.clientId}
         </Text>
         <Text style={styles.text}>
-          <Text style={styles.label}>Client Name :</Text> {lead.clientName}
+          <Text style={styles.label}>Firm Name :</Text> {lead.clientName}
         </Text>
         <Text style={styles.text}>
           <Text style={styles.label}>City :</Text>{' '}
@@ -146,7 +392,10 @@ export const LeadCard: React.FC<LeadProps> = ({
           <Text style={styles.label}>Monthly Turnover :</Text> {lead.turnover}
         </Text>
         <Text style={styles.text}>
-          <Text style={styles.label}>Credit Period :</Text> {lead.creditPeriod}
+          <Text style={styles.label}>Estimated Funding Required :</Text> {lead.estimatedFunding}
+        </Text>
+        <Text style={styles.text}>
+          <Text style={styles.label}>Credit Period (In Days) :</Text> {lead.creditPeriod}
         </Text>
 
         <TouchableOpacity style={styles.button} onPress={handleOpenModal}>
@@ -163,7 +412,7 @@ export const LeadCard: React.FC<LeadProps> = ({
               {loading
                 ? 'Loading fields...'
                 : error
-                ? error
+                ? String(error)
                 : 'Enter values for the following fields:'}
             </Text>
             {!loading &&
@@ -174,18 +423,49 @@ export const LeadCard: React.FC<LeadProps> = ({
                 <View key={method} style={styles.modalSection}>
                   <Text style={styles.modalLabel}>{method}</Text>
                   {(fields as Record<string, any[]>)[method].map(
-                    (field: any) => (
-                      <View key={field.id} style={{marginBottom: 10}}>
-                        <Text style={styles.modalSubLabel}>{field.label}</Text>
-                        <TextInput
-                          style={styles.modalInput}
-                          placeholder={`Enter value for ${field.label}`}
-                          keyboardType="numeric"
-                          value={inputValues[field.id]}
-                          onChangeText={val => handleInputChange(field.id, val)}
-                        />
-                      </View>
-                    ),
+                    (field: any) => {
+                      // Check if this field is shared with other methods
+                      const isSharedField = field.label === 'Existing W/C Limits' || 
+                                           field.label === 'CREDIT PERIOD Offered' ||
+                                           (field.label === 'Limit from banks' && (fields as any).Turnover);
+                      
+                      return (
+                        <View key={field.id} style={{marginBottom: 10}}>
+                          <Text style={styles.modalSubLabel}>
+                            {field.label}
+                            {isSharedField && (
+                              <Text style={styles.sharedFieldText}> (Shared with Turnover)</Text>
+                            )}
+                          </Text>
+                          <TextInput
+                            style={styles.modalInput}
+                            placeholder={
+                              field.label.toLowerCase().includes('dependency') || 
+                              field.label.toLowerCase().includes('dependancy') || 
+                              field.label.toLowerCase().includes('percentage') || 
+                              field.label.toLowerCase().includes('%')
+                                ? `Enter value (e.g., 98.22 or 98)`
+                                : `Enter value for ${field.label}`
+                            }
+                            keyboardType={
+                              field.label.toLowerCase().includes('dependency') || 
+                              field.label.toLowerCase().includes('dependancy') || 
+                              field.label.toLowerCase().includes('percentage') || 
+                              field.label.toLowerCase().includes('%')
+                                ? "decimal-pad"
+                                : "numeric"
+                            }
+                            value={inputValues[field.id]}
+                            onChangeText={val => handleInputChange(field.id, val)}
+                          />
+                          {isSharedField && (
+                            <Text style={styles.inputDescription}>
+                              Please enter value same as turnover
+                            </Text>
+                          )}
+                        </View>
+                      );
+                    }
                   )}
                 </View>
               ))}
@@ -193,11 +473,13 @@ export const LeadCard: React.FC<LeadProps> = ({
               <TouchableOpacity
                 onPress={() => {
                   setShowModal(false);
-                  dispatch(clientActions.clearSoftSanctionFields());
+                  dispatch(clearSoftSanctionFields());
                 }}>
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.runBtn} onPress={handleRun}>
+              <TouchableOpacity
+                style={styles.runBtn}
+                onPress={handleRun}>
                 <Text style={styles.runText}>Run</Text>
               </TouchableOpacity>
             </View>
@@ -305,6 +587,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
     marginBottom: 4,
+    marginLeft: 4,
+  },
+  sharedFieldText: {
+    fontSize: 12,
+    color: '#888',
     marginLeft: 4,
   },
 });

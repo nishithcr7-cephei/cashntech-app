@@ -6,7 +6,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import React, {useState, useEffect} from 'react';
@@ -29,6 +28,8 @@ import Toast from 'react-native-toast-message';
 import {useDispatch, useSelector} from 'react-redux';
 import clientSelector from '@store/client/client.selector';
 import {clientActions} from '@store/client';
+import softSelector from '@store/softsan/soft.selector';
+import {getSoftSanctionRuleset} from '@store/softsan/soft.slice';
 
 type SoftInfoNavigationType = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType>,
@@ -49,24 +50,31 @@ export const SoftSanctionRuleset = () => {
   const route = useRoute();
   const dispatch = useDispatch();
   const [search, setSearch] = useState<string>('');
-  const rulesetData = useSelector(clientSelector.getSoftSanctionRuleset);
+  const rulesetRaw = useSelector(softSelector.getSoftSanctionRuleset);
+  const rulesetData = Array.isArray(rulesetRaw)
+    ? rulesetRaw
+    : ((rulesetRaw as any)?.data ?? []);
   const rulesetLoading = useSelector(
-    clientSelector.getSoftSanctionRulesetLoading,
+    softSelector.getSoftSanctionRulesetLoading,
   );
-  const rulesetError = useSelector(clientSelector.getSoftSanctionRulesetError);
+  const rulesetError = useSelector(softSelector.getSoftSanctionRulesetError);
   const [refreshing, setRefreshing] = useState(false);
 
   // Get configRules from route params if available
   // @ts-ignore
   const {configRules, clientName, clientId} = route.params || {};
 
+
+  // Trigger API call when landing on the page
   useEffect(() => {
     // @ts-ignore
-    const {bankName, product} = route.params || {};
+    const {bankName, product, method} = route.params || {};
+    
     if (bankName && product && !configRules) {
-      dispatch(clientActions.getSoftSanctionRuleset({bank: bankName, product}));
+      // Trigger API call immediately
+      dispatch(getSoftSanctionRuleset({bank: bankName, product, method}));
     }
-  }, [route.params]);
+  }, [route.params, configRules]);
 
   // Transform configRules to match SoftRulestCard format
   const transformedConfigRules = configRules
@@ -80,20 +88,22 @@ export const SoftSanctionRuleset = () => {
       }))
     : [];
 
+  // Temporarily disable search filtering to test
   const filteredRulesets = configRules
-    ? transformedConfigRules.filter((item: any) =>
-        item.bankName.toLowerCase().includes(search.toLowerCase()),
-      )
-    : rulesetData.filter(item =>
-        item.bank_name?.toLowerCase().includes(search.toLowerCase()),
-      );
+    ? transformedConfigRules
+    : (rulesetData && Array.isArray(rulesetData) ? rulesetData : []);
+
+
+
 
   const handleRefresh = () => {
     // @ts-ignore
-    const {bankName, product} = route.params || {};
+    const {bankName, product, method} = route.params || {};
+    
+    
     setRefreshing(true);
     if (bankName && product) {
-      dispatch(clientActions.getSoftSanctionRuleset({bank: bankName, product}));
+      dispatch(getSoftSanctionRuleset({bank: bankName, product, method}));
     }
     setTimeout(() => setRefreshing(false), 1000);
   };
@@ -126,7 +136,7 @@ export const SoftSanctionRuleset = () => {
             <ActivityIndicator size="large" color={Colors.primaryColor} />
           </View>
         ) : rulesetError ? (
-          <Text style={{color: 'red'}}>{rulesetError}</Text>
+          <Text style={{color: 'red'}}>{String(rulesetError)}</Text>
         ) : configRules ? (
           <FlatList
             data={filteredRulesets}

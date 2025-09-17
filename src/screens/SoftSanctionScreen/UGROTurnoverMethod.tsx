@@ -30,6 +30,9 @@ import RNFS from 'react-native-fs';
 import {Platform} from 'react-native';
 import Toast from 'react-native-toast-message';
 import {PermissionsAndroid} from 'react-native';
+import {useDispatch, useSelector} from 'react-redux';
+import softSelector from '@store/softsan/soft.selector';
+import {getSoftSanctionResult} from '@store/softsan/soft.slice';
 
 type SoftInfoNavigationType = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType>,
@@ -52,15 +55,37 @@ type TurnoverMethod = {
 export const UGROTurnoverMethod = () => {
   const navigation = useNavigation<SoftInfoNavigationType>();
   const route = useRoute();
+  const dispatch = useDispatch();
   const {clientId, method, bank, product} = (route.params || {}) as {
     clientId: string;
     method: string;
     bank: string;
     product?: string;
   };
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Redux selectors
+  const softSanctionResult = useSelector(softSelector.getSoftSanctionResult);
+  const softSanctionResultLoading = useSelector(softSelector.getSoftSanctionResultLoading);
+  const softSanctionResultError = useSelector(softSelector.getSoftSanctionResultError);
+  
   const [result, setResult] = useState<any>(null);
+
+  // Indian number formatting (same comma style as used elsewhere like ClientInfo)
+  const formatIndianNumber = (num: number | string): string => {
+    if (num === null || num === undefined) return '';
+    const str = typeof num === 'number' ? num.toString() : String(num).replace(/,/g, '');
+    if (!/^\d+(\.\d+)?$/.test(str)) return String(num);
+    const [intPart, decimalPart] = str.split('.');
+    const reversed = intPart.split('').reverse();
+    let formatted = '';
+    for (let i = 0; i < reversed.length; i++) {
+      if (i === 3 || i === 5 || i === 7 || i === 9) {
+        formatted = ',' + formatted;
+      }
+      formatted = reversed[i] + formatted;
+    }
+    return decimalPart ? `${formatted}.${decimalPart}` : formatted;
+  };
 
   useEffect(() => {
     let sanitizedMethod = method || '';
@@ -71,28 +96,25 @@ export const UGROTurnoverMethod = () => {
     } else if (/wc/i.test(sanitizedMethod)) {
       sanitizedMethod = 'WC(Stock)';
     }
-    const apiUrl = `/client-info-master/soft-sanction/result/${clientId}?method=${encodeURIComponent(
-      sanitizedMethod,
-    )}&bank=${encodeURIComponent(bank || '')}`;
-    Alert.alert(
-      'API Debug',
-      `Client ID: ${clientId}\nmethod: ${sanitizedMethod}\nbank: ${bank}\nURL: ${apiUrl}`,
-    );
     if (clientId && sanitizedMethod && bank) {
-      setLoading(true);
-      setError(null);
-      clientApi
-        .softSanctionResult(clientId, sanitizedMethod, bank)
-        .then(res => {
-          setResult(res.data);
-          setLoading(false);
-        })
-        .catch(e => {
-          setError('Failed to fetch result');
-          setLoading(false);
-        });
+      dispatch(getSoftSanctionResult({
+        clientId,
+        method: sanitizedMethod,
+        bank
+      }));
     }
   }, [clientId, method, bank]);
+
+  // Handle Redux result
+  useEffect(() => {
+    if (softSanctionResult) {
+      setResult(softSanctionResult);
+    }
+  }, [softSanctionResult]);
+
+  // Use Redux loading and error states
+  const loading = softSanctionResultLoading;
+  const error = softSanctionResultError;
 
   let leads: TurnoverMethod[] = [];
   if (result && Array.isArray(result)) {
@@ -127,7 +149,15 @@ export const UGROTurnoverMethod = () => {
   const handleDownload = async () => {
     try {
       const exportProduct = product || productName;
-      const exportMethod = method || methodName;
+      let exportMethod = method || methodName;
+      // Sanitize method to backend-expected tokens
+      if (/turnover/i.test(exportMethod)) {
+        exportMethod = 'Turnover';
+      } else if (/purchase/i.test(exportMethod)) {
+        exportMethod = 'Purchase';
+      } else if (/wc/i.test(exportMethod)) {
+        exportMethod = 'WC(Stock)';
+      }
       if (!clientId || !exportMethod || !exportProduct) {
         Alert.alert('Error', 'Missing clientId, method, or product for export');
         return;
@@ -135,15 +165,15 @@ export const UGROTurnoverMethod = () => {
       
       // Use API function with token authentication
       const {url, headers} = await clientApi.softSanctionExportDownload(
-        clientId, 
-        exportMethod, 
-        exportProduct
+        clientId,
+        exportMethod,
+        exportProduct,
       );
       
       let filePath = '';
       let showPath = '';
       if (Platform.OS === 'android') {
-        filePath = `${RNFS.DownloadDirectoryPath}/dummy-test.pdf`;
+        filePath = `${RNFS.DownloadDirectoryPath}/SoftSanction.xlsx`;
         showPath = 'Downloads folder';
         const androidVersion = Number(Platform.Version);
         if (androidVersion <= 29) {
@@ -164,7 +194,7 @@ export const UGROTurnoverMethod = () => {
           }
         }
       } else {
-        filePath = `${RNFS.DocumentDirectoryPath}/dummy-test.pdf`;
+        filePath = `${RNFS.DocumentDirectoryPath}/SoftSanction.xlsx`;
         showPath = 'App private folder';
       }
 
@@ -254,14 +284,20 @@ export const UGROTurnoverMethod = () => {
                 style={styles.downloadIcon}
               />
             </TouchableOpacity>
-            {Object.entries(results).map(([label, value]) => (
-              <View key={label} style={styles.resultRow}>
-                <Text>
-                  <Text style={styles.resultLabel}>{label}:</Text>
-                  <Text style={styles.resultValue}> {value}</Text>
-                </Text>
-              </View>
-            ))}
+            {Object.entries(results).map(([label, value]) => {
+              const isNumeric =
+                typeof value === 'number' ||
+                (typeof value === 'string' && /^\d{1,3}(,\d{3})*(\.\d+)?$|^\d+(\.\d+)?$/.test(value));
+              const displayValue = isNumeric ? formatIndianNumber(value as any) : String(value);
+              return (
+                <View key={label} style={styles.resultRow}>
+                  <Text>
+                    <Text style={styles.resultLabel}>{label}:</Text>
+                    <Text style={styles.resultValue}> {displayValue}</Text>
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         ) : (
           <Text>No results found.</Text>

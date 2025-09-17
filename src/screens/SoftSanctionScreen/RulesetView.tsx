@@ -41,12 +41,13 @@ type RulesetViewArr = {
 export const RulesetView = () => {
   const navigation = useNavigation<SoftInfoNavigationType>();
   const route = useRoute();
-  const {rulesetData, location, clientName, clientId} = (route.params ||
+  const {rulesetData, location, clientName, clientId, errorMessage} = (route.params ||
     {}) as {
     rulesetData?: any[];
     location?: string;
     clientName?: string;
     clientId?: string;
+    errorMessage?: string;
   };
   const [search, setSearch] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
@@ -80,35 +81,38 @@ export const RulesetView = () => {
     },
   ];
 
-  // If rulesetData is provided, map it to the expected format
+  // If rulesetData is provided, use the raw objects after the first meta object for dynamic rendering
   const leads = Array.isArray(rulesetData)
-    ? rulesetData.slice(1).map(item => ({
-        methodName: item.method,
-        basis: item.basis,
-        creditPeriod: String(item.credit_period),
-        finallimit: String(item.final_limit),
-        tpaAmount: item.tpaAmount || '',
-      }))
+    ? rulesetData.slice(1)
     : staticLeads;
 
-  const filteredLeads = leads.filter(
-    lead =>
-      typeof lead.basis === 'string' &&
-      lead.basis.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredLeads = Array.isArray(leads)
+    ? (leads as any[]).filter(lead => {
+        const basisVal = (lead as any)?.basis;
+        if (typeof basisVal === 'string') {
+          return basisVal.toLowerCase().includes(search.toLowerCase());
+        }
+        return true;
+      })
+    : [];
 
-  const minFinalLimit =
-    filteredLeads.length > 0
-      ? Math.min(
-          ...filteredLeads.map(lead => {
-            const num = Number(String(lead.finallimit).replace(/,/g, ''));
-            return isNaN(num) ? Infinity : num;
-          }),
-        )
-      : 0;
+  const numericFinalLimits = Array.isArray(filteredLeads)
+    ? filteredLeads
+        .map(lead => {
+          const raw = (lead as any)?.final_limit ?? (lead as any)?.finallimit;
+          const num = Number(String(raw ?? '').toString().replace(/,/g, ''));
+          return isNaN(num) ? undefined : num;
+        })
+        .filter((n): n is number => typeof n === 'number')
+    : [];
+  const hasAnyFinalLimit = numericFinalLimits.length > 0;
+  const minFinalLimit = hasAnyFinalLimit
+    ? Math.min(...numericFinalLimits)
+    : undefined;
 
-  const formattedMinFinalLimit =
-    minFinalLimit > 0 ? minFinalLimit.toLocaleString('en-IN') : '-';
+  const formattedMinFinalLimit = hasAnyFinalLimit
+    ? (minFinalLimit as number).toLocaleString('en-IN')
+    : '-';
 
   const ListFooter = () => (
     <View style={styles.footerContainer}>
@@ -124,6 +128,10 @@ export const RulesetView = () => {
     Array.isArray(rulesetData) && rulesetData.length > 0 ? rulesetData[0] : {};
   const displayBankName = metaInfo.bank_name || 'Bank Name';
   const displayProductName = metaInfo.product || 'Product Name';
+  // Method can be an array or string; normalize to a display string
+  const displayMethodName = Array.isArray((metaInfo as any).method)
+    ? ((metaInfo as any).method as any[]).join(', ')
+    : ((metaInfo as any).method || '');
 
   return (
     <Container>
@@ -132,6 +140,17 @@ export const RulesetView = () => {
       {isLoading ? (
         <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
           <ActivityIndicator size="large" color={Colors.primaryColor} />
+        </View>
+      ) : errorMessage ? (
+        // Display error message in center
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorMessage}>{errorMessage}</Text>
+          <TouchableOpacity 
+            style={styles.errorButton}
+            onPress={navigation.goBack}
+          >
+            <Text style={styles.errorButtonText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <>
@@ -146,12 +165,13 @@ export const RulesetView = () => {
               <Text style={styles.contentText}>
                 {displayBankName}
                 {displayProductName ? `  Product[${displayProductName}]` : ''}
+                {displayMethodName ? `  Method[${displayMethodName}]` : ''}
               </Text>
             </TouchableOpacity>
           </View>
           <View style={styles.subHeading}>
             <Text style={styles.subHeadingText}>Client Name: {clientName}</Text>
-            <Text style={styles.subHeadingText}>Location: {location}</Text>
+            <Text style={styles.subHeadingText}>City: {location}</Text>
           </View>
           <View style={styles.container}>
             <FlatList
@@ -163,17 +183,11 @@ export const RulesetView = () => {
                   onPress={() =>
                     navigation.navigate('UGROTurnoverMethod', {
                       clientId: clientId || '',
-                      method: item.methodName,
-                      bank: metaInfo.bank_name,
+                      method: (item as any)?.method || '',
+                      bank: (metaInfo as any).bank_name,
                     })
                   }>
-                  <RulesetViewCard
-                    RulesetView={{
-                      ...item,
-                      creditperiod: item.creditPeriod,
-                      tpwAmount: item.tpaAmount,
-                    }}
-                  />
+                  <RulesetViewCard data={item as any} />
                 </TouchableOpacity>
               )}
               contentContainerStyle={{paddingBottom: 20}}
@@ -243,5 +257,36 @@ const styles = StyleSheet.create({
     color: Colors.gray500,
     fontWeight: fontWeight.Bold,
     fontSize: scaleFont(16),
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: Colors.white,
+  },
+  errorTitle: {
+    fontSize: scaleFont(20),
+    fontWeight: fontWeight.Bold,
+    color: Colors.red,
+    marginBottom: 10,
+  },
+  errorMessage: {
+    fontSize: scaleFont(16),
+    fontWeight: fontWeight.Medium,
+    color: Colors.gray500,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  errorButton: {
+    backgroundColor: Colors.primaryColor,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  errorButtonText: {
+    color: Colors.white,
+    fontSize: scaleFont(16),
+    fontWeight: fontWeight.SemiBold,
   },
 });

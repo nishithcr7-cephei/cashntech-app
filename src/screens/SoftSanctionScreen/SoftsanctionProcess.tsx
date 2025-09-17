@@ -6,11 +6,13 @@ import {
   TextInput,
   LogBox,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import React, {useEffect, useState, useCallback} from 'react';
 import Colors from '@constants/Colors';
 import fontWeight from '@constants/FontWeight';
+import Fonts from '@constants/Fonts';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {
   Container,
@@ -33,6 +35,9 @@ import {useDispatch, useSelector} from 'react-redux';
 import {RootState} from '@store/app/store';
 import {clientActions} from '@store/client';
 import clientSelector from '@store/client/client.selector';
+import softSelector from '@store/softsan/soft.selector';
+import {getSoftSanctionBnkPro, getSoftSanctionClientList} from '@store/softsan/soft.slice';
+import { decryptConditionally } from '@utils/crypto';
 
 LogBox.ignoreLogs(['VirtualizedLists should never be nested']);
 
@@ -47,6 +52,7 @@ type Lead = {
   location: string;
   initiator: string;
   turnover: string;
+  estimatedFunding: string;
   creditPeriod: string;
 };
 
@@ -56,24 +62,44 @@ export const SoftsanctionProcess = () => {
   const [showLeads, setShowLeads] = useState(false);
   const [selectedBank, setSelectedBank] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
-  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
+  const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
   const [selectedRulesetId, setSelectedRulesetId] = useState<string | null>(
     null,
   );
   const dispatch = useDispatch();
   const bankList = useSelector((state: RootState) => state.client.BankList);
-  const methodList = useSelector(
-    (state: RootState) => state.client.SoftSanctionBNKPROData,
-  );
+  const methodList = useSelector(softSelector.getSoftSanctionBnkPro);
   const softSanctionClientList = useSelector(
-    clientSelector.getSoftSanctionClientList,
+    softSelector.getSoftSanctionClientList,
   );
   const softSanctionClientLoading = useSelector(
-    clientSelector.getSoftSanctionClientLoading,
+    softSelector.getSoftSanctionClientLoading,
   );
   const softSanctionClientError = useSelector(
-    clientSelector.getSoftSanctionClientError,
+    softSelector.getSoftSanctionClientError,
   );
+
+  // Helper function to format numbers with Indian financial formatting
+  const formatIndianNumber = (num: number | string): string => {
+    if (!num || num === 'NA') return 'NA';
+    
+    const number = typeof num === 'string' ? parseInt(num, 10) : num;
+    if (isNaN(number)) return 'NA';
+    
+    // Convert to string and reverse for easier processing
+    const numStr = number.toString();
+    const reversed = numStr.split('').reverse();
+    
+    let formatted = '';
+    for (let i = 0; i < reversed.length; i++) {
+      if (i === 3 || i === 5 || i === 7 || i === 9) {
+        formatted = ',' + formatted;
+      }
+      formatted = reversed[i] + formatted;
+    }
+    
+    return formatted;
+  };
 
   useEffect(() => {
     dispatch(clientActions.getBankList());
@@ -84,30 +110,30 @@ export const SoftsanctionProcess = () => {
       const bank = bankList.find(b => b.id.toString() === selectedBank);
       if (bank) {
         dispatch({
-          type: clientActions.getSoftSanctionBnkPro.type,
-          payload: {bank: bank.bank_name.trim(), product: selectedProduct},
+          type: getSoftSanctionBnkPro.type,
+          payload: {bank: bank.bank_name.trim(), product: selectedProduct}
         });
       }
     }
   }, [selectedBank, selectedProduct]);
 
   useEffect(() => {
-    if (selectedMethod && methodList.length > 0) {
-      const method = methodList.find(m => m.method_name === selectedMethod);
-      if (method) {
-        setSelectedRulesetId(method.soft_sanction_ruleset_id);
+    if (selectedMethods.length > 0 && Array.isArray(methodList) && methodList.length > 0) {
+      const selectedMethod = methodList.find(m => m.method_name === selectedMethods[0]);
+      if (selectedMethod) {
+        setSelectedRulesetId(selectedMethod.soft_sanction_ruleset_id);
       } else {
         setSelectedRulesetId(null);
       }
     } else {
       setSelectedRulesetId(null);
     }
-  }, [selectedMethod, methodList]);
+  }, [selectedMethods, methodList]);
 
   useFocusEffect(
     useCallback(() => {
       if (showLeads) {
-        dispatch(clientActions.getSoftSanctionClientList());
+        dispatch(getSoftSanctionClientList());
       }
     }, [showLeads, dispatch]),
   );
@@ -117,39 +143,50 @@ export const SoftsanctionProcess = () => {
     value: bank.id.toString(),
   }));
 
-  const formattedMethodList = methodList.map(method => ({
+  const formattedMethodList = Array.isArray(methodList) ? methodList.map(method => ({
     label: method.method_name,
     value: method.method_name,
-  }));
+  })) : [];
+  
 
-  const formattedRulesetIdList = methodList
-    .filter(method => method.method_name === selectedMethod)
+
+  const formattedRulesetIdList = Array.isArray(methodList) ? methodList
+    .filter(method => selectedMethods.includes(method.method_name))
     .map(method => ({
       label: method.soft_sanction_ruleset_id,
       value: method.soft_sanction_ruleset_id,
-    }));
+    })) : [];
 
-  const filteredLeads = softSanctionClientList
-    .map(lead => ({
+  const clientListArray: any[] = Array.isArray(softSanctionClientList)
+    ? (softSanctionClientList as any[])
+    : (((softSanctionClientList as any)?.data as any[]) ?? []);
+  const searchTerm = (search || '').trim().toLowerCase();
+  const filteredLeads = clientListArray
+    .map((lead: any) => ({
       clientId: lead.id?.toString() || 'NA',
-      clientName: lead.client_name || 'NA',
-      location: lead.location || 'NA',
+      clientName: decryptConditionally(lead.firm_name) || 'NA',
+      location: lead.city || 'NA', // city is encrypted; decrypted in card
       initiator: lead.user
         ? `${(lead.user.first_name || '').trim()} ${(
             lead.user.last_name || ''
           ).trim()}`.trim()
         : 'NA',
-      turnover: lead.monthly_turnover || 'NA',
+      turnover: formatIndianNumber(lead.monthly_turnover) || 'NA',
+      estimatedFunding: formatIndianNumber(lead.estimated_funding_required) || 'NA',
       creditPeriod: lead.credit_period_offer?.toString() || 'NA',
     }))
-    .sort((a, b) => {
+    .sort((a: any, b: any) => {
       const idA = parseInt(a.clientId) || 0;
       const idB = parseInt(b.clientId) || 0;
-      return idA - idB;
+      return idB - idA; // Descending: latest (higher ID) first
     })
-    .filter(lead =>
-      lead.clientName.toLowerCase().includes(search.toLowerCase()),
-    );
+    .filter((lead: any) => {
+      if (searchTerm === '') return true;
+      return (
+        lead.clientName.toLowerCase().includes(searchTerm) ||
+        lead.clientId.toLowerCase().includes(searchTerm)
+      );
+    });
 
   return (
     <Container>
@@ -170,7 +207,7 @@ export const SoftsanctionProcess = () => {
             value={selectedBank ?? undefined}
             onChange={val => {
               setSelectedBank(val);
-              setSelectedMethod(null);
+              setSelectedMethods([]);
               setSelectedRulesetId(null);
             }}
             containerStyle={{marginBottom: scaleHeight(20)}}
@@ -186,36 +223,48 @@ export const SoftsanctionProcess = () => {
             value={selectedProduct ?? undefined}
             onChange={val => {
               setSelectedProduct(val);
-              setSelectedMethod(null);
+              setSelectedMethods([]);
               setSelectedRulesetId(null);
             }}
             containerStyle={{marginBottom: scaleHeight(20)}}
           />
-          <Text style={styles.label}>Method</Text>
-          <TextInput
-            value={
-              selectedBank && selectedProduct && methodList.length > 0
-                ? methodList.map(m => m.method_name).join(', ')
-                : ''
-            }
-            editable={false}
-            style={styles.input}
-            placeholder="Method Names"
-            placeholderTextColor={Colors.balancedGray}
-          />
-
-          <Text style={styles.label}>Rulest ID</Text>
-          <TextInput
-            value={
-              selectedBank && selectedProduct && methodList.length > 0
-                ? methodList.map(m => m.soft_sanction_ruleset_id).join(', ')
-                : ''
-            }
-            editable={false}
-            style={styles.input}
-            placeholder="Ruleset IDs"
-            placeholderTextColor={Colors.balancedGray}
-          />
+          <View style={styles.methodsContainer}>
+            <Text style={styles.methodsLabel}>Methods</Text>
+            <View style={styles.methodsList}>
+              {formattedMethodList.length > 0 ? (
+                formattedMethodList.map((method, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.methodItem}
+                    onPress={() => {
+                      if (selectedMethods.includes(method.value)) {
+                        setSelectedMethods(selectedMethods.filter(m => m !== method.value));
+                      } else {
+                        setSelectedMethods([...selectedMethods, method.value]);
+                      }
+                    }}
+                  >
+                    <View style={[
+                      styles.checkbox,
+                      selectedMethods.includes(method.value) && styles.checkedBox
+                    ]}>
+                      {selectedMethods.includes(method.value) && (
+                        <Text style={styles.checkmark}>✓</Text>
+                      )}
+                    </View>
+                    <Text style={styles.methodText}>{method.label}</Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <Text style={styles.placeholderText}>No methods available</Text>
+              )}
+            </View>
+            {selectedMethods.length > 0 && (
+              <Text style={styles.selectedMethodsText}>
+                Selected: {selectedMethods.join(', ')}
+              </Text>
+            )}
+          </View>
         </View>
         <Button
           buttonText={'View Rulset'}
@@ -238,11 +287,23 @@ export const SoftsanctionProcess = () => {
               return;
             }
 
+            if (selectedMethods.length === 0) {
+              Toast.show({
+                type: 'error',
+                text1: 'Please select at least one Method',
+              });
+              return;
+            }
+
             setShowLeads(true);
             const bank = bankList.find(b => b.id.toString() === selectedBank);
+            const methodParam = selectedMethods.length > 0 ? selectedMethods.join(',') : '';
+            
+            
             navigation.navigate('SoftSanctionRuleset', {
               bankName: bank ? bank.bank_name.trim() : '',
               product: selectedProduct ?? '',
+              method: methodParam,
             } as any);
           }}
         />
@@ -252,9 +313,7 @@ export const SoftsanctionProcess = () => {
               <View style={styles.titleWithBadge}>
                 <Text style={styles.header}>Leads</Text>
                 <View style={styles.countBadge}>
-                  <Text style={styles.countText}>
-                    {softSanctionClientList.length}
-                  </Text>
+                  <Text style={styles.countText}>{filteredLeads.length}</Text>
                 </View>
               </View>
               <View style={styles.searchContainer}>
@@ -275,7 +334,7 @@ export const SoftsanctionProcess = () => {
               </View>
             ) : softSanctionClientError ? (
               <Text style={{textAlign: 'center', color: 'red', marginTop: 20}}>
-                {softSanctionClientError}
+                {String(softSanctionClientError)}
               </Text>
             ) : (
               <FlatList
@@ -289,7 +348,11 @@ export const SoftsanctionProcess = () => {
                         ?.bank_name.trim() || ''
                     }
                     productName={selectedProduct || ''}
-                    methodName={selectedMethod || ''}
+                    methodName={
+                      selectedMethods.length > 0
+                        ? selectedMethods.join(',')
+                        : ''
+                    }
                     rulesetId={selectedRulesetId || ''}
                   />
                 )}
@@ -406,4 +469,66 @@ const styles = StyleSheet.create({
     padding: 10,
     color: '#000',
   },
+  methodsContainer: {
+    marginBottom: scaleHeight(20),
+  },
+  methodsLabel: {
+    fontSize: scaleFont(14),
+    fontWeight: fontWeight.SemiBold,
+    color: Colors.darkGray,
+    marginBottom: scaleHeight(8),
+  },
+  methodsList: {
+    backgroundColor: Colors.LimeGray,
+    borderRadius: 6,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: Colors.SteelGray,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  methodItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: Colors.SteelGray,
+    borderRadius: 4,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.white,
+  },
+  checkedBox: {
+    backgroundColor: Colors.primaryColor,
+    borderColor: Colors.primaryColor,
+  },
+  checkmark: {
+    color: Colors.white,
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  methodText: {
+    fontSize: scaleFont(14),
+    color: Colors.black,
+    flex: 1,
+  },
+  selectedMethodsText: {
+    fontSize: scaleFont(12),
+    color: Colors.gray500,
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  placeholderText: {
+    fontSize: scaleFont(14),
+    color: Colors.gray500,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+
 });

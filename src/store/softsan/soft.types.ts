@@ -18,6 +18,11 @@ export type SoftState = {
   softSanctionFields: Record<string, any[]>;
   softSanctionFieldsLoading: boolean;
   softSanctionFieldsError: string | null;
+
+  // Dynamic API call result
+  softSanctionResult: unknown;
+  softSanctionResultLoading: boolean;
+  softSanctionResultError: string | null;
 };
 
 export interface ISoftSanctionPayload {
@@ -67,11 +72,10 @@ export interface ISoftSanctionClient {
   monthly_turnover: string | null;
   estimated_funding_required: number | null;
   credit_period_offer: number | null;
-  user: any;
+  user: unknown;
 }
 
 export interface ISoftSanctionClientListResponse {
   statusCode: number;
   data: ISoftSanctionClient[];
 }
-

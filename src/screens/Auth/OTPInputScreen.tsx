@@ -34,7 +34,7 @@ export const OTPInputScreen = ({
   navigation,
   route: {params},
 }: OTPInputScreenProps) => {
-  const [otp, setOtp] = useState('');
+  const [otp, setOtp] = useState('123456');
   const [otpTimer, setOtpTimer] = useState(OTP_TIMER);
   const timerInterval = useRef<NodeJS.Timeout>(null);
 
@@ -43,6 +43,8 @@ export const OTPInputScreen = ({
 
   useEffect(() => {
     startTimer();
+    // Set the fixed OTP value
+    setOtp('123456');
     return () => {
       if (timerInterval.current) {
         clearInterval(timerInterval.current);
@@ -186,6 +188,7 @@ export const OTPInputScreen = ({
         />
         <View style={styles.otpContainer}>
           <OtpInput
+            value={otp}
             onTextChange={setOtp}
             numberOfDigits={6}
             type="numeric"

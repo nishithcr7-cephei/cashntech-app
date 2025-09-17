@@ -1,12 +1,17 @@
 import {call, put, takeLatest} from 'redux-saga/effects';
 import softApi from '@services/api/soft.api';
 import {Result} from '@utils/TryCatch';
+import {storage} from '@services/localStorage';
+import {Config} from '@config/index';
+import StorageKeys from '@constants/StorageKeys';
 import {
   getSoftSanction,
   getSoftSanctionBnkPro,
   getSoftSanctionClientList,
   getSoftSanctionFields,
+  getSoftSanctionResult,
   getSoftSanctionRuleset,
+  runSoftSanction,
   setSoftSanctionBnkProList,
   setSoftSanctionClientList,
   setSoftSanctionClientListError,
@@ -14,6 +19,8 @@ import {
   setSoftSanctionFieldsError,
   setSoftSanctionFieldsLoading,
   setSoftSanctionList,
+  setSoftSanctionResult,
+  setSoftSanctionResultError,
   setSoftSanctionRuleset,
   setSoftSanctionRulesetError,
 } from './soft.slice';
@@ -98,12 +105,59 @@ function* handleGetSoftSanctionFields(action: any): Generator<any, void, any> {
   }
 }
 
+function* handleRunSoftSanction(action: any): Generator<any, void, any> {
+  try {
+    const {url, payload} = action.payload;
+    
+    // Get token from storage
+    
+    const token = storage.getString(StorageKeys.TOKEN);
+    
+    const response = yield call(fetch, url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Device-Type': 'mobile',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const result = yield call([response, 'json']);
+    
+    yield put(setSoftSanctionResult(result));
+  } catch (error: any) {
+    yield put(setSoftSanctionResultError(error.message || 'Failed to run soft sanction'));
+  }
+}
+
+function* handleGetSoftSanctionResult(action: any): Generator<any, void, any> {
+  try {
+    const {clientId, method, bank} = action.payload;
+    
+    const {data, error}: Result<any> = yield call(
+      softApi.softSanctionResult,
+      clientId,
+      method,
+      bank,
+    );
+    
+    if (!error && data) {
+      yield put(setSoftSanctionResult(data));
+    } else {
+      yield put(setSoftSanctionResultError(error?.message || 'Failed to fetch soft sanction result'));
+    }
+  } catch (error: any) {
+    yield put(setSoftSanctionResultError(error.message || 'Failed to fetch soft sanction result'));
+  }
+}
+
 export default function* softSaga() {
   yield takeLatest(getSoftSanction.type, handleGetSoftSantion);
   yield takeLatest(getSoftSanctionBnkPro.type, handleGetSoftSantionBnkPro);
   yield takeLatest(getSoftSanctionRuleset.type, handleGetSoftSanctionRuleset);
   yield takeLatest(getSoftSanctionClientList.type, handleGetSoftSanctionClientList);
   yield takeLatest(getSoftSanctionFields.type, handleGetSoftSanctionFields);
+  yield takeLatest(runSoftSanction.type, handleRunSoftSanction);
+  yield takeLatest(getSoftSanctionResult.type, handleGetSoftSanctionResult);
 }
-
-

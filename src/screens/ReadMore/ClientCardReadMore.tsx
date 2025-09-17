@@ -15,7 +15,6 @@ import Endpoints from '@constants/ApiEndPoints';
 import {useDispatch, useSelector} from 'react-redux';
 import {clientActions, clientSelector} from '@store/client';
 import {decryptLocation} from '@utils/crypto';
-import axiosInstance from '@services/api/api';
 
 type SectionProps = {
   title: string;
@@ -44,22 +43,6 @@ export const ClientCardReadMore = ({
     console.log('ClientCardReadMore - Dispatching getClientDetails for ID:', clientId);
     console.log('ClientCardReadMore - Action available:', typeof clientActions.getClientDetails);
     dispatch(clientActions.getClientDetails(clientId));
-    
-    // Direct API test to bypass Redux
-    const testDirectAPI = async () => {
-      try {
-        console.log('Direct API test starting...');
-        console.log('axiosInstance baseURL:', axiosInstance.defaults.baseURL);
-        const response = await axiosInstance.get(`/client-info-master/details/${clientId}`);
-        const json = response.data;
-        console.log('Direct API Response:', json);
-        console.log('Direct API - data exists:', !!json.data);
-        console.log('Direct API - first item:', json.data && json.data[0] ? json.data[0] : 'No data[0]');
-      } catch (error) {
-        console.log('Direct API Error:', error);
-      }
-    };
-    testDirectAPI();
     
     // Set a small delay to wait for data
     const timer = setTimeout(() => {

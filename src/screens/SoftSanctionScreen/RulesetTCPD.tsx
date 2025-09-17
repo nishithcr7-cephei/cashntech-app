@@ -89,7 +89,11 @@ export const RulesetTCPD = () => {
           renderItem={({item}) => (
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => navigation.navigate('UGROTurnoverMethod')}>
+              onPress={() => navigation.navigate('UGROTurnoverMethod', {
+                clientId: '1',
+                method: item.methodName,
+                bank: item.bankName,
+              })}>
               <RulesetTCPDCard RulesetTCPD={item} />
             </TouchableOpacity>
           )}

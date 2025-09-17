@@ -10,7 +10,19 @@ import {
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 
-export const SoftSanctionModal = ({visible, onClose, onRun}) => {
+type SoftSanctionModalProps = {
+  visible: boolean;
+  onClose: () => void;
+  onRun?: (payload: {purchaseValue: string; turnoverValue: string}) => void;
+  runUrl?: string;
+};
+
+export const SoftSanctionModal: React.FC<SoftSanctionModalProps> = ({
+  visible,
+  onClose,
+  onRun,
+  runUrl,
+}) => {
   const [purchaseValue, setPurchaseValue] = useState('');
   const [turnoverValue, setTurnoverValue] = useState('');
 
@@ -73,8 +85,13 @@ export const SoftSanctionModal = ({visible, onClose, onRun}) => {
                   return;
                 }
 
-                // If validation passes, call onRun
-                onRun({purchaseValue, turnoverValue});
+                // Call the onRun callback with the values
+                if (onRun) {
+                  onRun({
+                    purchaseValue: purchaseValue.trim(),
+                    turnoverValue: turnoverValue.trim(),
+                  });
+                }
               }}>
               <Text style={styles.runText}>Run</Text>
             </TouchableOpacity>

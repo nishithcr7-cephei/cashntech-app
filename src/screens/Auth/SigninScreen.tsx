@@ -34,8 +34,8 @@ const Strings = {
 };
 
 export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
-  const [email, setEmail] = useState('');
-  const [passwordValue, setPassword] = useState('');
+  const [email, setEmail] = useState('piyush.sharma@cepheiinfotech.com');
+  const [passwordValue, setPassword] = useState('123456789@');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 

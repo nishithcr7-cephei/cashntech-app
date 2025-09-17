@@ -128,6 +128,11 @@ export type ClientState = {
   leadProgressDetailsLoading: boolean;
   leadProgressDetailsError: string | null;
 
+  // Soft Sanction Result
+  softSanctionResult: any | null;
+  softSanctionResultLoading: boolean;
+  softSanctionResultError: string | null;
+
   // Remark Report fields
   reportLoader: boolean;
   reportList: Array<IRemarkReportResponseDatum>;

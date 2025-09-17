@@ -201,15 +201,6 @@ const getCompanyInfoError = createSelector(
   state => state.CompanyInfoError,
 );
 
-const getSoftSanctionMethod = createSelector(
-  _selectState,
-  _state => _state.SoftSanctionData,
-);
-
-const getSoftSanctionBnkPro = createSelector(
-  _selectState,
-  _state => _state.SoftSanctionBNKPROData,
-);
 
 const getFilterbox = createSelector(
   _selectState,
@@ -221,38 +212,6 @@ const getTaskRecordsFilter = createSelector(
   _state => _state.TaskRecordsFilterData,
 );
 
-const getSoftSanctionRuleset = createSelector(
-  _selectState,
-  _state => _state.rulesetData,
-);
-const getSoftSanctionRulesetLoading = createSelector(
-  _selectState,
-  _state => _state.rulesetLoading,
-);
-const getSoftSanctionRulesetError = createSelector(
-  _selectState,
-  _state => _state.rulesetError,
-);
-
-const getSoftSanctionClientList = createSelector(
-  _selectState,
-  _state => _state.softSanctionClientList,
-);
-const getSoftSanctionClientLoading = createSelector(
-  _selectState,
-  _state => _state.softSanctionClientLoading,
-);
-const getSoftSanctionClientError = createSelector(
-  _selectState,
-  _state => _state.softSanctionClientError,
-);
-
-export const getSoftSanctionFields = (state: {client: any}) =>
-  state.client.softSanctionFields;
-export const getSoftSanctionFieldsLoading = (state: {client: any}) =>
-  state.client.softSanctionFieldsLoading;
-export const getSoftSanctionFieldsError = (state: {client: any}) =>
-  state.client.softSanctionFieldsError;
 
 const getBankStatement = createSelector(
   _selectState,
@@ -340,19 +299,8 @@ export default {
   getCompanyInfoLoading,
   getCompanyInfoData,
   getCompanyInfoError,
-  getSoftSanctionMethod,
-  getSoftSanctionBnkPro,
   getFilterbox,
   getTaskRecordsFilter,
-  getSoftSanctionRuleset,
-  getSoftSanctionRulesetLoading,
-  getSoftSanctionRulesetError,
-  getSoftSanctionClientList,
-  getSoftSanctionClientLoading,
-  getSoftSanctionClientError,
-  getSoftSanctionFields,
-  getSoftSanctionFieldsLoading,
-  getSoftSanctionFieldsError,
   getBankStatement,
   getClientDetails,
   getClientDetailsLoading,
