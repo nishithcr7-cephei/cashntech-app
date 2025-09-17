@@ -107,7 +107,7 @@ export const SoftsanctionProcess = () => {
 
   useEffect(() => {
     if (selectedBank && selectedProduct) {
-      const bank = bankList.find(b => b.id.toString() === selectedBank);
+      const bank = bankList.find((b: any) => b.id.toString() === selectedBank);
       if (bank) {
         dispatch({
           type: getSoftSanctionBnkPro.type,
@@ -138,7 +138,7 @@ export const SoftsanctionProcess = () => {
     }, [showLeads, dispatch]),
   );
 
-  const formattedBankList = bankList.map(bank => ({
+  const formattedBankList = bankList.map((bank: any) => ({
     label: bank.bank_name.trim(),
     value: bank.id.toString(),
   }));
@@ -230,9 +230,39 @@ export const SoftsanctionProcess = () => {
           />
           <View style={styles.methodsContainer}>
             <Text style={styles.methodsLabel}>Methods</Text>
-            <View style={styles.methodsList}>
-              {formattedMethodList.length > 0 ? (
-                formattedMethodList.map((method, index) => (
+            <TouchableOpacity 
+              style={[
+                styles.methodsDropdown,
+                !selectedProduct && styles.disabledDropdown
+              ]}
+              onPress={() => {
+                if (!selectedProduct) {
+                  Toast.show({
+                    type: 'error',
+                    text1: 'Please select a Product first',
+                  });
+                  return;
+                }
+                // This will be handled by the dropdown logic
+              }}
+              disabled={!selectedProduct}
+            >
+              <Text style={[
+                styles.methodsPlaceholder,
+                selectedMethods.length > 0 && styles.selectedMethodsDisplay,
+                !selectedProduct && styles.disabledText
+              ]}>
+                {!selectedProduct 
+                  ? 'Select Product first' 
+                  : selectedMethods.length > 0 
+                    ? selectedMethods.join(', ') 
+                    : 'Select Methods'
+                }
+              </Text>
+            </TouchableOpacity>
+            {formattedMethodList.length > 0 && selectedProduct && (
+              <View style={styles.methodsList}>
+                {formattedMethodList.map((method, index) => (
                   <TouchableOpacity
                     key={index}
                     style={styles.methodItem}
@@ -254,15 +284,8 @@ export const SoftsanctionProcess = () => {
                     </View>
                     <Text style={styles.methodText}>{method.label}</Text>
                   </TouchableOpacity>
-                ))
-              ) : (
-                <Text style={styles.placeholderText}>No methods available</Text>
-              )}
-            </View>
-            {selectedMethods.length > 0 && (
-              <Text style={styles.selectedMethodsText}>
-                Selected: {selectedMethods.join(', ')}
-              </Text>
+                ))}
+              </View>
             )}
           </View>
         </View>
@@ -296,7 +319,7 @@ export const SoftsanctionProcess = () => {
             }
 
             setShowLeads(true);
-            const bank = bankList.find(b => b.id.toString() === selectedBank);
+            const bank = bankList.find((b: any) => b.id.toString() === selectedBank);
             const methodParam = selectedMethods.length > 0 ? selectedMethods.join(',') : '';
             
             
@@ -344,7 +367,7 @@ export const SoftsanctionProcess = () => {
                     lead={item}
                     bankName={
                       bankList
-                        .find(b => b.id.toString() === selectedBank)
+                        .find((b: any) => b.id.toString() === selectedBank)
                         ?.bank_name.trim() || ''
                     }
                     productName={selectedProduct || ''}
@@ -478,14 +501,39 @@ const styles = StyleSheet.create({
     color: Colors.darkGray,
     marginBottom: scaleHeight(8),
   },
-  methodsList: {
+  methodsDropdown: {
     backgroundColor: Colors.LimeGray,
     borderRadius: 6,
-    padding: 8,
+    padding: 12,
     borderWidth: 1,
     borderColor: Colors.SteelGray,
     minHeight: 40,
     justifyContent: 'center',
+    marginBottom: 8,
+  },
+  disabledDropdown: {
+    backgroundColor: Colors.LimeGray,
+    opacity: 0.6,
+    borderColor: Colors.gray500,
+  },
+  methodsPlaceholder: {
+    fontSize: scaleFont(14),
+    color: Colors.gray500,
+  },
+  selectedMethodsDisplay: {
+    color: Colors.black,
+  },
+  disabledText: {
+    color: Colors.gray500,
+    fontStyle: 'italic',
+  },
+  methodsList: {
+    backgroundColor: Colors.white,
+    borderRadius: 6,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: Colors.SteelGray,
+    maxHeight: 200,
   },
   methodItem: {
     flexDirection: 'row',
@@ -522,12 +570,6 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(12),
     color: Colors.gray500,
     marginTop: 8,
-    fontStyle: 'italic',
-  },
-  placeholderText: {
-    fontSize: scaleFont(14),
-    color: Colors.gray500,
-    textAlign: 'center',
     fontStyle: 'italic',
   },
 
