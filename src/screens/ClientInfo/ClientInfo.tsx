@@ -50,10 +50,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
   const loading = useSelector(clientSelector.getClientLoader);
 
   const filteredClients = useMemo(() => {
-    // Use API filtered results if available, otherwise use clientsData
-    const baseData = apiFilteredClients.length > 0 ? apiFilteredClients : clientsData;
-    
-    if (!searchQuery) return baseData;
+    if (!searchQuery.trim()) return clientsData;
     const lowerCaseQuery = searchQuery.trim().toLowerCase();
     return baseData.filter(client => {
       const firmName = client.firm_name ?? '';

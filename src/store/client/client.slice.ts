@@ -46,6 +46,7 @@ const basicDetails: BasicDetailsType = {
   firmName: '',
   city: '',
   state: undefined,
+  pincode: '',
   location: '',
   dateOfVisit: undefined,
   productType: '',
@@ -203,6 +204,36 @@ const initialState: ClientState = {
   leadProgressDetails: [],
   leadProgressDetailsLoading: false,
   leadProgressDetailsError: null,
+  
+  // SoftSanction Bank Method
+  SoftSanctionLoading: false,
+  SoftSanctionData: [],
+  SoftSanctionError: null,
+  
+  // SoftSanction Bank Product
+  SoftSanctionBNKPROLoading: false,
+  SoftSanctionBNKPROData: [],
+  SoftSanctionBNKPROError: null,
+  
+  // Ruleset
+  rulesetLoading: false,
+  rulesetData: [],
+  rulesetError: null,
+  
+  // Soft Sanction Client
+  softSanctionClientLoading: false,
+  softSanctionClientList: [],
+  softSanctionClientError: null,
+  
+  // Soft Sanction Fields
+  softSanctionFields: {},
+  softSanctionFieldsLoading: false,
+  softSanctionFieldsError: null,
+  
+  // Soft Sanction Result
+  softSanctionResult: null,
+  softSanctionResultLoading: false,
+  softSanctionResultError: null,
 };
 
 const clientSlice = createSlice({

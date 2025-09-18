@@ -8,7 +8,9 @@ const getClientLoader = createSelector(
   _state => _state.clientLoader,
 );
 const getClientList = createSelector(_selectState, _state => _state.clientList);
-const getCityList = createSelector(_selectState, _state => _state.cityList);
+const getCityList = createSelector(_selectState, _state =>
+  _state.cityList.filter(Boolean),
+);
 const getClientFormId = createSelector(
   _selectState,
   _state => _state.clientFormId,

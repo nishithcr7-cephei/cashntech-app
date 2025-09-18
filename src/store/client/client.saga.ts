@@ -64,6 +64,7 @@ import {
   BasicDetailsResponse,
   IBankListResponse,
   ILeadProgressResponse,
+  ILeadProgressResponseDatum,
   IUploadKycDocumentPayload,
   IUploadKycDocumentResponse,
   IKycCheckedResponse,
@@ -322,6 +323,7 @@ function* saveBasicDetails(): unknown {
     created_by: `${first_name} ${last_name}`,
     date_of_visit: moment(basicDetailForm.dateOfVisit).toISOString(),
     firm_name: encryptUtility(basicDetailForm.firmName.trim()),
+    pin_code: encryptUtility(basicDetailForm.pincode.trim()),
     program_type: basicDetailForm.programType,
     product_type: basicDetailForm.productType,
     userId: id,
@@ -362,6 +364,7 @@ function* updateBasicDetails(): unknown {
     created_by: `${first_name} ${last_name}`,
     date_of_visit: moment(basicDetailForm.dateOfVisit).toISOString(),
     firm_name: encryptUtility(basicDetailForm.firmName.trim()),
+    pin_code: encryptUtility(basicDetailForm.pincode.trim()),
     program_type: basicDetailForm.programType,
     product_type: basicDetailForm.productType,
     userId: id,
@@ -407,6 +410,7 @@ function* getBasicDetailsSaga(action: PayloadAction<number>): unknown {
       state: decryptUtility(data.state) as keyof typeof Cities,
       city: decryptUtility(data.city),
       dateOfVisit: data.date_of_visit,
+      pincode: decryptUtility(data.pin_code),
       address: decryptUtility(data.address),
       productType: data.product_type,
       programType: data.program_type,
@@ -1174,7 +1178,7 @@ function* handleFilterbox(action: PayloadAction<IFilterPayload>) {
     } else {
       yield put(clientActions.FilterFailure(error?.response?.data?.message || error?.message || 'Unknown error'));
     }
-  } catch (error: AxiosError<{message?: string}>) {
+  } catch (error: any) {
     yield put(clientActions.FilterFailure(error.response?.data?.message || error.message || 'Unexpected error'));
   }
 }
