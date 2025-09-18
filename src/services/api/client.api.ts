@@ -763,6 +763,7 @@ const softSanctionExportDownload = async (
   clientId: string | number,
   method: string,
   product: string,
+  bank: string,
 ) => {
   // For file downloads, we need to get the token and construct the URL manually
   const token = storage.getString(StorageKeys.TOKEN);
@@ -770,7 +771,7 @@ const softSanctionExportDownload = async (
     Config.API_URL
   }/client-info-master/soft-sanction/export/${clientId}?method=${encodeURIComponent(
     method,
-  )}&product=${encodeURIComponent(product)}`;
+  )}&product=${encodeURIComponent(product)}&bank=${encodeURIComponent(bank)}`;
 
   return {
     url,

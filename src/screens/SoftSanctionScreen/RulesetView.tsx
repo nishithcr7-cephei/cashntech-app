@@ -181,11 +181,13 @@ export const RulesetView = () => {
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() =>
-                    navigation.navigate('UGROTurnoverMethod', {
+                    navigation.push('UGROTurnoverMethod', {
                       clientId: clientId || '',
                       method: (item as any)?.method || '',
                       bank: (metaInfo as any).bank_name,
-                    })
+                      product: (metaInfo as any).product,
+                      clientName: clientName || '',
+                    } as any)
                   }>
                   <RulesetViewCard data={item as any} />
                 </TouchableOpacity>

@@ -87,6 +87,8 @@ export type SoftNavigatorType = {
     clientId: string;
     method: string;
     bank: string;
+    product?: string;
+    clientName?: string;
   };
   UGROPurchaseMethod: undefined;
   RulesetView:

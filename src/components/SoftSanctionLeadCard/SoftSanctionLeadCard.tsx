@@ -72,7 +72,8 @@ export const LeadCard: React.FC<LeadProps> = ({
 
   // Handle the result from Redux
   useEffect(() => {
-    if (softSanctionResult) {
+    if (softSanctionResult && showModal) {
+      // Only navigate if the modal is currently shown (i.e., this component is active)
       
       // Navigate based on result
       if (softSanctionResult.statusCode === 500 || softSanctionResult?.error || softSanctionResult?.message) {
@@ -99,11 +100,12 @@ export const LeadCard: React.FC<LeadProps> = ({
       // Clear the result after handling
       dispatch(clearSoftSanctionResult());
     }
-  }, [softSanctionResult, dispatch, navigation, lead, setShowModal]);
+  }, [softSanctionResult, dispatch, navigation, lead, setShowModal, showModal]);
 
   // Handle errors from Redux
   useEffect(() => {
-    if (softSanctionResultError) {
+    if (softSanctionResultError && showModal) {
+      // Only navigate if the modal is currently shown (i.e., this component is active)
       setShowModal(false);
       dispatch(clearSoftSanctionFields());
       navigation.navigate('RulesetView', {
@@ -115,7 +117,7 @@ export const LeadCard: React.FC<LeadProps> = ({
       } as any);
       dispatch(clearSoftSanctionResult());
     }
-  }, [softSanctionResultError, dispatch, navigation, lead, setShowModal]);
+  }, [softSanctionResultError, dispatch, navigation, lead, setShowModal, showModal]);
 
   const handleOpenModal = () => {
     setShowModal(true);

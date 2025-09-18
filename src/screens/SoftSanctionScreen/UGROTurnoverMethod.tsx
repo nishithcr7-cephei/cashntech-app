@@ -9,7 +9,7 @@ import {
   Image,
   Linking,
 } from 'react-native';
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {LeftChevronCircle} from '@assets/Icons';
 import {Container, AppBar} from '@components/index';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
@@ -17,6 +17,7 @@ import {
   CompositeNavigationProp,
   useNavigation,
   useRoute,
+  useFocusEffect,
 } from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {HomeNavigatorType, SoftNavigatorType} from '@type/NavigatorTypes';
@@ -32,7 +33,7 @@ import Toast from 'react-native-toast-message';
 import {PermissionsAndroid} from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 import softSelector from '@store/softsan/soft.selector';
-import {getSoftSanctionResult} from '@store/softsan/soft.slice';
+import {getSoftSanctionResult, clearSoftSanctionResult} from '@store/softsan/soft.slice';
 
 type SoftInfoNavigationType = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType>,
@@ -56,11 +57,12 @@ export const UGROTurnoverMethod = () => {
   const navigation = useNavigation<SoftInfoNavigationType>();
   const route = useRoute();
   const dispatch = useDispatch();
-  const {clientId, method, bank, product} = (route.params || {}) as {
+  const {clientId, method, bank, product, clientName} = (route.params || {}) as {
     clientId: string;
     method: string;
     bank: string;
     product?: string;
+    clientName?: string;
   };
   
   // Redux selectors
@@ -69,6 +71,7 @@ export const UGROTurnoverMethod = () => {
   const softSanctionResultError = useSelector(softSelector.getSoftSanctionResultError);
   
   const [result, setResult] = useState<any>(null);
+  const [currentMethod, setCurrentMethod] = useState<string>('');
 
   // Indian number formatting (same comma style as used elsewhere like ClientInfo)
   const formatIndianNumber = (num: number | string): string => {
@@ -96,14 +99,26 @@ export const UGROTurnoverMethod = () => {
     } else if (/wc/i.test(sanitizedMethod)) {
       sanitizedMethod = 'WC(Stock)';
     }
+    
+    // Clear previous result if method has changed
+    if (currentMethod && currentMethod !== sanitizedMethod) {
+      dispatch(clearSoftSanctionResult());
+      setResult(null);
+    }
+    
+    // Update current method
+    setCurrentMethod(sanitizedMethod);
+    
     if (clientId && sanitizedMethod && bank) {
+      // Clear any existing result first to prevent conflicts
+      dispatch(clearSoftSanctionResult());
       dispatch(getSoftSanctionResult({
         clientId,
         method: sanitizedMethod,
         bank
       }));
     }
-  }, [clientId, method, bank]);
+  }, [clientId, method, bank, currentMethod, dispatch]);
 
   // Handle Redux result
   useEffect(() => {
@@ -111,6 +126,22 @@ export const UGROTurnoverMethod = () => {
       setResult(softSanctionResult);
     }
   }, [softSanctionResult]);
+
+  // Cleanup effect when component unmounts
+  useEffect(() => {
+    return () => {
+      // Clear the result when component unmounts to prevent stale data
+      dispatch(clearSoftSanctionResult());
+    };
+  }, [dispatch]);
+
+  // Clear Redux state when screen is focused to prevent navigation conflicts
+  useFocusEffect(
+    useCallback(() => {
+      // Clear any existing result when screen is focused
+      dispatch(clearSoftSanctionResult());
+    }, [dispatch])
+  );
 
   // Use Redux loading and error states
   const loading = softSanctionResultLoading;
@@ -146,10 +177,29 @@ export const UGROTurnoverMethod = () => {
     productName = result.data.product_name || '';
   }
 
+
+  // Function to generate filename
+  const generateFileName = () => {
+    const currentDate = new Date();
+    const day = String(currentDate.getDate()).padStart(2, '0');
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const year = currentDate.getFullYear();
+    const dateStr = `${day}-${month}-${year}`;
+    
+    // Clean client name for filename (remove special characters)
+    const cleanClientName = (clientName || 'Client').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, ' ');
+    const fileName = `${cleanClientName}-${dateStr}.xlsx`;
+    
+    
+    return fileName;
+  };
+
   const handleDownload = async () => {
     try {
       const exportProduct = product || productName;
       let exportMethod = method || methodName;
+      
+      
       // Sanitize method to backend-expected tokens
       if (/turnover/i.test(exportMethod)) {
         exportMethod = 'Turnover';
@@ -158,8 +208,9 @@ export const UGROTurnoverMethod = () => {
       } else if (/wc/i.test(exportMethod)) {
         exportMethod = 'WC(Stock)';
       }
-      if (!clientId || !exportMethod || !exportProduct) {
-        Alert.alert('Error', 'Missing clientId, method, or product for export');
+      
+      if (!clientId || !exportMethod || !exportProduct || !bank) {
+        Alert.alert('Error', `Missing required data for export:\nClientId: ${clientId}\nMethod: ${exportMethod}\nProduct: ${exportProduct}\nBank: ${bank}`);
         return;
       }
       
@@ -168,12 +219,15 @@ export const UGROTurnoverMethod = () => {
         clientId,
         exportMethod,
         exportProduct,
+        bank,
       );
       
+      
+      const fileName = generateFileName();
       let filePath = '';
       let showPath = '';
       if (Platform.OS === 'android') {
-        filePath = `${RNFS.DownloadDirectoryPath}/SoftSanction.xlsx`;
+        filePath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
         showPath = 'Downloads folder';
         const androidVersion = Number(Platform.Version);
         if (androidVersion <= 29) {
@@ -194,7 +248,7 @@ export const UGROTurnoverMethod = () => {
           }
         }
       } else {
-        filePath = `${RNFS.DocumentDirectoryPath}/SoftSanction.xlsx`;
+        filePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
         showPath = 'App private folder';
       }
 
@@ -208,7 +262,7 @@ export const UGROTurnoverMethod = () => {
         Toast.show({
           type: 'success',
           text1: 'Download complete',
-          text2: `File saved to ${showPath}.`,
+          text2: `File "${fileName}" saved to ${showPath}.`,
         });
       } else {
         Toast.show({
@@ -253,7 +307,7 @@ export const UGROTurnoverMethod = () => {
         <Text style={styles.Subheader}>Soft Sanction</Text>
       </View>
       <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backBtn} onPress={navigation.goBack}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <LeftChevronCircle height={20} width={20} />
         </TouchableOpacity>
         {(bankName || methodName || productName) && (
@@ -274,7 +328,7 @@ export const UGROTurnoverMethod = () => {
           <Text>Loading...</Text>
         ) : error ? (
           <Text style={{color: 'red'}}>{error}</Text>
-        ) : results ? (
+        ) : (results || result) ? (
           <View style={styles.dynamicCard}>
             <TouchableOpacity
               style={styles.downloadIconContainer}
@@ -284,7 +338,7 @@ export const UGROTurnoverMethod = () => {
                 style={styles.downloadIcon}
               />
             </TouchableOpacity>
-            {Object.entries(results).map(([label, value]) => {
+            {results ? Object.entries(results).map(([label, value]) => {
               const isNumeric =
                 typeof value === 'number' ||
                 (typeof value === 'string' && /^\d{1,3}(,\d{3})*(\.\d+)?$|^\d+(\.\d+)?$/.test(value));
@@ -297,7 +351,9 @@ export const UGROTurnoverMethod = () => {
                   </Text>
                 </View>
               );
-            })}
+            }) : (
+              <Text style={styles.resultRow}>Data available for download</Text>
+            )}
           </View>
         ) : (
           <Text>No results found.</Text>
@@ -354,10 +410,15 @@ const styles = StyleSheet.create({
     top: 8,
     right: 8,
     zIndex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   downloadIcon: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
     tintColor: '#888',
   },
   resultRow: {
