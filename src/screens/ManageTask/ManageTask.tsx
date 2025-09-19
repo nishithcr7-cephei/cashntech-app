@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   FlatList,
   StyleSheet,
+  TouchableOpacity,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
@@ -16,10 +17,19 @@ import {scaleFont} from '@utils/Scale';
 import {decryptLocation} from '@utils/crypto';
 import * as mngActions from '@store/mng';
 import { mngSelector, TaskRecordItem } from '@store/mng';
+import {CompositeNavigationProp} from '@react-navigation/native';
+import {DrawerNavigationProp} from '@react-navigation/drawer';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {HomeNavigatorType, DocNavigatorType} from '@type/NavigatorTypes';
 
+
+type DocNavigationType = CompositeNavigationProp<
+  DrawerNavigationProp<HomeNavigatorType>,
+  NativeStackNavigationProp<DocNavigatorType>
+>;
 
 export const ManageTask = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<DocNavigationType>();
   const dispatch = useDispatch();
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -151,9 +161,37 @@ export const ManageTask = () => {
     dispatch(mngActions.getSalesmanList());
   }, [dispatch]);
 
-  const renderItem = ({item, index}: {item: TaskRecordItem; index: number}) => (
-    <TaskCard item={item} index={index} />
-  );
+  const renderItem = ({item, index}: {item: TaskRecordItem; index: number}) => {
+    // Get the first task from the item to check status and get task details
+    const firstTask = item.task && item.task.length > 0 ? item.task[0] : null;
+    const isTaskPending = firstTask?.task_status?.toLowerCase() === 'pending';
+    
+    return (
+      <TouchableOpacity
+        onPress={() => {
+          // Only navigate if status is Pending
+          if (isTaskPending && firstTask) {
+            (navigation as any).navigate('DocNavigator', {
+              screen: 'TaskUpdate',
+              params: {
+                taskId: String(firstTask.id),
+                task_status: firstTask.task_status,
+                remark: firstTask.remark && firstTask.remark !== 'NA' ? firstTask.remark : '',
+                completed_at: firstTask.completed_at,
+                task_description: firstTask.task_description,
+                client_name: decryptLocation(item.firm_name || ''),
+                task_type: firstTask.task_type,
+                assigned_to: firstTask.assigned_to,
+              }
+            });
+          }
+          // If status is Completed, do nothing (no navigation)
+        }}
+        disabled={!isTaskPending}>
+        <TaskCard item={item} index={index} />
+      </TouchableOpacity>
+    );
+  };
 
 
   return (

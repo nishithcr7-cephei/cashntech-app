@@ -57,7 +57,7 @@ export const TaskUpdate = () => {
 
   // State for form fields
   const [completedAt, setCompletedAt] = useState<Date | null>(
-    params.completed_at ? new Date(params.completed_at) : null,
+    params.completed_at ? new Date(params.completed_at) : new Date(),
   );
   const [salesPersonName, setSalesPersonName] = useState(params.assigned_to || '');
   const [taskType, setTaskType] = useState(params.task_type || '');
@@ -225,7 +225,7 @@ export const TaskUpdate = () => {
              
              <TouchableOpacity
                style={styles.cancelButton}
-               onPress={() => navigation.goBack()}>
+               onPress={() => (navigation as any).navigate('ManageTask')}>
                <Text style={styles.cancelButtonText}>Cancel</Text>
              </TouchableOpacity>
            </View>
