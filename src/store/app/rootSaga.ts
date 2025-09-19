@@ -5,8 +5,9 @@ import tasklogSaga from '@store/tasklog/tasklog.saga';
 import mngSaga from '@store/mng/mng.saga';
 import {visitSaga} from '@store/visit';
 import {softSaga} from '@store/softsan';
+import {leadSaga} from '@store/lead';
 
 
 export default function* rootSaga() {
-  yield all([authSaga(), clientSaga(), tasklogSaga(), mngSaga(), visitSaga(), softSaga()]);
+  yield all([authSaga(), clientSaga(), tasklogSaga(), mngSaga(), visitSaga(), softSaga(), leadSaga()]);
 }

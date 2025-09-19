@@ -76,40 +76,6 @@ const getRemarkReportByClient = async (clientId: string) => {
   };
 };
 
-const getLeadProgress = async () => {
-  const {data, error} = await tryCatch<AxiosResponse<ILeadProgressResponse>>(
-    Api.get(Endpoints.apiGetLeadProgress, {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  if (error) {
-    return {
-      data: null,
-      error: error,
-    };
-  }
-  return {
-    data: data.data,
-    error: null,
-  };
-};
-const getLeadDesProgress = async (leadID: string) => {
-  const {data, error} = await tryCatch<AxiosResponse<ILeadProgressResponse>>(
-    Api.get(Endpoints.apiInfoLeadProgress(leadID), {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  if (error) {
-    return {
-      data: null,
-      error: error,
-    };
-  }
-  return {
-    data: data.data,
-    error: null,
-  };
-};
 
 const getTaskHistory = async (userName: string) => {
   const {data, error} = await tryCatch<AxiosResponse<ITaskHistoryResponse>>(
@@ -911,8 +877,6 @@ export default {
   getMasterBankList,
 
   getRemarkReport,
-  getLeadProgress,
-  getLeadDesProgress,
   getTaskHistory,
   uploadKycDocument,
   uploadPanDocument,

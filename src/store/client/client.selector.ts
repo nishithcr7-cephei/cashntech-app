@@ -71,8 +71,6 @@ const getRemarkReport = createSelector(
   _state => _state.reportList,
 );
 
-const getLeadProgress = createSelector(_selectState, _state => _state.leadList);
-const getLeadLoader = createSelector(_selectState, _state => _state.leadLoader);
 
 const getTaskHistory = createSelector(
   _selectState,
@@ -233,18 +231,6 @@ const getClientDetailsError = createSelector(
   _state => _state.clientDetailsError,
 );
 
-const getLeadProgressDetails = createSelector(
-  _selectState,
-  _state => _state.leadProgressDetails,
-);
-const getLeadProgressDetailsLoading = createSelector(
-  _selectState,
-  _state => _state.leadProgressDetailsLoading,
-);
-const getLeadProgressDetailsError = createSelector(
-  _selectState,
-  _state => _state.leadProgressDetailsError,
-);
 
 export default {
   getClientLoader,
@@ -265,8 +251,6 @@ export default {
   getMasterBankDropdown,
 
   getRemarkReport,
-  getLeadProgress,
-  getLeadLoader,
   getTaskHistory,
   getBasicDetailLoading,
   getBasicDetailError,
@@ -307,7 +291,4 @@ export default {
   getClientDetails,
   getClientDetailsLoading,
   getClientDetailsError,
-  getLeadProgressDetails,
-  getLeadProgressDetailsLoading,
-  getLeadProgressDetailsError,
 };

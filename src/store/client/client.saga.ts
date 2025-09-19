@@ -11,8 +11,6 @@ import {
   getFirmDetails,
   getKycBusinessChecked,
   getKycChecked,
-  getLead,
-  getLeadDesciption,
   getMasterBankList,
   getReport,
   getVendorDetails,
@@ -63,8 +61,6 @@ import {
   clientSelector,
   BasicDetailsResponse,
   IBankListResponse,
-  ILeadProgressResponse,
-  ILeadProgressResponseDatum,
   IUploadKycDocumentPayload,
   IUploadKycDocumentResponse,
   IKycCheckedResponse,
@@ -141,47 +137,7 @@ function* handleGetRemarkReport(): unknown {
   }
 }
 
-function* handleGetLeadProgress(): unknown {
-  try {
-    console.log('Saga: handleGetLeadProgress called');
-    const {data, error}: Result<ILeadProgressResponse> = yield call(
-      clientApi.getLeadProgress,
-    );
-    console.log('Saga: API response:', {
-      hasData: !!data,
-      hasError: !!error,
-      dataType: typeof data,
-    });
 
-    if (!error && data) {
-      console.log(
-        'Saga: Setting lead list with data length:',
-        data.data?.length || 0,
-      );
-      yield put(clientActions.setLeadList(data.data));
-    } else {
-      console.log('Saga: Setting empty lead list due to error or no data');
-      yield put(clientActions.setLeadList([]));
-    }
-  } catch (error) {
-    console.log('Saga: Error fetching lead progress:', error);
-    yield put(clientActions.setLeadList([]));
-  }
-}
-
-function* handleGetLeadDesProgress({
-  payload,
-}: PayloadAction<PayloadWithCallback<string, [Array<ILeadProgressResponseDatum>]>>): unknown {
-  const {data, error}: Result<ILeadProgressResponse> = yield call(
-    clientApi.getLeadDesProgress,
-    payload.payload,
-  );
-  if (!error) {
-    payload.callbackSuccess?.(data.data);
-  } else {
-    payload.callbackError?.();
-  }
-}
 
 function* handleGetTaskHistory(): unknown {
   const {first_name, last_name}: UserState = yield select(
@@ -1302,58 +1258,6 @@ function* handleGetClientDetails(action: PayloadAction<number>): Generator<any, 
   }
 }
 
-function* handleGetLeadProgressDetails(action: PayloadAction<number>) {
-  try {
-    console.log(
-      'Saga: handleGetLeadProgressDetails called with clientId:',
-      action.payload,
-    );
-
-    // Use the correct API function that calls the right endpoint with the lead ID
-    const {data, error} = yield call(
-      clientApi.getLeadDesProgress,
-      action.payload.toString(),
-    );
-
-    console.log('Saga: Lead progress API response:', {
-      hasData: !!data,
-      hasError: !!error,
-      dataType: typeof data,
-      isArray: Array.isArray(data),
-      dataLength: data?.length,
-      errorMessage: error?.message,
-    });
-
-    if (!error && data && Array.isArray(data)) {
-      const mapped = data.map((item: any) => ({
-        id: item.id,
-        status: item.current_status,
-        date: item.completed_at
-          ? new Date(item.completed_at).toISOString().slice(0, 10)
-          : 'N/A',
-        remark: item.remark ?? 'N/A',
-        tat: item.turn_around_time?.toString() ?? 'N/A',
-      }));
-      console.log('Saga: Mapped data:', mapped);
-      yield put(clientActions.setLeadProgressDetails(mapped));
-      console.log(
-        'Saga: Lead progress details set successfully, mapped items:',
-        mapped.length,
-      );
-    } else {
-      console.log('Saga: No valid data, setting empty array. Error:', error);
-      yield put(clientActions.setLeadProgressDetails([]));
-      console.log('Saga: No lead progress data found, setting empty array');
-    }
-  } catch (error: any) {
-    console.log('Saga: Lead progress error:', error);
-    yield put(
-      clientActions.setLeadProgressDetailsError(
-        error.message || 'Failed to fetch lead progress',
-      ),
-    );
-  }
-}
 
 export default function* clientSaga() {
   yield takeLatest(getClients.type, handleGetClientsFilter);
@@ -1374,8 +1278,6 @@ export default function* clientSaga() {
   yield takeLatest(prepareClientForEdit.type, handlePrepareClientForEdit);
   yield takeLatest(deleteClientRequest.type, handleDeleteClient);
   yield takeLatest(getReport.type, handleGetRemarkReport);
-  yield takeLatest(getLead.type, handleGetLeadProgress);
-  yield takeLatest(getLeadDesciption.type, handleGetLeadDesProgress);
 
   yield takeLatest(uploadKycRequest.type, handleUploadKyc);
   yield takeLatest(uploadPanRequest.type, handleUploadPan);
@@ -1394,8 +1296,4 @@ export default function* clientSaga() {
   yield takeLatest(TaskRecordsFilterRequest.type, handleTaskRecordsFilter);
   yield takeLatest(bankStatementRequest.type, handleBankStatement);
   yield takeLatest(clientActions.getClientDetails.type, handleGetClientDetails);
-  yield takeLatest(
-    clientActions.getLeadProgressDetails.type,
-    handleGetLeadProgressDetails,
-  );
 }

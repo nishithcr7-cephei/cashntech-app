@@ -1,11 +1,12 @@
 import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import React from 'react';
 import Colors from '@constants/Colors';
-import {ILeadProgressResponseDatum} from '@store/client';
+import {ILeadProgressResponseDatum} from '@store/lead';
 import {decryptLocation, decryptConditionally} from '@utils/crypto';
 
 interface LeadProgressProps {
   data: ILeadProgressResponseDatum;
+  index: number;
   onPress: () => void;
 }
 
@@ -17,6 +18,7 @@ const ChipColors = {
 
 export const LeadProgressCard: React.FC<LeadProgressProps> = ({
   data,
+  index,
   onPress,
 }) => {
   // Debug log for city field
@@ -33,17 +35,19 @@ export const LeadProgressCard: React.FC<LeadProgressProps> = ({
       </View> */}
 
       {[
-        {label: 'Client Id', value: data.id ?? 'N/A'},
-        {label: 'Client Name', value: data.client_name != null ? decryptLocation(data.client_name) : 'N/A'},
+        {label: 'Sr.No', value: (index + 1).toString()},
+        {label: 'Firm Name', value: data.firm_name != null ? decryptConditionally(data.firm_name) : 'N/A'},
+        {label: 'Sector', value: data.sector != null ? data.sector : 'N/A'},
         {label: 'City', value: data.city != null ? decryptConditionally(data.city) : 'N/A'},
-        {
-          label: 'Initiator',
-          value: data.user ? `${data.user.first_name} ${data.user.last_name}`.trim() : 'N/A',
-        },
-        {label: 'Source (D/H/C/O)', value: data.source_of_lead != null ? data.source_of_lead : 'N/A'},
-        {label: 'Monthly Turnover (Rs. Lacs)', value: data.monthly_turnover != null ? data.monthly_turnover : 'N/A'},
-        {label: 'Sanction Required (Rs. Lacs)', value: data.estimated_funding_required != null ? data.estimated_funding_required : 'N/A'},
+        {label: 'Initiator', value: data.file_by || 'N/A'},
+        {label: 'Source(D/H/C/O)', value: data.source_of_lead != null ? data.source_of_lead : 'N/A'},
+        {label: 'Monthly Turnover', value: data.monthly_turnover != null ? `${(data.monthly_turnover / 100000).toFixed(2)} Lacs` : 'N/A'},
+        {label: 'Sanction Required', value: data.estimated_funding_required != null ? `${(data.estimated_funding_required / 100000).toFixed(2)} Lacs` : 'N/A'},
+        {label: 'Current Status', value: data.leadProgress && data.leadProgress.length > 0 ? 
+          data.leadProgress.reduce((latest, current) => current.id > latest.id ? current : latest).lead_progress_status 
+          : 'N/A'},
         {label: 'Process Start', value: data.created_at ? new Date(data.created_at).toLocaleDateString('en-GB') : 'N/A'},
+        {label: 'Created At', value: data.created_at ? new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'},
       ].map((item, index) => (
         <Text style={styles.text} key={index}>
           <Text style={styles.label}>{item.label}: </Text>

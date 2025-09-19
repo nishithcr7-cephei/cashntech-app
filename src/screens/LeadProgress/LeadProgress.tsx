@@ -27,12 +27,12 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {LeadProgressInfo} from '@screens/LeadProgressInfo/LeadProgressInfo';
 import {useDispatch, useSelector} from 'react-redux';
 import {
-  clientActions,
-  clientSelector,
+  leadActions,
+  leadSelector,
   ILeadProgressResponseDatum,
-} from '@store/client';
+} from '@store/lead';
 import FontWeight from '@constants/FontWeight';
-import clientApi from '@services/api/client.api';
+import leadApi from '@services/api/lead.api';
 import {decryptLocation, decryptConditionally} from '@utils/crypto';
 
 type LeadNavigationType = CompositeNavigationProp<
@@ -129,9 +129,9 @@ export const LeadProgress = () => {
     item: ILeadProgressResponseDatum,
   ) => {
     dispatch(
-      clientActions.getLeadDesciption({
+      leadActions.getLeadDesciption({
         payload: leadId,
-        callbackSuccess: progressData => {
+        callbackSuccess: (progressData: any[]) => {
           setShowReadMore(true);
           setCurrentLeadData(item);
           setProgressStatusData(progressData);
@@ -141,8 +141,8 @@ export const LeadProgress = () => {
   };
 
   const dispatch = useDispatch();
-  const leadData = useSelector(clientSelector.getLeadProgress);
-  const leadLoading = useSelector(clientSelector.getLeadLoader);
+  const leadData = useSelector(leadSelector.getLeadProgress);
+  const leadLoading = useSelector(leadSelector.getLeadLoader);
   
   // Debug logs
   console.log('LeadProgress: State debug:', {
@@ -152,13 +152,13 @@ export const LeadProgress = () => {
   });
   const callgetleads = () => {
     console.log('LeadProgress: Calling getLead action');
-    dispatch(clientActions.getLead());
+    dispatch(leadActions.getLead());
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await dispatch(clientActions.getLead());
+      await dispatch(leadActions.getLead());
     } finally {
       setIsRefreshing(false);
     }
@@ -170,7 +170,7 @@ export const LeadProgress = () => {
     const timeout = setTimeout(() => {
       if (leadLoading) {
         console.log('LeadProgress: Loading timeout reached, forcing stop');
-        dispatch(clientActions.setLeadList([]));
+        dispatch(leadActions.setLeadList([]));
       }
     }, 10000); // 10 seconds timeout
     
@@ -188,7 +188,7 @@ export const LeadProgress = () => {
             .filter((city: string) => !!city)
         )
       );
-      const options = uniqueCities.map((city: string) => ({
+      const options = uniqueCities.map((city: any) => ({
         label: decryptConditionally(city),
         value: city,
       }));
@@ -204,12 +204,11 @@ export const LeadProgress = () => {
       const uniqueInitiators = Array.from(
         new Set(
           leadData
-            .map((item: any) => item.user)
-            .filter((user: any) => !!user)
-            .map((user: any) => `${user.first_name} ${user.last_name}`.trim())
+            .map((item: any) => item.file_by)
+            .filter((fileBy: string) => !!fileBy)
         )
       );
-      const options = uniqueInitiators.map((initiator: string) => ({
+      const options = uniqueInitiators.map((initiator: any) => ({
         label: initiator,
         value: initiator,
       }));
@@ -229,7 +228,7 @@ export const LeadProgress = () => {
             .filter((src: string) => !!src)
         )
       );
-      const options = uniqueSources.map((src: string) => ({
+      const options = uniqueSources.map((src: any) => ({
         label: src,
         value: src,
       }));
@@ -261,8 +260,7 @@ export const LeadProgress = () => {
       
       if (selectedFilters.initiator) {
         filteredData = filteredData.filter((item: any) => {
-          const userFullName = item.user ? `${item.user.first_name} ${item.user.last_name}`.trim() : '';
-          return userFullName === selectedFilters.initiator;
+          return item.file_by === selectedFilters.initiator;
         });
       }
       
@@ -288,7 +286,7 @@ export const LeadProgress = () => {
   }, [leadData, isFilterOpen]);
 
   const onCardPress = (item: ILeadProgressResponseDatum) => {
-    navigation.navigate('LeadProgressInfo', { clientId: item.id });
+    navigation.navigate('LeadProgressInfo' as any, { clientId: item.id });
   };
 
   return (
@@ -420,9 +418,10 @@ export const LeadProgress = () => {
                     : leadData
                 }
                 keyExtractor={item => item.id.toString()}
-                renderItem={({item}) => (
+                renderItem={({item, index}) => (
                   <LeadProgressCard
                     data={item}
+                    index={index}
                     onPress={() => onCardPress(item)}
                   />
                 )}

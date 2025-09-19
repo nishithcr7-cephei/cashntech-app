@@ -18,8 +18,6 @@ export type ClientState = {
   isSavedVendorDetails: boolean;
   isSavedVisitDetails: boolean;
 
-  leadLoader: boolean;
-  leadList: Array<ILeadProgressResponseDatum>;
 
   basicLoader: boolean;
   clientId: null;
@@ -124,9 +122,6 @@ export type ClientState = {
   clientDetails: any | null;
   clientDetailsLoading: boolean;
   clientDetailsError: string | null;
-  leadProgressDetails: any[];
-  leadProgressDetailsLoading: boolean;
-  leadProgressDetailsError: string | null;
 
   // Soft Sanction Result
   softSanctionResult: any | null;
@@ -460,24 +455,6 @@ export interface Vendor {
   monthly_sales_value: number;
 }
 
-export interface ILeadProgressResponse {
-  statusCode: number;
-  message: string;
-  data: Array<ILeadProgressResponseDatum>;
-}
-
-export interface ILeadProgressResponseDatum {
-  id: number;
-  source_of_lead: string;
-  city: string;
-  client_name: any;
-  monthly_turnover: any;
-  bank_name: any;
-  estimated_funding_required: any;
-  created_at: string;
-  user: any;
-  report: Array<{id: number; client: number; created_at: string}>;
-}
 
 export interface ITaskHistoryResponse {
   statusCode: number;

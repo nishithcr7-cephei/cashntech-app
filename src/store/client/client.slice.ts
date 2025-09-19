@@ -126,9 +126,6 @@ const initialState: ClientState = {
   //Remark Report fields
   reportLoader: false,
   reportList: [],
-  //Lead Progress fields
-  leadLoader: false,
-  leadList: [],
   //Task History fields
   TaskHistoryLoader: false,
   TaskHistoryList: [],
@@ -200,10 +197,6 @@ const initialState: ClientState = {
   clientDetails: null,
   clientDetailsLoading: false,
   clientDetailsError: null,
-  // Lead Progress
-  leadProgressDetails: [],
-  leadProgressDetailsLoading: false,
-  leadProgressDetailsError: null,
   
   // SoftSanction Bank Method
   SoftSanctionLoading: false,
@@ -475,33 +468,6 @@ const clientSlice = createSlice({
     resetReportList: state => {
       state.reportList = [];
       state.reportLoader = false;
-    },
-    getLead: state => {
-      console.log(
-        'Slice: getLead action dispatched, setting leadLoader = true',
-      );
-      state.leadLoader = true;
-    },
-    getLeadDesciption: (
-      state,
-      _payload: PayloadAction<PayloadWithCallback<string, [Array<any>]>>,
-    ) => {
-      state.leadLoader = true;
-    },
-    setLeadList: (
-      state,
-      action: PayloadAction<ILeadProgressResponseDatum[]>,
-    ) => {
-      console.log(
-        'Slice: setLeadList action dispatched, setting leadLoader = false, data length:',
-        action.payload?.length || 0,
-      );
-      state.leadLoader = false;
-      state.leadList = action.payload;
-    },
-    resetLeadList: state => {
-      state.leadList = [];
-      state.leadLoader = false;
     },
     uploadKycRequest(state, action: PayloadAction<IUploadKycDocumentPayload>) {
       state.loading = true;
@@ -834,20 +800,6 @@ const clientSlice = createSlice({
       state.clientDetails = null;
       state.clientDetailsError = action.payload;
     },
-    getLeadProgressDetails: (state, _action: PayloadAction<number>) => {
-      state.leadProgressDetailsLoading = true;
-      state.leadProgressDetailsError = null;
-    },
-    setLeadProgressDetails: (state, action: PayloadAction<any[]>) => {
-      state.leadProgressDetailsLoading = false;
-      state.leadProgressDetails = action.payload;
-      state.leadProgressDetailsError = null;
-    },
-    setLeadProgressDetailsError: (state, action: PayloadAction<string>) => {
-      state.leadProgressDetailsLoading = false;
-      state.leadProgressDetails = [];
-      state.leadProgressDetailsError = action.payload;
-    },
   },
 });
 
@@ -907,10 +859,6 @@ export const {
   getReport,
   setReportList,
   resetReportList,
-  getLead,
-  setLeadList,
-  resetLeadList,
-  getLeadDesciption,
   uploadKycRequest,
   uploadKycSuccess,
   uploadKycFailure,
@@ -978,8 +926,5 @@ export const {
   getClientDetails,
   setClientDetails,
   setClientDetailsError,
-  getLeadProgressDetails,
-  setLeadProgressDetails,
-  setLeadProgressDetailsError,
 } = clientSlice.actions;
 export default clientSlice.reducer;
