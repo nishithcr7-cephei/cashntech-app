@@ -1,6 +1,6 @@
 import {Search, LeftChevronCircle} from '@assets/Icons';
 import {AppBar, Container} from '@components/index';
-import {TaskCard} from '@components/TaskCard/TaskCard';
+import TaskCard from '@components/TaskCard/TaskCard';
 import Colors from '@constants/Colors';
 import Fonts from '@constants/Fonts';
 import FontWeight from '@constants/FontWeight';
@@ -228,25 +228,14 @@ export const TaskHistTabs = () => {
                   }}
                   disabled={item.raw?.task_status?.toLowerCase() === 'completed'}>
                   <TaskCard
-                    srNo={item.srNo}
-                    firmName={item.firmName}
-                    sector={item.sector}
-                    assignedBy={item.assignedBy}
-                    assignedTo={item.assignedTo}
-                    taskDescription={item.taskDescription}
-                    taskStatus={item.taskStatus}
-                    remarks={item.remarks}
-                    createdAt={item.createdAt}
-                    completedAt={item.completedAt}
-                    // Keep old props for compatibility
-                    salesman={item.salesman}
-                    tasktype={item.tasktype}
-                    clientId={item.clientId}
-                    clientName={item.clientName}
-                    location={item.location}
-                    referenceDetails={item.referenceDetails}
-                    sourceDHCO={item.sourceDHCO}
-                    status={item.status}
+                    item={{
+                      id: item.id,
+                      firm_name: item.firmName, // This should be encrypted, but we'll use the display name for now
+                      sector: item.sector,
+                      created_at: item.createdAt,
+                      task: [item.raw]
+                    }}
+                    index={item.srNo - 1}
                   />
                 </TouchableOpacity>
               )}
