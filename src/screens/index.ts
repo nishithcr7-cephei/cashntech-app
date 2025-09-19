@@ -49,3 +49,4 @@ export * from './TaskTabs/TaskUpdate';
 export * from './TermsOfService/TermsOfService';
 export * from './UdhyamCertificate/UdhyamCertificate';
 export * from './VisitDetails/VisitDetail';
+export * from './VisitDetails/UpdateVisitDetails';

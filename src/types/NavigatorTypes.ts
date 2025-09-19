@@ -67,6 +67,15 @@ export type ClientNavigatorType = {
   VendorDetailForm: undefined;
   VisitDetailForm: undefined;
   VisitDetail: undefined;
+  UpdateVisitDetails: {
+    visitId: string;
+    visit_date_time: string;
+    salesperson: string;
+    client_firm_name: string;
+    visit_type: string;
+    visit_number: number;
+    visit_remark: string;
+  };
   ProfileScreen: {clientId: number};
 };
 

@@ -336,8 +336,23 @@ export const VisitDetail = () => {
   });
 
   const renderItem = useCallback(({item, index}: {item: VisitItem; index: number}) => {
-    return <VisitCard item={item} index={index} />;
-  }, []);
+    return (
+      <TouchableOpacity
+        onPress={() => {
+          (navigation as any).navigate('UpdateVisitDetails', {
+            visitId: String(item.id),
+            visit_date_time: item.visit_date_time,
+            salesperson: item.salesperson,
+            client_firm_name: item.client_firm_name,
+            visit_type: item.visit_type,
+            visit_number: item.visit_number,
+            visit_remark: item.visit_remark,
+          });
+        }}>
+        <VisitCard item={item} index={index} />
+      </TouchableOpacity>
+    );
+  }, [navigation]);
 
   const keyExtractor = useCallback((item: VisitItem, index: number) => {
     const visitId = item?.id != null ? String(item.id) : 'na';

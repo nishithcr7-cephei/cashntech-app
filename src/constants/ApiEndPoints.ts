@@ -114,6 +114,7 @@ const Endpoints = {
 
   // Client visit details
   apiGetVisitDetailsList: '/client-info-master/visit-details',
+  apiUpdateVisitDetails: (visitId: string) => `/client-info-master/visit/update/${visitId}`,
 
   // Task Screen
   // apiRemarkReportTask:

@@ -82,10 +82,34 @@ const getLocations = async () => {
   return {data: data.data};
 };
 
+const updateVisitDetails = async (visitId: string, payload: {
+  firm_name: string;
+  remark: string;
+  salesperson: string;
+  visit_date_time: string;
+  visit_number: number;
+  visit_type: string;
+}) => {
+  const {data, error} = await tryCatch<AxiosResponse<any>>(
+    Api.post(Endpoints.apiUpdateVisitDetails(visitId), payload, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  
+  if (error) {
+    return {data: null, error};
+  }
+  
+  // The response structure is: { message: "...", statusCode: 201 }
+  // So we return the entire response data
+  return {data: data?.data ?? data, error: null};
+};
+
 export default {
   saveVisitForm,
   getVisitDetailsList,
   postVisitDetailsList,
   getSalesmanList,
   getLocations,
+  updateVisitDetails,
 };
