@@ -9,11 +9,11 @@ import {
   ActivityIndicator,
   TouchableWithoutFeedback,
 } from 'react-native';
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState, useMemo} from 'react';
 import {
   AppBar,
   Container,
-  FilterDropdown,
+  FilterModal,
   LeadProgressCard,
 } from '@components/index';
 import {Filter, Search} from '@assets/Icons';
@@ -101,28 +101,13 @@ export const LeadProgress = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Filter states
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [selectedFilters, setSelectedFilters] = useState({
-    location: '',
-    initiator: '',
-    source: '',
-  });
-  const [enabledFilters, setEnabledFilters] = useState({
-    location: false,
-    initiator: false,
-    source: false,
-  });
-  const [locationOptions, setLocationOptions] = useState<
-    {label: string; value: string}[]
-  >([]);
-  const [initiatorOptions, setInitiatorOptions] = useState<
-    {label: string; value: string | number}[]
-  >([]);
-  const [sourceOptions, setSourceOptions] = useState<
-    {label: string; value: string}[]
-  >([]);
-  const [filterLoading, setFilterLoading] = useState(false);
-  const [filteredLeads, setFilteredLeads] = useState<ILeadProgressResponseDatum[]>([]);
+  const [searchText, setSearchText] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [initiatorOptions, setInitiatorOptions] = useState<string[]>([]);
+  const [sourceOptions, setSourceOptions] = useState<string[]>([]);
+  const [sectorOptions, setSectorOptions] = useState<string[]>([]);
 
   const onPressReadMore = (
     leadId: string,
@@ -177,113 +162,122 @@ export const LeadProgress = () => {
     return () => clearTimeout(timeout);
   }, []);
 
-  // Filter functions
-  const fetchLocations = async () => {
-    try {
-      // For leads, we'll get unique cities from the current leads data
-      const uniqueCities = Array.from(
-        new Set(
-          leadData
-            .map((item: any) => item.city)
-            .filter((city: string) => !!city)
-        )
-      );
-      const options = uniqueCities.map((city: any) => ({
-        label: decryptConditionally(city),
-        value: city,
-      }));
-      setLocationOptions(options);
-    } catch (e) {
-      setLocationOptions([]);
-    }
-  };
-
-  const fetchInitiators = async () => {
-    try {
-      // For leads, we'll get unique initiators from the current leads data
-      const uniqueInitiators = Array.from(
-        new Set(
-          leadData
-            .map((item: any) => item.file_by)
-            .filter((fileBy: string) => !!fileBy)
-        )
-      );
-      const options = uniqueInitiators.map((initiator: any) => ({
-        label: initiator,
-        value: initiator,
-      }));
-      setInitiatorOptions(options);
-    } catch (e) {
-      setInitiatorOptions([]);
-    }
-  };
-
-  const fetchSources = async () => {
-    try {
-      // For leads, we'll get unique sources from the current leads data
-      const uniqueSources = Array.from(
-        new Set(
-          leadData
-            .map((item: any) => item.source_of_lead)
-            .filter((src: string) => !!src)
-        )
-      );
-      const options = uniqueSources.map((src: any) => ({
-        label: src,
-        value: src,
-      }));
-      setSourceOptions(options);
-    } catch (e) {
-      setSourceOptions([]);
-    }
-  };
-
+  // Build filter options from lead data (similar to VisitDetail pattern)
   useEffect(() => {
-    if (isFilterOpen) {
-      fetchLocations();
-      fetchInitiators();
-      fetchSources();
+    if (leadData && leadData.length > 0) {
+      // Build dynamic filter options from actual data
+      const cities = new Set<string>();
+      const initiators = new Set<string>();
+      const sources = new Set<string>();
+      const sectors = new Set<string>();
+      
+      leadData.forEach((item: any) => {
+        // Add cities
+        const city = decryptConditionally(item.city || '');
+        if (city) cities.add(city);
+        
+        // Add initiators
+        if (item.file_by) initiators.add(item.file_by);
+        
+        // Add sources
+        if (item.source_of_lead) sources.add(item.source_of_lead);
+        
+        // Add sectors
+        const sector = (item.sector ?? '').toString().trim();
+        if (sector) sectors.add(sector);
+      });
+      
+      setCityOptions(Array.from(cities));
+      setInitiatorOptions(Array.from(initiators));
+      setSourceOptions(Array.from(sources));
+      setSectorOptions(Array.from(sectors));
     }
-  }, [isFilterOpen]);
+  }, [leadData]);
 
-  const handleApplyFilter = async () => {
-    setFilterLoading(true);
-    try {
-      // Filter leads data locally based on selected filters
-      let filteredData = [...leadData];
-      
-      if (selectedFilters.location) {
-        filteredData = filteredData.filter((item: any) => 
-          item.city === selectedFilters.location
+  // Prepare filter data for FilterModal
+  const filterData = {
+    'City': cityOptions,
+    'Initiator': initiatorOptions,
+    'Source': sourceOptions,
+    'Sector': sectorOptions,
+    'Month/Year': [], // Will be handled specially by MonthYearFilter component
+  };
+
+  // Filtered leads based on search and applied filters (similar to VisitDetail pattern)
+  const filteredLeads = useMemo(() => {
+    if (!leadData || leadData.length === 0) return [];
+    
+    let filtered = [...leadData];
+    
+    // Apply search filter
+    if (searchText) {
+      const term = searchText.toLowerCase();
+      filtered = filtered.filter((item: any) => {
+        const clientName = decryptConditionally(item.client_name || '').toLowerCase();
+        const city = decryptConditionally(item.city || '').toLowerCase();
+        const source = (item.source_of_lead || '').toLowerCase();
+        const initiator = (item.file_by || '').toLowerCase();
+        const sector = (item.sector || '').toString().toLowerCase();
+        
+        return (
+          clientName.includes(term) ||
+          city.includes(term) ||
+          source.includes(term) ||
+          initiator.includes(term) ||
+          sector.includes(term)
         );
-      }
-      
-      if (selectedFilters.initiator) {
-        filteredData = filteredData.filter((item: any) => {
-          return item.file_by === selectedFilters.initiator;
+      });
+    }
+    
+    // Apply filters
+    if (appliedFilters['City'] && appliedFilters['City'].length > 0) {
+      filtered = filtered.filter((item: any) => {
+        const city = decryptConditionally(item.city || '');
+        return appliedFilters['City'].includes(city);
+      });
+    }
+    
+    if (appliedFilters['Initiator'] && appliedFilters['Initiator'].length > 0) {
+      filtered = filtered.filter((item: any) => {
+        const initiator = item.file_by || '';
+        return appliedFilters['Initiator'].includes(initiator);
+      });
+    }
+    
+    if (appliedFilters['Source'] && appliedFilters['Source'].length > 0) {
+      filtered = filtered.filter((item: any) => {
+        const source = item.source_of_lead || '';
+        return appliedFilters['Source'].includes(source);
+      });
+    }
+    
+    if (appliedFilters['Sector'] && appliedFilters['Sector'].length > 0) {
+      filtered = filtered.filter((item: any) => {
+        const sector = (item.sector ?? '').toString().trim();
+        return appliedFilters['Sector'].includes(sector);
+      });
+    }
+    
+    if (appliedFilters['Month/Year'] && appliedFilters['Month/Year'].length > 0) {
+      filtered = filtered.filter((item: any) => {
+        // Use created_at date for Month/Year filtering
+        const dateToUse = item.created_at;
+        if (!dateToUse) return false;
+        
+        const leadDate = new Date(dateToUse);
+        const leadYear = leadDate.getFullYear();
+        const leadMonth = leadDate.getMonth() + 1; // getMonth() returns 0-11
+        
+        return appliedFilters['Month/Year'].some((monthYear: string) => {
+          // monthYear format: "2025-08" (year-month)
+          const [year, month] = monthYear.split('-').map(Number);
+          return leadYear === year && leadMonth === month;
         });
-      }
-      
-      if (selectedFilters.source) {
-        filteredData = filteredData.filter((item: any) => 
-          item.source_of_lead === selectedFilters.source
-        );
-      }
-      
-      setFilteredLeads(filteredData);
-    } catch (error) {
-      console.log('Filter error:', error);
-      setFilteredLeads([]);
-    } finally {
-      setFilterLoading(false);
+      });
     }
-  };
-
-  useEffect(() => {
-    if (!isFilterOpen) {
-      setFilteredLeads(leadData);
-    }
-  }, [leadData, isFilterOpen]);
+    
+    return filtered;
+  }, [leadData, searchText, appliedFilters]);
 
   const onCardPress = (item: ILeadProgressResponseDatum) => {
     navigation.navigate('LeadProgressInfo' as any, { clientId: item.id });
@@ -322,12 +316,7 @@ export const LeadProgress = () => {
               <Text style={styles.Subrowcontainertxt}>Leads</Text>
               <View style={styles.Badge}>
                 <Text style={styles.Badgetext}>
-                  {(() => {
-                    if (isFilterOpen || filteredLeads.length !== leadData.length) {
-                      return filteredLeads.length;
-                    }
-                    return leadData.length;
-                  })()}
+                  {filteredLeads.length}
                 </Text>
               </View>
             </View>
@@ -335,104 +324,48 @@ export const LeadProgress = () => {
               <Search height={12} width={12} />
               <TextInput
                 style={styles.input}
-                placeholder="Search Leads"
+                placeholder="Search by Client name"
                 placeholderTextColor={Colors.balancedGray}
+                value={searchText}
+                onChangeText={setSearchText}
               />
             </View>
             
 
-            <TouchableOpacity onPress={() => setIsFilterOpen(prev => !prev)}>
+            <TouchableOpacity onPress={() => setShowFilterModal(true)}>
               <View style={styles.Filterbox}>
                 <Filter height={12} width={12} />
               </View>
             </TouchableOpacity>
           </View>
 
-          {/* FilterDropdown */}
-          {isFilterOpen && (
-            <TouchableWithoutFeedback onPress={() => setIsFilterOpen(false)}>
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(0,0,0,0.1)',
-                  zIndex: 999,
-                  justifyContent: 'flex-start',
-                  alignItems: 'flex-end',
-                }}>
-                <View
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    position: 'absolute',
-                  }}
-                />
-                <View style={{zIndex: 1000}}>
-                  <FilterDropdown
-                    selectedFilters={selectedFilters}
-                    enabledFilters={enabledFilters}
-                    onSetSelectedFilters={setSelectedFilters}
-                    onSetEnabledFilters={setEnabledFilters}
-                    onApply={handleApplyFilter}
-                    onClear={() => {
-                      setSelectedFilters({
-                        location: '',
-                        initiator: '',
-                        source: '',
-                      });
-                      setEnabledFilters({
-                        location: false,
-                        initiator: false,
-                        source: false,
-                      });
-                      callgetleads();
-                    }}
-                    onSetIsFilterOpen={setIsFilterOpen}
-                    locations={locationOptions}
-                    initiators={initiatorOptions}
-                    sources={sourceOptions}
-                  />
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          )}
+          {/* Filter Modal */}
+          <FilterModal
+            visible={showFilterModal}
+            onClose={() => setShowFilterModal(false)}
+            appliedFilters={appliedFilters}
+            onApply={setAppliedFilters}
+            filterData={filterData}
+          />
 
           <View style={styles.Cardlist}>
-            {filterLoading ? (
-              <View
-                style={{
-                  flex: 1,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                <ActivityIndicator size="large" color={Colors.primaryColor} />
-              </View>
-            ) : (
-              <FlatList
-                data={
-                  isFilterOpen || filteredLeads.length !== leadData.length
-                    ? filteredLeads
-                    : leadData
-                }
-                keyExtractor={item => item.id.toString()}
-                renderItem={({item, index}) => (
-                  <LeadProgressCard
-                    data={item}
-                    index={index}
-                    onPress={() => onCardPress(item)}
-                  />
-                )}
-                contentContainerStyle={{flexGrow: 1}}
-                refreshing={isRefreshing}
-                onRefresh={handleRefresh}
-                ListEmptyComponent={
-                  <Text style={styles.emptyList}>No Leads Found</Text>
-                }
-              />
-            )}
+            <FlatList
+              data={filteredLeads}
+              keyExtractor={item => item.id.toString()}
+              renderItem={({item, index}) => (
+                <LeadProgressCard
+                  data={item}
+                  index={index}
+                  onPress={() => onCardPress(item)}
+                />
+              )}
+              contentContainerStyle={{flexGrow: 1}}
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              ListEmptyComponent={
+                <Text style={styles.emptyList}>No Leads Found</Text>
+              }
+            />
           </View>
         </>
       )}
