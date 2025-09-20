@@ -27,6 +27,8 @@ const Endpoints = {
   apiGetVendorDetails: `/client-info-master/vendor/`,
   apiSaveVisitDetails: `/client-info-master/follow-up/`,
   apiGetVisitDetails: `/client-info-master/follow-up/`,
+  apiGetClientProfile: (id: string | number) => `/client-info-master/profile/${id}`,
+  apiGetSoftSanctionDetails: (id: string | number) => `/client-info-master/soft-sanction/detail/${id}`,
 
   apiDeleteClient: `/client-info-master/delete/`,
 
@@ -83,6 +85,9 @@ const Endpoints = {
   // Bussiness KYC Check document
   apiGetBusinessKycChecked: (clientID: string) =>
     `/client-info-master/business-kyc/check/${clientID}`,
+  // Get all KYC documents for a client
+  apiGetKycDocuments: (clientID: string) =>
+    `/client-info-master/kyc/${clientID}`,
 
   // BankList dropdown
   apiBankList: '/client-info-master/bank-list',

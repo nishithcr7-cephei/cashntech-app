@@ -2,6 +2,7 @@ import Config from 'react-native-config';
 import {getEnvironmentVariable} from '@utils/Utils';
 
 export const API_URL = getEnvironmentVariable(Config.API_URL);
+export const FILE_DOWNLOAD_URL = getEnvironmentVariable(Config.FILE_DOWNLOAD_URL);
 export const RK_ENCRYPTION_KEY = getEnvironmentVariable(
   Config.RK_ENCRYPTION_KEY,
 );

@@ -25,7 +25,7 @@ import {scaleFont} from '@utils/Scale';
 import fontWeight from '@constants/FontWeight';
 import {Colors, FontWeight} from '@constants/index';
 import {TurnoverMethodCard} from '@components/UGRO-TurnoverMethod/TurnoverMethodCard';
-import clientApi from '@services/api/client.api';
+import softApi from '@services/api/soft.api';
 import Config from 'react-native-config';
 import RNFS from 'react-native-fs';
 import {Platform} from 'react-native';
@@ -215,7 +215,7 @@ export const UGROTurnoverMethod = () => {
       }
       
       // Use API function with token authentication
-      const {url, headers} = await clientApi.softSanctionExportDownload(
+      const {url, headers} = await softApi.softSanctionExportDownload(
         clientId,
         exportMethod,
         exportProduct,

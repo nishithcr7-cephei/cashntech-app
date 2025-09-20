@@ -7,10 +7,7 @@ import {
   BasicDetailsPayload,
   IBankListResponse,
   BasicDetailsResponse,
-  ILeadProgressResponse,
   IKycCheckedResponse,
-  ISoftSanctionResponse,
-  IsoftSanctionBankProductResponse,
   IFilterPayload,
   IFilterResponse,
   ITaskRecordsFilterPayload,
@@ -595,43 +592,7 @@ const getBusinessKycChecked = async (clientID: string) => {
   };
 };
 
-const getSoftSanction = async (bankName: string) => {
-  const {data, error} = await tryCatch<AxiosResponse<ISoftSanctionResponse>>(
-    Api.get(Endpoints.apiGetSoftSanction(bankName), {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  if (error) {
-    return {
-      data: null,
-      error: error,
-    };
-  }
-  return {
-    data: data.data,
-    error: null,
-  };
-};
 
-const getSoftSanctionProductBank = async (bank: string, product: string) => {
-  const {data, error} = await tryCatch<
-    AxiosResponse<IsoftSanctionBankProductResponse>
-  >(
-    Api.get(Endpoints.apiGetSoftSanctionBankProduct(bank, product), {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  if (error) {
-    return {
-      data: null,
-      error: error,
-    };
-  }
-  return {
-    data: data.data,
-    error: null,
-  };
-};
 
 const FilterBox = async (payload: IFilterPayload) => {
   const {data, error} = await tryCatch<AxiosResponse<IFilterResponse>>(
@@ -690,64 +651,6 @@ const bankStatement = async (FormData: FormData) => {
   };
 };
 
-const softSanctionCalculate = async (payload: any, clientId: string) => {
-  const {data, error} = await tryCatch<AxiosResponse<any>>(
-    Api.post(Endpoints.apiSoftSanctionCalculate(clientId), payload, {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  return {data: data?.data ?? null, error};
-};
-
-const softSanctionResult = async (
-  clientId: string | number,
-  method: string,
-  bank: string,
-) => {
-  const {data, error} = await tryCatch<AxiosResponse<any>>(
-    Api.get(Endpoints.apiSoftSanctionResult(clientId, method, bank), {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  return {data: data?.data ?? null, error};
-};
-
-const softSanctionExport = async (
-  clientId: string | number,
-  method: string,
-  product: string,
-) => {
-  const {data, error} = await tryCatch<AxiosResponse<any>>(
-    Api.get(Endpoints.apiSoftSanctionExport(clientId, method, product), {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  return {data: data?.data ?? null, error};
-};
-
-const softSanctionExportDownload = async (
-  clientId: string | number,
-  method: string,
-  product: string,
-  bank: string,
-) => {
-  // For file downloads, we need to get the token and construct the URL manually
-  const token = storage.getString(StorageKeys.TOKEN);
-  const url = `${
-    Config.API_URL
-  }/client-info-master/soft-sanction/export/${clientId}?method=${encodeURIComponent(
-    method,
-  )}&product=${encodeURIComponent(product)}&bank=${encodeURIComponent(bank)}`;
-
-  return {
-    url,
-    token,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Device-Type': 'mobile',
-    },
-  };
-};
 
 const getLocations = async () => {
   const {data, error} = await tryCatch<AxiosResponse<any>>(
@@ -773,65 +676,6 @@ const getSalesmanList = async () => {
   return {data: data.data};
 };
 
-const getSoftSanctionRuleset = async (bank: string, product: string) => {
-  const {data, error} = await tryCatch<AxiosResponse<any>>(
-    Api.get(
-      `/client-info-master/soft-sanction/ruleset?bank=${encodeURIComponent(
-        bank,
-      )}&product=${encodeURIComponent(product)}`,
-      {authRequired: true} as CustomRequestConfig,
-    ),
-  );
-  if (error) {
-    return {
-      data: null,
-      error: error,
-    };
-  }
-  return {
-    data: data.data,
-    error: null,
-  };
-};
-
-const getSoftSanctionClientList = async () => {
-  const {data, error} = await tryCatch<AxiosResponse<any>>(
-    Api.get('/client-info-master/soft-sanction/client/list', {
-      authRequired: true,
-    } as CustomRequestConfig),
-  );
-  if (error) {
-    return {
-      data: null,
-      error: error,
-    };
-  }
-  return {
-    data: data.data,
-    error: null,
-  };
-};
-
-const getSoftSanctionFields = async (bankName: string, productName: string) => {
-  const {data, error} = await tryCatch<AxiosResponse<any>>(
-    Api.get(
-      `/client-info-master/soft-sanction?product_name=${encodeURIComponent(
-        productName,
-      )}`,
-      {authRequired: true} as CustomRequestConfig,
-    ),
-  );
-  if (error) {
-    return {
-      data: null,
-      error: error,
-    };
-  }
-  return {
-    data: data.data,
-    error: null,
-  };
-};
 
 const getVisitDetailsList = async () => {
   const {data, error} = await tryCatch<AxiosResponse<any>>(
@@ -857,6 +701,7 @@ export const deleteClient = async (id: number, payload: IDeletePayload) => {
   }
   return {data: data.data, error: null};
 };
+
 
 export default {
   getClientsFilter,
@@ -891,20 +736,11 @@ export default {
   getBankList,
   getKycChecked,
   getBusinessKycChecked,
-  getSoftSanction,
-  getSoftSanctionProductBank,
   FilterBox,
   bankStatement,
-  softSanctionCalculate,
-  softSanctionResult,
-  softSanctionExport,
-  softSanctionExportDownload,
   taskRecordsFilter,
   getLocations,
   getSalesmanList,
-  getSoftSanctionRuleset,
-  getSoftSanctionClientList,
-  getSoftSanctionFields,
   getVisitDetailsList,
   getRemarkReportByClient,
 };

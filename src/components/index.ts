@@ -26,3 +26,4 @@ export * from './FilterModal/FilterModal';
 export * from './TaskCard/TaskCard';
 export * from './TaskFilterModal/TaskFilterModal';
 export * from './MonthYearFilter/MonthYearFilter';
+export * from './TabBar';

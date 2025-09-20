@@ -135,6 +135,12 @@ export type ClientState = {
   // Task History fields
   TaskHistoryLoader: boolean;
   TaskHistoryList: Array<ITaskHistoryResponseDatum>;
+
+  // KYC Documents
+  kycDocumentsLoading: boolean;
+  kycDocumentsData: IKycDocumentsData | null;
+  kycDocumentsError: string | null;
+
 };
 
 export type BasicDetailsType = {
@@ -185,6 +191,7 @@ export type VendorDetailsType = Array<{
   city: string;
   pinCode: string;
   vendorContactNumber: string;
+  vendorContactEmail: string;
   monthlySalesValue: string;
 }>;
 
@@ -865,4 +872,54 @@ export interface IDeletePayload {
 export interface IDeleteResponse {
   statusCode: number;
   message: string;
+}
+
+// KYC Documents Response Types
+export interface IKycDocumentsResponse {
+  statusCode: number;
+  data: IKycDocumentsData[];
+}
+
+export interface IKycDocumentsData {
+  id: number;
+  bankStatement: IBankStatementDocument[];
+  business: IBusinessDocument[];
+  personalKyc: IPersonalKycDocument[];
+}
+
+export interface IBankStatementDocument {
+  id: number;
+  bank_name: string;
+  statement_file_names: string[];
+  uploaded_at: string;
+}
+
+export interface IBusinessDocument {
+  id: number;
+  filename_obj: {
+    udhyam?: {
+      file_name: string;
+      urn_number: string;
+      name_as_per_udhyam: string;
+    };
+  };
+  uploaded_at: string;
+}
+
+export interface IPersonalKycDocument {
+  id: number;
+  document_type: string;
+  filename_obj: {
+    profile?: {
+      file_name: string;
+      client_name: string;
+    };
+    pan?: {
+      dob: string;
+      file_name: string;
+      pan_number: string;
+      name_as_per_pan: string;
+    };
+  };
+  uploaded_at: string;
 }

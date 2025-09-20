@@ -232,6 +232,7 @@ const getClientDetailsError = createSelector(
 );
 
 
+
 export default {
   getClientLoader,
   getClientList,

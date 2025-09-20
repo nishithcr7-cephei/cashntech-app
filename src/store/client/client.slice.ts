@@ -11,6 +11,7 @@ import {
   IFilterResponseDatum,
   IKycBusinessResponseDatum,
   IKycCheckedResponseDatum,
+  IKycDocumentsData,
   ILeadProgressResponseDatum,
   IRemarkReportResponseDatum,
   ITaskHistoryResponseDatum,
@@ -92,6 +93,7 @@ const vendorDetails: VendorDetailsType = [
     productType: '',
     state: undefined,
     vendorContactNumber: '',
+    vendorContactEmail: '',
     monthlySalesValue: '',
   },
 ];
@@ -227,6 +229,7 @@ const initialState: ClientState = {
   softSanctionResult: null,
   softSanctionResultLoading: false,
   softSanctionResultError: null,
+
 };
 
 const clientSlice = createSlice({

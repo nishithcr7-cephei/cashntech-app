@@ -88,6 +88,15 @@ const getSoftSanctionFields = async (
   return {data: data.data, error: null};
 };
 
+const softSanctionCalculate = async (payload: any, clientId: string) => {
+  const {data, error} = await tryCatch<AxiosResponse<any>>(
+    Api.post(Endpoints.apiSoftSanctionCalculate(clientId), payload, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  return {data: data?.data ?? null, error};
+};
+
 const softSanctionResult = async (
   clientId: string | number,
   method: string,
@@ -141,6 +150,7 @@ export default {
   getSoftSanctionRuleset,
   getSoftSanctionClientList,
   getSoftSanctionFields,
+  softSanctionCalculate,
   softSanctionResult,
   softSanctionExport,
   softSanctionExportDownload,
