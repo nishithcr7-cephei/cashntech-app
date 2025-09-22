@@ -647,6 +647,7 @@ function* getVendorDetailsSaga(action: PayloadAction<number>): unknown {
     state: decryptUtility(vendor.vendor_state) as keyof typeof Cities,
     pinCode: decryptUtility(vendor.vendor_pin_code),
     vendorContactNumber: vendor.vendor_contact_number,
+    vendorContactEmail: vendor.vendor_contact_email || '',
     monthlySalesValue: vendor.monthly_sales_value.toString(),
     key: Math.random().toString(36).substring(7),
   }));

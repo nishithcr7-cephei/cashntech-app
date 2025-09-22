@@ -12,7 +12,6 @@ import {
   IKycBusinessResponseDatum,
   IKycCheckedResponseDatum,
   IKycDocumentsData,
-  ILeadProgressResponseDatum,
   IRemarkReportResponseDatum,
   ITaskHistoryResponseDatum,
   ITaskRecordsFilterPayload,
@@ -229,6 +228,11 @@ const initialState: ClientState = {
   softSanctionResult: null,
   softSanctionResultLoading: false,
   softSanctionResultError: null,
+  
+  // KYC Documents
+  kycDocumentsLoading: false,
+  kycDocumentsData: null,
+  kycDocumentsError: null,
 
 };
 
@@ -411,6 +415,7 @@ const clientSlice = createSlice({
         pinCode: '',
         monthlySalesValue: '',
         vendorContactNumber: '',
+        vendorContactEmail: '',
       });
     },
     removeVendorDetails: (state, action: PayloadAction<string>) => {
