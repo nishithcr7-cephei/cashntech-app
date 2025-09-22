@@ -21,6 +21,7 @@ export const AuthNavigator = () => {
       initialRouteName={AuthScreens.SignupScreen}
     >
       <AuthStack.Screen name={AuthScreens.OnBoarding} component={OnBoarding} />
+      
       <AuthStack.Screen
         name={AuthScreens.SignupScreen}
         component={SignupScreen}
