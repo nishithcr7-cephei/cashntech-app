@@ -16,6 +16,7 @@ export * from './LeftChevronCircle';
 export * from './RightChevron';
 export * from './RightChevronCircle';
 export * from './RightCheckmark';
+export * from './RightCheckmarkWhite';
 export * from './Download';
 export * from './Upload';
 export * from './File';

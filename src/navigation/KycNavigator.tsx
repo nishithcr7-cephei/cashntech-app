@@ -1,8 +1,10 @@
 import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {
+  BankStatementUpload,
   CompanyDocument,
   CompanyPanCard,
+  FullImage,
   GodownDetails,
   GodownDetails2,
   GSTDocument,
@@ -26,6 +28,7 @@ export const KycNavigator = () => {
     <Stack.Navigator screenOptions={{headerShown: false}}>
       <Stack.Screen name="KycDocument" component={KycDocument} />
       <Stack.Screen name="KYCFormSelection" component={KYCFormSelection} />
+      <Stack.Screen name="BankStatementUpload" component={BankStatementUpload} />
       <Stack.Screen name="KycUploadDoc" component={KycUploadDoc} />
       <Stack.Screen name="KycUploadPan" component={KycUplaodPan} />
       <Stack.Screen name="KycUploadAdhar" component={KycUploadAdhar} />
@@ -42,6 +45,7 @@ export const KycNavigator = () => {
         component={ShareholdingCompany}
       />
       <Stack.Screen name="CompanyDocument" component={CompanyDocument} />
+      <Stack.Screen name="FullImage" component={FullImage} />
     </Stack.Navigator>
   );
 };

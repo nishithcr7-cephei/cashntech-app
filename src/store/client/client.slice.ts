@@ -5,37 +5,12 @@ import {
   ClientsFilterResponseDatum,
   ClientState,
   FirmDetailsType,
-  IBankListResponseDatum,
-  IBankStatementPayload,
   IFilterPayload,
   IFilterResponseDatum,
-  IKycBusinessResponseDatum,
-  IKycCheckedResponseDatum,
-  IKycDocumentsData,
   IRemarkReportResponseDatum,
   ITaskHistoryResponseDatum,
   ITaskRecordsFilterPayload,
   ITaskReordsFilterResponseDatum,
-  IuplaodCompanyPanResponse,
-  IUploadAdharDocumentResponse,
-  IUploadAdharDocumnetsPayload,
-  IUploadCompanyInfoPayload,
-  IUploadCompanyInfoResponse,
-  IuploadCompanyPanPayload,
-  IUploadGodDownDetailsResponse,
-  IUploadGoDownDetailsPayload,
-  IUploadGstPayload,
-  IUploadGstResponse,
-  IUploadKycDocumentPayload,
-  IUploadKycDocumentResponse,
-  IUploadPanDocumentsPayload,
-  IUploadPanDocumentsResponse,
-  IUploadResidenceDetailsPayload,
-  IUploadResidenceDetailsResponse,
-  IUploadShareholdingPayload,
-  IUploadShareholdingResponse,
-  IUploadUdhyamPayload,
-  IUploadUdhyamResponse,
   VendorDetailsType,
   VisitDetailsType,
 } from './client.types';
@@ -133,55 +108,6 @@ const initialState: ClientState = {
   //Basic Detail fields
   basicLoader: false,
   clientId: null,
-  // Profile kyc
-  loading: false,
-  data: null,
-  error: null,
-  // Bank List
-  BankLoader: false,
-  BankList: [],
-  // Kyc Checked
-  KycCheckedLoader: false,
-  kycCheckedList: [],
-  // Kyc Business Checked
-  KycBusinessLoader: false,
-  KycBusinessList: [],
-  // Pan Kyc
-  panLoading: false,
-  panData: null,
-  panError: null,
-  // Adhar Kyc
-  adharLoading: false,
-  adharData: null,
-  adharError: null,
-  // Residence Kyc
-  residenceLoading: false,
-  residenceData: null,
-  residenceError: null,
-  // Udhyam Kyc
-  udhyamLoading: false,
-  udhyamData: null,
-  udhyamError: null,
-  // Gst Kyc
-  gstDocLoading: false,
-  gstDocData: null,
-  gtsDocError: null,
-  // GoDown Kyc
-  goDownLoading: false,
-  goDownData: null,
-  goDownError: null,
-  // CompanyPan Upload
-  CompanyPanLoading: false,
-  CompanyPanData: null,
-  CompanyPanError: null,
-  // Shareholding Kyc
-  ShareholdingLoading: false,
-  ShareholdingData: null,
-  ShareholdingError: null,
-  // CompanyInfo Upload
-  CompanyInfoLoading: false,
-  CompanyInfoData: null,
-  CompanyInfoError: null,
   // Filterbox
   FilterboxLoading: false,
   FilterboxData: null,
@@ -190,10 +116,6 @@ const initialState: ClientState = {
   TaskRecordsFilterLoading: false,
   TaskRecordsFilterData: null,
   TaskRecordsFilterError: null,
-  // Bank Statement
-  BankStatementLoading: false,
-  BankStatementData: null,
-  BankStatementError: null,
   // Client
   clientDetails: null,
   clientDetailsLoading: false,
@@ -229,10 +151,6 @@ const initialState: ClientState = {
   softSanctionResultLoading: false,
   softSanctionResultError: null,
   
-  // KYC Documents
-  kycDocumentsLoading: false,
-  kycDocumentsData: null,
-  kycDocumentsError: null,
 
 };
 
@@ -477,266 +395,6 @@ const clientSlice = createSlice({
       state.reportList = [];
       state.reportLoader = false;
     },
-    uploadKycRequest(state, action: PayloadAction<IUploadKycDocumentPayload>) {
-      state.loading = true;
-      state.error = null;
-    },
-    uploadKycSuccess(state, action: PayloadAction<IUploadKycDocumentResponse>) {
-      state.loading = false;
-      state.data = action.payload;
-    },
-    uploadKycFailure(state, action: PayloadAction<string>) {
-      state.loading = false;
-      state.error = action.payload;
-    },
-    clearUploadKyc(state) {
-      state.loading = false;
-      state.data = null;
-      state.error = null;
-    },
-    setBankLoader: (state, action: PayloadAction<boolean>) => {
-      state.BankLoader = action.payload;
-    },
-    getBankList: state => {
-      state.BankLoader = true;
-    },
-    setBankList: (
-      state,
-      action: PayloadAction<Array<IBankListResponseDatum>>,
-    ) => {
-      state.BankLoader = false;
-      state.BankList = action.payload;
-    },
-    resetBankList: state => {
-      state.BankList = [];
-      state.BankLoader = false;
-    },
-    setKycCheckedLoader: (state, action: PayloadAction<boolean>) => {
-      state.KycCheckedLoader = action.payload;
-    },
-    getKycChecked: (state, action: PayloadAction<string>) => {
-      state.KycCheckedLoader = true;
-    },
-    setKycCheckedList: (
-      state,
-      action: PayloadAction<Array<IKycCheckedResponseDatum>>,
-    ) => {
-      state.KycCheckedLoader = false;
-      state.kycCheckedList = action.payload;
-    },
-    resetKycCheckedList: state => {
-      state.kycCheckedList = [];
-      state.KycCheckedLoader = false;
-    },
-    setKycBusinessLoader: (state, action: PayloadAction<boolean>) => {
-      state.KycBusinessLoader = action.payload;
-    },
-    getKycBusinessChecked: (state, action: PayloadAction<string>) => {
-      state.KycBusinessLoader = true;
-    },
-    setKycBusinessCheckedList: (
-      state,
-      action: PayloadAction<Array<IKycBusinessResponseDatum>>,
-    ) => {
-      (state.KycBusinessLoader = false),
-        (state.KycBusinessList = action.payload);
-    },
-    resetKycBusinessList: state => {
-      state.KycBusinessList = [];
-      state.KycBusinessLoader = false;
-    },
-    uploadPanRequest(state, action: PayloadAction<IUploadPanDocumentsPayload>) {
-      state.panLoading = true;
-      state.panError = null;
-    },
-    uploadPanSuccess(
-      state,
-      action: PayloadAction<IUploadPanDocumentsResponse>,
-    ) {
-      state.panLoading = false;
-      state.panData = action.payload;
-    },
-    uploadPanFailure(state, action: PayloadAction<string>) {
-      state.panLoading = false;
-      state.panError = action.payload;
-    },
-    clearPanUpload(state) {
-      state.panLoading = false;
-      state.panData = null;
-      state.panError = null;
-    },
-    uploadAdharRequest(
-      state,
-      action: PayloadAction<IUploadAdharDocumnetsPayload>,
-    ) {
-      state.adharLoading = true;
-      state.adharError = null;
-    },
-    uploadAdharSuccess(
-      state,
-      action: PayloadAction<IUploadAdharDocumentResponse>,
-    ) {
-      state.adharLoading = false;
-      state.adharData = action.payload;
-    },
-    uploadAdharFailure(state, action: PayloadAction<string>) {
-      state.adharLoading = false;
-      state.adharError = action.payload;
-    },
-    clearAdhar(state) {
-      state.adharLoading = false;
-      state.adharData = null;
-      state.adharError = null;
-    },
-    uploadResidenceRequest(
-      state,
-      action: PayloadAction<IUploadResidenceDetailsPayload>,
-    ) {
-      state.residenceLoading = true;
-      state.residenceError = null;
-    },
-    uploadResidenceSuccess(
-      state,
-      action: PayloadAction<IUploadResidenceDetailsResponse>,
-    ) {
-      state.residenceLoading = false;
-      state.residenceData = action.payload;
-    },
-    uploadResidenceFailure(state, action: PayloadAction<string>) {
-      state.residenceLoading = false;
-      state.residenceError = action.payload;
-    },
-    clearUploadResidence(state) {
-      state.residenceLoading = false;
-      state.residenceData = null;
-      state.residenceError = null;
-    },
-    uploadUdhyamRequest(state, action: PayloadAction<IUploadUdhyamPayload>) {
-      state.udhyamLoading = true;
-      state.udhyamError = null;
-    },
-    uploadUdhyamSuccess(state, action: PayloadAction<IUploadUdhyamResponse>) {
-      state.udhyamLoading = false;
-      state.udhyamData = action.payload;
-    },
-    uploadUdhyamFailure(state, action: PayloadAction<string>) {
-      state.udhyamLoading = false;
-      state.udhyamError = action.payload;
-    },
-    clearUplaodUdhyam(state) {
-      state.udhyamLoading = false;
-      state.udhyamData = null;
-      state.udhyamError = null;
-    },
-    uploadGstRequest(state, action: PayloadAction<IUploadGstPayload>) {
-      state.gstDocLoading = true;
-      state.gtsDocError = null;
-    },
-    uploadGstSuccess(state, action: PayloadAction<IUploadGstResponse>) {
-      state.gstDocLoading = false;
-      state.gstDocData = action.payload;
-    },
-    uploadGstfailure(state, action: PayloadAction<string>) {
-      state.gstDocLoading = false;
-      state.gtsDocError = action.payload;
-    },
-    clearUplaodGst(state) {
-      state.gstDocLoading = false;
-      state.gstDocData = null;
-      state.gtsDocError = null;
-    },
-    uploadGoDownRequest(
-      state,
-      action: PayloadAction<IUploadGoDownDetailsPayload>,
-    ) {
-      state.goDownLoading = true;
-      state.goDownError = null;
-    },
-    uploadGoDownSuccess(
-      state,
-      action: PayloadAction<IUploadGodDownDetailsResponse>,
-    ) {
-      state.goDownLoading = false;
-      state.goDownData = action.payload;
-    },
-    uploadGoDownFailure(state, action: PayloadAction<string>) {
-      state.goDownLoading = false;
-      state.goDownError = action.payload;
-    },
-    clearUploadGoDown(state) {
-      state.goDownLoading = false;
-      state.goDownData = null;
-      state.goDownError = null;
-    },
-    uploadShareholdingRequest(
-      state,
-      action: PayloadAction<IUploadShareholdingPayload>,
-    ) {
-      state.ShareholdingLoading = true;
-      state.ShareholdingError = null;
-    },
-    uploadShareholdingSuccess(
-      state,
-      action: PayloadAction<IUploadShareholdingResponse>,
-    ) {
-      state.ShareholdingLoading = false;
-      state.ShareholdingData = action.payload;
-    },
-    uploadShareholdingFailure(state, action: PayloadAction<string>) {
-      state.ShareholdingLoading = false;
-      state.ShareholdingError = action.payload;
-    },
-    clearShareholding(state) {
-      state.ShareholdingLoading = false;
-      state.ShareholdingData = null;
-      state.ShareholdingError = null;
-    },
-    uploadCompanyPanRequest(
-      state,
-      action: PayloadAction<IuploadCompanyPanPayload>,
-    ) {
-      state.CompanyPanLoading = true;
-      state.CompanyPanError = null;
-    },
-    uploadCompanyPanSuccess(
-      state,
-      action: PayloadAction<IuplaodCompanyPanResponse>,
-    ) {
-      state.CompanyPanLoading = false;
-      state.CompanyPanData = action.payload;
-    },
-    uploadCompanyPanFailure(state, action: PayloadAction<string>) {
-      state.CompanyPanLoading = false;
-      state.CompanyPanError = action.payload;
-    },
-    clearCompanyPan(state) {
-      state.CompanyPanLoading = false;
-      state.CompanyPanData = null;
-      state.CompanyPanError = null;
-    },
-    uploadCompanyInfoRequest(
-      state,
-      action: PayloadAction<IUploadCompanyInfoPayload>,
-    ) {
-      state.CompanyInfoLoading = true;
-      state.CompanyInfoError = null;
-    },
-    uploadCompanyInfoSuccess(
-      state,
-      action: PayloadAction<IUploadCompanyInfoResponse>,
-    ) {
-      state.CompanyInfoLoading = false;
-      state.CompanyInfoData = action.payload;
-    },
-    uploadCompanyInfoFailure(state, action: PayloadAction<string>) {
-      state.CompanyInfoLoading = false;
-      state.CompanyInfoError = action.payload;
-    },
-    clearCompanyInfo(state) {
-      state.CompanyInfoLoading = false;
-      state.CompanyInfoData = null;
-      state.CompanyInfoError = null;
-    },
     FilterRequest(state, action: PayloadAction<IFilterPayload>) {
       state.FilterboxLoading = true;
       state.FilterboxError = null;
@@ -776,23 +434,6 @@ const clientSlice = createSlice({
       state.TaskRecordsFilterLoading = false;
       state.TaskRecordsFilterData = null;
       state.TaskRecordsFilterError = null;
-    },
-    bankStatementRequest(state, action: PayloadAction<IBankStatementPayload>) {
-      state.BankStatementLoading = true;
-      state.BankStatementError = null;
-    },
-    bankStatementSuccess(state, action: PayloadAction<any>) {
-      state.BankStatementLoading = false;
-      state.BankStatementData = action.payload;
-    },
-    bankStatementFailure(state, action: PayloadAction<string>) {
-      state.BankStatementLoading = false;
-      state.BankStatementError = action.payload;
-    },
-    clearBankStatement(state) {
-      state.BankStatementLoading = false;
-      state.BankStatementData = null;
-      state.BankStatementError = null;
     },
     getClientDetails: (state, _action: PayloadAction<number>) => {
       state.clientDetailsLoading = true;
@@ -867,58 +508,6 @@ export const {
   getReport,
   setReportList,
   resetReportList,
-  uploadKycRequest,
-  uploadKycSuccess,
-  uploadKycFailure,
-  clearUploadKyc,
-  setBankLoader,
-  getBankList,
-  setBankList,
-  resetBankList,
-  setKycCheckedLoader,
-  getKycChecked,
-  setKycCheckedList,
-  resetKycCheckedList,
-  setKycBusinessLoader,
-  getKycBusinessChecked,
-  setKycBusinessCheckedList,
-  resetKycBusinessList,
-  uploadPanRequest,
-  uploadPanSuccess,
-  uploadPanFailure,
-  clearPanUpload,
-  uploadAdharRequest,
-  uploadAdharSuccess,
-  uploadAdharFailure,
-  clearAdhar,
-  uploadResidenceRequest,
-  uploadResidenceSuccess,
-  uploadResidenceFailure,
-  clearUploadResidence,
-  uploadUdhyamRequest,
-  uploadUdhyamSuccess,
-  uploadUdhyamFailure,
-  clearUplaodUdhyam,
-  uploadGstRequest,
-  uploadGstSuccess,
-  uploadGstfailure,
-  clearUplaodGst,
-  uploadGoDownRequest,
-  uploadGoDownSuccess,
-  uploadGoDownFailure,
-  clearUploadGoDown,
-  uploadShareholdingRequest,
-  uploadShareholdingSuccess,
-  uploadShareholdingFailure,
-  clearShareholding,
-  uploadCompanyPanRequest,
-  uploadCompanyPanSuccess,
-  uploadCompanyPanFailure,
-  clearCompanyPan,
-  uploadCompanyInfoRequest,
-  uploadCompanyInfoSuccess,
-  uploadCompanyInfoFailure,
-  clearCompanyInfo,
   FilterRequest,
   FilterSucess,
   FilterFailure,
@@ -927,10 +516,6 @@ export const {
   TaskRecordsFilterSucess,
   TaskRecordsFailure,
   clearTaskRecordsFilter,
-  bankStatementRequest,
-  bankStatementSuccess,
-  bankStatementFailure,
-  clearBankStatement,
   getClientDetails,
   setClientDetails,
   setClientDetailsError,

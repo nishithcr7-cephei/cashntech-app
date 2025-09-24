@@ -79,6 +79,10 @@ const Endpoints = {
   // bank Statement
   apiGetBankStatment: (clientId: string) =>
     `/client-info-master/bank-statement/${clientId}`,
+  apiGetBankStatementInfo: (clientId: string) =>
+    `/client-info-master/bank-statement-info/${clientId}`,
+  apiGetBankStatementDetail: (bankId: string) =>
+    `/client-info-master/bank-statement/${bankId}`,
   // Get Api to check document uploaded or not
   apiGetKycChecked: (clientID: string) =>
     `/client-info-master/personal-kyc/check/${clientID}`,
@@ -88,6 +92,8 @@ const Endpoints = {
   // Get all KYC documents for a client
   apiGetKycDocuments: (clientID: string) =>
     `/client-info-master/kyc/${clientID}`,
+  // Get KYC details with intent filtering
+  apiGetKycDetails: '/client-info-master/kyc-details',
 
   // BankList dropdown
   apiBankList: '/client-info-master/bank-list',

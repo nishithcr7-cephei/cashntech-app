@@ -1,4 +1,4 @@
-import {File, RightCheckmark} from '@assets/Icons';
+import {File, RightCheckmarkWhite} from '@assets/Icons';
 import Colors from '@constants/Colors';
 import Fonts from '@constants/Fonts';
 import {
@@ -163,7 +163,7 @@ export const UploadModal = ({
                   handleSubmit();
                 }}>
                 <Text style={styles.saveText}>Submit</Text>
-                <RightCheckmark width={12} height={12} />
+                <RightCheckmarkWhite width={12} height={12} />
               </TouchableOpacity>
             </View>
           </TouchableWithoutFeedback>

@@ -126,6 +126,7 @@ export type ReportNavigatorType = {
 export type KycNavigatorType = {
   KycDocument: undefined;
   KYCFormSelection: {clientID: number};
+  BankStatementUpload: {clientID: number};
   KycUploadDoc: {clientID: number};
   KycUploadPan: {clientID: number};
   KycUploadAdhar: {clientID: number};
@@ -139,6 +140,7 @@ export type KycNavigatorType = {
   CompanyPanCard: {clientID: number};
   ShareholdingCompany: {clientID: number};
   CompanyDocument: {clientID: number};
+  FullImage: {imageUrl: string};
 };
 
 export type DocNavigatorType = {
