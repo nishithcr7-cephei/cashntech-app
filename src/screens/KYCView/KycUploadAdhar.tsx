@@ -374,7 +374,7 @@ export const KycUploadAdhar = () => {
         navigation.goBack();
       }, 1500);
     } else {
-      console.warn('Please fill all required Aadhar Details and upload images.');
+      // Please fill all required Aadhar Details and upload images
     }
   };
 

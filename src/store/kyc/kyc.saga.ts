@@ -89,7 +89,6 @@ import {
   IKycDetailsPayload,
   IKycDetailsResponseDatum,
   IGetPersonalKycPayload,
-  IGetPersonalKycResponse,
   IPersonalKycDocument,
 } from './kyc.types';
 import {Result} from '@utils/TryCatch';
@@ -97,7 +96,6 @@ import {PayloadAction} from '@reduxjs/toolkit';
 
 function* handleUploadKyc(action: PayloadAction<IUploadKycDocumentPayload>) {
   try {
-    console.log('Called uploadKycRequest');
     const formData = new FormData();
     formData.append('doc', {
       uri: action.payload.doc.uri,
@@ -240,8 +238,6 @@ function* handleUploadResidence(
 
 function* handleUploadUdhyam(action: PayloadAction<IUploadUdhyamPayload>) {
   try {
-    console.log('Uploading Udhyam Document...');
-
     const formData = new FormData();
 
     // Attach file if exists
@@ -276,8 +272,6 @@ function* handleUploadUdhyam(action: PayloadAction<IUploadUdhyamPayload>) {
 
 function* handleUploadGst(action: PayloadAction<IUploadGstPayload>) {
   try {
-    console.log('Uploading GST Document...');
-
     const formData = new FormData();
 
     // Attach the document
@@ -348,7 +342,6 @@ function* handleUploadShareholding(
   action: PayloadAction<IUploadShareholdingPayload>,
 ) {
   try {
-    console.log('Called UploadShareholdingRequest');
     const formData = new FormData();
     formData.append('doc', {
       uri: action.payload.doc.uri,
@@ -385,8 +378,6 @@ function* handleUploadCompanyPan(
   action: PayloadAction<IuploadCompanyPanPayload>,
 ) {
   try {
-    console.log('Uploading CompanyPan Document...');
-
     const formData = new FormData();
 
     // Add the document file
@@ -548,17 +539,13 @@ function* handleGetKycClients(action: PayloadAction<number>): unknown {
 }
 
 function* handleGetKycDetails(action: PayloadAction<IKycDetailsPayload>): unknown {
-  console.log('KYC Saga: Starting getKycDetails with payload:', action.payload);
   const {data, error}: Result<IKycDetailsResponseDatum[]> = yield call(
     kycApi.getKycDetails,
     action.payload,
   );
-  console.log('KYC Saga: API response:', {data, error});
   if (!error) {
-    console.log('KYC Saga: Success - data length:', data?.length);
     yield put(getKycDetailsSuccess(data));
   } else {
-    console.log('KYC Saga: Error:', error?.message);
     yield put(getKycDetailsFailure(error?.message ?? 'Failed to fetch KYC details'));
   }
 }
@@ -576,18 +563,13 @@ function* handleGetPersonalKyc(action: PayloadAction<IGetPersonalKycPayload>): u
 }
 
 function* handleGetBusinessKyc(action: PayloadAction<IGetPersonalKycPayload>): unknown {
-  console.log('🏢🏢🏢 BUSINESS KYC SAGA CALLED - NOT PERSONAL KYC 🏢🏢🏢');
-  console.log('🏢 Business KYC Saga: Starting with payload:', action.payload);
   const {data, error}: Result<IPersonalKycDocument[]> = yield call(
     kycApi.getBusinessKycDocuments,
     action.payload,
   );
-  console.log('🏢 Business KYC Saga: API response:', {data, error});
   if (!error) {
-    console.log('🏢 Business KYC Saga: Success - data length:', data?.length);
     yield put(getBusinessKycSuccess(data));
   } else {
-    console.log('🏢 Business KYC Saga: Error:', error?.message);
     yield put(getBusinessKycFailure(error?.message ?? 'Failed to fetch business KYC documents'));
   }
 }

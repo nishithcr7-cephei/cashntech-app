@@ -1,3 +1,26 @@
+import React, {useEffect, useState} from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import {DrawerNavigationProp} from '@react-navigation/drawer';
+import {
+  CompositeNavigationProp,
+  RouteProp,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useDispatch, useSelector} from 'react-redux';
+import Toast from 'react-native-toast-message';
+import moment from 'moment';
+import {DocumentPickerResponse} from '@react-native-documents/picker';
+
 import {RightCheckmark} from '@assets/Icons';
 import {
   AppBar,
@@ -11,14 +34,6 @@ import {
 import Colors from '@constants/Colors';
 import Fonts from '@constants/Fonts';
 import fontWeight from '@constants/FontWeight';
-import {DrawerNavigationProp} from '@react-navigation/drawer';
-import {
-  CompositeNavigationProp,
-  RouteProp,
-  useNavigation,
-  useRoute,
-} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {
   kycActions,
   kycSelector,
@@ -27,20 +42,6 @@ import {
 import {HomeNavigatorType, KycNavigatorType} from '@type/NavigatorTypes';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {getUserFullName} from '@utils/Utils';
-import moment from 'moment';
-import React, {useEffect, useState} from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
-import Toast from 'react-native-toast-message';
-import {useDispatch, useSelector} from 'react-redux';
-import {DocumentPickerResponse} from '@react-native-documents/picker';
 
 type KycNavigationType = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType>,
@@ -200,14 +201,12 @@ export const BankStatementUpload = () => {
 
   useEffect(() => {
     if (bankStatementInfo && bankStatementInfo.length > 0) {
-      console.log('Bank Statement Info received:', bankStatementInfo);
       // You can use this data to pre-populate the form or show existing bank statements
     }
   }, [bankStatementInfo]);
 
   useEffect(() => {
     if (bankStatementDetail) {
-      console.log('Bank Statement Detail received:', bankStatementDetail);
       // Auto-fill the form with the bank statement detail data
       const newBankEntry: BankEntry = {
         bankName: mapBankNameToValue(bankStatementDetail.bank_name),
@@ -218,8 +217,6 @@ export const BankStatementUpload = () => {
         endDate: moment(bankStatementDetail.statement_to, 'YYYY-MM-DD').format('DD-MM-YYYY'),
         uploadedFrontFile: undefined,
       };
-      
-      console.log('Mapped bank entry:', newBankEntry);
       
       // Replace the first bank entry with the fetched data
       setBankEntries([newBankEntry]);
@@ -353,7 +350,6 @@ export const BankStatementUpload = () => {
 
   // Handle bank card click to fetch details
   const handleBankCardClick = (bankId: number) => {
-    console.log('Clicked on bank with ID:', bankId);
     dispatch(kycActions.getBankStatementDetailRequest(bankId.toString()));
   };
 

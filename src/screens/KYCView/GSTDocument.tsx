@@ -83,17 +83,9 @@ export const GSTDocument = () => {
 
   // Fetch existing GST data using Redux Saga
   const fetchExistingGst = () => {
-    console.log('🔍 fetchExistingGst called with params:', params);
     if (!params?.clientID) {
-      console.log('❌ No clientID found, returning early');
       return;
     }
-    
-    console.log('🚀 Dispatching getBusinessKycRequest with:', {
-      clientId: params.clientID.toString(),
-      docType: 'gst'
-    });
-    console.log('🏢🏢🏢 DISPATCHING BUSINESS KYC REQUEST - NOT PERSONAL KYC 🏢🏢🏢');
     
     dispatch(kycActions.getBusinessKycRequest({
       clientId: params.clientID.toString(),
@@ -103,57 +95,38 @@ export const GSTDocument = () => {
 
   // Handle Redux state changes
   useEffect(() => {
-    console.log('📊 useEffect triggered - personalKycData:', personalKycData);
-    console.log('⏳ personalKycLoading:', personalKycLoading);
-    console.log('❌ personalKycError:', personalKycError);
-    
     if (personalKycData && personalKycData.length > 0) {
-      console.log('✅ Found personalKycData, processing...');
       const gstRecords = personalKycData;
       
       // Process main applicant (first record)
       if (gstRecords.length > 0) {
         const mainApplicantData = gstRecords[0];
-        console.log('📄 mainApplicantData:', mainApplicantData);
-        console.log('📁 filename_obj:', mainApplicantData.filename_obj);
         
         const fileName = (mainApplicantData.filename_obj as any)?.gst?.file_name;
         const nameAsPerGst = (mainApplicantData.filename_obj as any)?.gst?.name_as_per_gst;
         const gstNumberValue = (mainApplicantData.filename_obj as any)?.gst?.gst_number;
         
-        console.log('🔍 Extracted data:', { fileName, nameAsPerGst, gstNumberValue });
-        
         if (fileName) {
-          console.log('✅ Found fileName, setting up existing data...');
           // Construct full image URL for main applicant
           const fullImageUrl = `${FILE_DOWNLOAD_URL}/KYC/client_${params.clientID}/${fileName}`;
-          console.log('🖼️ Setting image URL:', fullImageUrl);
           
           setExistingImageUrl(fullImageUrl);
           setExistingImageName(fileName);
           
           // Pre-fill form fields if available
           if (nameAsPerGst) {
-            console.log('📝 Setting name:', nameAsPerGst);
             setNameonGstCertificate(nameAsPerGst);
           }
           if (gstNumberValue) {
-            console.log('🔢 Setting GST number:', gstNumberValue);
             setGstNumber(gstNumberValue);
           }
-        } else {
-          console.log('❌ No fileName found in data');
         }
       }
       
       // Set edit mode if any existing data is found
-      console.log('🔄 Setting edit mode to true');
       setIsEditMode(true);
     } else if (personalKycData && personalKycData.length === 0) {
-      console.log('📭 No data found, setting edit mode to false');
       setIsEditMode(false);
-    } else {
-      console.log('❓ personalKycData is null or undefined');
     }
   }, [personalKycData, params?.clientID]);
 
@@ -171,7 +144,6 @@ export const GSTDocument = () => {
 
   // Fetch existing GST data on component mount
   useEffect(() => {
-    console.log('🏁 Component mount useEffect triggered, params?.clientID:', params?.clientID);
     fetchExistingGst();
   }, [params?.clientID]);
 
@@ -188,7 +160,6 @@ export const GSTDocument = () => {
   const openPdfInBrowser = (fileName: string) => {
     const pdfUrl = `${FILE_DOWNLOAD_URL}/KYC/client_${params.clientID}/${fileName}`;
     Linking.openURL(pdfUrl).catch(err => {
-      console.error('Failed to open PDF:', err);
       Alert.alert('Error', 'Failed to open PDF document');
     });
   };

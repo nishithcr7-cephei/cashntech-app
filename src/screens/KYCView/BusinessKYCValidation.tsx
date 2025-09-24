@@ -1,15 +1,15 @@
-/* eslint-disable react-native/no-inline-styles */
-import {View, Text, StyleSheet, TouchableOpacity, FlatList} from 'react-native';
 import React from 'react';
-import {AppBar, Container, PersonalKYCValidationCard} from '@components/index';
+import {View, Text, StyleSheet, TouchableOpacity, FlatList} from 'react-native';
 import {CompositeNavigationProp, useNavigation} from '@react-navigation/native';
-import {LeftChevronCircle} from '@assets/Icons';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {ScrollView} from 'react-native-gesture-handler';
+
+import {AppBar, Container, PersonalKYCValidationCard} from '@components/index';
+import {LeftChevronCircle} from '@assets/Icons';
 import {HomeNavigatorType, ClientNavigatorType} from '@type/NavigatorTypes';
 import Colors from '@constants/Colors';
 import {scaleFont} from '@utils/Scale';
-import {ScrollView} from 'react-native-gesture-handler';
 import fontWeight from '@constants/FontWeight';
 
 type NavigationType = CompositeNavigationProp<

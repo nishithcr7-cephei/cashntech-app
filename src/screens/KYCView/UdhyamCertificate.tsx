@@ -86,17 +86,9 @@ export const UdhyamCertificate = () => {
 
   // Fetch existing Udhyam data using Redux Saga
   const fetchExistingUdhyam = () => {
-    console.log('🔍 fetchExistingUdhyam called with params:', params);
     if (!params?.clientID) {
-      console.log('❌ No clientID found, returning early');
       return;
     }
-    
-    console.log('🚀 Dispatching getBusinessKycRequest with:', {
-      clientId: params.clientID.toString(),
-      docType: 'udhyam'
-    });
-    console.log('🏢🏢🏢 DISPATCHING BUSINESS KYC REQUEST - NOT PERSONAL KYC 🏢🏢🏢');
     
     dispatch(kycActions.getBusinessKycRequest({
       clientId: params.clientID.toString(),
@@ -106,57 +98,38 @@ export const UdhyamCertificate = () => {
 
   // Handle Redux state changes
   useEffect(() => {
-    console.log('📊 useEffect triggered - personalKycData:', personalKycData);
-    console.log('⏳ personalKycLoading:', personalKycLoading);
-    console.log('❌ personalKycError:', personalKycError);
-    
     if (personalKycData && personalKycData.length > 0) {
-      console.log('✅ Found personalKycData, processing...');
       const udhyamRecords = personalKycData;
       
       // Process main applicant (first record)
       if (udhyamRecords.length > 0) {
         const mainApplicantData = udhyamRecords[0];
-        console.log('📄 mainApplicantData:', mainApplicantData);
-        console.log('📁 filename_obj:', mainApplicantData.filename_obj);
         
         const fileName = (mainApplicantData.filename_obj as any)?.udhyam?.file_name;
         const nameAsPerUdhyam = (mainApplicantData.filename_obj as any)?.udhyam?.name_as_per_udhyam;
         const urnNumber = (mainApplicantData.filename_obj as any)?.udhyam?.urn_number;
         
-        console.log('🔍 Extracted data:', { fileName, nameAsPerUdhyam, urnNumber });
-        
         if (fileName) {
-          console.log('✅ Found fileName, setting up existing data...');
           // Construct full image URL for main applicant
           const fullImageUrl = `${FILE_DOWNLOAD_URL}/KYC/client_${params.clientID}/${fileName}`;
-          console.log('🖼️ Setting image URL:', fullImageUrl);
           
           setExistingImageUrl(fullImageUrl);
           setExistingImageName(fileName);
           
           // Pre-fill form fields if available
           if (nameAsPerUdhyam) {
-            console.log('📝 Setting name:', nameAsPerUdhyam);
             setUdhyamAdharName(nameAsPerUdhyam);
           }
           if (urnNumber) {
-            console.log('🔢 Setting URN:', urnNumber);
             setUdhyamNumber(urnNumber);
           }
-        } else {
-          console.log('❌ No fileName found in data');
         }
       }
       
       // Set edit mode if any existing data is found
-      console.log('🔄 Setting edit mode to true');
       setIsEditMode(true);
     } else if (personalKycData && personalKycData.length === 0) {
-      console.log('📭 No data found, setting edit mode to false');
       setIsEditMode(false);
-    } else {
-      console.log('❓ personalKycData is null or undefined');
     }
   }, [personalKycData, params?.clientID]);
 
@@ -174,7 +147,6 @@ export const UdhyamCertificate = () => {
 
   // Fetch existing Udhyam data on component mount
   useEffect(() => {
-    console.log('🏁 Component mount useEffect triggered, params?.clientID:', params?.clientID);
     fetchExistingUdhyam();
   }, [params?.clientID]);
 
@@ -191,7 +163,6 @@ export const UdhyamCertificate = () => {
   const openPdfInBrowser = (fileName: string) => {
     const pdfUrl = `${FILE_DOWNLOAD_URL}/KYC/client_${params.clientID}/${fileName}`;
     Linking.openURL(pdfUrl).catch(err => {
-      console.error('Failed to open PDF:', err);
       Alert.alert('Error', 'Failed to open PDF document');
     });
   };

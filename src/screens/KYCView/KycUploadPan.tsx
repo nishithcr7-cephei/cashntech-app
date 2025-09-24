@@ -352,7 +352,7 @@ export const KycUplaodPan = () => {
         navigation.goBack();
       }, 1500);
     } else {
-      console.warn('Please fill all required PAN details and upload images.');
+      // Please fill all required PAN details and upload images
     }
   };
 

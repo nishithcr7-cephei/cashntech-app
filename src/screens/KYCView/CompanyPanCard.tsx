@@ -1,3 +1,25 @@
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import {DrawerNavigationProp} from '@react-navigation/drawer';
+import {
+  CompositeNavigationProp,
+  RouteProp,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useDispatch, useSelector} from 'react-redux';
+import Toast from 'react-native-toast-message';
+import {DocumentPickerResponse} from '@react-native-documents/picker';
+import {Linking} from 'react-native';
+
 import {RightCheckmarkWhite} from '@assets/Icons';
 import {
   AppBar,
@@ -9,32 +31,11 @@ import {
 import Colors from '@constants/Colors';
 import Fonts from '@constants/Fonts';
 import fontWeight from '@constants/FontWeight';
-import {DocumentPickerResponse} from '@react-native-documents/picker';
-import {DrawerNavigationProp} from '@react-navigation/drawer';
-import {
-  CompositeNavigationProp,
-  RouteProp,
-  useNavigation,
-  useRoute,
-} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {kycActions, IuploadCompanyPanPayload, kycSelector} from '@store/kyc';
 import {HomeNavigatorType, KycNavigatorType} from '@type/NavigatorTypes';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {getUserFullName} from '@utils/Utils';
 import {FILE_DOWNLOAD_URL} from '@config/config';
-import {Linking} from 'react-native';
-import React, {useState, useEffect} from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
-import Toast from 'react-native-toast-message';
-import {useDispatch, useSelector} from 'react-redux';
 
 type KycNavigationType = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType>,
@@ -83,7 +84,6 @@ export const CompanyPanCard = () => {
   // Load existing data when component mounts
   useEffect(() => {
     if (params.clientID) {
-      console.log('Loading business KYC company PAN data for client:', params.clientID);
       // Clear any previous upload data to prevent false success toasts
       dispatch(kycActions.clearCompanyPan());
       dispatch(kycActions.getBusinessKycRequest({
@@ -95,22 +95,16 @@ export const CompanyPanCard = () => {
 
   // Update form when data is loaded
   useEffect(() => {
-    console.log('Business KYC Data:', personalKycData);
-    console.log('Business KYC Loading:', personalKycLoading);
-    
     if (personalKycData && personalKycData.length > 0) {
       // For business KYC, look for documents with company_pan in filename_obj
       const companyPanDoc = personalKycData.find(
         (doc: any) => doc.filename_obj && doc.filename_obj.company_pan
       );
       
-      console.log('Company PAN Doc:', companyPanDoc);
-      
       if (companyPanDoc?.filename_obj) {
         const filenameObj = companyPanDoc.filename_obj as any;
         if (filenameObj.company_pan) {
           const panData = filenameObj.company_pan;
-          console.log('PAN Data:', panData);
           setNamePan(panData.name_as_per_pan || '');
           setPanNumber(panData.pan_number || '');
           
@@ -126,10 +120,7 @@ export const CompanyPanCard = () => {
       // Set edit mode if any existing data is found
       setIsEditMode(true);
     } else if (!personalKycLoading && personalKycData && personalKycData.length === 0) {
-      console.log('No company PAN data found for this client');
       setIsEditMode(false);
-    } else {
-      console.log('❓ personalKycData is null or undefined');
     }
   }, [personalKycData, personalKycLoading]);
 
@@ -165,7 +156,6 @@ export const CompanyPanCard = () => {
   const openPdfInBrowser = (fileName: string) => {
     const pdfUrl = `${FILE_DOWNLOAD_URL}/KYC/client_${params.clientID}/${fileName}`;
     Linking.openURL(pdfUrl).catch(err => {
-      console.error('Failed to open PDF:', err);
       Alert.alert('Error', 'Failed to open PDF document');
     });
   };

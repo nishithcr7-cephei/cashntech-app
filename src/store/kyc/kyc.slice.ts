@@ -5,9 +5,7 @@ import {
   IBankStatementPayload,
   IBankStatementInfoData,
   IBankStatementDetailData,
-  IKycBusinessResponseDatum,
   IKycCheckedResponseDatum,
-  IKycDocumentsData,
   IuplaodCompanyPanResponse,
   IUploadAdharDocumentResponse,
   IUploadAdharDocumnetsPayload,
@@ -32,7 +30,6 @@ import {
   IKycDetailsPayload,
   IKycDetailsResponseDatum,
   IGetPersonalKycPayload,
-  IGetPersonalKycResponse,
   IPersonalKycDocument,
 } from './kyc.types';
 

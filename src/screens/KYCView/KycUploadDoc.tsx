@@ -1,4 +1,25 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Image,
+} from 'react-native';
+import {DrawerNavigationProp} from '@react-navigation/drawer';
+import {
+  CompositeNavigationProp,
+  RouteProp,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useDispatch, useSelector} from 'react-redux';
+import Toast from 'react-native-toast-message';
+import {DocumentPickerResponse} from '@react-native-documents/picker';
+
 import {RightCheckmark, RightCheckmarkWhite, Upload} from '@assets/Icons';
 import {
   AppBar,
@@ -10,15 +31,6 @@ import {
 import Colors from '@constants/Colors';
 import Fonts from '@constants/Fonts';
 import fontWeight from '@constants/FontWeight';
-import {DocumentPickerResponse} from '@react-native-documents/picker';
-import {DrawerNavigationProp} from '@react-navigation/drawer';
-import {
-  CompositeNavigationProp,
-  RouteProp,
-  useNavigation,
-  useRoute,
-} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {kycActions, kycSelector} from '@store/kyc';
 import {
   HomeNavigatorType,
@@ -30,18 +42,6 @@ import {getUserFullName} from '@utils/Utils';
 import {FILE_DOWNLOAD_URL, API_URL} from '@config/config';
 import {storage} from '@services/localStorage';
 import StorageKeys from '@constants/StorageKeys';
-import React, {useState, useEffect} from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  Image,
-} from 'react-native';
-import Toast from 'react-native-toast-message';
-import {useDispatch, useSelector} from 'react-redux';
 
 type KycNavigationType = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType>,

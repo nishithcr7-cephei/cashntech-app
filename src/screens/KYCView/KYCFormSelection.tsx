@@ -40,23 +40,18 @@ export const KYCFormSelection = () => {
   const {params} = useRoute<RouteProp<KycNavigatorType, 'KYCFormSelection'>>();
 
   const dispatch = useDispatch();
-  const kycChecked = useSelector(kycSelector.getkycChecked);
+  const kycChecked = useSelector(kycSelector.getKycChecked) || [];
   const KycBusinessChecked =
     useSelector(kycSelector.getBusinessChecked) || [];
 
   const checkedKyc = () => {
     if (params?.clientID != null) {
       dispatch(kycActions.getKycChecked(params.clientID.toString()));
-    } else {
-      console.warn('checkedKyc: clientID is undefined');
     }
   };
   const CheckedBusinessKyc = () => {
     if (params?.clientID != null) {
-      console.log('🏢 Calling business KYC check for client ID:', params.clientID);
       dispatch(kycActions.getKycBusinessChecked(params.clientID.toString()));
-    } else {
-      console.warn('CheckedBusinessKyc: clientID is undefined');
     }
   };
   useEffect(() => {
@@ -110,7 +105,7 @@ export const KYCFormSelection = () => {
     const screen = navMap[text];
     screen
       ? navigation.navigate(screen, {clientID: params.clientID})
-      : console.warn('Screen not found for', text);
+      : null;
   };
 
   const handleNavigation2 = (text: string) => {
@@ -133,7 +128,7 @@ export const KYCFormSelection = () => {
     const screen = navMap[text];
     screen
       ? navigation.navigate(screen, {clientID: params.clientID})
-      : console.warn('Screen not found for', text);
+      : null;
   };
 
   const renderList = (
@@ -165,9 +160,6 @@ export const KYCFormSelection = () => {
   ) =>
     docs.map(({label, key}, index) => {
       const isUploaded = KycBusinessChecked.includes(key);
-      console.log(`🏢 Document ${label} (${key}): isUploaded=${isUploaded}`);
-      console.log(`🏢 KycBusinessChecked array:`, KycBusinessChecked);
-      console.log(`🏢 Checking if "${key}" is in array:`, KycBusinessChecked.includes(key));
       
       return (
         <TouchableOpacity

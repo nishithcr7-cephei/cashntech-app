@@ -1,3 +1,12 @@
+import React from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
+
 import {RightCheckmark} from '@assets/Icons';
 import {
   AppBar,
@@ -7,17 +16,8 @@ import {
   Input,
 } from '@components/index';
 import Colors from '@constants/Colors';
-import Fonts from '@constants/Fonts';
 import fontWeight from '@constants/FontWeight';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-} from 'react-native';
 
 export const KycElectricityBill = () => {
   const [uploading, setUploading] = React.useState(false);
@@ -106,70 +106,11 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
   },
-  dropdown: {
-    backgroundColor: '#FFF',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 10,
-  },
-  dropdownContainer: {
-    backgroundColor: '#FFF',
-    borderColor: '#ccc',
-    zIndex: 1000,
-    elevation: 5,
-  },
-  labelText: {
-    fontSize: 16,
-  },
-  image_arrow: {
-    width: 17,
-    height: 20,
-    margin: 1,
-  },
   sectionTitle: {
     fontSize: scaleFont(16),
     fontWeight: fontWeight.SemiBold,
     marginVertical: 10,
     marginBottom: scaleHeight(16),
-  },
-  inputGroup: {
-    marginBottom: 10,
-  },
-  label: {
-    fontSize: 13,
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 4,
-    fontSize: 14,
-    backgroundColor: '#f9f9f9',
-  },
-  uploadBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#bbb',
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 10,
-    gap: 10,
-  },
-  icon: {
-    width: 16,
-    height: 16,
-    marginRight: 8,
-    tintColor: '#888',
-  },
-  uploadText: {
-    fontSize: 13,
-    color: '#666',
   },
   footerButton: {
     flexDirection: 'row',
@@ -199,7 +140,6 @@ const styles = StyleSheet.create({
   },
   saveText: {
     color: Colors.white,
-    fontFamily: Fonts.GilroyMedium,
     fontSize: scaleFont(14),
   },
   row: {

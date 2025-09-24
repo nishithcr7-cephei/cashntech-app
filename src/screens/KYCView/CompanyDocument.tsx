@@ -1,28 +1,4 @@
-import {RightCheckmark} from '@assets/Icons';
-import {AppBar, Container, DashedButton, UploadModal} from '@components/index';
-import Colors from '@constants/Colors';
-import Fonts from '@constants/Fonts';
-import fontWeight from '@constants/FontWeight';
-import {DocumentPickerResponse} from '@react-native-documents/picker';
-import {DrawerNavigationProp} from '@react-navigation/drawer';
-import {
-  CompositeNavigationProp,
-  RouteProp,
-  useNavigation,
-  useRoute,
-} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {kycActions} from '@store/kyc';
-import {
-  HomeNavigatorType,
-  ClientNavigatorType,
-  KycNavigatorType,
-} from '@type/NavigatorTypes';
-import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {getUserFullName} from '@utils/Utils';
-import {FILE_DOWNLOAD_URL} from '@config/config';
-import {Linking} from 'react-native';
-import React, {useState, useEffect, useMemo} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -32,8 +8,33 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import Toast from 'react-native-toast-message';
+import {DrawerNavigationProp} from '@react-navigation/drawer';
+import {
+  CompositeNavigationProp,
+  RouteProp,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useDispatch, useSelector} from 'react-redux';
+import Toast from 'react-native-toast-message';
+import {DocumentPickerResponse} from '@react-native-documents/picker';
+import {Linking} from 'react-native';
+
+import {RightCheckmark} from '@assets/Icons';
+import {AppBar, Container, DashedButton, UploadModal} from '@components/index';
+import Colors from '@constants/Colors';
+import Fonts from '@constants/Fonts';
+import fontWeight from '@constants/FontWeight';
+import {kycActions} from '@store/kyc';
+import {
+  HomeNavigatorType,
+  ClientNavigatorType,
+  KycNavigatorType,
+} from '@type/NavigatorTypes';
+import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+import {getUserFullName} from '@utils/Utils';
+import {FILE_DOWNLOAD_URL} from '@config/config';
 import {RootState} from '@store/app/store';
 
 type NavigationType = CompositeNavigationProp<
@@ -97,17 +98,9 @@ export const CompanyDocument = () => {
 
   // Fetch existing company documents using Redux Saga
   const fetchExistingCompanyDocs = () => {
-    console.log('🔍 fetchExistingCompanyDocs called with params:', params);
     if (!params?.clientID) {
-      console.log('❌ No clientID found, returning early');
       return;
     }
-    
-    console.log('🚀 Dispatching getBusinessKycRequest with:', {
-      clientId: params.clientID.toString(),
-      docType: 'company_docs'
-    });
-    console.log('🏢🏢🏢 DISPATCHING BUSINESS KYC REQUEST FOR COMPANY DOCS 🏢🏢🏢');
     
     dispatch(kycActions.getBusinessKycRequest({
       clientId: params.clientID.toString(),
@@ -117,27 +110,16 @@ export const CompanyDocument = () => {
 
   // Handle Redux state changes
   useEffect(() => {
-    console.log('📊 useEffect triggered - personalKycData:', personalKycData);
-    console.log('⏳ personalKycLoading:', personalKycLoading);
-    console.log('❌ personalKycError:', personalKycError);
-    
     if (personalKycData && personalKycData.length > 0) {
-      console.log('✅ Found personalKycData, processing...');
       const companyDocsRecords = personalKycData;
       
       // Process main applicant (first record)
       if (companyDocsRecords.length > 0) {
         const mainApplicantData = companyDocsRecords[0];
-        console.log('📄 mainApplicantData:', mainApplicantData);
-        console.log('📁 filename_obj:', mainApplicantData.filename_obj);
         
         const companyDocs = (mainApplicantData.filename_obj as any)?.company_docs;
         
-        console.log('🔍 Extracted company docs:', companyDocs);
-        
         if (companyDocs) {
-          console.log('✅ Found company docs, setting up existing data...');
-          
           setExistingDocs({
             aoa: companyDocs.aoa,
             moa: companyDocs.moa,
@@ -146,17 +128,11 @@ export const CompanyDocument = () => {
           });
           
           // Set edit mode if any existing data is found
-          console.log('🔄 Setting edit mode to true');
           setIsEditMode(true);
-        } else {
-          console.log('❌ No company docs found in data');
         }
       }
     } else if (personalKycData && personalKycData.length === 0) {
-      console.log('📭 No data found, setting edit mode to false');
       setIsEditMode(false);
-    } else {
-      console.log('❓ personalKycData is null or undefined');
     }
   }, [personalKycData, params?.clientID]);
 
@@ -174,14 +150,12 @@ export const CompanyDocument = () => {
 
   // Fetch existing company documents on component mount
   useEffect(() => {
-    console.log('🏁 Component mount useEffect triggered, params?.clientID:', params?.clientID);
     fetchExistingCompanyDocs();
   }, [params?.clientID]);
 
   const openPdfInBrowser = (fileName: string) => {
     const pdfUrl = `${FILE_DOWNLOAD_URL}/KYC/client_${params.clientID}/${fileName}`;
     Linking.openURL(pdfUrl).catch(err => {
-      console.error('Failed to open PDF:', err);
       Alert.alert('Error', 'Failed to open PDF document');
     });
   };

@@ -34,14 +34,7 @@ export const KycDocument = () => {
   const KycData = useSelector(kycSelector.getKycDetailsData);
   const KycLoading = useSelector(kycSelector.getKycDetailsLoading);
 
-  // Debug logging
-  console.log('KycData type:', typeof KycData);
-  console.log('KycData value:', KycData);
-  console.log('Is KycData array:', Array.isArray(KycData));
-  console.log('KycLoading:', KycLoading);
-
   const callGetKYC = () => {
-    console.log('Called KYC Details API');
     dispatch(kycActions.getKycDetailsRequest({
       byIntent: {
         intent: ["High", "Medium"]
@@ -91,10 +84,6 @@ export const KycDocument = () => {
       );
     });
   }, [KycData, searchQuery]);
-
-  // Debug logging for filtered data
-  console.log('filteredKYC length:', filteredKYC.length);
-
 
   return (
     <Container>

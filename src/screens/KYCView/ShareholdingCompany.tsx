@@ -78,17 +78,9 @@ export const ShareholdingCompany = () => {
 
   // Fetch existing shareholding data using Redux Saga
   const fetchExistingShareholding = () => {
-    console.log('🔍 fetchExistingShareholding called with params:', params);
     if (!params?.clientID) {
-      console.log('❌ No clientID found, returning early');
       return;
     }
-    
-    console.log('🚀 Dispatching getBusinessKycRequest with:', {
-      clientId: params.clientID.toString(),
-      docType: 'shareholding'
-    });
-    console.log('🏢🏢🏢 DISPATCHING BUSINESS KYC REQUEST FOR SHAREHOLDING 🏢🏢🏢');
     
     dispatch(kycActions.getBusinessKycRequest({
       clientId: params.clientID.toString(),
@@ -98,52 +90,34 @@ export const ShareholdingCompany = () => {
 
   // Handle Redux state changes
   useEffect(() => {
-    console.log('📊 useEffect triggered - personalKycData:', personalKycData);
-    console.log('⏳ personalKycLoading:', personalKycLoading);
-    console.log('❌ personalKycError:', personalKycError);
-    
     if (personalKycData && personalKycData.length > 0) {
-      console.log('✅ Found personalKycData, processing...');
       const shareholdingRecords = personalKycData;
       
       // Process main applicant (first record)
       if (shareholdingRecords.length > 0) {
         const mainApplicantData = shareholdingRecords[0];
-        console.log('📄 mainApplicantData:', mainApplicantData);
-        console.log('📁 filename_obj:', mainApplicantData.filename_obj);
         
         const fileName = (mainApplicantData.filename_obj as any)?.shareholding?.file_name;
         const companyNameValue = (mainApplicantData.filename_obj as any)?.shareholding?.company_name;
         
-        console.log('🔍 Extracted data:', { fileName, companyNameValue });
-        
         if (fileName) {
-          console.log('✅ Found fileName, setting up existing data...');
           // Construct full image URL for main applicant
           const fullImageUrl = `${FILE_DOWNLOAD_URL}/KYC/client_${params.clientID}/${fileName}`;
-          console.log('🖼️ Setting image URL:', fullImageUrl);
           
           setExistingImageUrl(fullImageUrl);
           setExistingImageName(fileName);
           
           // Pre-fill form fields if available
           if (companyNameValue) {
-            console.log('📝 Setting company name:', companyNameValue);
             setCompanyName(companyNameValue);
           }
-        } else {
-          console.log('❌ No fileName found in data');
         }
       }
       
       // Set edit mode if any existing data is found
-      console.log('🔄 Setting edit mode to true');
       setIsEditMode(true);
     } else if (personalKycData && personalKycData.length === 0) {
-      console.log('📭 No data found, setting edit mode to false');
       setIsEditMode(false);
-    } else {
-      console.log('❓ personalKycData is null or undefined');
     }
   }, [personalKycData, params?.clientID]);
 
@@ -161,14 +135,12 @@ export const ShareholdingCompany = () => {
 
   // Fetch existing shareholding data on component mount
   useEffect(() => {
-    console.log('🏁 Component mount useEffect triggered, params?.clientID:', params?.clientID);
     fetchExistingShareholding();
   }, [params?.clientID]);
 
   const openPdfInBrowser = (fileName: string) => {
     const pdfUrl = `${FILE_DOWNLOAD_URL}/KYC/client_${params.clientID}/${fileName}`;
     Linking.openURL(pdfUrl).catch(err => {
-      console.error('Failed to open PDF:', err);
       Alert.alert('Error', 'Failed to open PDF document');
     });
   };

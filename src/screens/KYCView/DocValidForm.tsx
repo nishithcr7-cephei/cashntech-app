@@ -1,14 +1,15 @@
-import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import React from 'react';
+import {View, Text, StyleSheet, TouchableOpacity} from 'react-native';
+import {DrawerNavigationProp} from '@react-navigation/drawer';
+import {CompositeNavigationProp, useNavigation} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {ScrollView} from 'react-native-gesture-handler';
+
 import {AppBar, Container, CustomDropdown, Input} from '@components/index';
 import Colors from '@constants/Colors';
 import fontWeight from '@constants/FontWeight';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {ScrollView} from 'react-native-gesture-handler';
 import Fonts from '@constants/Fonts';
-import {DrawerNavigationProp} from '@react-navigation/drawer';
-import {CompositeNavigationProp, useNavigation} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {HomeNavigatorType, DocNavigatorType} from '@type/NavigatorTypes';
 
 const organisationTypes = [

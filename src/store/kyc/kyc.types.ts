@@ -185,7 +185,7 @@ export interface IUploadShareholdingPayload {
 
 export interface IUploadShareholdingResponse {
   status: boolean;
-  messsage: string;
+  message: string;
   data: {
     document_url: string;
   };
@@ -265,11 +265,7 @@ export interface IKycCheckedResponseDatum {
 
 export interface IKYCBusinessResponse {
   statusCode: number;
-  data: string[]; // Changed from IKycBusinessResponseDatum[] to string[]
-}
-
-export interface IKycBusinessResponseDatum {
-  document_type: string;
+  data: string[];
 }
 
 // Bank Statement Types
@@ -289,29 +285,13 @@ export type BankStatementDocument = {
   statement_to: string;
 };
 
-export interface IBankStatementResponse {
-  success: boolean;
-  message: string;
-  data?: any;
-}
-
 // Bank Statement Info Types
-export interface IBankStatementInfoResponse {
-  statusCode: number;
-  data: IBankStatementInfoData[];
-}
-
 export interface IBankStatementInfoData {
   id: number;
   bank_name: string;
 }
 
 // Individual Bank Statement Detail Types
-export interface IBankStatementDetailResponse {
-  statusCode: number;
-  data: IBankStatementDetailData;
-}
-
 export interface IBankStatementDetailData {
   id: number;
   bank_name: string;
@@ -325,11 +305,6 @@ export interface IBankStatementDetailData {
 }
 
 // KYC Documents Response Types
-export interface IKycDocumentsResponse {
-  statusCode: number;
-  data: IKycDocumentsData[];
-}
-
 export interface IKycDocumentsData {
   id: number;
   bankStatement: IBankStatementDocument[];
@@ -502,11 +477,6 @@ export interface IKycDetailsPayload {
   };
 }
 
-export interface IKycDetailsResponse {
-  statusCode: number;
-  data: IKycDetailsResponseDatum[];
-}
-
 export interface IKycDetailsResponseDatum {
   clientId: number;
   firm_name: string;
@@ -525,11 +495,6 @@ export interface IKycDetailsResponseDatum {
 export interface IGetPersonalKycPayload {
   clientId: string;
   docType: string;
-}
-
-export interface IGetPersonalKycResponse {
-  statusCode: number;
-  data: IPersonalKycDocument[];
 }
 
 export interface IPersonalKycDocument {

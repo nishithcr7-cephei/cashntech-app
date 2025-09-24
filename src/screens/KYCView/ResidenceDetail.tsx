@@ -1,3 +1,26 @@
+import React, {useMemo, useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Image,
+  ScrollView,
+} from 'react-native';
+import {DrawerNavigationProp} from '@react-navigation/drawer';
+import {
+  CompositeNavigationProp,
+  RouteProp,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useDispatch, useSelector} from 'react-redux';
+import Toast from 'react-native-toast-message';
+import {DocumentPickerResponse} from '@react-native-documents/picker';
+
 import {RightCheckmarkWhite} from '@assets/Icons';
 import {
   AppBar,
@@ -10,33 +33,11 @@ import {
 import Colors from '@constants/Colors';
 import Fonts from '@constants/Fonts';
 import fontWeight from '@constants/FontWeight';
-import {DocumentPickerResponse} from '@react-native-documents/picker';
-import {DrawerNavigationProp} from '@react-navigation/drawer';
-import {
-  CompositeNavigationProp,
-  RouteProp,
-  useNavigation,
-  useRoute,
-} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {kycActions} from '@store/kyc';
 import {HomeNavigatorType, KycNavigatorType} from '@type/NavigatorTypes';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {getUserFullName} from '@utils/Utils';
 import {FILE_DOWNLOAD_URL} from '@config/config';
-import React, {useMemo, useState, useEffect} from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  Image,
-  ScrollView,
-} from 'react-native';
-import Toast from 'react-native-toast-message';
-import {useDispatch, useSelector} from 'react-redux';
 import {RootState} from '@store/app/store';
 
 type KycNavigationType = CompositeNavigationProp<

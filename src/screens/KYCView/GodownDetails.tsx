@@ -1,3 +1,26 @@
+import React, {useMemo, useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  ScrollView,
+} from 'react-native';
+import {DrawerNavigationProp} from '@react-navigation/drawer';
+import {
+  CompositeNavigationProp,
+  RouteProp,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useDispatch, useSelector} from 'react-redux';
+import Toast from 'react-native-toast-message';
+import {DocumentPickerResponse} from '@react-native-documents/picker';
+import {Linking} from 'react-native';
+
 import {RightCheckmark} from '@assets/Icons';
 import {
   AppBar,
@@ -10,33 +33,11 @@ import {
 import Colors from '@constants/Colors';
 import Fonts from '@constants/Fonts';
 import fontWeight from '@constants/FontWeight';
-import {DocumentPickerResponse} from '@react-native-documents/picker';
-import {DrawerNavigationProp} from '@react-navigation/drawer';
-import {
-  CompositeNavigationProp,
-  RouteProp,
-  useNavigation,
-  useRoute,
-} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {kycActions} from '@store/kyc';
 import {HomeNavigatorType, KycNavigatorType} from '@type/NavigatorTypes';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {getUserFullName} from '@utils/Utils';
 import {FILE_DOWNLOAD_URL} from '@config/config';
-import {Linking} from 'react-native';
-import React, {useMemo, useState, useEffect} from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
-import Toast from 'react-native-toast-message';
-import {useDispatch, useSelector} from 'react-redux';
 import {RootState} from '@store/app/store';
 
 type KycNavigationType = CompositeNavigationProp<
@@ -105,17 +106,9 @@ export const GodownDetails = () => {
 
   // Fetch existing godown data using Redux Saga
   const fetchExistingGodown = () => {
-    console.log('🔍 fetchExistingGodown called with params:', params);
     if (!params?.clientID) {
-      console.log('❌ No clientID found, returning early');
       return;
     }
-    
-    console.log('🚀 Dispatching getBusinessKycRequest with:', {
-      clientId: params.clientID.toString(),
-      docType: 'godown'
-    });
-    console.log('🏢🏢🏢 DISPATCHING BUSINESS KYC REQUEST FOR GODOWN 🏢🏢🏢');
     
     dispatch(kycActions.getBusinessKycRequest({
       clientId: params.clientID.toString(),
@@ -125,62 +118,42 @@ export const GodownDetails = () => {
 
   // Handle Redux state changes
   useEffect(() => {
-    console.log('📊 useEffect triggered - personalKycData:', personalKycData);
-    console.log('⏳ personalKycLoading:', personalKycLoading);
-    console.log('❌ personalKycError:', personalKycError);
-    
     if (personalKycData && personalKycData.length > 0) {
-      console.log('✅ Found personalKycData, processing...');
       const godownRecords = personalKycData;
       
       // Process main applicant (first record)
       if (godownRecords.length > 0) {
         const mainApplicantData = godownRecords[0];
-        console.log('📄 mainApplicantData:', mainApplicantData);
-        console.log('📁 filename_obj:', mainApplicantData.filename_obj);
         
         const fileName = (mainApplicantData.filename_obj as any)?.godown?.file_name;
         const nameOfOwner = (mainApplicantData.filename_obj as any)?.godown?.name_of_owner;
         const ownershipStatusValue = (mainApplicantData.filename_obj as any)?.godown?.ownership_status;
         const docType = (mainApplicantData.filename_obj as any)?.godown?.doc_type;
         
-        console.log('🔍 Extracted data:', { fileName, nameOfOwner, ownershipStatusValue, docType });
-        
         if (fileName) {
-          console.log('✅ Found fileName, setting up existing data...');
           // Construct full image URL for main applicant
           const fullImageUrl = `${FILE_DOWNLOAD_URL}/KYC/client_${params.clientID}/${fileName}`;
-          console.log('🖼️ Setting image URL:', fullImageUrl);
           
           setExistingImageUrl(fullImageUrl);
           setExistingImageName(fileName);
           
           // Pre-fill form fields if available
           if (nameOfOwner) {
-            console.log('📝 Setting name:', nameOfOwner);
             setnameofOwner(nameOfOwner);
           }
           if (ownershipStatusValue) {
-            console.log('🏠 Setting ownership status:', ownershipStatusValue);
             setOwnershipStatus(ownershipStatusValue);
           }
           if (docType) {
-            console.log('📄 Setting document type:', docType);
             setDocumentType(docType);
           }
-        } else {
-          console.log('❌ No fileName found in data');
         }
       }
       
       // Set edit mode if any existing data is found
-      console.log('🔄 Setting edit mode to true');
       setIsEditMode(true);
     } else if (personalKycData && personalKycData.length === 0) {
-      console.log('📭 No data found, setting edit mode to false');
       setIsEditMode(false);
-    } else {
-      console.log('❓ personalKycData is null or undefined');
     }
   }, [personalKycData, params?.clientID]);
 
@@ -198,14 +171,12 @@ export const GodownDetails = () => {
 
   // Fetch existing godown data on component mount
   useEffect(() => {
-    console.log('🏁 Component mount useEffect triggered, params?.clientID:', params?.clientID);
     fetchExistingGodown();
   }, [params?.clientID]);
 
   const openPdfInBrowser = (fileName: string) => {
     const pdfUrl = `${FILE_DOWNLOAD_URL}/KYC/client_${params.clientID}/${fileName}`;
     Linking.openURL(pdfUrl).catch(err => {
-      console.error('Failed to open PDF:', err);
       Alert.alert('Error', 'Failed to open PDF document');
     });
   };

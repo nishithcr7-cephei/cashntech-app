@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   StatusBar,
 } from 'react-native';
+
 import {LeftChevron} from '@assets/Icons';
 import Colors from '@constants/Colors';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
