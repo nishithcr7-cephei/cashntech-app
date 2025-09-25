@@ -65,20 +65,29 @@ export const KycDocumentCard: React.FC<KycDocumentCardProps> = ({
           {label: 'City', value: decryptUtility(data.city || '')},
           {label: 'Initiator', value: data.file_by || 'N/A'},
           {label: 'Source (D/H/C/O)', value: data.source_of_lead || 'N/A'},
+          {label: 'Monthly Turnover', value: data.monthly_turnover ? data.monthly_turnover.toLocaleString() : 'N/A'},
+          {label: 'Intent', value: data.intent || 'N/A', isIntent: true},
           {label: 'Current Status', value: data.status || 'N/A', isStatus: true},
           {label: 'Existing Funding Amount', value: '5000000'}, // Placeholder - not in current data
           {label: 'Estimated Funding Required', value: '10000000'}, // Placeholder - not in current data
-          {label: 'Monthly Turnover', value: data.monthly_turnover ? data.monthly_turnover.toLocaleString() : 'N/A'},
           {label: 'Created At', value: formatDate(data.created_at)},
         ].map((item, itemIndex) => (
           <View key={itemIndex} style={styles.dataRow}>
             <Text style={styles.label}>{item.label}:</Text>
-            <Text style={[
-              styles.value,
-              item.isStatus && {color: item.value === 'Completed' ? '#4CAF50' : '#666666'}
-            ]}>
-              {item.value}
-            </Text>
+            {item.isIntent ? (
+              <View style={[styles.intentBadge, {backgroundColor: intentStyle.backgroundColor}]}>
+                <Text style={[styles.intentText, {color: intentStyle.color}]}>
+                  {item.value}
+                </Text>
+              </View>
+            ) : (
+              <Text style={[
+                styles.value,
+                item.isStatus && {color: item.value === 'Completed' ? '#4CAF50' : '#666666'}
+              ]}>
+                {item.value}
+              </Text>
+            )}
           </View>
         ))}
         
