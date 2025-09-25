@@ -18,6 +18,7 @@ export * from './RightChevronCircle';
 export * from './RightCheckmark';
 export * from './RightCheckmarkWhite';
 export * from './Download';
+export * from './DownloadWhite';
 export * from './Upload';
 export * from './File';
 export * from './Tasklog';

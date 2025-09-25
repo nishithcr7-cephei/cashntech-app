@@ -5,12 +5,18 @@ import {IKycDetailsResponseDatum} from '@store/kyc';
 import {decryptUtility} from '@utils/crypto';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import FontWeight from '@constants/FontWeight';
+import {DownloadWhite} from '@assets/Icons';
 
+// KycDocumentCard Component
 interface KycDocumentCardProps {
   data: IKycDetailsResponseDatum;
   index: number;
   onPress: () => void;
+  onDownload?: () => void;
+  isDownloading?: boolean;
 }
+
+export type {KycDocumentCardProps};
 
 const getIntentStyle = (intent: string | null) => {
   if (intent === 'High') {
@@ -43,6 +49,8 @@ export const KycDocumentCard: React.FC<KycDocumentCardProps> = ({
   data,
   index,
   onPress,
+  onDownload,
+  isDownloading = false,
 }) => {
   const intentStyle = getIntentStyle(data.intent);
 
@@ -73,6 +81,22 @@ export const KycDocumentCard: React.FC<KycDocumentCardProps> = ({
             </Text>
           </View>
         ))}
+        
+        {/* Action Row with Download Button */}
+        <View style={styles.actionRow}>
+          <Text style={styles.label}>Action:</Text>
+          <TouchableOpacity 
+            style={[styles.downloadButton, isDownloading && styles.downloadButtonDisabled]} 
+            onPress={onDownload}
+            activeOpacity={0.7}
+            disabled={isDownloading}
+          >
+            <DownloadWhite height={16} width={16} />
+            <Text style={styles.downloadText}>
+              {isDownloading ? 'Downloading...' : 'Download'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -131,5 +155,32 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(12),
     fontWeight: FontWeight.SemiBold,
     textAlign: 'center',
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: scaleHeight(8),
+    paddingTop: scaleHeight(8),
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  downloadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryColor,
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(6),
+    borderRadius: scaleWidth(6),
+    gap: scaleWidth(4),
+  },
+  downloadText: {
+    fontSize: scaleFont(12),
+    fontWeight: FontWeight.Medium,
+    color: '#FFFFFF',
+  },
+  downloadButtonDisabled: {
+    backgroundColor: '#CCCCCC',
+    opacity: 0.7,
   },
 });

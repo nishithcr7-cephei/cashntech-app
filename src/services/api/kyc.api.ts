@@ -432,6 +432,27 @@ const getBankStatementDetail = async (bankId: string) => {
   };
 };
 
+const downloadKycDocuments = async (clientId: string) => {
+  const {data, error} = await tryCatch<AxiosResponse<Blob>>(
+    Api.get(Endpoints.apiDownloadKycDocuments(clientId), {
+      authRequired: true,
+      responseType: 'blob', // Important for file downloads
+    } as CustomRequestConfig),
+  );
+  
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  
+  return {
+    data: data.data,
+    error: null,
+  };
+};
+
 export default {
   // Document Upload APIs
   uploadKycDocument,
@@ -456,4 +477,5 @@ export default {
   getBusinessKycDocuments,
   getBankStatementInfo,
   getBankStatementDetail,
+  downloadKycDocuments,
 };

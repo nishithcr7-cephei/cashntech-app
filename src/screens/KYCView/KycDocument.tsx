@@ -7,8 +7,8 @@ import {
   FlatList,
   TouchableOpacity,
 } from 'react-native';
-import React, {useEffect, useState} from 'react';
-import {AppBar, Container, KycDocumentCard} from '@components/index';
+import React, {useEffect, useState, useMemo} from 'react';
+import {AppBar, Container, KycDocumentCard, FilterModal} from '@components/index';
 import {Filter, Search} from '@assets/Icons';
 import Colors from '@constants/Colors';
 import fontWeight from '@constants/FontWeight';
@@ -21,6 +21,8 @@ import {useDispatch, useSelector} from 'react-redux';
 import {kycActions, kycSelector} from '@store/kyc';
 import FontWeight from '@constants/FontWeight';
 import {decryptUtility} from '@utils/crypto';
+import kycApi from '@services/api/kyc.api';
+import {downloadFile, showDownloadSuccessAlert, showDownloadErrorAlert} from '@utils/downloadUtils';
 
 type KycNavigationType = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType>,
@@ -45,45 +47,159 @@ export const KycDocument = () => {
     callGetKYC();
   }, []);
 
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [activeFilterField, setActiveFilterField] = useState<
-    'Location' | 'Initiator' | 'Source' | null
-  >(null);
-
-  const [selectedFilters, setSelectedFilters] = useState({
-    location: '',
-    initiator: '',
-    source: '',
-  });
-
   const [searchQuery, setSearchQuery] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
+  const [cityOptions, setCityOptions] = useState<string[]>([]);
+  const [initiatorOptions, setInitiatorOptions] = useState<string[]>([]);
+  const [sourceOptions, setSourceOptions] = useState<string[]>([]);
+  const [sectorOptions, setSectorOptions] = useState<string[]>([]);
+  const [downloadingClientId, setDownloadingClientId] = useState<string | null>(null);
+
+  // Prepare filter data
+  const filterData = {
+    'City': cityOptions,
+    'Initiator': initiatorOptions,
+    'Source': sourceOptions,
+    'Sector': sectorOptions,
+    'Month/Year': [], // Will be handled specially
+  };
+
+  // Build filter options from KYC data
+  useEffect(() => {
+    if (KycData && Array.isArray(KycData) && KycData.length > 0) {
+      const cities = new Set<string>();
+      const initiators = new Set<string>();
+      const sources = new Set<string>();
+      const sectors = new Set<string>();
+      
+      KycData.forEach((item: any) => {
+        // Add cities
+        const city = decryptUtility(item.city || '');
+        if (city) cities.add(city);
+        
+        // Add initiators (file_by field)
+        if (item.file_by) initiators.add(item.file_by);
+        
+        // Add sources
+        if (item.source_of_lead) sources.add(item.source_of_lead);
+        
+        // Add sectors
+        if (item.sector) sectors.add(item.sector);
+      });
+      
+      setCityOptions(Array.from(cities));
+      setInitiatorOptions(Array.from(initiators));
+      setSourceOptions(Array.from(sources));
+      setSectorOptions(Array.from(sectors));
+    }
+  }, [KycData]);
   
   // Decrypt and filter KYC data
-  const filteredKYC = React.useMemo(() => {
+  const filteredKYC = useMemo(() => {
     // Ensure KycData is an array
     const safeKycData = Array.isArray(KycData) ? KycData : [];
     
-    if (!searchQuery.trim()) return safeKycData;
+    let filtered = safeKycData;
     
-    const lowerCaseQuery = searchQuery.trim().toLowerCase();
-    
-    return safeKycData.filter(item => {
-      const decryptedFirmName = decryptUtility(item.firm_name || '');
-      const decryptedCity = decryptUtility(item.city || '');
-      const decryptedBankName = item.bank_name ? decryptUtility(item.bank_name) : '';
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const lowerCaseQuery = searchQuery.trim().toLowerCase();
       
-      return (
-        item.clientId?.toString().toLowerCase().includes(lowerCaseQuery) ||
-        decryptedFirmName.toLowerCase().includes(lowerCaseQuery) ||
-        decryptedCity.toLowerCase().includes(lowerCaseQuery) ||
-        item.source_of_lead?.toLowerCase().includes(lowerCaseQuery) ||
-        item.monthly_turnover?.toString().toLowerCase().includes(lowerCaseQuery) ||
-        item.sector?.toLowerCase().includes(lowerCaseQuery) ||
-        item.intent?.toLowerCase().includes(lowerCaseQuery) ||
-        item.file_by?.toLowerCase().includes(lowerCaseQuery)
-      );
-    });
-  }, [KycData, searchQuery]);
+      filtered = filtered.filter(item => {
+        const decryptedFirmName = decryptUtility(item.firm_name || '');
+        const decryptedCity = decryptUtility(item.city || '');
+        const decryptedBankName = item.bank_name ? decryptUtility(item.bank_name) : '';
+        
+        return (
+          item.clientId?.toString().toLowerCase().includes(lowerCaseQuery) ||
+          decryptedFirmName.toLowerCase().includes(lowerCaseQuery) ||
+          decryptedCity.toLowerCase().includes(lowerCaseQuery) ||
+          item.source_of_lead?.toLowerCase().includes(lowerCaseQuery) ||
+          item.monthly_turnover?.toString().toLowerCase().includes(lowerCaseQuery) ||
+          item.sector?.toLowerCase().includes(lowerCaseQuery) ||
+          item.intent?.toLowerCase().includes(lowerCaseQuery) ||
+          item.file_by?.toLowerCase().includes(lowerCaseQuery)
+        );
+      });
+    }
+    
+    // Apply other filters
+    if (appliedFilters['City'] && appliedFilters['City'].length > 0) {
+      filtered = filtered.filter(item => {
+        const city = decryptUtility(item.city || '');
+        return appliedFilters['City'].includes(city);
+      });
+    }
+    
+    if (appliedFilters['Initiator'] && appliedFilters['Initiator'].length > 0) {
+      filtered = filtered.filter(item => {
+        const initiator = item.file_by || '';
+        return appliedFilters['Initiator'].includes(initiator);
+      });
+    }
+    
+    if (appliedFilters['Source'] && appliedFilters['Source'].length > 0) {
+      filtered = filtered.filter(item => {
+        const source = item.source_of_lead || '';
+        return appliedFilters['Source'].includes(source);
+      });
+    }
+    
+    if (appliedFilters['Sector'] && appliedFilters['Sector'].length > 0) {
+      filtered = filtered.filter(item => {
+        const sector = item.sector || '';
+        return appliedFilters['Sector'].includes(sector);
+      });
+    }
+    
+    if (appliedFilters['Month/Year'] && appliedFilters['Month/Year'].length > 0) {
+      filtered = filtered.filter(item => {
+        const createdAt = item.created_at;
+        if (!createdAt) return false;
+        
+        const itemDate = new Date(createdAt);
+        const itemYear = itemDate.getFullYear();
+        const itemMonth = itemDate.getMonth() + 1; // getMonth() returns 0-11
+        
+        return appliedFilters['Month/Year'].some((monthYear: string) => {
+          // monthYear format: "2025-08" (year-month)
+          const [year, month] = monthYear.split('-').map(Number);
+          return itemYear === year && itemMonth === month;
+        });
+      });
+    }
+    
+    return filtered;
+  }, [KycData, searchQuery, appliedFilters]);
+
+  const handleDownload = async (clientId: string) => {
+    try {
+      setDownloadingClientId(clientId);
+      
+      // Call the API to get the zip file
+      const {data: blobData, error} = await kycApi.downloadKycDocuments(clientId);
+      
+      if (error || !blobData) {
+        showDownloadErrorAlert(error?.message || 'Failed to download documents');
+        return;
+      }
+      
+      // Download the file to device
+      const result = await downloadFile(blobData, `KYC_Documents_${clientId}.zip`, clientId);
+      
+      if (result.success && result.filePath) {
+        showDownloadSuccessAlert(result.filePath);
+      } else {
+        showDownloadErrorAlert(result.error || 'Download failed');
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      showDownloadErrorAlert(error instanceof Error ? error.message : 'Download failed');
+    } finally {
+      setDownloadingClientId(null);
+    }
+  };
 
   return (
     <Container>
@@ -95,7 +211,7 @@ export const KycDocument = () => {
         <View style={styles.subRowContainer}>
           <Text style={styles.subRowContainerTxt}>Leads</Text>
           <View style={styles.Badge}>
-            <Text style={styles.badgeText}>{Array.isArray(KycData) ? KycData.length : 0}</Text>
+            <Text style={styles.badgeText}>{filteredKYC.length}</Text>
           </View>
         </View>
         <View style={styles.Searchbox}>
@@ -109,12 +225,21 @@ export const KycDocument = () => {
           />
         </View>
 
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowFilterModal(true)}>
           <View style={styles.filterBox}>
             <Filter height={12} width={12} />
           </View>
         </TouchableOpacity>
       </View>
+
+      {/* Filter Modal */}
+      <FilterModal
+        visible={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        appliedFilters={appliedFilters}
+        onApply={setAppliedFilters}
+        filterData={filterData}
+      />
 
       <View style={styles.cardList}>
         <FlatList
@@ -136,6 +261,8 @@ export const KycDocument = () => {
                   clientID: item.clientId,
                 })
               }
+              onDownload={() => handleDownload(item.clientId.toString())}
+              isDownloading={downloadingClientId === item.clientId.toString()}
             />
           )}
         />

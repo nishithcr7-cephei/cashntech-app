@@ -94,6 +94,8 @@ const Endpoints = {
     `/client-info-master/kyc/${clientID}`,
   // Get KYC details with intent filtering
   apiGetKycDetails: '/client-info-master/kyc-details',
+  // Download KYC documents
+  apiDownloadKycDocuments: (clientId: string) => `/client-info-master/kyc/download/${clientId}`,
 
   // BankList dropdown
   apiBankList: '/client-info-master/bank-list',
