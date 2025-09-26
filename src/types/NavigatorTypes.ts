@@ -77,6 +77,12 @@ export type ClientNavigatorType = {
     visit_remark: string;
   };
   ProfileScreen: {clientId: number};
+  ClientLeadInfoTab: {
+    clientId: string;
+    client_name?: string;
+    firm_name?: string;
+    initiator?: string;
+  };
 };
 
 export type SoftNavigatorType = {

@@ -22,6 +22,7 @@ const Strings = {
   readMore: 'Read more',
   edit: 'Edit',
   delete: 'Delete',
+  assignTask: 'Assign Task',
 };
 
 type ClientCardProps = {
@@ -29,6 +30,7 @@ type ClientCardProps = {
   onPressCard: (id: number) => void;
   onEdit?: (id: number) => void;
   onDelete?: (id: number) => void;
+  onAssignTask?: (id: number) => void;
 };
 
 export const ClientCard: React.FC<ClientCardProps> = ({
@@ -36,11 +38,12 @@ export const ClientCard: React.FC<ClientCardProps> = ({
   onPressCard,
   onEdit,
   onDelete,
+  onAssignTask,
 }) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const toggleMenu = () => setMenuVisible(!menuVisible);
 
-  const handleOptionPress = (option: 'edit' | 'delete') => {
+  const handleOptionPress = (option: 'edit' | 'delete' | 'assignTask') => {
     setMenuVisible(false);
     if (option === 'edit') {
       if (onEdit) onEdit(data.id);
@@ -61,6 +64,10 @@ export const ClientCard: React.FC<ClientCardProps> = ({
           },
         },
       ]);
+    }
+    if (option === 'assignTask') {
+      if (onAssignTask) onAssignTask(data.id);
+      setMenuVisible(false);
     }
   };
 
@@ -97,6 +104,19 @@ export const ClientCard: React.FC<ClientCardProps> = ({
             />
             <Text style={[styles.menuText, {color: Colors.primaryColor}]}>
               {Strings.delete}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleOptionPress('assignTask')}
+            style={styles.menuLabel}>
+            <FontAwesome6
+              name="list-check"
+              iconStyle="solid"
+              color={Colors.tertiaryBlue}
+              size={16}
+            />
+            <Text style={[styles.menuText, {color: Colors.tertiaryBlue}]}>
+              {Strings.assignTask}
             </Text>
           </TouchableOpacity>
         </View>

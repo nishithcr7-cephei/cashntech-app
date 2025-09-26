@@ -80,6 +80,18 @@ function* handleGetRemarkReport(): unknown {
   }
 }
 
+function* handleGetClientRemarkReport(action: any): unknown {
+  const {data, error}: Result<any> = yield call(
+    ClientApis.getRemarkReportByClient,
+    action.payload,
+  );
+  if (!error) {
+    yield put(clientActions.setClientRemarkReportList(data.data || []));
+  } else {
+    yield put(clientActions.setClientRemarkReportList([]));
+  }
+}
+
 
 
 function* handleGetTaskHistory(): unknown {
@@ -779,6 +791,7 @@ export default function* clientSaga() {
   yield takeLatest(prepareClientForEdit.type, handlePrepareClientForEdit);
   yield takeLatest(deleteClientRequest.type, handleDeleteClient);
   yield takeLatest(getReport.type, handleGetRemarkReport);
+  yield takeLatest(clientActions.getClientRemarkReport.type, handleGetClientRemarkReport);
 
   yield takeLatest(FilterRequest.type, handleFilterbox);
   yield takeLatest(TaskRecordsFilterRequest.type, handleTaskRecordsFilter);

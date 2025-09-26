@@ -24,3 +24,4 @@ export * from './File';
 export * from './Tasklog';
 export * from './Dots';
 export * from './Tick';
+export * from './AssignTask';

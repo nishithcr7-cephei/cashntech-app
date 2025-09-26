@@ -8,7 +8,22 @@ const {
  *
  * @type {import('@react-native/metro-config').MetroConfig}
  */
-const config = {};
+const config = {
+  server: {
+    port: 8081,
+  },
+  resolver: {
+    sourceExts: ['js', 'jsx', 'json', 'ts', 'tsx'],
+  },
+  transformer: {
+    getTransformOptions: async () => ({
+      transform: {
+        experimentalImportSupport: false,
+        inlineRequires: true,
+      },
+    }),
+  },
+};
 
 module.exports = wrapWithReanimatedMetroConfig(
   mergeConfig(getDefaultConfig(__dirname), config),

@@ -142,6 +142,8 @@ export interface JWTData {
   first_name: string;
   last_name: string;
   mobile_number: string;
+  exp?: number; // Token expiration time (Unix timestamp)
+  iat?: number; // Token issued at time (Unix timestamp)
 }
 
 /**
@@ -156,6 +158,28 @@ export const decodeJWT = (token: string): JWTData | null => {
     return decoded;
   } catch (error) {
     return null;
+  }
+};
+
+/**
+ * Checks if the JWT token is expired
+ * 
+ * @param token - The JWT token to check
+ * @returns True if the token is expired, false otherwise
+ */
+export const isTokenExpired = (token: string): boolean => {
+  try {
+    const decoded = decodeJWT(token);
+    if (!decoded || !decoded.exp) {
+      return true; // If we can't decode or no exp claim, consider it expired
+    }
+    
+    // Check if token is expired (exp is in seconds, Date.now() is in milliseconds)
+    const currentTime = Math.floor(Date.now() / 1000);
+    return decoded.exp < currentTime;
+  } catch (error) {
+    console.warn('Failed to decode token for expiration check:', error);
+    return true; // If decoding fails, consider it expired
   }
 };
 

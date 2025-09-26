@@ -67,6 +67,10 @@ export type ClientState = {
   // Remark Report fields
   reportLoader: boolean;
   reportList: Array<IRemarkReportResponseDatum>;
+  
+  // Client-specific Remark Report fields
+  clientRemarkReportLoader: boolean;
+  clientRemarkReportList: Array<any>;
 
   // Task History fields
   TaskHistoryLoader: boolean;

@@ -3,6 +3,7 @@ import StorageKeys from '@constants/StorageKeys';
 import {storage} from '@services/localStorage';
 import {store} from '@store/app/store';
 import {authActions} from '@store/auth';
+import {decodeJWT, isTokenExpired} from '@utils/Utils';
 import axios, {
   AxiosError,
   AxiosResponse,
@@ -71,6 +72,7 @@ const isAuthEndpoint = (url: string): boolean => {
   }
 };
 
+
 /**
  * Request interceptor to add the access token to the authorization header
  * if the authRequired flag is set.
@@ -88,6 +90,15 @@ axiosInstance.interceptors.request.use(
     if (config.authRequired) {
       const token = storage.getString(StorageKeys.TOKEN);
       if (token && config.headers) {
+        // Check if token is expired before making the request
+        if (isTokenExpired(token)) {
+          const url = config.url || '';
+          if (!isAuthEndpoint(url)) {
+            Alert.alert('Session Expired', 'Your session has expired. Please log in again.');
+            logoutUser();
+            return Promise.reject(new Error('Token expired'));
+          }
+        }
         config.headers.Authorization = `Bearer ${token}`;
       }
     }

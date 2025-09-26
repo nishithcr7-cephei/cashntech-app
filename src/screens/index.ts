@@ -37,7 +37,7 @@ export * from './ClientInfo/VendorDetailForm';
 export * from './ClientInfo/VisitDetailForm';
 export * from './ClientInfo/ProfileScreen';
 
-export * from './ClientLeadInfoTabs/ClientLeadInfoTab';
+export * from './ClientInfo/AssignTask';
 export * from './FormSelectionScreen/FormSelectionScreen';
 export * from './CreateClientForm/CreateClientForm';
 export * from './LeadProgress/LeadProgress';

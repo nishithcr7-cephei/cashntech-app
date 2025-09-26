@@ -11,6 +11,7 @@ import {
   VisitDetail,
   UpdateVisitDetails,
   ProfileScreen,
+  ClientLeadInfoTab,
 } from '@screens/index';
 import {ClientNavigatorType} from '@type/NavigatorTypes';
 import {ClientScreens} from '@constants/Screens';
@@ -56,6 +57,10 @@ export const ClientNavigator = () => {
       <Stack.Screen
         name={ClientScreens.ProfileScreen}
         component={ProfileScreen}
+      />
+      <Stack.Screen
+        name={ClientScreens.ClientLeadInfoTab}
+        component={ClientLeadInfoTab}
       />
     </Stack.Navigator>
   );

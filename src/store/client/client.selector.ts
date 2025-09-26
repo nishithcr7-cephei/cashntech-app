@@ -71,6 +71,16 @@ const getRemarkReport = createSelector(
   _state => _state.reportList,
 );
 
+const getClientRemarkReport = createSelector(
+  _selectState,
+  _state => _state.clientRemarkReportList,
+);
+
+const getClientRemarkReportLoader = createSelector(
+  _selectState,
+  _state => _state.clientRemarkReportLoader,
+);
+
 
 const getTaskHistory = createSelector(
   _selectState,
@@ -133,6 +143,8 @@ export default {
   getMasterBankDropdown,
 
   getRemarkReport,
+  getClientRemarkReport,
+  getClientRemarkReportLoader,
   getTaskHistory,
   getBasicDetailLoading,
   getBasicDetailError,

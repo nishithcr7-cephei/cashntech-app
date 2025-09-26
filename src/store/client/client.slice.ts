@@ -102,6 +102,10 @@ const initialState: ClientState = {
   //Remark Report fields
   reportLoader: false,
   reportList: [],
+  
+  // Client-specific Remark Report fields
+  clientRemarkReportLoader: false,
+  clientRemarkReportList: [],
   //Task History fields
   TaskHistoryLoader: false,
   TaskHistoryList: [],
@@ -395,6 +399,19 @@ const clientSlice = createSlice({
       state.reportList = [];
       state.reportLoader = false;
     },
+    
+    // Client-specific Remark Report actions
+    getClientRemarkReport: (state, action: PayloadAction<string>) => {
+      state.clientRemarkReportLoader = true;
+    },
+    setClientRemarkReportList: (state, action: PayloadAction<any[]>) => {
+      state.clientRemarkReportLoader = false;
+      state.clientRemarkReportList = action.payload;
+    },
+    resetClientRemarkReportList: state => {
+      state.clientRemarkReportList = [];
+      state.clientRemarkReportLoader = false;
+    },
     FilterRequest(state, action: PayloadAction<IFilterPayload>) {
       state.FilterboxLoading = true;
       state.FilterboxError = null;
@@ -508,6 +525,10 @@ export const {
   getReport,
   setReportList,
   resetReportList,
+  
+  getClientRemarkReport,
+  setClientRemarkReportList,
+  resetClientRemarkReportList,
   FilterRequest,
   FilterSucess,
   FilterFailure,

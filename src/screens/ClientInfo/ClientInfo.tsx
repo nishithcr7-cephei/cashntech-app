@@ -52,7 +52,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
   const filteredClients = useMemo(() => {
     if (!searchQuery.trim()) return clientsData;
     const lowerCaseQuery = searchQuery.trim().toLowerCase();
-    return baseData.filter(client => {
+    return clientsData.filter((client: any) => {
       const firmName = client.firm_name ?? '';
       return firmName.trim().toLowerCase().includes(lowerCaseQuery);
     });
@@ -101,6 +101,19 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
         deleted_by: first_name + ' ' + last_name,
       }),
     );
+  };
+
+  const onAssignTask = (clientId: number) => {
+    // Navigate to ClientLeadInfoTab for task assignment
+    const client = clientsData.find(client => client.id === clientId);
+    navigation.navigate(ClientScreens.ClientLeadInfoTab, {
+      clientId: clientId.toString(),
+      client_name: client?.firm_name, // Using firm_name as client_name since client_name doesn't exist
+      firm_name: client?.firm_name,
+      initiator: client?.user 
+        ? `${client.user.first_name || ''} ${client.user.last_name || ''}`.trim()
+        : undefined,
+    });
   };
 
   // Safe search function that handles encrypted fields
@@ -344,6 +357,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
                 onPressCard={onPressCard}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onAssignTask={onAssignTask}
               />
             )}
             refreshing={loading}
