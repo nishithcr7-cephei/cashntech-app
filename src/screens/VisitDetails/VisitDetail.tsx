@@ -366,11 +366,11 @@ export const VisitDetail = () => {
     <Container>
       <AppBar title="Visit Details" navigation={navigation as any} />
       <View style={styles.subContainer}>
-        <Text style={styles.Subheader}>Assign Visit</Text>
+        <Text style={styles.Subheader}>Visit Report</Text>
       </View>
       <View style={styles.headerRow}>
                <View style={styles.headerLeft}>
-                 <Text style={styles.headerTitle}>Visit Details</Text>
+                   <Text style={styles.headerTitle}>Leads</Text>
                  <View style={styles.badge}><Text style={styles.badgeText}>{filteredVisitDetails.length}</Text></View>
                </View>
         <View style={styles.searchBox}>

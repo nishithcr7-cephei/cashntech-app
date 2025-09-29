@@ -18,26 +18,48 @@ interface KycDocumentCardProps {
 
 export type {KycDocumentCardProps};
 
-const getIntentStyle = (intent: string | null) => {
-  if (intent === 'High') {
+const getStatusStyle = (status: string | null) => {
+  if (status === 'Eligibility Check') {
+    return {
+      backgroundColor: '#FF9800', // Orange
+      color: '#FFFFFF'
+    };
+  } else if (status === 'Completed') {
     return {
       backgroundColor: '#4CAF50', // Green
       color: '#FFFFFF'
     };
-  } else if (intent === 'Medium') {
+  } else if (status === 'In Progress') {
     return {
-      backgroundColor: '#8D6E63', // Brown
+      backgroundColor: '#2196F3', // Blue
       color: '#FFFFFF'
     };
   }
   return {
-    backgroundColor: '#E0E0E0', // Default gray
-    color: '#000000'
+    backgroundColor: '#9E9E9E', // Default gray
+    color: '#FFFFFF'
   };
 };
 
-// Format date
-const formatDate = (dateString: string) => {
+// Format currency
+const formatCurrency = (amount: number | null) => {
+  if (!amount) return '0.00';
+  return new Intl.NumberFormat('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
+
+// Format date for display
+const formatDisplayDate = (dateString: string) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+};
+
+// Format month year
+const formatMonthYear = (dateString: string) => {
+  if (!dateString) return 'N/A';
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', {
     month: 'short',
@@ -52,55 +74,73 @@ export const KycDocumentCard: React.FC<KycDocumentCardProps> = ({
   onDownload,
   isDownloading = false,
 }) => {
-  const intentStyle = getIntentStyle(data.intent);
+  const statusStyle = getStatusStyle(data.status || 'Eligibility Check');
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       {/* Card Content */}
       <View style={styles.cardContent}>
-        {[
-          {label: 'Sr.No', value: (index + 1).toString()},
-          {label: 'Firm Name', value: decryptUtility(data.firm_name || '')},
-          {label: 'Sector', value: data.sector || 'N/A'},
-          {label: 'City', value: decryptUtility(data.city || '')},
-          {label: 'Initiator', value: data.file_by || 'N/A'},
-          {label: 'Source (D/H/C/O)', value: data.source_of_lead || 'N/A'},
-          {label: 'Monthly Turnover', value: data.monthly_turnover ? data.monthly_turnover.toLocaleString() : 'N/A'},
-          {label: 'Intent', value: data.intent || 'N/A', isIntent: true},
-          {label: 'Current Status', value: data.status || 'N/A', isStatus: true},
-          {label: 'Existing Funding Amount', value: '5000000'}, // Placeholder - not in current data
-          {label: 'Estimated Funding Required', value: '10000000'}, // Placeholder - not in current data
-          {label: 'Created At', value: formatDate(data.created_at)},
-        ].map((item, itemIndex) => (
-          <View key={itemIndex} style={styles.dataRow}>
-            <Text style={styles.label}>{item.label}:</Text>
-            {item.isIntent ? (
-              <View style={[styles.intentBadge, {backgroundColor: intentStyle.backgroundColor}]}>
-                <Text style={[styles.intentText, {color: intentStyle.color}]}>
-                  {item.value}
-                </Text>
-              </View>
-            ) : (
-              <Text style={[
-                styles.value,
-                item.isStatus && {color: item.value === 'Completed' ? '#4CAF50' : '#666666'}
-              ]}>
-                {item.value}
-              </Text>
-            )}
+        {/* Header Row */}
+        <View style={styles.headerRow}>
+          <Text style={styles.serialNumber}>{(index + 1).toString().padStart(2, '0')}</Text>
+          <View style={styles.firmInfoContainer}>
+            <Text style={styles.firmName}>{decryptUtility(data.firm_name || 'N/A')}</Text>
+            <Text style={styles.sector}>{data.sector || 'N/A'}</Text>
           </View>
-        ))}
+          <View style={[styles.statusBadge, {backgroundColor: statusStyle.backgroundColor}]}>
+            <Text style={[styles.statusText, {color: statusStyle.color}]}>
+              {data.status || 'Eligibility Check'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Main Content */}
+        <View style={styles.mainContent}>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>City:</Text>
+            <Text style={styles.value}>{decryptUtility(data.city || 'N/A')}</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Initiator:</Text>
+            <Text style={styles.value}>{data.file_by || 'N/A'}</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Source(D/H/C/O):</Text>
+            <Text style={styles.value}>Market Knowledge (D)</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Monthly Turnover:</Text>
+            <Text style={styles.valueCurrency}>{formatCurrency(data.monthly_turnover)}</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Sanction Required:</Text>
+            <Text style={styles.valueCurrency}>{formatCurrency(data.estimated_funding_required)}</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Process Start:</Text>
+            <Text style={styles.value}>{formatDisplayDate(data.created_at)}</Text>
+          </View>
+          
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Created At:</Text>
+            <Text style={styles.value}>{formatMonthYear(data.created_at)}</Text>
+          </View>
+        </View>
         
         {/* Action Row with Download Button */}
         <View style={styles.actionRow}>
-          <Text style={styles.label}>Action:</Text>
           <TouchableOpacity 
             style={[styles.downloadButton, isDownloading && styles.downloadButtonDisabled]} 
             onPress={onDownload}
             activeOpacity={0.7}
             disabled={isDownloading}
           >
-            <DownloadWhite height={16} width={16} />
+            <DownloadWhite height={14} width={14} />
             <Text style={styles.downloadText}>
               {isDownloading ? 'Downloading...' : 'Download'}
             </Text>
@@ -113,83 +153,141 @@ export const KycDocumentCard: React.FC<KycDocumentCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#F8F9FA',
-    marginVertical: scaleHeight(8),
-    marginHorizontal: scaleWidth(10),
+    backgroundColor: '#FFFFFF',
+    marginVertical: scaleHeight(6),
+    marginHorizontal: scaleWidth(12),
     borderRadius: scaleWidth(8),
-    borderColor: '#E5E7EB',
+    borderColor: '#E8E8E8',
     borderWidth: 1,
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: {
       width: 0,
       height: 1,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 1,
   },
   cardContent: {
     paddingHorizontal: scaleWidth(16),
-    paddingTop: scaleHeight(16),
-    paddingBottom: scaleHeight(16),
+    paddingTop: scaleHeight(14),
+    paddingBottom: scaleHeight(14),
   },
-  dataRow: {
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: scaleHeight(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+    paddingBottom: scaleHeight(10),
+  },
+  serialNumber: {
+    fontSize: scaleFont(14),
+    fontWeight: FontWeight.Bold,
+    color: Colors.darkblack,
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: scaleWidth(8),
+    paddingVertical: scaleHeight(4),
+    borderRadius: scaleWidth(4),
+    minWidth: scaleWidth(32),
+    textAlign: 'center',
+    marginRight: scaleWidth(12),
+  },
+  firmInfoContainer: {
+    flex: 1,
+    marginRight: scaleWidth(12),
+  },
+  firmName: {
+    fontSize: scaleFont(15),
+    fontWeight: FontWeight.SemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(2),
+  },
+  sector: {
+    fontSize: scaleFont(12),
+    fontWeight: FontWeight.Regular,
+    color: Colors.graybase,
+  },
+  statusBadge: {
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(5),
+    borderRadius: scaleWidth(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusText: {
+    fontSize: scaleFont(11),
+    fontWeight: FontWeight.SemiBold,
+    textAlign: 'center',
+  },
+  mainContent: {
+    backgroundColor: '#FEFEFE',
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(12),
+    borderRadius: scaleWidth(6),
+  },
+  infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: scaleHeight(6),
+    marginBottom: scaleHeight(8),
     paddingVertical: scaleHeight(2),
   },
   label: {
     fontSize: scaleFont(13),
     fontWeight: FontWeight.Medium,
-    color: '#374151',
+    color: Colors.gray600,
     flex: 1,
   },
   value: {
     fontSize: scaleFont(13),
     fontWeight: FontWeight.Regular,
-    color: '#1F2937',
+    color: Colors.darkblack,
     flex: 1,
     textAlign: 'right',
   },
-  intentBadge: {
-    paddingHorizontal: scaleWidth(8),
-    paddingVertical: scaleHeight(4),
-    borderRadius: scaleWidth(12),
-    minWidth: scaleWidth(60),
-    alignItems: 'center',
-  },
-  intentText: {
-    fontSize: scaleFont(12),
+  valueCurrency: {
+    fontSize: scaleFont(13),
     fontWeight: FontWeight.SemiBold,
-    textAlign: 'center',
+    color: Colors.darkblack,
+    flex: 1,
+    textAlign: 'right',
   },
   actionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginTop: scaleHeight(8),
+    marginTop: scaleHeight(12),
     paddingTop: scaleHeight(8),
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#F0F0F0',
   },
   downloadButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primaryColor,
     paddingHorizontal: scaleWidth(12),
-    paddingVertical: scaleHeight(6),
+    paddingVertical: scaleHeight(8),
     borderRadius: scaleWidth(6),
-    gap: scaleWidth(4),
+    gap: scaleWidth(6),
+    shadowColor: Colors.primaryColor,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   downloadText: {
     fontSize: scaleFont(12),
-    fontWeight: FontWeight.Medium,
+    fontWeight: FontWeight.SemiBold,
     color: '#FFFFFF',
   },
   downloadButtonDisabled: {
     backgroundColor: '#CCCCCC',
     opacity: 0.7,
+    shadowOpacity: 0,
+    elevation: 0,
   },
 });

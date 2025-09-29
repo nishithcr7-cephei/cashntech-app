@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import React, {useEffect, useState} from 'react';
 import {
+  AppBar,
   Container,
   CustomDropdown,
   DateNTimePicker,
@@ -22,7 +23,7 @@ import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {RightCheckmark, AssignTask} from '@assets/Icons';
+import {RightCheckmark, AssignTask, LeftChevronCircle} from '@assets/Icons';
 import fontWeight from '@constants/FontWeight';
 import Colors from '@constants/Colors';
 import Fonts from '@constants/Fonts';
@@ -33,6 +34,7 @@ import { getStorage } from '@services/localStorage';
 import { decryptLocation } from '@utils/crypto';
 import { useDispatch, useSelector } from 'react-redux';
 import { clientActions, clientSelector } from '@store/client';
+import FontWeight from '@constants/FontWeight';
 
 
 const remarkData = [
@@ -91,6 +93,7 @@ type ClientInfoNavigationType = CompositeNavigationProp<
 >;
 
 type Props = {
+  navigation: ClientInfoNavigationType;
   route: {
     params: {
       clientId: string;
@@ -101,7 +104,7 @@ type Props = {
   };
 };
 
-export const ClientLeadInfoTab = ({ route }: Props) => {
+export const ClientLeadInfoTab = ({ navigation, route }: Props) => {
   const { clientId, client_name, firm_name, initiator } = route.params;
   const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState<'Task' | 'Report'>('Task');
@@ -406,6 +409,15 @@ export const ClientLeadInfoTab = ({ route }: Props) => {
 
   return (
     <Container>
+      <AppBar 
+        title="Assign Task" 
+        renderLeftIcon={<LeftChevronCircle height={scaleHeight(24)} width={scaleWidth(24)} />}
+        onPressLeftIcon={() => navigation.goBack()}
+      />
+      <View style={styles.subContainer}>
+        <Text style={styles.Subheader}>Client Information</Text>
+      </View>
+
       <ScrollView 
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
@@ -597,6 +609,16 @@ const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#fff', padding: 16},
   scrollContent: {
     paddingBottom: scaleHeight(40), // Reduced from 100 to 40
+  },
+  subContainer: {
+    backgroundColor: '#fff',
+  },
+  Subheader: {
+    width: '100%',
+    padding: 16,
+    fontSize: scaleFont(16),
+    fontWeight: FontWeight.SemiBold,
+    backgroundColor: Colors.LimeGray,
   },
   header: {
     backgroundColor: '#fdeeee',

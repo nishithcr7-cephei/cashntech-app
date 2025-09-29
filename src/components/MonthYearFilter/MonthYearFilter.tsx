@@ -27,8 +27,8 @@ const MonthYearFilter: React.FC<MonthYearFilterProps> = ({
   const years = Array.from({ length: 20 }, (_, i) => currentYear - 10 + i);
   
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+    'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'
   ];
 
   const toggleMonth = (monthIndex: number) => {

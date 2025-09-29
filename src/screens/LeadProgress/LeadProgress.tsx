@@ -324,7 +324,7 @@ export const LeadProgress = () => {
               <Search height={12} width={12} />
               <TextInput
                 style={styles.input}
-                placeholder="Search by Client name"
+                placeholder="Search By Firm Name"
                 placeholderTextColor={Colors.balancedGray}
                 value={searchText}
                 onChangeText={setSearchText}
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
   Searchbox: {
     flex: 1,
     flexDirection: 'row',
-    height: scaleHeight(29),
+    height: scaleHeight(40),
     marginLeft: 5,
     marginTop: 2,
     alignItems: 'center',

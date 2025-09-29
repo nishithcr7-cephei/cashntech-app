@@ -16,7 +16,6 @@ import {
   LeftChevron,
   UpChevron,
   Logout,
-  Tasklog,
 } from '@assets/Icons';
 import {DrawerContentComponentProps} from '@react-navigation/drawer';
 import {Colors, Fonts} from '@constants/index';
@@ -24,10 +23,10 @@ import {useDispatch, useSelector} from 'react-redux';
 import {Alert} from 'react-native';
 import {userSelector} from '@store/user';
 import {logoutUser} from '@services/api/api';
+import Toast from 'react-native-toast-message';
 
 export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const [isOpen, setIsOpen] = React.useState(false);
-  const [isTaskLogOpen, setIsTaskLogOpen] = React.useState(false);
   const {top, bottom} = useSafeAreaInsets();
   const userInfo = useSelector(userSelector.getUserInfo);
 
@@ -66,7 +65,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
           <TouchableOpacity
             style={styles.closeButton}
             onPress={() => navigation.closeDrawer()}>
-            <LeftChevron height={scaleHeight(12)} width={scaleWidth(12)} />
+            <LeftChevron height={scaleHeight(10)} width={scaleWidth(10)} />
           </TouchableOpacity>
         </View>
 
@@ -137,11 +136,14 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.button}
-                    onPress={() =>
-                      navigation.navigate('DocNavigator', {
-                        screen: 'DocumentValidation',
-                      })
-                    }>
+                    onPress={() => {
+                      Toast.show({
+                        type: 'info',
+                        text1: 'Document Validation',
+                        text2: 'This Feature under Development',
+                        visibilityTime: 3000,
+                      });
+                    }}>
                     <Text style={styles.buttonText}>Document Validation</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -153,60 +155,10 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                     }>
                     <Text style={styles.buttonText}>Lead Progress</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={() =>
-                      navigation.navigate('ReportNavigator', {
-                        screen: 'Report',
-                      })
-                    }>
-                    <Text style={styles.buttonText}>Task Management</Text>
-                  </TouchableOpacity>
                 </View>
               )}
             </View>
 
-            {/* Task Log Dropdown Section */}
-            <View>
-              <TouchableOpacity
-                style={styles.button}
-                onPress={() => {
-                  setIsTaskLogOpen(!isTaskLogOpen);
-                }}>
-                <View style={styles.rowCenter}>
-                  <Tasklog
-                    height={scaleHeight(24)}
-                    width={scaleWidth(24)}
-                  />
-                  <Text style={styles.buttonText}>
-                    Task Log
-                  </Text>
-                </View>
-                <UpChevron rotation={isTaskLogOpen ? 0 : 180} />
-              </TouchableOpacity>
-              {isTaskLogOpen && (
-                <View style={{marginLeft: scaleWidth(24)}}>
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={() =>
-                      navigation.navigate('DocNavigator', {
-                        screen: 'TaskLogTabs',
-                      })
-                    }>
-                    <Text style={styles.buttonText}>Task List</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={() =>
-                      navigation.navigate('DocNavigator', {
-                        screen: 'TaskHistTabs',
-                      })
-                    }>
-                    <Text style={styles.buttonText}>Task History</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
 
           </ScrollView>
         </View>
@@ -251,9 +203,9 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     backgroundColor: 'rgba(236, 74, 83, 0.3)',
-    borderRadius: scaleWidth(32),
-    height: scaleWidth(32),
-    width: scaleWidth(32),
+    borderRadius: scaleWidth(24),
+    height: scaleWidth(24),
+    width: scaleWidth(24),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -265,6 +217,7 @@ const styles = StyleSheet.create({
   infoContainer: {
     marginStart: scaleWidth(16),
     flex: 1,
+    marginEnd: scaleWidth(8),
   },
   title: {
     fontSize: scaleFont(18),
@@ -272,7 +225,7 @@ const styles = StyleSheet.create({
     color: Colors.primaryColor,
   },
   subTitle: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(11),
     fontFamily: Fonts.GilroyMedium,
     color: '#95969C',
   },

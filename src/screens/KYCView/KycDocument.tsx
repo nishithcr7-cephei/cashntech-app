@@ -203,9 +203,9 @@ export const KycDocument = () => {
 
   return (
     <Container>
-      <AppBar title="Kyc Document" navigation={navigation} />
+      <AppBar title="KYC Document" navigation={navigation} />
       <View style={styles.Subcontainer}>
-        <Text style={styles.Subheader}>Kyc Document</Text>
+        <Text style={styles.Subheader}>Select Lead for KYC</Text>
       </View>
       <View style={styles.RowContainer}>
         <View style={styles.subRowContainer}>
@@ -218,7 +218,7 @@ export const KycDocument = () => {
           <Search height={12} width={12} />
           <TextInput
             style={styles.input}
-            placeholder="Search Leads"
+            placeholder="Search By Firm Name"
             placeholderTextColor={Colors.balancedGray}
             value={searchQuery}
             onChangeText={setSearchQuery}
