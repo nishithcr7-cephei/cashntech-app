@@ -40,56 +40,6 @@ type LeadNavigationType = CompositeNavigationProp<
   NativeStackNavigationProp<LeadNavigatorType>
 >;
 
-const leadData = [
-  {
-    clientId: '0001',
-    clientName: 'S D Verma',
-    location: 'Delhi',
-    initiator: 'Delhi',
-    sourceDHCO: 'Source D',
-    referenceDetails: '9898923222',
-    monthlyTurnover: '20,00,000',
-    sanctionRequested: '25,00,000',
-    processStart: '10-02-2023',
-    status: 'Warm',
-  },
-  {
-    clientId: '0002',
-    clientName: 'S D Verma',
-    location: 'Delhi',
-    initiator: 'Delhi',
-    sourceDHCO: 'Source D',
-    referenceDetails: '9898923222',
-    monthlyTurnover: '20,00,000',
-    sanctionRequested: '25,00,000',
-    processStart: '10-02-2023',
-    status: 'Hot',
-  },
-  {
-    clientId: '0003',
-    clientName: 'S D Verma',
-    location: 'Delhi',
-    initiator: 'Delhi',
-    sourceDHCO: 'Source D',
-    referenceDetails: '9898923222',
-    monthlyTurnover: '20,00,000',
-    sanctionRequested: '25,00,000',
-    processStart: '10-02-2023',
-    status: 'Cold',
-  },
-  {
-    clientId: '0004',
-    clientName: 'S D Verma',
-    location: 'Delhi',
-    initiator: 'Delhi',
-    sourceDHCO: 'Source D',
-    referenceDetails: '9898923222',
-    monthlyTurnover: '20,00,000',
-    sanctionRequested: '25,00,000',
-    processStart: '10-02-2023',
-    status: 'Warm',
-  },
-] as const;
 
 export const LeadProgress = () => {
   const navigation = useNavigation<LeadNavigationType>();
@@ -324,7 +274,7 @@ export const LeadProgress = () => {
               <Search height={12} width={12} />
               <TextInput
                 style={styles.input}
-                placeholder="Search By Firm Name"
+                placeholder="Search by Firm Name"
                 placeholderTextColor={Colors.balancedGray}
                 value={searchText}
                 onChangeText={setSearchText}

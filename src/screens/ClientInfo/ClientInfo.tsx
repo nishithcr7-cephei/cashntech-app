@@ -333,7 +333,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
             <Search height={12} width={12} />
             <TextInput
               style={styles.input}
-              placeholder="Search Clients"
+              placeholder="Search by Firm name"
               placeholderTextColor={Colors.balancedGray}
               value={searchQuery}
               onChangeText={setSearchQuery}

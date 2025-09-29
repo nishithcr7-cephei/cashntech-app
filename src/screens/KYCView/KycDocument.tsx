@@ -218,7 +218,7 @@ export const KycDocument = () => {
           <Search height={12} width={12} />
           <TextInput
             style={styles.input}
-            placeholder="Search By Firm Name"
+            placeholder="Search by Firm Name"
             placeholderTextColor={Colors.balancedGray}
             value={searchQuery}
             onChangeText={setSearchQuery}
