@@ -20,6 +20,7 @@ type FooterButtonProps = {
   showNext?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
   clearButtonText?: string;
+  disableSubmit?: boolean;
 };
 
 export const FooterButton: React.FC<FooterButtonProps> = ({
@@ -30,6 +31,7 @@ export const FooterButton: React.FC<FooterButtonProps> = ({
   showNext = true,
   containerStyle,
   clearButtonText = 'Clear all',
+  disableSubmit = false,
 }) => {
   return (
     <View style={[styles.footerButton, containerStyle]}>
@@ -53,9 +55,22 @@ export const FooterButton: React.FC<FooterButtonProps> = ({
           <Text style={styles.nextText}>Next</Text>
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity style={styles.saveButton} onPress={onPressSubmit}>
-          <Text style={styles.saveText}>Submit</Text>
-          <RightCheckmark width={12} height={12} />
+        <TouchableOpacity 
+          style={[
+            styles.saveButton, 
+            disableSubmit && styles.disabledButton
+          ]} 
+          onPress={disableSubmit ? undefined : onPressSubmit}
+          disabled={disableSubmit}>
+          <Text style={[
+            styles.saveText,
+            disableSubmit && styles.disabledText
+          ]}>Submit</Text>
+          <RightCheckmark 
+            width={12} 
+            height={12} 
+            color={disableSubmit ? Colors.gray : Colors.white} 
+          />
         </TouchableOpacity>
       )}
     </View>
@@ -104,5 +119,13 @@ const styles = StyleSheet.create({
     color: Colors.blueGray700,
     fontSize: 16,
     marginStart: scaleWidth(10),
+  },
+  disabledButton: {
+    backgroundColor: Colors.gray,
+    borderColor: Colors.gray,
+  },
+  disabledText: {
+    color: Colors.white,
+    opacity: 0.6,
   },
 });

@@ -46,9 +46,9 @@ const firmDetails: FirmDetailsType = {
   firmType: '',
   businessVintage: '',
   sector: '',
-  bankName: '',
+  bankName: [], // Ensure this is truly empty, not containing empty strings
   cibilScore: '',
-  facilityType: '',
+  facilityType: [], // Changed to array to support multiple facility types
   monthlyTurnover: '',
   existingFundingSanctionedAmount: '',
   estimatedFundingRequired: '',
@@ -155,6 +155,8 @@ const initialState: ClientState = {
   softSanctionResultLoading: false,
   softSanctionResultError: null,
   
+  // Generic error holder (used by deleteClientFailure and others)
+  error: null,
 
 };
 
@@ -263,13 +265,14 @@ const clientSlice = createSlice({
       );
     },
     clearClientDetails: state => {
-      state.clientDetails = initialState.clientDetails;
+      // Reset the editable clientsDetails array (not the singular clientDetails view state)
+      state.clientsDetails = initialState.clientsDetails;
     },
     setSavedClientsDetailsStatus: (state, action: PayloadAction<boolean>) => {
       state.isSavedClientsDetails = action.payload;
     },
     saveClientsDetails: state => {
-      state.clientLoader = false;
+      state.clientLoader = true;
     },
     updateClientsDetails: state => {
       state.clientLoader = true;
@@ -346,7 +349,7 @@ const clientSlice = createSlice({
       );
     },
     saveVendorDetails: state => {
-      state.clientLoader = false;
+      state.clientLoader = true;
     },
     setSavedVendorDetailsStatus: (state, action: PayloadAction<boolean>) => {
       state.isSavedVendorDetails = action.payload;
@@ -372,7 +375,10 @@ const clientSlice = createSlice({
     },
     // Set Client Form Data,
     saveVisitDetails: state => {
-      state.clientLoader = false;
+      state.clientLoader = true;
+    },
+    saveVisitDetailsAndSubmit: state => {
+      state.clientLoader = true;
     },
     updateVisitDetails: state => {
       state.clientLoader = true;
@@ -514,6 +520,7 @@ export const {
   getVendorDetails,
 
   saveVisitDetails,
+  saveVisitDetailsAndSubmit,
   updateVisitDetails,
   setVisitDetails,
   clearVisitDetails,

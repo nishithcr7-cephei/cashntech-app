@@ -165,4 +165,14 @@ export type DocNavigatorType = {
     task_description?: string;
     client_name?: string;
   };
+  SubTask: {
+    clientId: string;
+    clientName: string;
+    taskData: any;
+  };
+  SubVisitDetail: {
+    clientId: string;
+    clientName: string;
+    visitData: any;
+  };
 };

@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React from 'react';
+import React, {useEffect, useRef} from 'react';
 import {LeftChevronCircle} from '@assets/Icons';
 import {
   Container,
@@ -51,6 +51,7 @@ type Props = CompositeScreenProps<
 >;
 export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
   const dispatch = useDispatch();
+  const shouldNavigateAfterSave = useRef(false);
   const {
     userResponse,
     dateOfNextVisit,
@@ -63,11 +64,23 @@ export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
     clientSelector.getSavedVisitDetailsStatus,
   );
 
+  // Handle navigation after successful save and submit
+  useEffect(() => {
+    if (isSavedVisitDetails && shouldNavigateAfterSave.current) {
+      shouldNavigateAfterSave.current = false;
+      navigation.reset({
+        index: 0,
+        routes: [{name: ClientScreens.ClientInfo}],
+      });
+    }
+  }, [isSavedVisitDetails, navigation]);
+
   function setData<T extends keyof VisitDetailsType>(
     field: T,
     value: VisitDetailsType[T],
   ) {
     dispatch(clientActions.setVisitDetails({[field]: value}));
+    dispatch(clientActions.setSavedVisitDetailsStatus(false));
   }
 
   const handleClear = () => {
@@ -80,7 +93,10 @@ export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
   };
 
   const handleSubmit = () => {
+    if (!validateVisitDetails()) return;
+    
     if (isSavedVisitDetails) {
+      // Data already saved, just show success and navigate
       Toast.show({
         type: 'success',
         text1: 'Success',
@@ -91,11 +107,9 @@ export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
         routes: [{name: ClientScreens.ClientInfo}],
       });
     } else {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Please save the form before proceeding to submit.',
-      });
+      // Data not saved, call API to save and submit
+      shouldNavigateAfterSave.current = true;
+      dispatch(clientActions.saveVisitDetailsAndSubmit());
     }
   };
 
@@ -220,6 +234,7 @@ export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
         onPressSave={handleSave}
         onPressSubmit={handleSubmit}
         showNext={false}
+        disableSubmit={!isSavedVisitDetails}
       />
       <Modal transparent visible={visitLoader}>
         <View style={styles.loader}>

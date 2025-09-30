@@ -249,6 +249,6 @@ const styles = StyleSheet.create({
   },
   logOut: {
     marginHorizontal: scaleWidth(16),
-    marginBottom: scaleHeight(16),
+    marginBottom: scaleHeight(64),
   },
 });

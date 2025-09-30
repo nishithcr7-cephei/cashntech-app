@@ -13,6 +13,7 @@ import {
   formatTaskRemark, 
   formatTaskStatus 
 } from '@utils/taskUtils';
+import {RightChevron} from '@assets/Icons';
 
 interface TaskData {
   id?: number | string;
@@ -35,9 +36,11 @@ interface TaskData {
 interface TaskCardProps {
   item: TaskData;
   index: number;
+  hasSubTasks?: boolean;
+  subTaskCount?: number;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ item, index }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ item, index, hasSubTasks = false, subTaskCount = 0 }) => {
   // Safe data extraction with fallbacks
   const task = getDisplayTask(item?.task || []);
   const firmName = capitalizeFirst(decryptLocation(String(item?.firm_name || '')));
@@ -58,9 +61,19 @@ const TaskCard: React.FC<TaskCardProps> = ({ item, index }) => {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.label}>
-        <Text style={styles.bold}>SrNo :</Text> <Text style={styles.value}>{serialNumber}</Text>
-      </Text>
+      <View style={styles.cardHeader}>
+        <Text style={styles.label}>
+          <Text style={styles.bold}>SrNo :</Text> <Text style={styles.value}>{serialNumber}</Text>
+        </Text>
+        {hasSubTasks && (
+          <View style={styles.subTaskContainer}>
+            <Text style={styles.subTaskText}>
+              {subTaskCount} Sub Task{subTaskCount !== 1 ? 's' : ''}
+            </Text>
+            <RightChevron height={16} width={16} />
+          </View>
+        )}
+      </View>
       <Text style={styles.label}>
         <Text style={styles.bold}>FirmName :</Text> <Text style={styles.value}>{firmName}</Text>
       </Text>
@@ -112,6 +125,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  subTaskContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  subTaskText: {
+    fontSize: 12,
+    color: Colors.primaryColor,
+    fontWeight: '600',
   },
   label: { 
     fontSize: 14, 

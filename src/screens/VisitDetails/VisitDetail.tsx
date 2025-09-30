@@ -12,7 +12,7 @@ import {useNavigation} from '@react-navigation/native';
 import {useSelector, useDispatch} from 'react-redux';
 import {Container, AppBar, FilterModal} from '@components/index';
 import Colors from '@constants/Colors';
-import {Filter, Search} from '@assets/Icons';
+import {Filter, Search, RightChevron} from '@assets/Icons';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import FontWeight from '@constants/FontWeight';
 import {decryptLocation} from '@utils/crypto';
@@ -49,6 +49,7 @@ type VisitItem = {
     city?: string; 
     sector?: string | null;
     created_at?: string;
+    allVisits?: any[]; // Store all visits for SubVisitDetail
   };
 };
 
@@ -98,7 +99,7 @@ export const VisitDetail = () => {
     fetchInitiators();
   }, []);
 
-  // Helper function to normalize visit items
+  // Helper function to normalize visit items and get only latest visit per client
   const normalizeVisitItems = (items: any[]): VisitItem[] => {
     if (!Array.isArray(items)) return [];
     
@@ -106,26 +107,32 @@ export const VisitDetail = () => {
     
     items.forEach((rec) => {
       if (Array.isArray(rec?.visit) && rec.visit.length > 0) {
-        // Create a separate item for each visit
-        rec.visit.forEach((visit: any) => {
-          flattenedItems.push({
-            id: visit.id ?? rec.id,
-            visit_date_time: visit.visit_date_time,
-            salesperson: visit.salesperson,
-            client_firm_name: visit.client_firm_name,
-            visit_type: visit.visit_type,
-            visit_number: visit.visit_number,
-            visit_remark: visit.visit_remark,
-            sector: rec.sector ?? null,
-            client: {
-              id: rec.id,
-              source_of_lead: rec.source_of_lead,
-              city: rec.city,
-              sector: rec.sector ?? null,
-              created_at: rec.created_at,
-            },
-          } as VisitItem);
+        // Sort visits by date (newest first) and take only the latest one
+        const sortedVisits = [...rec.visit].sort((a, b) => {
+          const dateA = a.visit_date_time ? new Date(a.visit_date_time).getTime() : 0;
+          const dateB = b.visit_date_time ? new Date(b.visit_date_time).getTime() : 0;
+          return dateB - dateA;
         });
+        
+        const latestVisit = sortedVisits[0];
+        flattenedItems.push({
+          id: latestVisit.id ?? rec.id,
+          visit_date_time: latestVisit.visit_date_time,
+          salesperson: latestVisit.salesperson,
+          client_firm_name: latestVisit.client_firm_name,
+          visit_type: latestVisit.visit_type,
+          visit_number: latestVisit.visit_number,
+          visit_remark: latestVisit.visit_remark,
+          sector: rec.sector ?? null,
+          client: {
+            id: rec.id,
+            source_of_lead: rec.source_of_lead,
+            city: rec.city,
+            sector: rec.sector ?? null,
+            created_at: rec.created_at,
+            allVisits: rec.visit, // Store all visits for SubVisitDetail
+          },
+        } as VisitItem);
       } else {
         // Handle records without visit array (fallback)
         flattenedItems.push({
@@ -140,6 +147,7 @@ export const VisitDetail = () => {
           client: {
             ...rec.client,
             created_at: rec.created_at,
+            allVisits: [], // No visits for this client
           },
         } as VisitItem);
       }
@@ -279,18 +287,46 @@ export const VisitDetail = () => {
     return `${month} ${year}`;
   };
 
-  const VisitCard = React.memo(({item, index}: {item: VisitItem; index: number}) => {
+  const VisitCard = React.memo(({
+    item, 
+    index, 
+    onCardPress, 
+    onSubVisitPress
+  }: {
+    item: VisitItem; 
+    index: number;
+    onCardPress: () => void;
+    onSubVisitPress: () => void;
+  }) => {
     const firmName = decryptLocation(item.client_firm_name || '');
     const city = decryptLocation(item.client?.city || '');
     const source = item.client?.source_of_lead || 'N/A';
     const sector = (item.sector ?? item.client?.sector ?? '').toString().trim() || 'N/A';
+    const hasSubVisits = item.client?.allVisits && item.client.allVisits.length > 1;
+    const subVisitCount = hasSubVisits ? (item.client?.allVisits?.length || 0) - 1 : 0;
     
     return (
-      <View style={styles.card}>
-        <Text style={styles.label}>
-          <Text style={styles.bold}>Sr.No :</Text> 
-          <Text style={styles.value}>{index + 1}</Text>
-        </Text>
+      <TouchableOpacity style={styles.card} onPress={onCardPress}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.label}>
+            <Text style={styles.bold}>Sr.No :</Text> 
+            <Text style={styles.value}>{index + 1}</Text>
+          </Text>
+          {hasSubVisits && (
+            <TouchableOpacity 
+              style={styles.subVisitContainer}
+              onPress={(e) => {
+                e.stopPropagation(); // Prevent card press when sub-visit is tapped
+                onSubVisitPress();
+              }}
+            >
+              <Text style={styles.subVisitText}>
+                {subVisitCount} Sub Visit{subVisitCount !== 1 ? 's' : ''}
+              </Text>
+              <RightChevron height={16} width={16} />
+            </TouchableOpacity>
+          )}
+        </View>
         <Text style={styles.label}>
           <Text style={styles.bold}>Firm Name :</Text> 
           <Text style={styles.value}>{firmName}</Text>
@@ -331,14 +367,20 @@ export const VisitDetail = () => {
           <Text style={styles.bold}>Created At :</Text> 
           <Text style={styles.value}>{formatCreatedAt(item.client?.created_at)}</Text>
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   });
 
   const renderItem = useCallback(({item, index}: {item: VisitItem; index: number}) => {
+    const firmName = decryptLocation(item.client_firm_name || '');
+    const hasMultipleVisits = item.client?.allVisits && item.client.allVisits.length > 1;
+    
     return (
-      <TouchableOpacity
-        onPress={() => {
+      <VisitCard 
+        item={item} 
+        index={index} 
+        onCardPress={() => {
+          // Always navigate to UpdateVisitDetails when card is tapped
           (navigation as any).navigate('UpdateVisitDetails', {
             visitId: String(item.id),
             visit_date_time: item.visit_date_time,
@@ -348,9 +390,26 @@ export const VisitDetail = () => {
             visit_number: item.visit_number,
             visit_remark: item.visit_remark,
           });
-        }}>
-        <VisitCard item={item} index={index} />
-      </TouchableOpacity>
+        }}
+        onSubVisitPress={() => {
+          // Navigate to SubVisitDetail when sub-visit indicator is tapped
+          (navigation as any).navigate('DocNavigator', {
+            screen: 'SubVisitDetail',
+            params: {
+              clientId: String(item.client?.id || ''),
+              clientName: firmName,
+              visitData: {
+                id: item.client?.id,
+                source_of_lead: item.client?.source_of_lead,
+                city: item.client?.city,
+                sector: item.client?.sector,
+                created_at: item.client?.created_at,
+                visit: item.client?.allVisits || [],
+              },
+            },
+          });
+        }}
+      />
     );
   }, [navigation]);
 
@@ -488,6 +547,22 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  subVisitContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  subVisitText: {
+    fontSize: 12,
+    color: Colors.primaryColor,
+    fontWeight: '600',
   },
   label: {
     fontSize: 14,

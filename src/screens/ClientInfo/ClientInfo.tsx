@@ -49,6 +49,15 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
   const cityList = useSelector(clientSelector.getCityList);
   const loading = useSelector(clientSelector.getClientLoader);
 
+  // Debug logging
+  console.log('ClientInfo Debug:', {
+    clientsDataLength: clientsData?.length || 0,
+    clientsData: clientsData,
+    loading,
+    searchQuery,
+    appliedFilters
+  });
+
   const filteredClients = useMemo(() => {
     if (!searchQuery.trim()) return clientsData;
     const lowerCaseQuery = searchQuery.trim().toLowerCase();
@@ -77,7 +86,11 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
   }, [appliedFilters, dispatch]);
 
   const callGetClients = () => {
-    dispatch(clientActions.getClients(appliedFilters));
+    try {
+      dispatch(clientActions.getClients(appliedFilters));
+    } catch (error) {
+      console.error('Error calling getClients:', error);
+    }
   };
 
   const onPressFAB = () => {
@@ -135,7 +148,11 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
       if (city.toLowerCase().includes(searchLower)) return true;
 
       const bankName = decryptConditionally(item.bank_name || '');
-      if (bankName.toLowerCase().includes(searchLower)) return true;
+      if (Array.isArray(bankName)) {
+        if (bankName.some(bank => bank.toLowerCase().includes(searchLower))) return true;
+      } else if (bankName.toLowerCase().includes(searchLower)) {
+        return true;
+      }
 
       const location = decryptConditionally(item.location || '');
       if (location.toLowerCase().includes(searchLower)) return true;
@@ -151,7 +168,6 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
 
       return false;
     } catch (error) {
-      console.log('Search error for item:', item.id, error);
       return false;
     }
   };

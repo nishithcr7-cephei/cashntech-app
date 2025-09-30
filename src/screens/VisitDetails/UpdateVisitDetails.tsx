@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  BackHandler,
 } from 'react-native';
 import {
   AppBar,
@@ -63,9 +64,22 @@ export const UpdateVisitDetails = () => {
   );
   const [firmName, setFirmName] = useState(decryptLocation(params.client_firm_name || ''));
   const [visitType, setVisitType] = useState(params.visit_type || '');
-  const [visitNumber, setVisitNumber] = useState(String(params.visit_number || ''));
+  const [visitNumber, setVisitNumber] = useState(String((params.visit_number || 0) + 1));
   const [remark, setRemark] = useState(params.visit_remark || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Handle Android back button
+  useEffect(() => {
+    const backAction = () => {
+      // Go back to previous screen (VisitDetail) without re-mounting
+      navigation.goBack();
+      return true; // Prevent default back action
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
+
+    return () => backHandler.remove();
+  }, [navigation]);
 
   const handleSubmit = async () => {
     // Validation for editable fields
@@ -87,6 +101,25 @@ export const UpdateVisitDetails = () => {
       return;
     }
 
+    if (!visitNumber || visitNumber.trim() === '') {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please enter a visit number',
+      });
+      return;
+    }
+
+    const visitNumberInt = parseInt(visitNumber);
+    if (isNaN(visitNumberInt) || visitNumberInt <= 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please enter a valid visit number',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
@@ -95,7 +128,7 @@ export const UpdateVisitDetails = () => {
         remark: remark.trim(),
         salesperson: salesPersonName,
         visit_date_time: visitDate.toISOString(),
-        visit_number: parseInt(visitNumber) || 0,
+        visit_number: visitNumberInt,
         visit_type: visitType,
       };
       
@@ -125,7 +158,7 @@ export const UpdateVisitDetails = () => {
       
       // Add delay to show toast before navigation
       setTimeout(() => {
-        (navigation as any).navigate('VisitDetail');
+        navigation.goBack();
       }, 2000);
     } catch (error) {
       Toast.show({
@@ -141,6 +174,7 @@ export const UpdateVisitDetails = () => {
   const handleClear = () => {
     setVisitDate(new Date());
     setRemark('');
+    setVisitNumber(String((params.visit_number || 0) + 1));
   };
 
   return (
@@ -149,7 +183,7 @@ export const UpdateVisitDetails = () => {
       <View>
         <TouchableOpacity
           style={styles.subContainer}
-          onPress={() => (navigation as any).navigate('VisitDetail')}>
+          onPress={() => navigation.goBack()}>
           <LeftChevronCircle height={26} width={26} />
           <Text style={styles.subheader}>Update Visit Details</Text>
         </TouchableOpacity>
@@ -212,7 +246,7 @@ export const UpdateVisitDetails = () => {
             
             <TouchableOpacity
               style={styles.cancelButton}
-              onPress={() => (navigation as any).navigate('VisitDetail')}>
+              onPress={() => navigation.goBack()}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>

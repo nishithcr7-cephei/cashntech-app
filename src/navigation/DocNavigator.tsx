@@ -9,6 +9,8 @@ import {
   TaskLogTabs,
   TaskHistTabs,
   TaskUpdate,
+  SubTask,
+  SubVisitDetail,
 } from '@screens/index';
 import {DocNavigatorType} from '@type/NavigatorTypes';
 
@@ -31,6 +33,8 @@ export const DocNavigator = () => {
       <Stack.Screen name="TaskLogTabs" component={TaskLogTabs} />
       <Stack.Screen name="TaskHistTabs" component={TaskHistTabs} />
       <Stack.Screen name="TaskUpdate" component={TaskUpdate} />
+      <Stack.Screen name="SubTask" component={SubTask} />
+      <Stack.Screen name="SubVisitDetail" component={SubVisitDetail} />
     </Stack.Navigator>
   );
 };

@@ -8,6 +8,7 @@ export * from './Footer/TnCFooter';
 export * from './Footer/FooterButton';
 export * from './ClientCard/ClientCard';
 export * from './Dropdown/CustomDropdown';
+export * from './MultiSelectDropdown/MultiSelectDropdown';
 export * from './SoftSanctionLeadCard/SoftSanctionLeadCard';
 export * from './SoftRulesetCard/SoftRulestCard';
 export * from './RulesetTCPDCard/RulesetTCPDCard';

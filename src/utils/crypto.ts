@@ -52,8 +52,8 @@ export function decryptUtility(
 export function encryptUtility(
   value: Record<string, any> | string | null,
 ): string {
-  const key = CryptoJS.enc.Base64.parse(RK_ENCRYPTION_KEY);
-  const iv = CryptoJS.enc.Base64.parse(RK_ENCRYPTION_IV);
+  const key = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_KEY);
+  const iv = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_IV);
   let plainText;
   if (typeof value === 'string') {
     plainText = value;
@@ -69,15 +69,13 @@ export function encryptUtility(
   return encrypted.ciphertext.toString(CryptoJS.enc.Base64);
 }
 
-// TODO: Remove keys
-const RK_ENCRYPTION_KEY = 'u/Gu5posvwDsXUnV5Zaq4g==';
-const RK_ENCRYPTION_IV = '5D9r9ZVzEYYgha93/aUK2w==';
+// TODO: Remove keys - now using Config values
 
 export function decryptLocation(encrypted: string): string {
   if (!encrypted) return '';
   try {
-    const key = CryptoJS.enc.Base64.parse(RK_ENCRYPTION_KEY);
-    const iv = CryptoJS.enc.Base64.parse(RK_ENCRYPTION_IV);
+    const key = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_KEY);
+    const iv = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_IV);
     const decrypted = CryptoJS.AES.decrypt(encrypted, key, {
       iv: iv,
       mode: CryptoJS.mode.CBC,
@@ -109,8 +107,8 @@ export function decryptConditionally(value: string): string {
 
   // Try to decrypt it
   try {
-    const key = CryptoJS.enc.Base64.parse(RK_ENCRYPTION_KEY);
-    const iv = CryptoJS.enc.Base64.parse(RK_ENCRYPTION_IV);
+    const key = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_KEY);
+    const iv = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_IV);
     const decrypted = CryptoJS.AES.decrypt(value, key, {
       iv: iv,
       mode: CryptoJS.mode.CBC,

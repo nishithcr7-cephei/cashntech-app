@@ -36,10 +36,13 @@ const Strings = {
 export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
   const [email, setEmail] = useState('piyush.sharma@cepheiinfotech.com');
   const [passwordValue, setPassword] = useState('123456789@');
+  
   //const [email, setEmail] = useState('sdkd@cashntech.com');
   //const [passwordValue, setPassword] = useState('Sarthak@123');
+  
   //const [email, setEmail] = useState('');
   //const [passwordValue, setPassword] = useState('');
+  
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
@@ -98,10 +101,6 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
       password: passwordValue.trim(),
     };
 
-    // Console log the URL when login button is pressed
-    console.log('🔐 Login Button Pressed - API URL: /auth/login');
-    console.log('📧 Email:', data.email);
-    console.log('🔑 Password Length:', data.password.length);
 
     // Make the API call directly
     const payload = {

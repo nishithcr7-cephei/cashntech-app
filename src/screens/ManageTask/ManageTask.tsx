@@ -165,12 +165,24 @@ export const ManageTask = () => {
     // Get the first task from the item to check status and get task details
     const firstTask = item.task && item.task.length > 0 ? item.task[0] : null;
     const isTaskPending = firstTask?.task_status?.toLowerCase() === 'pending';
+    const hasSubTasks = item.task && item.task.length > 1;
+    const clientName = decryptLocation(item.firm_name || '');
     
     return (
       <TouchableOpacity
         onPress={() => {
-          // Only navigate if status is Pending
-          if (isTaskPending && firstTask) {
+          if (hasSubTasks) {
+            // Navigate to SubTask screen if has sub-tasks
+            (navigation as any).navigate('DocNavigator', {
+              screen: 'SubTask',
+              params: {
+                clientId: String(item.id),
+                clientName: clientName,
+                taskData: item,
+              }
+            });
+          } else if (isTaskPending && firstTask) {
+            // Navigate to TaskUpdate if no sub-tasks and status is Pending
             (navigation as any).navigate('DocNavigator', {
               screen: 'TaskUpdate',
               params: {
@@ -179,16 +191,21 @@ export const ManageTask = () => {
                 remark: firstTask.remark && firstTask.remark !== 'NA' ? firstTask.remark : '',
                 completed_at: firstTask.completed_at,
                 task_description: firstTask.task_description,
-                client_name: decryptLocation(item.firm_name || ''),
+                client_name: clientName,
                 task_type: firstTask.task_type,
                 assigned_to: firstTask.assigned_to,
               }
             });
           }
-          // If status is Completed, do nothing (no navigation)
+          // If status is Completed and no sub-tasks, do nothing (no navigation)
         }}
-        disabled={!isTaskPending}>
-        <TaskCard item={item} index={index} />
+        disabled={!hasSubTasks && !isTaskPending}>
+        <TaskCard 
+          item={item} 
+          index={index} 
+          hasSubTasks={hasSubTasks} 
+          subTaskCount={hasSubTasks ? (item.task?.length ? item.task.length - 1 : 0) : 0}
+        />
       </TouchableOpacity>
     );
   };

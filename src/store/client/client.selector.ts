@@ -29,12 +29,18 @@ const getClientsDetailsFormStatus = createSelector(
   _state => _state.isSavedClientsDetails,
 );
 
-const getMasterBankDropdown = createSelector(_selectState, _state =>
-  _state.masterBankList.map(item => ({
-    label: item.bank_name,
-    value: item.bank_name,
-  })),
-);
+const getMasterBankDropdown = createSelector(_selectState, _state => {
+  const bankMap = new Map();
+  _state.masterBankList.forEach(item => {
+    if (!bankMap.has(item.bank_name)) {
+      bankMap.set(item.bank_name, {
+        label: item.bank_name,
+        value: item.bank_name,
+      });
+    }
+  });
+  return Array.from(bankMap.values());
+});
 
 const getFirmDetailsFormData = createSelector(
   _selectState,

@@ -17,6 +17,7 @@ import {
   saveFirmDetails,
   saveVendorDetails,
   saveVisitDetails,
+  saveVisitDetailsAndSubmit,
   TaskRecordsFilterRequest,
   updateClientBasicDetails,
   updateClientsDetails,
@@ -135,17 +136,46 @@ function* handleGetClientsFilter(
       },
     }),
   };
-  const {
-    data,
-    error,
-  }: Result<ClientsFilterResponse, AxiosError<{message: string}>> = yield call(
-    ClientApis.getClientsFilter,
-    payload,
-  );
+
+  // Check if payload is empty (no filters applied)
+  const hasFilters = city.length > 0 || sector.length > 0 || source_of_lead.length > 0;
+  
+  // If no filters are applied, send a default payload to get all clients
+  const finalPayload = hasFilters ? payload : {
+    byCity: { city: [] },
+    bySector: { sector: [] },
+    bySource: { source_of_lead: [] }
+  };
+
+  // Always use POST filter endpoint (backend expects POST even for no filters)
+  const result: Result<ClientsFilterResponse, AxiosError<{message: string}>> =
+    yield call(ClientApis.getClientsFilter, finalPayload);
+  
+  const {data, error} = result;
+  
+  // Debug logging
+  console.log('Saga Debug - handleGetClientsFilter:', {
+    finalPayload,
+    hasFilters,
+    data: data?.data,
+    dataLength: data?.data?.length,
+    error: error?.response?.data || error?.message,
+    errorStatus: error?.status
+  });
+  
   yield put(clientActions.setClientLoader(false));
   if (error) {
     if (error.status === 404) {
       yield put(clientActions.setClientList([]));
+      return;
+    }
+    if (error.status === 500) {
+      // Handle 500 Internal Server Error - try with a simpler payload
+      console.warn('500 error received, this might be due to server-side payload validation issues');
+      Toast.show({
+        type: 'error',
+        text1: 'Server error occurred while fetching client list. Please try again.',
+      });
       return;
     }
     Toast.show({
@@ -465,18 +495,29 @@ function* handleGetMasterBankList(): unknown {
 
 function* saveFirmDetailsSaga(): unknown {
   const clientId = yield select(clientSelector.getClientFormId);
+  
   const {first_name, last_name}: UserState = yield select(
     userSelector.getUserInfo,
   );
+  
   const firmDetails: FirmDetailsType = yield select(
     clientSelector.getFirmDetailsFormData,
   );
+  
+  // Prepare bank names for encryption
+  const bankNamesString = firmDetails.bankName.join(',');
+  
+  const encryptedBankNames = encryptUtility(bankNamesString);
+  
+  // Prepare facility types for API (comma-separated string)
+  const facilityTypesString = firmDetails.facilityType.join(',');
+  
   const body: FirmDetailsPayload = {
     firm_type: firmDetails.firmType,
-    bank_name: encryptUtility(firmDetails.bankName.trim()),
+    bank_name: encryptedBankNames, // Join multiple banks with comma and encrypt
     business_vintage: firmDetails.businessVintage.trim(),
     sector: firmDetails.sector,
-    facility_type: firmDetails.facilityType,
+    facility_type: facilityTypesString, // Join multiple facility types with comma
     cibil_score: Number(firmDetails.cibilScore),
     credit_period_offer: Number(firmDetails.creditPeriodOffer),
     estimated_funding_required: Number(firmDetails.estimatedFundingRequired),
@@ -486,12 +527,14 @@ function* saveFirmDetailsSaga(): unknown {
     monthly_turnover: Number(firmDetails.monthlyTurnover),
     created_by: `${first_name} ${last_name}`,
   };
+  
   const {
     error,
   }: Result<
     {statusCode: number; message: string},
     AxiosError<{message?: string}>
   > = yield call(ClientApis.saveFirmDetailsForm, clientId, body);
+  
   yield put(clientActions.setClientLoader(false));
   if (error) {
     Toast.show({
@@ -513,6 +556,7 @@ function* getFirmDetailsSaga(action: PayloadAction<number>): unknown {
     ClientApis.getFirmDetailsForm,
     clientId,
   );
+  
   yield put(clientActions.setClientLoader(false));
   if (error) {
     Toast.show({
@@ -522,12 +566,44 @@ function* getFirmDetailsSaga(action: PayloadAction<number>): unknown {
     return;
   }
   if (data) {
+    
+    // Handle bank_name - it might be a string or array from the API
+    let bankNames: string[] = [];
+    if (data.bank_name) {
+      if (Array.isArray(data.bank_name)) {
+        bankNames = data.bank_name.map(bank => decryptUtility(bank));
+      } else if (typeof data.bank_name === 'string') {
+        // If it's a string, it might be comma-separated or a single value
+        const decryptedBankName = decryptUtility(data.bank_name);
+        
+        if (decryptedBankName && decryptedBankName.trim() !== '') {
+          bankNames = decryptedBankName.includes(',') 
+            ? decryptedBankName.split(',').map(bank => bank.trim()).filter(bank => bank !== '')
+            : [decryptedBankName.trim()];
+        } else {
+          bankNames = [];
+        }
+      }
+    }
+
+    // Handle facility_type - parse comma-separated string back to array
+    let facilityTypes: string[] = [];
+    if (data.facility_type) {
+      if (data.facility_type && data.facility_type.trim() !== '') {
+        facilityTypes = data.facility_type.includes(',') 
+          ? data.facility_type.split(',').map(type => type.trim()).filter(type => type !== '')
+          : [data.facility_type.trim()];
+      } else {
+        facilityTypes = [];
+      }
+    }
+
     const firmDetails: Partial<FirmDetailsType> = {
       firmType: data.firm_type,
-      bankName: decryptUtility(data.bank_name),
+      bankName: bankNames,
       businessVintage: data.business_vintage,
       sector: data.sector,
-      facilityType: data.facility_type,
+      facilityType: facilityTypes,
       cibilScore: data.cibil_score?.toString() ?? '',
       creditPeriodOffer: data.credit_period_offer?.toString() ?? '',
       estimatedFundingRequired:
@@ -536,6 +612,7 @@ function* getFirmDetailsSaga(action: PayloadAction<number>): unknown {
         data.existing_funding_sanctioned_amount?.toString() ?? '',
       monthlyTurnover: data.monthly_turnover?.toString() ?? '',
     };
+    
     yield put(clientActions.setFirmDetails(firmDetails));
   }
 }
@@ -656,6 +733,56 @@ function* saveVisitDetailsSaga(): unknown {
   });
 }
 
+function* saveVisitDetailsAndSubmitSaga(): unknown {
+  const clientId = yield select(clientSelector.getClientFormId);
+  const {first_name, last_name}: UserState = yield select(
+    userSelector.getUserInfo,
+  );
+  const visitDetails: VisitDetailsType = yield select(
+    clientSelector.getVisitDetailsFormData,
+  );
+
+  let body: VisitDetailsPayload;
+  if (!visitDetails.userResponse) return;
+  if (visitDetails.userResponse === UserResponse.INTERESTED) {
+    body = {
+      client_response: visitDetails.userResponse,
+      intent: visitDetails.intent ?? ''.trim(),
+      date_of_next_visit: moment(visitDetails.dateOfNextVisit).toISOString(),
+      created_by: `${first_name} ${last_name}`,
+    };
+  } else {
+    body = {
+      client_response: visitDetails.userResponse,
+      are_you_interested_for: visitDetails.interestedFor.trim(),
+      reason_for_not_interested: visitDetails.reasonForNotInterested.trim(),
+      created_by: `${first_name} ${last_name}`,
+    };
+  }
+  const {
+    error,
+  }: Result<
+    {statusCode: number; message: string},
+    AxiosError<{message?: string}>
+  > = yield call(ClientApis.saveVisitDetailsForm, clientId, body);
+  yield put(clientActions.setClientLoader(false));
+  if (error) {
+    Toast.show({
+      type: 'error',
+      text1: error.response?.data?.message || 'Failed to save visit details.',
+    });
+    return;
+  }
+  yield put(clientActions.setSavedVisitDetailsStatus(true));
+  Toast.show({
+    type: 'success',
+    text1: 'Form submitted successfully!',
+  });
+  
+  // Navigate back after successful save and submit
+  // Note: Navigation will be handled by the component after receiving the success state
+}
+
 function* getVisitDetailsFormData(action: PayloadAction<number>): unknown {
   const clientId = action.payload;
   const {data, error}: Result<VisitDetailsData> = yield call(
@@ -728,41 +855,17 @@ function* handleTaskRecordsFilter(
 function* handleGetClientDetails(action: PayloadAction<number>): Generator<any, void, any> {
   try {
     const clientId = action.payload;
-    console.log('Using axiosInstance baseURL for client details');
     // Clear previous client details
     yield put(clientActions.setClientDetails(null));
     const url = `/client-info-master/details/${clientId}`;
-    console.log('API URL:', url, 'Method: GET');
     const response = yield call([axiosInstance, 'get'], url);
-    console.log('Raw axios response status:', response.status);
-    console.log('Raw axios response data:', response.data);
-    console.log('API Response statusCode:', response.data.statusCode);
-    console.log('API Response data array:', response.data.data);
-    console.log(
-      'API Response data length:',
-      response.data.data ? response.data.data.length : 0,
-    );
-    console.log(
-      'First data item:',
-      response.data.data && response.data.data[0]
-        ? response.data.data[0]
-        : 'No data[0]',
-    );
-    console.log(
-      'Extracted client data:',
-      response.data.data && response.data.data[0]
-        ? response.data.data[0]
-        : 'No data found',
-    );
 
     const clientData =
       response.data.data && response.data.data[0]
         ? response.data.data[0]
         : null;
-    console.log('Setting client data in Redux:', clientData);
     yield put(clientActions.setClientDetails(clientData));
   } catch (error: any) {
-    console.log('API Error:', error);
     yield put(
       clientActions.setClientDetailsError(
         error.message || 'Failed to fetch client details',
@@ -787,6 +890,7 @@ export default function* clientSaga() {
   yield takeLatest(saveVendorDetails.type, saveVendorDetailsSaga);
   yield takeLatest(getVendorDetails.type, getVendorDetailsSaga);
   yield takeLatest(saveVisitDetails.type, saveVisitDetailsSaga);
+  yield takeLatest(saveVisitDetailsAndSubmit.type, saveVisitDetailsAndSubmitSaga);
   yield takeLatest(getVisitDetails.type, getVisitDetailsFormData);
   yield takeLatest(prepareClientForEdit.type, handlePrepareClientForEdit);
   yield takeLatest(deleteClientRequest.type, handleDeleteClient);

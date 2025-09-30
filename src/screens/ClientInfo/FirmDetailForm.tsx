@@ -13,6 +13,7 @@ import {
   AppBar,
   Input,
   CustomDropdown,
+  MultiSelectDropdown,
   FooterButton,
 } from '@components/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -64,6 +65,7 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
     dispatch(clientActions.getMasterBankList());
   }, [dispatch]);
 
+
   const {
     firmType,
     businessVintage,
@@ -76,6 +78,7 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
     estimatedFundingRequired,
     creditPeriodOffer,
   } = useSelector(clientSelector.getFirmDetailsFormData);
+
   const firmLoader = useSelector(clientSelector.getClientLoader);
   const isSavedFirmDetails = useSelector(
     clientSelector.getFirmDetailsFormStatus,
@@ -93,16 +96,21 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
   };
 
   const handleSave = () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      return;
+    }
+    
     const strip = (s: string | undefined) =>
       s ? s.toString().replace(/,/g, '') : '';
-    dispatch(
-      clientActions.setFirmDetails({
-        monthlyTurnover: strip(monthlyTurnover),
-        existingFundingSanctionedAmount: strip(existingFundingSanctionedAmount),
-        estimatedFundingRequired: strip(estimatedFundingRequired),
-      }),
-    );
+    
+    const firmDetailsToSave = {
+      monthlyTurnover: strip(monthlyTurnover),
+      existingFundingSanctionedAmount: strip(existingFundingSanctionedAmount),
+      estimatedFundingRequired: strip(estimatedFundingRequired),
+      bankName: bankName, // Ensure bank names are included in save
+    };
+    
+    dispatch(clientActions.setFirmDetails(firmDetailsToSave));
     dispatch(clientActions.saveFirmDetails());
   };
 
@@ -137,7 +145,17 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
   const validateForm = () => {
     for (let i = 0; i < requiredFields.length; i++) {
       const {field, name} = requiredFields[i];
-      if (!field || (typeof field === 'string' && !field.trim())) {
+      if (name === 'Bank Name' || name === 'Facility Type') {
+        // Special validation for bank names and facility type arrays
+        if (!field || !Array.isArray(field) || field.length === 0) {
+          Toast.show({
+            type: 'error',
+            text1: 'Validation Error',
+            text2: `Please select at least one ${name}`,
+          });
+          return false;
+        }
+      } else if (!field || (typeof field === 'string' && !field.trim())) {
         Toast.show({
           type: 'error',
           text1: 'Validation Error',
@@ -182,11 +200,14 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             value={sector}
             onChange={value => setData('sector', value)}
           />
-          <CustomDropdown
+          <MultiSelectDropdown
             label="Bank Name"
             data={listOfBanks}
             value={bankName}
-            onChange={value => setData('bankName', value)}
+            onChange={value => {
+              setData('bankName', value);
+            }}
+            placeholder="Select multiple banks"
           />
           <Input
             label="Monthly Turnover"
@@ -204,11 +225,14 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             maxLength={3}
             onChangeText={value => setData('cibilScore', value)}
           />
-          <CustomDropdown
+          <MultiSelectDropdown
             label="Facility Type"
             data={listOfFacilityTypes}
             value={facilityType}
-            onChange={value => setData('facilityType', value)}
+            onChange={value => {
+              setData('facilityType', value);
+            }}
+            placeholder="Select multiple facility types"
           />
           <Input
             label="Existing Funding Sanctioned Amt"

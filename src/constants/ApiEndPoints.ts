@@ -17,10 +17,11 @@ const Endpoints = {
 
   // Client apis
   apiGetClientsFilter: '/client-info-master/filter/',
+  apiGetAllClients: '/client-info-master/list',
   apiSaveBasicDetails: '/client-info-master/basic-details/',
   apiGetBasicDetails: '/client-info-master/basic/',
   apiSaveClientsDetails: '/client-info-master/client-details/',
-  apiGetClientsDetails: 'client-info-master/details/',
+  apiGetClientsDetails: '/client-info-master/details/',
   apiSaveFirmDetails: `/client-info-master/client-firm-details/`,
   apiGetFirmDetails: `/client-info-master/client-firm/`,
   apiSaveVendorDetails: `/client-info-master/vendor-details/`,

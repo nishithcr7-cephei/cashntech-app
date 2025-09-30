@@ -76,6 +76,8 @@ export type ClientState = {
   TaskHistoryLoader: boolean;
   TaskHistoryList: Array<ITaskHistoryResponseDatum>;
 
+  // Generic error field optionally set by reducers like deleteClientFailure
+  error: string | null;
 
 };
 
@@ -107,9 +109,9 @@ export type FirmDetailsType = {
   firmType: string;
   businessVintage: string;
   sector: string;
-  bankName: string;
+  bankName: string[];
   cibilScore: string;
-  facilityType: string;
+  facilityType: string[];
   monthlyTurnover: string;
   existingFundingSanctionedAmount: string;
   estimatedFundingRequired: string;
@@ -273,10 +275,10 @@ export type FirmDetailsPayload = {
   firm_type: string;
   business_vintage: string;
   sector: string;
-  bank_name: string;
+  bank_name: string; // API expects comma-separated string
   cibil_score: number;
   monthly_turnover: number;
-  facility_type: string;
+  facility_type: string; // API expects comma-separated string
   existing_funding_sanctioned_amount: number;
   estimated_funding_required: number;
   credit_period_offer: number;
@@ -295,7 +297,7 @@ export type FirmDetailsData = {
   firm_type: string;
   business_vintage: string;
   sector: string;
-  bank_name: string;
+  bank_name: string | string[]; // Support both string and array for backward compatibility
   cibil_score: number;
   facility_type: string;
   existing_funding_sanctioned_amount: number;

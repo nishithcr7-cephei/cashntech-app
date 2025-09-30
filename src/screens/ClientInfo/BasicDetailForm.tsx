@@ -82,8 +82,11 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
   }
 
   useEffect(() => {
-    setData('city', '');
-  }, [state]);
+    // Only clear city if we're not in edit mode (no clientFormId)
+    if (!clientFormId) {
+      setData('city', '');
+    }
+  }, [state, clientFormId]);
 
   const listOfCities = useMemo(() => {
     if (state) {

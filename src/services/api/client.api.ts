@@ -84,6 +84,25 @@ const getTaskHistory = async (userName: string) => {
   return {data: data.data, error: null};
 };
 
+// Get All Clients API (without filters)
+const getAllClients = async () => {
+  const {data, error} = await tryCatch<AxiosResponse<ClientsFilterResponse>>(
+    Api.get(Endpoints.apiGetAllClients, {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+  return {
+    data: data.data,
+    error: null,
+  };
+};
+
 // Client Filter API
 const getClientsFilter = async (payload: ClientsFilterPayload) => {
   const {data, error} = await tryCatch<AxiosResponse<ClientsFilterResponse>>(
@@ -435,6 +454,7 @@ export const deleteClient = async (id: number, payload: IDeletePayload) => {
 
 
 export default {
+  getAllClients,
   getClientsFilter,
   getCityList,
   deleteClient,

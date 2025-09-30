@@ -401,7 +401,9 @@ export const ProfileScreen: React.FC<NavigationType> = ({
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Bank Name</Text>
               <Text style={styles.detailValue}>
-                {t(firmDetails.bankName)}
+                {Array.isArray(firmDetails.bankName) 
+                  ? firmDetails.bankName.map(bank => t(bank)).join(', ')
+                  : t(firmDetails.bankName)}
               </Text>
             </View>
             <View style={styles.detailRow}>
@@ -413,7 +415,9 @@ export const ProfileScreen: React.FC<NavigationType> = ({
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Facility Type</Text>
               <Text style={styles.detailValue}>
-                {t(firmDetails.facilityType)}
+                {Array.isArray(firmDetails.facilityType) 
+                  ? firmDetails.facilityType.map(type => t(type)).join(', ')
+                  : t(firmDetails.facilityType)}
               </Text>
             </View>
             <View style={styles.detailRow}>
