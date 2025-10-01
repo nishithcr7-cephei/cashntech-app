@@ -49,15 +49,6 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
   const cityList = useSelector(clientSelector.getCityList);
   const loading = useSelector(clientSelector.getClientLoader);
 
-  // Debug logging
-  console.log('ClientInfo Debug:', {
-    clientsDataLength: clientsData?.length || 0,
-    clientsData: clientsData,
-    loading,
-    searchQuery,
-    appliedFilters
-  });
-
   const filteredClients = useMemo(() => {
     if (!searchQuery.trim()) return clientsData;
     const lowerCaseQuery = searchQuery.trim().toLowerCase();
@@ -66,6 +57,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
       return firmName.trim().toLowerCase().includes(lowerCaseQuery);
     });
   }, [clientsData, searchQuery, apiFilteredClients]);
+
 
   const filterData = useMemo(() => {
     const listOfSectors = Object.values(SectorType);
@@ -161,7 +153,7 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
       if (item.source_of_lead?.toLowerCase().includes(searchLower)) return true;
       if (item.reference_details?.toLowerCase().includes(searchLower))
         return true;
-      if (item.monthly_turnover?.toString().includes(searchLower)) return true;
+      if (item.annual_turnover?.toString().includes(searchLower)) return true;
       if (item.estimated_funding_required?.toString().includes(searchLower))
         return true;
       if (item.financier_name?.toLowerCase().includes(searchLower)) return true;
@@ -296,7 +288,12 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
 
   const fetchSources = async () => {
     try {
-      const response = await clientApi.getClientsFilter({});
+      const response = await clientApi.getClientsFilter({
+        locations: [],
+        firstNames: [],
+        lastNames: [],
+        sourceOfLead: []
+      });
       const dataArr = response?.data?.data;
       if (dataArr && Array.isArray(dataArr)) {
         const uniqueSources = Array.from(

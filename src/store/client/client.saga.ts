@@ -119,49 +119,44 @@ function* handleGetClientsFilter(
   );
   const sector = action.payload?.['Sector'] ?? [];
   const source_of_lead = action.payload?.['Source of lead'] ?? [];
+  
+  // Use the correct payload structure for POST /client-info-master/filter
   const payload = {
-    ...(city.length && {
-      byCity: {
-        city,
-      },
-    }),
-    ...(sector.length && {
-      bySector: {
-        sector,
-      },
-    }),
-    ...(source_of_lead.length && {
-      bySource: {
-        source_of_lead,
-      },
-    }),
+    locations: city, // City data goes to locations
+    firstNames: [], // Not used in current filter
+    lastNames: [], // Not used in current filter
+    sourceOfLead: source_of_lead, // Source of lead data
   };
 
   // Check if payload is empty (no filters applied)
   const hasFilters = city.length > 0 || sector.length > 0 || source_of_lead.length > 0;
   
-  // If no filters are applied, send a default payload to get all clients
-  const finalPayload = hasFilters ? payload : {
-    byCity: { city: [] },
-    bySector: { sector: [] },
-    bySource: { source_of_lead: [] }
-  };
-
-  // Always use POST filter endpoint (backend expects POST even for no filters)
+  console.log('=== API Call Decision ===');
+  console.log('hasFilters:', hasFilters);
+  console.log('city.length:', city.length);
+  console.log('sector.length:', sector.length);
+  console.log('source_of_lead.length:', source_of_lead.length);
+  console.log('Final payload:', payload);
+  
+  // Always use POST filter endpoint with correct payload structure
+  console.log('Using getClientsFilter with payload:', payload);
   const result: Result<ClientsFilterResponse, AxiosError<{message: string}>> =
-    yield call(ClientApis.getClientsFilter, finalPayload);
+    yield call(ClientApis.getClientsFilter, payload);
   
   const {data, error} = result;
   
   // Debug logging
-  console.log('Saga Debug - handleGetClientsFilter:', {
-    finalPayload,
-    hasFilters,
-    data: data?.data,
-    dataLength: data?.data?.length,
-    error: error?.response?.data || error?.message,
-    errorStatus: error?.status
-  });
+  console.log('=== Saga Debug - handleGetClientsFilter ===');
+  console.log('hasFilters:', hasFilters);
+  console.log('API Response data:', data);
+  console.log('API Response data.data:', data?.data);
+  console.log('API Response dataLength:', data?.data?.length);
+  console.log('API Response error:', error);
+  console.log('API Response error.response:', error?.response);
+  console.log('API Response error.response.data:', error?.response?.data);
+  console.log('API Response error.message:', error?.message);
+  console.log('API Response error.status:', error?.status);
+  console.log('==========================================');
   
   yield put(clientActions.setClientLoader(false));
   if (error) {
@@ -184,12 +179,27 @@ function* handleGetClientsFilter(
     });
     return;
   }
-  const clientList = data.data.map(client => ({
+  console.log('=== Processing client data ===');
+  console.log('Raw data.data:', data.data);
+  console.log('data.data type:', typeof data.data);
+  console.log('data.data is array:', Array.isArray(data.data));
+  
+  const clientList = data.data.map((client, index) => {
+    console.log(`Processing client ${index}:`, client);
+    const processedClient = {
       ...client,
       firm_name: decryptUtility(client.firm_name),
       city: decryptUtility(client.city),
-    }))
+    };
+    console.log(`Processed client ${index}:`, processedClient);
+    return processedClient;
+  });
+  
+  console.log('Final clientList:', clientList);
+  console.log('Final clientList length:', clientList.length);
+  console.log('Dispatching setClientList...');
   yield put(clientActions.setClientList(clientList));
+  console.log('setClientList dispatched successfully');
 }
 
 function* handleGetCityList(): unknown {
@@ -524,7 +534,7 @@ function* saveFirmDetailsSaga(): unknown {
     existing_funding_sanctioned_amount: Number(
       firmDetails.existingFundingSanctionedAmount,
     ),
-    monthly_turnover: Number(firmDetails.monthlyTurnover),
+    annual_turnover: Number(firmDetails.annualTurnover),
     created_by: `${first_name} ${last_name}`,
   };
   
@@ -610,7 +620,7 @@ function* getFirmDetailsSaga(action: PayloadAction<number>): unknown {
         data.estimated_funding_required?.toString() ?? '',
       existingFundingSanctionedAmount:
         data.existing_funding_sanctioned_amount?.toString() ?? '',
-      monthlyTurnover: data.monthly_turnover?.toString() ?? '',
+      annualTurnover: data.annual_turnover?.toString() ?? '',
     };
     
     yield put(clientActions.setFirmDetails(firmDetails));

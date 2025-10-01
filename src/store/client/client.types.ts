@@ -112,7 +112,7 @@ export type FirmDetailsType = {
   bankName: string[];
   cibilScore: string;
   facilityType: string[];
-  monthlyTurnover: string;
+  annualTurnover: string;
   existingFundingSanctionedAmount: string;
   estimatedFundingRequired: string;
   creditPeriodOffer: string;
@@ -189,15 +189,10 @@ export type VisitDetailsPayload =
     };
 
 export type ClientsFilterPayload = {
-  bySource?: {
-    source_of_lead: string[];
-  };
-  bySector?: {
-    sector: string[];
-  };
-  byCity?: {
-    city: string[];
-  };
+  locations: string[];
+  firstNames: string[];
+  lastNames: string[];
+  sourceOfLead: string[];
 };
 
 export type ClientsFilterResponse = {
@@ -210,7 +205,7 @@ export type ClientsFilterResponseDatum = {
   source_of_lead: string;
   city: string;
   firm_name: string;
-  monthly_turnover: number | null;
+  annual_turnover: number | null;
   sector: null | string;
   existing_funding_sanctioned_amount: number | null;
   estimated_funding_required: number | null;
@@ -277,7 +272,7 @@ export type FirmDetailsPayload = {
   sector: string;
   bank_name: string; // API expects comma-separated string
   cibil_score: number;
-  monthly_turnover: number;
+  annual_turnover: number;
   facility_type: string; // API expects comma-separated string
   existing_funding_sanctioned_amount: number;
   estimated_funding_required: number;
@@ -293,7 +288,7 @@ export type FirmDetailsResponse = {
 
 export type FirmDetailsData = {
   id: number;
-  monthly_turnover: number;
+  annual_turnover: number;
   firm_type: string;
   business_vintage: string;
   sector: string;
@@ -382,7 +377,7 @@ export interface IClientInfoSuccessResponse {
 
 export interface IClientInfoResponseDatum {
   reference_details: any;
-  monthly_turnover: any;
+  annual_turnover: any;
   financier_name: any;
   id: number;
   source_of_lead: string;
@@ -468,7 +463,7 @@ export interface IFilterResponseDatum {
   location: string;
   client_name: string;
   firm_name: string;
-  monthly_turnover: any;
+  annual_turnover: any;
   bank_name: string;
   estimated_funding_required: number;
   user: any;
@@ -491,7 +486,7 @@ export interface ISoftSanctionClient {
   id: number;
   location: string;
   client_name: string;
-  monthly_turnover: string | null;
+  annual_turnover: string | null;
   estimated_funding_required: number | null;
   credit_period_offer: number | null;
   user: any;

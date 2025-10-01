@@ -49,7 +49,7 @@ const firmDetails: FirmDetailsType = {
   bankName: [], // Ensure this is truly empty, not containing empty strings
   cibilScore: '',
   facilityType: [], // Changed to array to support multiple facility types
-  monthlyTurnover: '',
+  annualTurnover: '',
   existingFundingSanctionedAmount: '',
   estimatedFundingRequired: '',
   creditPeriodOffer: '',
@@ -166,7 +166,12 @@ const clientSlice = createSlice({
   reducers: {
     // Set Client Loader
     setClientLoader: (state, action: PayloadAction<boolean>) => {
+      console.log('=== Redux setClientLoader action ===');
+      console.log('Previous clientLoader:', state.clientLoader);
+      console.log('New clientLoader:', action.payload);
       state.clientLoader = action.payload;
+      console.log('clientLoader updated in state');
+      console.log('====================================');
     },
     // City List
     getCityList: state => {
@@ -176,14 +181,24 @@ const clientSlice = createSlice({
       state.cityList = action.payload;
     },
     // Get Client from api
-    getClients: (state, _action: PayloadAction<Record<string, string[]>>) => {
+    getClients: (state, action: PayloadAction<Record<string, string[]>>) => {
+      console.log('=== Redux getClients action ===');
+      console.log('Action payload:', action.payload);
+      console.log('Setting clientLoader to true');
       state.clientLoader = true;
+      console.log('================================');
     },
     setClientList: (
       state,
       action: PayloadAction<Array<ClientsFilterResponseDatum>>,
     ) => {
+      console.log('=== Redux setClientList action ===');
+      console.log('Previous clientList length:', state.clientList.length);
+      console.log('New clientList payload:', action.payload);
+      console.log('New clientList length:', action.payload.length);
       state.clientList = action.payload;
+      console.log('clientList updated in state');
+      console.log('==================================');
     },
     saveClientFormId: (state, action: PayloadAction<number>) => {
       state.clientFormId = action.payload;

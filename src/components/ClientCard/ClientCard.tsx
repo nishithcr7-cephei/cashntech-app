@@ -17,7 +17,7 @@ const Strings = {
   currentStatus: 'Current Status : ',
   existingFunding: 'Existing Funding Amount : ',
   estimatedFundingRequired: 'Estimated Funding Required : ',
-  monthlyTurnover: 'Monthly Turnover : ',
+  monthlyTurnover: 'Annual Turnover : ',
   createdAt: 'Created At : ',
   readMore: 'Read more',
   edit: 'Edit',
@@ -166,7 +166,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.monthlyTurnover}</Text>
-          {data.monthly_turnover ?? 'N/A'}
+          {data.annual_turnover ?? 'N/A'}
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.createdAt}</Text>
