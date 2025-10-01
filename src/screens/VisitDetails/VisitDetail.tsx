@@ -383,6 +383,7 @@ export const VisitDetail = () => {
           // Always navigate to UpdateVisitDetails when card is tapped
           (navigation as any).navigate('UpdateVisitDetails', {
             visitId: String(item.id),
+            clientId: String(item.client?.id || ''), // Add client ID for API call
             visit_date_time: item.visit_date_time,
             salesperson: item.salesperson,
             client_firm_name: item.client_firm_name,

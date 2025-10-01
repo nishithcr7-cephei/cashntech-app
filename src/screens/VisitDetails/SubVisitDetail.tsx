@@ -178,6 +178,7 @@ export const SubVisitDetail = () => {
           // Navigate to UpdateVisitDetails for individual visit update
           (navigation as any).navigate('UpdateVisitDetails', {
             visitId: String(item.id),
+            clientId: String(clientId), // Add client ID for API call
             visit_date_time: item.visit_date_time,
             salesperson: item.salesperson,
             client_firm_name: item.client_firm_name,

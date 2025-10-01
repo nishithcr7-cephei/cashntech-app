@@ -33,8 +33,8 @@ import {ScrollView} from 'react-native-gesture-handler';
 import {Search} from '@assets/Icons';
 import {useDispatch, useSelector} from 'react-redux';
 import {RootState} from '@store/app/store';
-import {clientActions} from '@store/client';
-import clientSelector from '@store/client/client.selector';
+import {kycActions} from '@store/kyc';
+import kycSelector from '@store/kyc/kyc.selector';
 import softSelector from '@store/softsan/soft.selector';
 import {getSoftSanctionBnkPro, getSoftSanctionClientList} from '@store/softsan/soft.slice';
 import { decryptConditionally } from '@utils/crypto';
@@ -67,7 +67,7 @@ export const SoftsanctionProcess = () => {
     null,
   );
   const dispatch = useDispatch();
-  const bankList = useSelector((state: RootState) => state.client.BankList);
+  const bankList = useSelector(kycSelector.getBankList);
   const methodList = useSelector(softSelector.getSoftSanctionBnkPro);
   const softSanctionClientList = useSelector(
     softSelector.getSoftSanctionClientList,
@@ -102,7 +102,7 @@ export const SoftsanctionProcess = () => {
   };
 
   useEffect(() => {
-    dispatch(clientActions.getBankList());
+    dispatch(kycActions.getBankList());
   }, []);
 
   useEffect(() => {
@@ -138,10 +138,10 @@ export const SoftsanctionProcess = () => {
     }, [showLeads, dispatch]),
   );
 
-  const formattedBankList = bankList.map((bank: any) => ({
+  const formattedBankList = Array.isArray(bankList) ? bankList.map((bank: any) => ({
     label: bank.bank_name.trim(),
     value: bank.id.toString(),
-  }));
+  })) : [];
 
   const formattedMethodList = Array.isArray(methodList) ? methodList.map(method => ({
     label: method.method_name,

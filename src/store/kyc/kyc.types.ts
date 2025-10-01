@@ -485,7 +485,7 @@ export interface IKycDetailsResponseDatum {
   file_by: string;
   source_of_lead: string;
   bank_name: string | null;
-  monthly_turnover: number | null;
+  annual_turnover: number | null;
   intent: string | null;
   sector: string | null;
   status: string;

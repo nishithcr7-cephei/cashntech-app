@@ -7,6 +7,7 @@ import {
   Modal,
   ActivityIndicator,
   BackHandler,
+  Keyboard,
 } from 'react-native';
 import {
   AppBar,
@@ -44,6 +45,7 @@ interface UpdateVisitDetailsParams {
   visit_type: string;
   visit_number: number;
   visit_remark: string;
+  clientId?: string; // Add clientId to distinguish from visitId
 }
 
 export const UpdateVisitDetails = () => {
@@ -51,6 +53,13 @@ export const UpdateVisitDetails = () => {
   const route = useRoute();
   const params = route.params as UpdateVisitDetailsParams;
   const dispatch = useDispatch();
+  
+  // Debug: Log all received parameters
+  console.log('=== UPDATE VISIT DETAILS PARAMS ===');
+  console.log('All params:', JSON.stringify(params, null, 2));
+  console.log('visitId:', params.visitId);
+  console.log('clientId:', params.clientId);
+  console.log('===================================');
   
   // Get logged-in user info
   const userInfo = useSelector(userSelector.getUserInfo);
@@ -65,7 +74,7 @@ export const UpdateVisitDetails = () => {
   const [firmName, setFirmName] = useState(decryptLocation(params.client_firm_name || ''));
   const [visitType, setVisitType] = useState(params.visit_type || '');
   const [visitNumber, setVisitNumber] = useState(String((params.visit_number || 0) + 1));
-  const [remark, setRemark] = useState(params.visit_remark || '');
+  const [remark, setRemark] = useState(''); // Start with empty remark
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Handle Android back button
@@ -82,6 +91,9 @@ export const UpdateVisitDetails = () => {
   }, [navigation]);
 
   const handleSubmit = async () => {
+    // Dismiss keyboard first to prevent flickering
+    Keyboard.dismiss();
+    
     // Validation for editable fields
     if (!visitDate) {
       Toast.show({
@@ -132,16 +144,32 @@ export const UpdateVisitDetails = () => {
         visit_type: visitType,
       };
       
-      const {data, error} = await visitApi.updateVisitDetails(params.visitId, updateData);
+      // Construct the full URL - use clientId for the API call
+      const clientId = params.clientId || params.visitId; // Fallback to visitId if clientId not provided
+      const fullUrl = `/client-info-master/visit/update/${clientId}`;
+      
+      console.log('=== SUBMIT BUTTON PRESSED ===');
+      console.log('Full URL:', fullUrl);
+      console.log('Visit ID (from params):', params.visitId);
+      console.log('Client ID (for API):', clientId);
+      console.log('POST Body:', JSON.stringify(updateData, null, 2));
+      console.log('=============================');
+      
+      const {data, error} = await visitApi.updateVisitDetails(clientId, updateData);
       
       console.log('API Response:', {data, error});
       
       if (error) {
-        console.log('API Error:', error);
+        console.log('=== API ERROR DETAILS ===');
+        console.log('Error:', error);
+        console.log('Error Message:', error?.message);
+        console.log('Error Response:', (error as any)?.response?.data);
+        console.log('Error Status:', (error as any)?.response?.status);
+        console.log('========================');
         Toast.show({
           type: 'error',
           text1: 'Error',
-          text2: 'Failed to update visit details',
+          text2: error?.message || 'Failed to update visit details',
         });
         return;
       }
@@ -161,6 +189,9 @@ export const UpdateVisitDetails = () => {
         navigation.goBack();
       }, 2000);
     } catch (error) {
+      console.log('=== CATCH ERROR ===');
+      console.log('Catch Error:', error);
+      console.log('==================');
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -177,6 +208,10 @@ export const UpdateVisitDetails = () => {
     setVisitNumber(String((params.visit_number || 0) + 1));
   };
 
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
+
   return (
     <Container>
       <AppBar title="Update Visit Details" navigation={navigation} />
@@ -188,8 +223,12 @@ export const UpdateVisitDetails = () => {
           <Text style={styles.subheader}>Update Visit Details</Text>
         </TouchableOpacity>
       </View>
-      <KeyboardAvoidingScrollView style={{flexGrow: 1}}>
-        <View style={styles.inputContainer}>
+      <KeyboardAvoidingScrollView 
+        style={{flexGrow: 1}}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{flexGrow: 1}}
+        showsVerticalScrollIndicator={false}>
+          <View style={styles.inputContainer}>
           <DateNTimePicker
             label="Visit Date"
             placeholder="Select Visit Date"
@@ -231,9 +270,15 @@ export const UpdateVisitDetails = () => {
             placeholder="Enter remark"
             value={remark}
             onChangeText={setRemark}
+            onBlur={dismissKeyboard}
+            onFocus={() => {
+              // Optional: Add any focus handling if needed
+            }}
             multiline
             numberOfLines={6}
             textAlignVertical="top"
+            returnKeyType="done"
+            blurOnSubmit={true}
           />
           
           <View style={styles.buttonContainer}>
@@ -250,7 +295,7 @@ export const UpdateVisitDetails = () => {
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-        </View>
+          </View>
       </KeyboardAvoidingScrollView>
       <Modal transparent visible={isSubmitting}>
         <View style={styles.loader}>

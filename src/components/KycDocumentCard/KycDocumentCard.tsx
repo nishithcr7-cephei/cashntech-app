@@ -85,7 +85,6 @@ export const KycDocumentCard: React.FC<KycDocumentCardProps> = ({
           <Text style={styles.serialNumber}>{(index + 1).toString().padStart(2, '0')}</Text>
           <View style={styles.firmInfoContainer}>
             <Text style={styles.firmName}>{decryptUtility(data.firm_name || 'N/A')}</Text>
-            <Text style={styles.sector}>{data.sector || 'N/A'}</Text>
           </View>
           <View style={[styles.statusBadge, {backgroundColor: statusStyle.backgroundColor}]}>
             <Text style={[styles.statusText, {color: statusStyle.color}]}>
@@ -96,6 +95,11 @@ export const KycDocumentCard: React.FC<KycDocumentCardProps> = ({
 
         {/* Main Content */}
         <View style={styles.mainContent}>
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Sector:</Text>
+            <Text style={styles.value}>{data.sector || 'N/A'}</Text>
+          </View>
+          
           <View style={styles.infoRow}>
             <Text style={styles.label}>City:</Text>
             <Text style={styles.value}>{decryptUtility(data.city || 'N/A')}</Text>
@@ -108,22 +112,17 @@ export const KycDocumentCard: React.FC<KycDocumentCardProps> = ({
           
           <View style={styles.infoRow}>
             <Text style={styles.label}>Source(D/H/C/O):</Text>
-            <Text style={styles.value}>Market Knowledge (D)</Text>
+            <Text style={styles.value}>{data.source_of_lead || 'N/A'}</Text>
           </View>
           
           <View style={styles.infoRow}>
-            <Text style={styles.label}>Monthly Turnover:</Text>
-            <Text style={styles.valueCurrency}>{formatCurrency(data.monthly_turnover)}</Text>
+            <Text style={styles.label}>Annual Turnover:</Text>
+            <Text style={styles.valueCurrency}>{formatCurrency(data.annual_turnover)}</Text>
           </View>
           
           <View style={styles.infoRow}>
-            <Text style={styles.label}>Sanction Required:</Text>
-            <Text style={styles.valueCurrency}>{formatCurrency(data.estimated_funding_required)}</Text>
-          </View>
-          
-          <View style={styles.infoRow}>
-            <Text style={styles.label}>Process Start:</Text>
-            <Text style={styles.value}>{formatDisplayDate(data.created_at)}</Text>
+            <Text style={styles.label}>Intent:</Text>
+            <Text style={styles.value}>{data.intent || 'N/A'}</Text>
           </View>
           
           <View style={styles.infoRow}>
