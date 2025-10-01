@@ -108,6 +108,7 @@ export type ClientsDetailsType = Array<{
 export type FirmDetailsType = {
   firmType: string;
   businessVintage: string;
+  industry: string;
   sector: string;
   bankName: string[];
   cibilScore: string;
@@ -317,7 +318,41 @@ export type VisitDetailsData = {
 
 export type VendorDetailsResponse = {
   statusCode: number;
-  data: VendorDetailsDatum[];
+  data: Array<{
+    id: number;
+    source_of_lead: string;
+    program_type: string;
+    product_type: string;
+    pin_code: string;
+    location: string;
+    city: string;
+    address: string;
+    state: string;
+    file_by: string;
+    date_of_visit: string;
+    firm_name: string;
+    annual_turnover: number;
+    firm_type: string | null;
+    business_vintage: string;
+    industry: string | null;
+    sector: string | null;
+    bank_name: string;
+    cibil_score: number;
+    facility_type: string;
+    existing_funding_sanctioned_amount: number;
+    estimated_funding_required: number;
+    credit_period_offer: number;
+    client_response: string;
+    intent: string;
+    date_of_next_visit: string;
+    reason_for_not_interested: string | null;
+    are_you_interested_for: string | null;
+    created_at: string;
+    deleted_at: string | null;
+    deleted_by: string | null;
+    user: number;
+    vendor: VendorDetailsDatum[];
+  }>;
   message: string;
 };
 

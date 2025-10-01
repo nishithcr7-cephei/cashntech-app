@@ -377,9 +377,9 @@ export const ProfileScreen: React.FC<NavigationType> = ({
         {expanded === 'firm' && (
           <View style={styles.sectionContent}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Monthly Turnover</Text>
+              <Text style={styles.detailLabel}>Annual Turnover</Text>
               <Text style={styles.detailValue}>
-                {formatIndianNumber(t(firmDetails.monthlyTurnover))}
+                {formatIndianNumber(t(firmDetails.annualTurnover))}
               </Text>
             </View>
             <View style={styles.detailRow}>
@@ -393,6 +393,10 @@ export const ProfileScreen: React.FC<NavigationType> = ({
               <Text style={styles.detailValue}>
                 {t(firmDetails.businessVintage)}
               </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Industry</Text>
+              <Text style={styles.detailValue}>{t(firmDetails.industry)}</Text>
             </View>
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Sector</Text>

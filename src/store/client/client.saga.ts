@@ -612,6 +612,7 @@ function* getFirmDetailsSaga(action: PayloadAction<number>): unknown {
       firmType: data.firm_type,
       bankName: bankNames,
       businessVintage: data.business_vintage,
+      industry: data.industry,
       sector: data.sector,
       facilityType: facilityTypes,
       cibilScore: data.cibil_score?.toString() ?? '',
@@ -667,33 +668,75 @@ function* saveVendorDetailsSaga(): unknown {
 }
 
 function* getVendorDetailsSaga(action: PayloadAction<number>): unknown {
-  const clientId = action.payload;
-  const {data, error}: Result<Array<VendorDetailsDatum>> = yield call(
-    ClientApis.getVendorDetailsForm,
-    clientId,
-  );
-  yield put(clientActions.setClientLoader(false));
-  if (error) {
+  try {
+    const clientId = action.payload;
+    const {data, error}: Result<Array<VendorDetailsDatum>> = yield call(
+      ClientApis.getVendorDetailsForm,
+      clientId,
+    );
+    yield put(clientActions.setClientLoader(false));
+    
+    if (error) {
+      console.error('getVendorDetailsSaga API error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to get vendor details.',
+      });
+      yield put(clientActions.setAllVendorDetails([]));
+      return;
+    }
+    
+    // Handle case where data is null or undefined
+    if (!data || !Array.isArray(data)) {
+      console.log('getVendorDetailsSaga: No vendor data received');
+      yield put(clientActions.setAllVendorDetails([]));
+      return;
+    }
+    
+    const vendorDetails: VendorDetailsType = data.map(vendor => {
+      try {
+        return {
+          productCategory: vendor.product_category as ProductCategory,
+          productType: vendor.product_type || '',
+          vendorName: decryptUtility(vendor.vendor_name || ''),
+          address: decryptUtility(vendor.vendor_address || ''),
+          city: decryptUtility(vendor.vendor_city || ''),
+          state: decryptUtility(vendor.vendor_state || '') as keyof typeof Cities,
+          pinCode: decryptUtility(vendor.vendor_pin_code || ''),
+          vendorContactNumber: vendor.vendor_contact_number || '',
+          vendorContactEmail: vendor.vendor_contact_email || '',
+          monthlySalesValue: vendor.monthly_sales_value?.toString() || '0',
+          key: Math.random().toString(36).substring(7),
+        };
+      } catch (vendorError) {
+        console.error('getVendorDetailsSaga: Error processing vendor:', vendor, vendorError);
+        // Return a safe default vendor object
+        return {
+          productCategory: undefined,
+          productType: '',
+          vendorName: '',
+          address: '',
+          city: '',
+          state: undefined,
+          pinCode: '',
+          vendorContactNumber: '',
+          vendorContactEmail: '',
+          monthlySalesValue: '0',
+          key: Math.random().toString(36).substring(7),
+        };
+      }
+    });
+    
+    yield put(clientActions.setAllVendorDetails(vendorDetails));
+  } catch (sagaError) {
+    console.error('getVendorDetailsSaga: Unexpected error:', sagaError);
+    yield put(clientActions.setClientLoader(false));
+    yield put(clientActions.setAllVendorDetails([]));
     Toast.show({
       type: 'error',
       text1: 'Failed to get vendor details.',
     });
-    return;
   }
-  const vendorDetails: VendorDetailsType = data.map(vendor => ({
-    productCategory: vendor.product_category as ProductCategory,
-    productType: vendor.product_type,
-    vendorName: decryptUtility(vendor.vendor_name),
-    address: decryptUtility(vendor.vendor_address),
-    city: decryptUtility(vendor.vendor_city),
-    state: decryptUtility(vendor.vendor_state) as keyof typeof Cities,
-    pinCode: decryptUtility(vendor.vendor_pin_code),
-    vendorContactNumber: vendor.vendor_contact_number,
-    vendorContactEmail: vendor.vendor_contact_email || '',
-    monthlySalesValue: vendor.monthly_sales_value.toString(),
-    key: Math.random().toString(36).substring(7),
-  }));
-  yield put(clientActions.setAllVendorDetails(vendorDetails));
 }
 
 function* saveVisitDetailsSaga(): unknown {

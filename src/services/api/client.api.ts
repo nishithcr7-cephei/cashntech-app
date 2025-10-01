@@ -322,7 +322,7 @@ const getVendorDetailsForm = async (clientFormId: number) => {
     };
   }
   return {
-    data: data.data.data,
+    data: data.data.data[0]?.vendor || [],
     error: null,
   };
 };

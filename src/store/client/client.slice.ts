@@ -45,6 +45,7 @@ const clientsDetails: ClientsDetailsType = [
 const firmDetails: FirmDetailsType = {
   firmType: '',
   businessVintage: '',
+  industry: '',
   sector: '',
   bankName: [], // Ensure this is truly empty, not containing empty strings
   cibilScore: '',
