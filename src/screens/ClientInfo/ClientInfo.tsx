@@ -397,11 +397,6 @@ export const ClientInfo: React.FC<NavigationType> = ({navigation}) => {
       <TouchableOpacity style={styles.plusButton} onPress={onPressFAB}>
         <Plus height={24} width={24} />
       </TouchableOpacity>
-      {loading && (
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={Colors.primaryColor} />
-        </View>
-      )}
     </Container>
   );
 };
@@ -496,16 +491,5 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  loader: {
-    flex: 1,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
   },
 });

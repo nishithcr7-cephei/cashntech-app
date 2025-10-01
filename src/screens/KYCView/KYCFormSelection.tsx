@@ -27,6 +27,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 
@@ -81,6 +82,7 @@ export const KYCFormSelection = () => {
   const [activeTab, setActiveTab] = useState<'personal' | 'business' | 'bank'>(
     'personal',
   );
+  const [refreshing, setRefreshing] = useState(false);
 
   // Call business KYC check when business tab is selected
   useEffect(() => {
@@ -88,6 +90,19 @@ export const KYCFormSelection = () => {
       CheckedBusinessKyc();
     }
   }, [activeTab]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Refresh both personal and business KYC status
+      checkedKyc();
+      CheckedBusinessKyc();
+    } catch (error) {
+      console.error('Refresh error:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleNavigation = (text: string) => {
     const navMap: {
@@ -232,6 +247,21 @@ export const KYCFormSelection = () => {
       <AppBar title="Kyc Document" navigation={navigation} />
       <View style={styles.Subcontainer}>
         <Text style={styles.Subheader}>Kyc Document</Text>
+      </View>
+      
+      {/* Small Refresh Button */}
+      <View style={styles.refreshContainer}>
+        <TouchableOpacity 
+          style={styles.refreshButton} 
+          onPress={handleRefresh}
+          disabled={refreshing}
+        >
+          {refreshing ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.refreshButtonText}>Refresh</Text>
+          )}
+        </TouchableOpacity>
       </View>
       <View style={styles.container}>
         {/* Tabs */}
@@ -387,5 +417,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: scaleWidth(10),
+  },
+  refreshContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    backgroundColor: '#fff',
+    alignItems: 'flex-end',
+  },
+  refreshButton: {
+    backgroundColor: Colors.green,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 28,
+  },
+  refreshButtonText: {
+    color: '#fff',
+    fontSize: scaleFont(12),
+    fontWeight: fontWeight.SemiBold,
   },
 });

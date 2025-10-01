@@ -270,6 +270,7 @@ export type ClientsDetailsPayload = Array<{
 export type FirmDetailsPayload = {
   firm_type: string;
   business_vintage: string;
+  industry: string;
   sector: string;
   bank_name: string; // API expects comma-separated string
   cibil_score: number;

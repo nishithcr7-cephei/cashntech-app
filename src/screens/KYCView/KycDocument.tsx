@@ -6,14 +6,15 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
-import React, {useEffect, useState, useMemo} from 'react';
+import React, {useEffect, useState, useMemo, useRef} from 'react';
 import {AppBar, Container, KycDocumentCard, FilterModal} from '@components/index';
 import {Filter, Search} from '@assets/Icons';
 import Colors from '@constants/Colors';
 import fontWeight from '@constants/FontWeight';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {CompositeNavigationProp, useNavigation} from '@react-navigation/native';
+import {CompositeNavigationProp, useNavigation, useFocusEffect} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {HomeNavigatorType, KycNavigatorType} from '@type/NavigatorTypes';
@@ -23,6 +24,7 @@ import FontWeight from '@constants/FontWeight';
 import {decryptUtility} from '@utils/crypto';
 import kycApi from '@services/api/kyc.api';
 import {downloadFile, showDownloadSuccessAlert, showDownloadErrorAlert} from '@utils/downloadUtils';
+import Toast from 'react-native-toast-message';
 
 type KycNavigationType = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType>,
@@ -36,17 +38,6 @@ export const KycDocument = () => {
   const KycData = useSelector(kycSelector.getKycDetailsData);
   const KycLoading = useSelector(kycSelector.getKycDetailsLoading);
 
-  const callGetKYC = () => {
-    dispatch(kycActions.getKycDetailsRequest({
-      byIntent: {
-        intent: ["High", "Medium"]
-      }
-    }));
-  };
-  useEffect(() => {
-    callGetKYC();
-  }, []);
-
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
@@ -55,6 +46,91 @@ export const KycDocument = () => {
   const [sourceOptions, setSourceOptions] = useState<string[]>([]);
   const [sectorOptions, setSectorOptions] = useState<string[]>([]);
   const [downloadingClientId, setDownloadingClientId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const callGetKYC = () => {
+    dispatch(kycActions.getKycDetailsRequest({
+      byIntent: {
+        intent: ["High", "Medium"]
+      }
+    }));
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      // Call the main KYC details API
+      callGetKYC();
+      
+      // Also refresh personal KYC check for all clients
+      if (KycData && Array.isArray(KycData)) {
+        const refreshPromises = KycData.map((item: any) => 
+          dispatch(kycActions.getKycChecked(item.clientId.toString()))
+        );
+        await Promise.all(refreshPromises);
+      }
+      
+      // Show success message
+      Toast.show({
+        type: 'success',
+        text1: 'KYC Data Refreshed',
+        text2: 'Document status updated successfully',
+        position: 'top',
+      });
+    } catch (error) {
+      console.error('Refresh error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Refresh Failed',
+        text2: 'Unable to update KYC data',
+        position: 'top',
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    callGetKYC();
+  }, []);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const startAutoRefresh = () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+      
+      refreshIntervalRef.current = setInterval(() => {
+        if (!refreshing) {
+          handleRefresh();
+        }
+      }, 30000); // 30 seconds
+    };
+
+    startAutoRefresh();
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [refreshing]);
+
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      // Small delay to ensure screen is fully focused
+      const timer = setTimeout(() => {
+        if (!refreshing) {
+          handleRefresh();
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }, [refreshing])
+  );
 
   // Prepare filter data
   const filterData = {
@@ -116,7 +192,7 @@ export const KycDocument = () => {
           decryptedFirmName.toLowerCase().includes(lowerCaseQuery) ||
           decryptedCity.toLowerCase().includes(lowerCaseQuery) ||
           item.source_of_lead?.toLowerCase().includes(lowerCaseQuery) ||
-          item.monthly_turnover?.toString().toLowerCase().includes(lowerCaseQuery) ||
+          item.annual_turnover?.toString().toLowerCase().includes(lowerCaseQuery) ||
           item.sector?.toLowerCase().includes(lowerCaseQuery) ||
           item.intent?.toLowerCase().includes(lowerCaseQuery) ||
           item.file_by?.toLowerCase().includes(lowerCaseQuery)
@@ -175,6 +251,18 @@ export const KycDocument = () => {
 
   const handleDownload = async (clientId: string) => {
     try {
+      // Find the client data to check status
+      const clientData = KycData.find(item => item.clientId.toString() === clientId);
+      
+      // Check if status is Pending
+      if (clientData?.status === 'Pending') {
+        Toast.show({
+          type: 'error',
+          text1: 'Still KYC Document is not Uploaded',
+        });
+        return;
+      }
+      
       setDownloadingClientId(clientId);
       
       // Call the API to get the zip file

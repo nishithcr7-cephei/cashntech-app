@@ -526,6 +526,7 @@ function* saveFirmDetailsSaga(): unknown {
     firm_type: firmDetails.firmType,
     bank_name: encryptedBankNames, // Join multiple banks with comma and encrypt
     business_vintage: firmDetails.businessVintage.trim(),
+    industry: firmDetails.industry,
     sector: firmDetails.sector,
     facility_type: facilityTypesString, // Join multiple facility types with comma
     cibil_score: Number(firmDetails.cibilScore),

@@ -41,7 +41,7 @@ export const LeadProgressCard: React.FC<LeadProgressProps> = ({
         {label: 'City', value: data.city != null ? decryptConditionally(data.city) : 'N/A'},
         {label: 'Initiator', value: data.file_by || 'N/A'},
         {label: 'Source(D/H/C/O)', value: data.source_of_lead != null ? data.source_of_lead : 'N/A'},
-        {label: 'Monthly Turnover', value: data.monthly_turnover != null ? `${Number(data.monthly_turnover).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'},
+        {label: 'Annual Turnover', value: data.annual_turnover != null ? `${Number(data.annual_turnover).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'},
         {label: 'Sanction Required', value: data.estimated_funding_required != null ? `${Number(data.estimated_funding_required).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'},
         {label: 'Current Status', value: data.leadProgress && data.leadProgress.length > 0 ? 
           data.leadProgress.reduce((latest, current) => current.id > latest.id ? current : latest).lead_progress_status 

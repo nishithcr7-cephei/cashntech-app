@@ -35,7 +35,7 @@ export enum FirmType {
   GOVERNMENT = 'GOVERNMENT',
   HUF = 'HUF',
   INDIVIDUAL_SALARIED = 'INDIVIDUAL/SALARIED',
-  LIMITED_LIABILITY_PARTNERSHIP = 'LIMITED LIABILITY PARTNERSHIP',
+  LIMITED_LIABILITY_PARTNERSHIP = 'Limited Liability Partnership (LLP)',
   MNC = 'MNC',
   NON_GOVERNMENT_ORGANIZATION = 'NON GOVERNMENT ORGANIZATION',
   PARTNERSHIP = 'Partnership',
@@ -45,27 +45,95 @@ export enum FirmType {
   TRUST = 'TRUST',
 }
 
-export enum SectorType {
-  FMCG = 'FMCG',
-  PAINT = 'Paint',
+export enum IndustryType {
+  AGRICULTURE_ALLIED = 'Agriculture & Allied',
   MANUFACTURING = 'Manufacturing',
-  PHARMA = 'Pharma',
-  ELECTRONIC = 'Electronic',
-  AUTOMOBILE = 'Automobile',
-  TEXTILE = 'Textile',
-  CHEMICAL = 'Chemical',
-  IT_SOFTWARE = 'IT & Software',
-  TELECOM = 'Telecom',
-  RETAIL = 'Retail',
-  HOSPITALITY = 'Hospitality',
-  EDUCATION = 'Education',
-  REAL_ESTATE = 'Real Estate',
-  CONSTRUCTION = 'Construction',
-  AGRICULTURE = 'Agriculture',
-  BANKING_FINANCE = 'Banking & Finance',
-  HEALTHCARE = 'Healthcare',
-  ENERGY = 'Energy',
-  TRANSPORT_LOGISTICS = 'Transport & Logistics',
+  PHARMACEUTICALS_HEALTHCARE = 'Pharmaceuticals & Healthcare',
+  INFORMATION_TECHNOLOGY_SERVICES = 'Information Technology & Services',
+  FINANCIAL_SERVICES = 'Financial Services',
+  ENERGY_UTILITIES = 'Energy & Utilities',
+  INFRASTRUCTURE_CONSTRUCTION = 'Infrastructure & Construction',
+  CONSUMER_RETAIL = 'Consumer & Retail',
+  TELECOM_COMMUNICATION = 'Telecom & Communication',
+  LOGISTICS_TRANSPORTATION = 'Logistics & Transportation',
+  EDUCATION_SKILL_DEVELOPMENT = 'Education & Skill Development',
+  GOVERNMENT_PUBLIC_SECTOR = 'Government & Public Sector',
+}
+
+export enum SectorType {
+  // Agriculture & Allied
+  FARMING_CROP_PRODUCTION = 'Farming & Crop Production',
+  DAIRY_POULTRY_FISHERIES = 'Dairy, Poultry, Fisheries',
+  AGRI_INPUTS = 'Agri Inputs (Fertilizers, Seeds, Pesticides)',
+  AGRI_EQUIPMENT = 'Agri Equipment',
+  
+  // Manufacturing
+  AUTOMOBILES_AUTO_COMPONENTS = 'Automobiles & Auto Components',
+  CHEMICALS_PETROCHEMICALS = 'Chemicals & Petrochemicals',
+  CEMENT_BUILDING_MATERIALS = 'Cement & Building Materials',
+  CONSUMER_DURABLES_ELECTRONICS = 'Consumer Durables & Electronics',
+  TEXTILES_APPAREL = 'Textiles & Apparel',
+  ENGINEERING_CAPITAL_GOODS = 'Engineering & Capital Goods',
+  METALS_MINING = 'Metals & Mining',
+  
+  // Pharmaceuticals & Healthcare
+  PHARMACEUTICALS_FORMULATIONS_APIS = 'Pharmaceuticals (Formulations, APIs)',
+  BIOTECHNOLOGY_BIOSIMILARS = 'Biotechnology & Biosimilars',
+  HOSPITALS_DIAGNOSTICS = 'Hospitals & Diagnostics',
+  MEDICAL_DEVICES = 'Medical Devices',
+  
+  // Information Technology & Services
+  IT_SERVICES_CONSULTING = 'IT Services & Consulting',
+  SOFTWARE_SAAS = 'Software & SaaS',
+  BPO_BPM_KPO = 'BPO / BPM / KPO',
+  FINTECH_DIGITAL_PLATFORMS = 'Fintech & Digital Platforms',
+  
+  // Financial Services
+  BANKS = 'Banks',
+  NBFCs = 'NBFCs',
+  INSURANCE = 'Insurance',
+  ASSET_MANAGEMENT_MUTUAL_FUNDS = 'Asset Management / Mutual Funds',
+  CAPITAL_MARKETS = 'Capital Markets',
+  
+  // Energy & Utilities
+  POWER_GENERATION = 'Power Generation (Thermal, Hydro, Renewable)',
+  OIL_GAS = 'Oil & Gas (Exploration, Refining, Distribution)',
+  RENEWABLE_ENERGY = 'Renewable Energy (Solar, Wind, Bioenergy)',
+  WATER_SUPPLY_SANITATION = 'Water Supply & Sanitation',
+  
+  // Infrastructure & Construction
+  REAL_ESTATE = 'Real Estate (Residential, Commercial)',
+  ROADS_HIGHWAYS = 'Roads & Highways',
+  PORTS_AIRPORTS = 'Ports & Airports',
+  RAILWAYS_METRO = 'Railways & Metro',
+  URBAN_INFRASTRUCTURE = 'Urban Infrastructure',
+  
+  // Consumer & Retail
+  FMCG = 'FMCG (Food, Beverages, Personal Care)',
+  RETAIL = 'Retail (Organised, E-commerce)',
+  HOSPITALITY = 'Hospitality (Hotels, Restaurants, Tourism)',
+  MEDIA_ENTERTAINMENT = 'Media & Entertainment',
+  
+  // Telecom & Communication
+  TELECOM_SERVICES = 'Telecom Services (Mobile, Broadband)',
+  DIGITAL_COMMUNICATION_NETWORKING = 'Digital Communication & Networking',
+  SATELLITE_COMMUNICATION = 'Satellite Communication',
+  
+  // Logistics & Transportation
+  SHIPPING_PORTS = 'Shipping & Ports',
+  AVIATION = 'Aviation',
+  WAREHOUSING_COLD_CHAIN = 'Warehousing & Cold Chain',
+  ROAD_TRANSPORT_LOGISTICS = 'Road Transport & Logistics',
+  
+  // Education & Skill Development
+  SCHOOLS_COLLEGES = 'Schools & Colleges',
+  EDTECH_PLATFORMS = 'EdTech Platforms',
+  VOCATIONAL_TRAINING = 'Vocational Training',
+  
+  // Government & Public Sector
+  DEFENCE_AEROSPACE = 'Defence & Aerospace',
+  PSUs = 'PSUs',
+  SOCIAL_INFRASTRUCTURE = 'Social Infrastructure (Healthcare, Education, Welfare Schemes)',
 }
 
 export enum FacilityType {
@@ -93,6 +161,84 @@ export enum ProductCategory {
   STAPLE_GROCERY = 'Staple & Grocery',
   PAPER_DISPOSABLE = 'Paper & Disposable',
 }
+
+// Industry to Sector mapping
+export const industrySectorMapping: Record<IndustryType, SectorType[]> = {
+  [IndustryType.AGRICULTURE_ALLIED]: [
+    SectorType.FARMING_CROP_PRODUCTION,
+    SectorType.DAIRY_POULTRY_FISHERIES,
+    SectorType.AGRI_INPUTS,
+    SectorType.AGRI_EQUIPMENT,
+  ],
+  [IndustryType.MANUFACTURING]: [
+    SectorType.AUTOMOBILES_AUTO_COMPONENTS,
+    SectorType.CHEMICALS_PETROCHEMICALS,
+    SectorType.CEMENT_BUILDING_MATERIALS,
+    SectorType.CONSUMER_DURABLES_ELECTRONICS,
+    SectorType.TEXTILES_APPAREL,
+    SectorType.ENGINEERING_CAPITAL_GOODS,
+    SectorType.METALS_MINING,
+  ],
+  [IndustryType.PHARMACEUTICALS_HEALTHCARE]: [
+    SectorType.PHARMACEUTICALS_FORMULATIONS_APIS,
+    SectorType.BIOTECHNOLOGY_BIOSIMILARS,
+    SectorType.HOSPITALS_DIAGNOSTICS,
+    SectorType.MEDICAL_DEVICES,
+  ],
+  [IndustryType.INFORMATION_TECHNOLOGY_SERVICES]: [
+    SectorType.IT_SERVICES_CONSULTING,
+    SectorType.SOFTWARE_SAAS,
+    SectorType.BPO_BPM_KPO,
+    SectorType.FINTECH_DIGITAL_PLATFORMS,
+  ],
+  [IndustryType.FINANCIAL_SERVICES]: [
+    SectorType.BANKS,
+    SectorType.NBFCs,
+    SectorType.INSURANCE,
+    SectorType.ASSET_MANAGEMENT_MUTUAL_FUNDS,
+    SectorType.CAPITAL_MARKETS,
+  ],
+  [IndustryType.ENERGY_UTILITIES]: [
+    SectorType.POWER_GENERATION,
+    SectorType.OIL_GAS,
+    SectorType.RENEWABLE_ENERGY,
+    SectorType.WATER_SUPPLY_SANITATION,
+  ],
+  [IndustryType.INFRASTRUCTURE_CONSTRUCTION]: [
+    SectorType.REAL_ESTATE,
+    SectorType.ROADS_HIGHWAYS,
+    SectorType.PORTS_AIRPORTS,
+    SectorType.RAILWAYS_METRO,
+    SectorType.URBAN_INFRASTRUCTURE,
+  ],
+  [IndustryType.CONSUMER_RETAIL]: [
+    SectorType.FMCG,
+    SectorType.RETAIL,
+    SectorType.HOSPITALITY,
+    SectorType.MEDIA_ENTERTAINMENT,
+  ],
+  [IndustryType.TELECOM_COMMUNICATION]: [
+    SectorType.TELECOM_SERVICES,
+    SectorType.DIGITAL_COMMUNICATION_NETWORKING,
+    SectorType.SATELLITE_COMMUNICATION,
+  ],
+  [IndustryType.LOGISTICS_TRANSPORTATION]: [
+    SectorType.SHIPPING_PORTS,
+    SectorType.AVIATION,
+    SectorType.WAREHOUSING_COLD_CHAIN,
+    SectorType.ROAD_TRANSPORT_LOGISTICS,
+  ],
+  [IndustryType.EDUCATION_SKILL_DEVELOPMENT]: [
+    SectorType.SCHOOLS_COLLEGES,
+    SectorType.EDTECH_PLATFORMS,
+    SectorType.VOCATIONAL_TRAINING,
+  ],
+  [IndustryType.GOVERNMENT_PUBLIC_SECTOR]: [
+    SectorType.DEFENCE_AEROSPACE,
+    SectorType.PSUs,
+    SectorType.SOCIAL_INFRASTRUCTURE,
+  ],
+};
 
 export const productTypeOptions: Record<ProductCategory, string[]> = {
   [ProductCategory.PERSONAL_CARE_HYGIENE]: [

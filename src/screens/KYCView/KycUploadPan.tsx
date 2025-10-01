@@ -87,10 +87,12 @@ export const KycUplaodPan = () => {
     panNumber: false,
     panNumberFormat: false,
     dateofBirth: false,
+    dateofBirthAge: false,
     coApplicantNamePan: false,
     coApplicantPanNumber: false,
     coApplicantPanNumberFormat: false,
     coApplicantDateofBirth: false,
+    coApplicantDateofBirthAge: false,
     frontImage: false,
     coApplicantFrontImage: false,
   });
@@ -211,16 +213,28 @@ export const KycUplaodPan = () => {
     return panRegex.test(pan);
   };
 
+  const isValidAge = (dateOfBirth: string): boolean => {
+    if (!dateOfBirth) return false;
+    
+    const today = moment();
+    const dob = moment(dateOfBirth, 'DD-MM-YYYY');
+    const age = today.diff(dob, 'years');
+    
+    return age >= 18 && age <= 60;
+  };
+
   const handleSubmit = () => {
     if (
       !namePan ||
       !panNumber ||
       !dateofBirth ||
+      !isValidAge(dateofBirth) ||
       (!frontImage && !existingImageUrl) ||
       (showCoApplicant &&
         (!coApplicantNamePan ||
           !coApplicantPanNumber ||
           !coApplicantDateofBirth ||
+          !isValidAge(coApplicantDateofBirth) ||
           (!coApplicantFrontImage && !coApplicantExistingImageUrl)))
     ) {
       setErrors({
@@ -228,6 +242,7 @@ export const KycUplaodPan = () => {
         panNumber: !panNumber,
         panNumberFormat: !panNumber || !isValidPANFormat(panNumber),
         dateofBirth: !dateofBirth,
+        dateofBirthAge: Boolean(dateofBirth && !isValidAge(dateofBirth)),
         frontImage: !frontImage && !existingImageUrl,
 
         // Co-applicant validations only if shown
@@ -240,6 +255,7 @@ export const KycUplaodPan = () => {
         coApplicantDateofBirth: showCoApplicant
           ? !coApplicantDateofBirth
           : false,
+        coApplicantDateofBirthAge: showCoApplicant ? Boolean(coApplicantDateofBirth && !isValidAge(coApplicantDateofBirth)) : false,
         coApplicantFrontImage: showCoApplicant ? (!coApplicantFrontImage && !coApplicantExistingImageUrl) : false,
       });
 
@@ -249,6 +265,8 @@ export const KycUplaodPan = () => {
       if (panNumber && !isValidPANFormat(panNumber))
         missingFields.push('Invalid PAN Number Format');
       if (!dateofBirth) missingFields.push('Date of Birth');
+      if (dateofBirth && !isValidAge(dateofBirth))
+        missingFields.push('Age must be between 18 and 60 years');
       if (!frontImage && !existingImageUrl) missingFields.push('Front Image');
 
       if (showCoApplicant) {
@@ -259,6 +277,8 @@ export const KycUplaodPan = () => {
           missingFields.push('Invalid Co-Applicant PAN Number Format');
         if (!coApplicantDateofBirth)
           missingFields.push('Co-Applicant Date of Birth');
+        if (coApplicantDateofBirth && !isValidAge(coApplicantDateofBirth))
+          missingFields.push('Co-Applicant age must be between 18 and 60 years');
         if (!coApplicantFrontImage && !coApplicantExistingImageUrl)
           missingFields.push('Co-Applicant Front Image');
       }
@@ -275,10 +295,12 @@ export const KycUplaodPan = () => {
       panNumber: false,
       panNumberFormat: false,
       dateofBirth: false,
+      dateofBirthAge: false,
       coApplicantNamePan: false,
       coApplicantPanNumber: false,
       coApplicantPanNumberFormat: false,
       coApplicantDateofBirth: false,
+      coApplicantDateofBirthAge: false,
       frontImage: false,
       coApplicantFrontImage: false,
     });
@@ -288,12 +310,14 @@ export const KycUplaodPan = () => {
       panNumber &&
       isValidPANFormat(panNumber) &&
       dateofBirth &&
+      isValidAge(dateofBirth) &&
       (frontImage || existingImageUrl) &&
       (!showCoApplicant ||
         (coApplicantNamePan &&
           coApplicantPanNumber &&
           isValidPANFormat(coApplicantPanNumber) &&
           coApplicantDateofBirth &&
+          isValidAge(coApplicantDateofBirth) &&
           (coApplicantFrontImage || coApplicantExistingImageUrl)));
 
     if (allFieldsFilled) {
@@ -457,12 +481,20 @@ export const KycUplaodPan = () => {
             if (errors.dateofBirth) {
               setErrors(prev => ({...prev, dateofBirth: false}));
             }
+            if (errors.dateofBirthAge && isValidAge(formatted)) {
+              setErrors(prev => ({...prev, dateofBirthAge: false}));
+            }
           }}
           datePickerProps={{
             mode: 'date',
             maximumDate: new Date(),
           }}
         />
+        {errors.dateofBirthAge && dateofBirth && (
+          <Text style={styles.errorText}>
+            Age must be between 18 and 60 years
+          </Text>
+        )}
 
         {personalKycLoading ? (
           <View style={styles.imageContainer}>
@@ -632,12 +664,20 @@ export const KycUplaodPan = () => {
                 if (errors.coApplicantDateofBirth) {
                   setErrors(prev => ({...prev, coApplicantDateofBirth: false}));
                 }
+                if (errors.coApplicantDateofBirthAge && isValidAge(formatted)) {
+                  setErrors(prev => ({...prev, coApplicantDateofBirthAge: false}));
+                }
               }}
               datePickerProps={{
                 mode: 'date',
                 maximumDate: new Date(),
               }}
             />
+            {errors.coApplicantDateofBirthAge && coApplicantDateofBirth && (
+              <Text style={styles.errorText}>
+                Age must be between 18 and 60 years
+              </Text>
+            )}
             {personalKycLoading ? (
               <View style={styles.imageContainer}>
                 <ActivityIndicator size="large" color={Colors.primaryColor} />

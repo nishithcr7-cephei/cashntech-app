@@ -31,10 +31,17 @@ import {
   CreditPeriodOffer,
   FacilityType,
   FirmType,
+  IndustryType,
   SectorType,
+  industrySectorMapping,
 } from './ClientInfo.type';
 
 const listOfFirmTypes = Object.values(FirmType).map(item => ({
+  label: item,
+  value: item,
+}));
+
+const listOfIndustries = Object.values(IndustryType).map(item => ({
   label: item,
   value: item,
 }));
@@ -69,11 +76,12 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
   const {
     firmType,
     businessVintage,
+    industry,
     sector,
     bankName,
     cibilScore,
     facilityType,
-    monthlyTurnover,
+    annualTurnover,
     existingFundingSanctionedAmount,
     estimatedFundingRequired,
     creditPeriodOffer,
@@ -91,6 +99,25 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
     dispatch(clientActions.setFirmDetails({[field]: value}));
   }
 
+  // Get filtered sectors based on selected industry
+  const getFilteredSectors = () => {
+    if (!industry) {
+      return listOfSectors;
+    }
+    const industryKey = industry as IndustryType;
+    const sectorsForIndustry = industrySectorMapping[industryKey] || [];
+    return sectorsForIndustry.map(sector => ({
+      label: sector,
+      value: sector,
+    }));
+  };
+
+  // Handle industry change and reset sector
+  const handleIndustryChange = (value: string) => {
+    setData('industry', value);
+    setData('sector', ''); // Reset sector when industry changes
+  };
+
   const handleClear = () => {
     dispatch(clientActions.clearFirmDetails());
   };
@@ -104,7 +131,7 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
       s ? s.toString().replace(/,/g, '') : '';
     
     const firmDetailsToSave = {
-      monthlyTurnover: strip(monthlyTurnover),
+      annualTurnover: strip(annualTurnover),
       existingFundingSanctionedAmount: strip(existingFundingSanctionedAmount),
       estimatedFundingRequired: strip(estimatedFundingRequired),
       bankName: bankName, // Ensure bank names are included in save
@@ -129,9 +156,10 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
   const requiredFields = [
     {field: firmType, name: 'Type of Firm'},
     {field: businessVintage, name: 'Business Vintage'},
+    {field: industry, name: 'Industry'},
     {field: sector, name: 'Sector'},
     {field: bankName, name: 'Bank Name'},
-    {field: monthlyTurnover, name: 'Monthly Turnover'},
+    {field: annualTurnover, name: 'Annual Turnover'},
     {field: cibilScore, name: 'CIBIL Score'},
     {field: facilityType, name: 'Facility Type'},
     {
@@ -195,8 +223,14 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             onChangeText={value => setData('businessVintage', value)}
           />
           <CustomDropdown
+            label="Industry"
+            data={listOfIndustries}
+            value={industry}
+            onChange={handleIndustryChange}
+          />
+          <CustomDropdown
             label="Sector"
-            data={listOfSectors}
+            data={getFilteredSectors()}
             value={sector}
             onChange={value => setData('sector', value)}
           />
@@ -210,12 +244,12 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             placeholder="Select multiple banks"
           />
           <Input
-            label="Monthly Turnover"
-            placeholder="Enter Monthly Turnover"
+            label="Annual Turnover"
+            placeholder="Enter Annual Turnover"
             keyboardType="numeric"
             maxLength={10}
-            value={formatIndianNumber(monthlyTurnover)}
-            onChangeText={value => setData('monthlyTurnover', value)}
+            value={formatIndianNumber(annualTurnover)}
+            onChangeText={value => setData('annualTurnover', value)}
           />
           <Input
             label="CIBIL Score"
