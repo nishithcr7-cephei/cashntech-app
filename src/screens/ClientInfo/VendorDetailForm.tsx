@@ -162,7 +162,6 @@ const VendorForm = ({
           placeholder="Enter Monthly sales value"
           value={formatIndianNumber(vendor.monthlySalesValue.toString())}
           keyboardType="numeric"
-          maxLength={10}
           onChangeText={value =>
             setData('monthlySalesValue', value.replace(/,/g, ''), index)
           }

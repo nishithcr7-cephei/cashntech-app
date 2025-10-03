@@ -247,7 +247,6 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             label="Annual Turnover"
             placeholder="Enter Annual Turnover"
             keyboardType="numeric"
-            maxLength={10}
             value={formatIndianNumber(annualTurnover)}
             onChangeText={value => setData('annualTurnover', value)}
           />
@@ -272,7 +271,6 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             label="Existing Funding Sanctioned Amt"
             placeholder="Enter Funding Amount"
             keyboardType="numeric"
-            maxLength={10}
             value={formatIndianNumber(existingFundingSanctionedAmount)}
             onChangeText={value =>
               setData('existingFundingSanctionedAmount', value)
@@ -282,7 +280,6 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             label="Estimated Funding Required"
             placeholder="Enter funding required"
             keyboardType="numeric"
-            maxLength={10}
             value={formatIndianNumber(estimatedFundingRequired)}
             onChangeText={value => setData('estimatedFundingRequired', value)}
           />
