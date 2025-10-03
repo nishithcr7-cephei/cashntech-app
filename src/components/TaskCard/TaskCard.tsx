@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { decryptLocation } from '@utils/crypto';
 import Colors from '@constants/Colors';
 import { scaleFont } from '@utils/Scale';
@@ -38,9 +38,12 @@ interface TaskCardProps {
   index: number;
   hasSubTasks?: boolean;
   subTaskCount?: number;
+  hideId?: boolean; // Option to hide ID display
+  onSubTaskPress?: () => void; // Callback for SubTask link tap
+  displayId?: string | number; // Override the displayed ID
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ item, index, hasSubTasks = false, subTaskCount = 0 }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ item, index, hasSubTasks = false, subTaskCount= 0, hideId = false, onSubTaskPress, displayId }) => {
   // Safe data extraction with fallbacks
   const task = getDisplayTask(item?.task || []);
   const firmName = capitalizeFirst(decryptLocation(String(item?.firm_name || '')));
@@ -61,17 +64,26 @@ const TaskCard: React.FC<TaskCardProps> = ({ item, index, hasSubTasks = false, s
 
   return (
     <View style={styles.card}>
+      {!hideId && (
+        <Text style={styles.label}>
+          <Text style={styles.bold}>ID :</Text> <Text style={styles.value}>{displayId || item?.id || 'N/A'}</Text>
+        </Text>
+      )}
       <View style={styles.cardHeader}>
         <Text style={styles.label}>
           <Text style={styles.bold}>SrNo :</Text> <Text style={styles.value}>{serialNumber}</Text>
         </Text>
         {hasSubTasks && (
-          <View style={styles.subTaskContainer}>
+          <TouchableOpacity 
+            style={styles.subTaskContainer} 
+            onPress={onSubTaskPress}
+            activeOpacity={0.7}
+          >
             <Text style={styles.subTaskText}>
-              {subTaskCount} Sub Task{subTaskCount !== 1 ? 's' : ''}
+              {subTaskCount} Sub Task{subTaskCount !== 1 ? 's' : ''} >
             </Text>
             <RightChevron height={16} width={16} />
-          </View>
+          </TouchableOpacity>
         )}
       </View>
       <Text style={styles.label}>

@@ -1,23 +1,19 @@
-import React, {useEffect, useState, useMemo} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {
   View,
   Text,
-  ActivityIndicator,
   FlatList,
   StyleSheet,
   TouchableOpacity,
   BackHandler,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {useDispatch, useSelector} from 'react-redux';
 import {Container, AppBar} from '@components/index';
 import TaskCard from '@components/TaskCard/TaskCard';
 import {LeftChevron} from '@assets/Icons';
 import Colors from '@constants/Colors';
 import {scaleFont} from '@utils/Scale';
-import {decryptLocation} from '@utils/crypto';
-import * as mngActions from '@store/mng';
-import { mngSelector, TaskRecordItem } from '@store/mng';
+import { TaskRecordItem } from '@store/mng';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -43,47 +39,24 @@ interface SubTaskItem {
   task_type: string;
   task_description: string;
   task_status: string;
-  remark: string | null;
-  completed_at: string | null;
+  remark: string | null | undefined;
+  completed_at: string | null | undefined;
   client: number;
 }
 
 export const SubTask = () => {
   const navigation = useNavigation<DocNavigationType>();
   const route = useRoute();
-  const dispatch = useDispatch();
   const {clientId, clientName, taskData} = route.params as SubTaskRouteParams;
 
-  // Redux selectors
-  const taskRecordsLoading = useSelector(mngSelector.getTaskRecordsLoading);
-  const taskRecordsList = useSelector(mngSelector.getTaskRecordsList);
-
-  // Get the specific client's task data
-  const clientTaskData = useMemo(() => {
-    if (!taskData || !taskData.task) return null;
+  // Optimal: Direct data processing from passed parameters
+  const subTasks = useMemo(() => {
+    if (!taskData || !taskData.task || taskData.task.length <= 1) return [];
     
-    // Sort tasks by assigned_at date (newest first) and exclude the first one (which is shown in main list)
-    const sortedTasks = [...taskData.task]
-      .sort((a, b) => {
-        const dateA = a.assigned_at ? new Date(a.assigned_at).getTime() : 0;
-        const dateB = b.assigned_at ? new Date(b.assigned_at).getTime() : 0;
-        return dateB - dateA;
-      })
-      .slice(1); // Remove the first task (latest one shown in main list)
-    
-    return {
-      ...taskData,
-      task: sortedTasks
-    };
+    // Simply slice to get sub-tasks (exclude first task)
+    // Data is already sorted by the parent component
+    return taskData.task.slice(1);
   }, [taskData]);
-
-  const fetchReports = () => {
-    dispatch(mngActions.getTaskRecordsList({hasTask: true}));
-  };
-
-  useEffect(() => {
-    fetchReports();
-  }, []);
 
   // Handle Android back button
   useEffect(() => {
@@ -104,10 +77,14 @@ export const SubTask = () => {
     // Create a TaskRecordItem format for the TaskCard component
     const taskRecordItem: TaskRecordItem = {
       id: item.client,
-      firm_name: clientTaskData?.firm_name || '',
-      sector: clientTaskData?.sector || '',
-      created_at: clientTaskData?.created_at || '',
-      task: [item] // Single task in array format
+      firm_name: taskData?.firm_name || '',
+      sector: taskData?.sector || '',
+      created_at: taskData?.created_at || '',
+      task: [{
+        ...item,
+        remark: item.remark === null ? undefined : item.remark,
+        completed_at: item.completed_at === null ? undefined : item.completed_at,
+      }] // Single task in array format
     };
     
     return (
@@ -118,7 +95,8 @@ export const SubTask = () => {
             (navigation as any).navigate('DocNavigator', {
               screen: 'TaskUpdate',
               params: {
-                taskId: String(item.id),
+                taskId: String(item.id), // SubTask ID
+                subTaskId: String(item.id), // Alias for subTaskId
                 task_status: item.task_status,
                 remark: item.remark && item.remark !== 'NA' ? item.remark : '',
                 completed_at: item.completed_at,
@@ -126,17 +104,18 @@ export const SubTask = () => {
                 client_name: clientName,
                 task_type: item.task_type,
                 assigned_to: item.assigned_to,
+                navigationSource: 'SubTask', // Indicator for navigation source
+                clientId: clientId, // Pass clientId for back navigation
+                mainTaskId: String(taskData?.id), // Main task ID for reference
               }
             });
           }
         }}
         disabled={!isTaskPending}>
-        <TaskCard item={taskRecordItem} index={index} hasSubTasks={false} />
+        <TaskCard item={taskRecordItem} index={index} hasSubTasks={false} hideId={false} displayId={item.id} />
       </TouchableOpacity>
     );
   };
-
-  const subTasks = clientTaskData?.task || [];
 
   return (
     <Container>
@@ -157,28 +136,20 @@ export const SubTask = () => {
         </Text>
       </View>
 
-      {taskRecordsLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primaryColor} />
-        </View>
-      ) : (
-        <FlatList
-          data={subTasks as SubTaskItem[]}
-          keyExtractor={(item, idx) => String(item.id ?? idx)}
-          renderItem={renderSubTaskItem}
-          contentContainerStyle={{padding: 16}}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No Sub Tasks Found</Text>
-              <Text style={styles.emptySubText}>
-                This client doesn't have any additional tasks beyond the main task.
-              </Text>
-            </View>
-          }
-          onRefresh={fetchReports}
-          refreshing={taskRecordsLoading}
-        />
-      )}
+      <FlatList
+        data={subTasks as SubTaskItem[]}
+        keyExtractor={(item, idx) => String(item.id ?? idx)}
+        renderItem={renderSubTaskItem}
+        contentContainerStyle={{padding: 16}}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No Sub Tasks Found</Text>
+            <Text style={styles.emptySubText}>
+              This client doesn't have any additional tasks beyond the main task.
+            </Text>
+          </View>
+        }
+      />
     </Container>
   );
 };
@@ -199,12 +170,6 @@ const styles = StyleSheet.create({
   subTaskCount: {
     fontSize: scaleFont(14),
     color: Colors.SteelGray,
-  },
-  loadingContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    paddingVertical: 50 
   },
   emptyContainer: {
     flex: 1,

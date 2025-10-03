@@ -15,7 +15,7 @@ import {
   FooterButton,
   Input,
 } from '@components/index';
-import {LeftChevronCircle} from '@assets/Icons';
+import {LeftChevronCircle, LeftChevron} from '@assets/Icons';
 import Colors from '@constants/Colors';
 import fontWeight from '@constants/FontWeight';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -44,6 +44,10 @@ interface TaskUpdateParams {
   client_name: string;
   task_type: string;
   assigned_to: string;
+  navigationSource?: string; // Source of navigation: 'ManageTask' or 'SubTask'
+  clientId?: string; // Client ID for SubTask navigation
+  subTaskId?: string; // SubTask ID (same as taskId when coming from SubTask)
+  mainTaskId?: string; // Main task ID for reference
 }
 
 export const TaskUpdate = () => {
@@ -86,11 +90,12 @@ export const TaskUpdate = () => {
         text1: 'Success',
         text2: successMessage,
       });
-      navigation.goBack();
+      // Always navigate back to ManageTask screen
+      (navigation as any).navigate('ManageTask');
       // Clear the message after handling
       dispatch(tasklogActions.setTaskUpdateSuccess(''));
     }
-  }, [successMessage, navigation, dispatch]);
+  }, [successMessage, navigation, dispatch, params]);
 
   useEffect(() => {
     if (errorMessage && errorMessage.trim()) {
@@ -152,16 +157,34 @@ export const TaskUpdate = () => {
     setRemark('');
   };
 
+  // Determine navigation source header text
+  const getNavigationSourceText = () => {
+    switch (params.navigationSource) {
+      case 'SubTask':
+        return 'Sub Task Update';
+      case 'ManageTask':
+        return 'Main Task Update';
+      default:
+        return 'Task Update';
+    }
+  };
+
   return (
     <Container>
-      <AppBar title="Update Task" navigation={navigation} />
+      <AppBar 
+        title={getNavigationSourceText()} 
+        navigation={navigation}
+        renderLeftIcon={<LeftChevron height={20} width={20} />}
+        onPressLeftIcon={() => {
+          // Always navigate back to ManageTask screen
+          (navigation as any).navigate('ManageTask');
+        }}
+      />
+      
       <View>
-        <TouchableOpacity
-          style={styles.subContainer}
-          onPress={navigation.goBack}>
-          <LeftChevronCircle height={26} width={26} />
-          <Text style={styles.subheader}>Task Update</Text>
-        </TouchableOpacity>
+        <View style={styles.subContainer}>
+          <Text style={styles.subheader}>Task Update - ID: {params.taskId}</Text>
+        </View>
       </View>
       <KeyboardAvoidingScrollView style={{flexGrow: 1}}>
         <View style={styles.inputContainer}>
@@ -225,7 +248,10 @@ export const TaskUpdate = () => {
              
              <TouchableOpacity
                style={styles.cancelButton}
-               onPress={() => (navigation as any).navigate('ManageTask')}>
+               onPress={() => {
+                 // Always navigate back to ManageTask screen
+                 (navigation as any).navigate('ManageTask');
+               }}>
                <Text style={styles.cancelButtonText}>Cancel</Text>
              </TouchableOpacity>
            </View>

@@ -171,8 +171,35 @@ export const ManageTask = () => {
     return (
       <TouchableOpacity
         onPress={() => {
-          if (hasSubTasks) {
-            // Navigate to SubTask screen if has sub-tasks
+          // Card tap always goes to TaskUpdate if main task is Pending
+          if (isTaskPending && firstTask) {
+            (navigation as any).navigate('DocNavigator', {
+              screen: 'TaskUpdate',
+              params: {
+                taskId: String(firstTask.id),
+                task_status: firstTask.task_status,
+                remark: firstTask.remark && firstTask.remark !== 'NA' ? firstTask.remark ?? '' : '',
+                completed_at: firstTask.completed_at,
+                task_description: firstTask.task_description,
+                client_name: clientName,
+                task_type: firstTask.task_type,
+                assigned_to: firstTask.assigned_to,
+                navigationSource: 'ManageTask',
+                clientId: String(item.id), // Pass clientId for SubTask navigation
+              }
+            });
+          }
+          // If status is NOT Pending, do nothing (no navigation)
+        }}
+        disabled={!isTaskPending}>
+        <TaskCard 
+          item={item} 
+          index={index} 
+          hasSubTasks={hasSubTasks} 
+          subTaskCount={hasSubTasks ? (item.task?.length ? item.task.length - 1 : 0) : 0}
+          displayId={firstTask?.id} // Show first task's ID instead of client ID
+          onSubTaskPress={() => {
+            // Navigate to SubTask screen when SubTask link is tapped
             (navigation as any).navigate('DocNavigator', {
               screen: 'SubTask',
               params: {
@@ -181,30 +208,7 @@ export const ManageTask = () => {
                 taskData: item,
               }
             });
-          } else if (isTaskPending && firstTask) {
-            // Navigate to TaskUpdate if no sub-tasks and status is Pending
-            (navigation as any).navigate('DocNavigator', {
-              screen: 'TaskUpdate',
-              params: {
-                taskId: String(firstTask.id),
-                task_status: firstTask.task_status,
-                remark: firstTask.remark && firstTask.remark !== 'NA' ? firstTask.remark : '',
-                completed_at: firstTask.completed_at,
-                task_description: firstTask.task_description,
-                client_name: clientName,
-                task_type: firstTask.task_type,
-                assigned_to: firstTask.assigned_to,
-              }
-            });
-          }
-          // If status is Completed and no sub-tasks, do nothing (no navigation)
-        }}
-        disabled={!hasSubTasks && !isTaskPending}>
-        <TaskCard 
-          item={item} 
-          index={index} 
-          hasSubTasks={hasSubTasks} 
-          subTaskCount={hasSubTasks ? (item.task?.length ? item.task.length - 1 : 0) : 0}
+          }}
         />
       </TouchableOpacity>
     );
