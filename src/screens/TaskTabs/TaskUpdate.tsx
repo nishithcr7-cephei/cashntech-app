@@ -174,17 +174,19 @@ export const TaskUpdate = () => {
       <AppBar 
         title={getNavigationSourceText()} 
         navigation={navigation}
-        renderLeftIcon={<LeftChevron height={20} width={20} />}
-        onPressLeftIcon={() => {
-          // Always navigate back to ManageTask screen
-          (navigation as any).navigate('ManageTask');
-        }}
+        hideHamburger={true}
       />
       
       <View>
-        <View style={styles.subContainer}>
+        <TouchableOpacity
+          style={styles.subContainer}
+          onPress={() => {
+            // Always navigate back to ManageTask screen
+            (navigation as any).navigate('ManageTask');
+          }}>
+          <LeftChevronCircle height={26} width={26} />
           <Text style={styles.subheader}>Task Update - ID: {params.taskId}</Text>
-        </View>
+        </TouchableOpacity>
       </View>
       <KeyboardAvoidingScrollView style={{flexGrow: 1}}>
         <View style={styles.inputContainer}>

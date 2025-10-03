@@ -127,13 +127,14 @@ const softSanctionExportDownload = async (
   clientId: string | number,
   method: string,
   product: string,
+  bank: string,
 ) => {
   const token = storage.getString(StorageKeys.TOKEN);
   const url = `${
     Config.API_URL
   }/client-info-master/soft-sanction/export/${clientId}?method=${encodeURIComponent(
     method,
-  )}&product=${encodeURIComponent(product)}`;
+  )}&product=${encodeURIComponent(product)}&bank=${encodeURIComponent(bank)}`;
   return {
     url,
     token,

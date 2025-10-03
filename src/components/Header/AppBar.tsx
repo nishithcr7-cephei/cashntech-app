@@ -21,6 +21,7 @@ export type AppBarProps = {
   title?: string;
   containerStyle?: StyleProp<ViewStyle>;
   titleTextStyle?: StyleProp<TextStyle>;
+  hideHamburger?: boolean;
 
   renderLeftIcon?: React.ReactNode;
   onPressLeftIcon?: () => void;
@@ -46,31 +47,34 @@ export const AppBar = ({
   renderLeftIcon,
   leftIconProps,
   titleTextStyle,
+  hideHamburger = false,
   navigation,
 }: AppBarProps) => {
   return (
     <View style={[styles.container, containerStyle]}>
-      <TouchableOpacity
-        onPress={() => {
-          if (onPressLeftIcon) {
-            onPressLeftIcon();
-          } else if (
-            navigation &&
-            typeof navigation?.openDrawer === 'function'
-          ) {
-            navigation.openDrawer();
-          }
-        }}
-        style={[leftIconContainerStyle]}
-        {...leftIconProps}>
-        {renderLeftIcon ? (
-          renderLeftIcon
-        ) : (
-          <MenuIcon height={scaleWidth(16)} width={scaleHeight(16)} />
-        )}
-      </TouchableOpacity>
+      {!hideHamburger && (
+        <TouchableOpacity
+          onPress={() => {
+            if (onPressLeftIcon) {
+              onPressLeftIcon();
+            } else if (
+              navigation &&
+              typeof navigation?.openDrawer === 'function'
+            ) {
+              navigation.openDrawer();
+            }
+          }}
+          style={[leftIconContainerStyle]}
+          {...leftIconProps}>
+          {renderLeftIcon ? (
+            renderLeftIcon
+          ) : (
+            <MenuIcon height={scaleWidth(16)} width={scaleHeight(16)} />
+          )}
+        </TouchableOpacity>
+      )}
 
-      <Text style={[styles.titleText, titleTextStyle]} numberOfLines={1}>
+      <Text style={[styles.titleText, hideHamburger ? styles.titleTextNoHamburger : undefined, titleTextStyle]} numberOfLines={1}>
         {title}
       </Text>
     </View>
@@ -91,5 +95,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroyBold,
     fontSize: scaleFont(20),
     marginStart: scaleWidth(24),
+  },
+  titleTextNoHamburger: {
+    marginStart: 0,
   },
 });

@@ -10,9 +10,10 @@ import {
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {Container, AppBar} from '@components/index';
 import TaskCard from '@components/TaskCard/TaskCard';
-import {LeftChevron} from '@assets/Icons';
+import {LeftChevronCircle} from '@assets/Icons';
 import Colors from '@constants/Colors';
-import {scaleFont} from '@utils/Scale';
+import fontWeight from '@constants/FontWeight';
+import {scaleFont, scaleWidth, scaleHeight} from '@utils/Scale';
 import { TaskRecordItem } from '@store/mng';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
@@ -119,15 +120,19 @@ export const SubTask = () => {
 
   return (
     <Container>
-      <AppBar 
-        title="Sub Task" 
-        navigation={navigation as any}
-        renderLeftIcon={<LeftChevron height={20} width={20} />}
-        onPressLeftIcon={() => {
-          // Navigate back to ManageTask without resetting
-          (navigation as any).getParent()?.navigate('ManageTask');
-        }}
-      />
+      <AppBar title="Sub Task" navigation={navigation as any} hideHamburger={true} />
+      
+      <View>
+        <TouchableOpacity
+          style={styles.subContainer}
+          onPress={() => {
+            // Navigate back to ManageTask without resetting
+            (navigation as any).getParent()?.navigate('ManageTask');
+          }}>
+          <LeftChevronCircle height={26} width={26} />
+          <Text style={styles.subheader}>{clientName}</Text>
+        </TouchableOpacity>
+      </View>
       
       <View style={styles.header}>
         <Text style={styles.clientName}>{clientName}</Text>
@@ -155,6 +160,19 @@ export const SubTask = () => {
 };
 
 const styles = StyleSheet.create({
+  subContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.LimeGray,
+    paddingLeft: 16,
+    paddingVertical: 12,
+  },
+  subheader: {
+    marginLeft: 12,
+    fontSize: scaleFont(16),
+    fontWeight: fontWeight.SemiBold,
+    color: Colors.darkblack,
+  },
   header: {
     padding: 16,
     backgroundColor: Colors.white,

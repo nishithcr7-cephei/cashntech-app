@@ -7,7 +7,6 @@ import {
   FlatList,
   Alert,
   Image,
-  Linking,
 } from 'react-native';
 import React, {useState, useEffect, useCallback} from 'react';
 import {LeftChevronCircle} from '@assets/Icons';
@@ -30,7 +29,7 @@ import Config from 'react-native-config';
 import RNFS from 'react-native-fs';
 import {Platform} from 'react-native';
 import Toast from 'react-native-toast-message';
-import {PermissionsAndroid} from 'react-native';
+import {PermissionsAndroid, Linking} from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 import softSelector from '@store/softsan/soft.selector';
 import {getSoftSanctionResult, clearSoftSanctionResult} from '@store/softsan/soft.slice';
@@ -73,12 +72,18 @@ export const UGROTurnoverMethod = () => {
   const [result, setResult] = useState<any>(null);
   const [currentMethod, setCurrentMethod] = useState<string>('');
 
-  // Indian number formatting (same comma style as used elsewhere like ClientInfo)
+  // Indian number formatting with decimal rounding
   const formatIndianNumber = (num: number | string): string => {
     if (num === null || num === undefined) return '';
     const str = typeof num === 'number' ? num.toString() : String(num).replace(/,/g, '');
     if (!/^\d+(\.\d+)?$/.test(str)) return String(num);
-    const [intPart, decimalPart] = str.split('.');
+    
+    // Parse the number and round to 1 decimal place
+    const parsedNum = parseFloat(str);
+    const roundedNum = Math.round(parsedNum * 10) / 10;
+    const roundedStr = roundedNum.toString();
+    
+    const [intPart, decimalPart] = roundedStr.split('.');
     const reversed = intPart.split('').reverse();
     let formatted = '';
     for (let i = 0; i < reversed.length; i++) {
@@ -87,7 +92,44 @@ export const UGROTurnoverMethod = () => {
       }
       formatted = reversed[i] + formatted;
     }
-    return decimalPart ? `${formatted}.${decimalPart}` : formatted;
+    
+    // Only include decimal if it's not .0
+    const finalDecimal = decimalPart && decimalPart !== '0' ? decimalPart : '';
+    return finalDecimal ? `${formatted}.${finalDecimal}` : formatted;
+  };
+
+  // Function to format labels with proper capitalization
+  const formatLabel = (label: string): string => {
+    // Handle specific labels with custom formatting
+    if (label.toLowerCase().includes('projected to for credit period')) {
+      return 'Projected TO for Credit Period';
+    }
+    if (label.toLowerCase().includes('credit period offered')) {
+      return 'Credit Period Offered';
+    }
+    if (label.toLowerCase().includes('existing w/c limits')) {
+      return 'Existing W/C Limits';
+    }
+    if (label.toLowerCase().includes('monthly turnover')) {
+      return 'Monthly Turnover';
+    }
+    if (label.toLowerCase().includes('last 12 m turnover')) {
+      return 'Last 12 M Turnover';
+    }
+    if (label.toLowerCase().includes('projected turnover')) {
+      return 'Projected Turnover';
+    }
+    if (label.toLowerCase().includes('20% of projected to')) {
+      return '20% of Projected TO';
+    }
+    if (label.toLowerCase().includes('final limit')) {
+      return 'Final Limit';
+    }
+    
+    // Default: capitalize first letter of each word
+    return label.split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join(' ');
   };
 
   useEffect(() => {
@@ -198,7 +240,7 @@ export const UGROTurnoverMethod = () => {
     try {
       const exportProduct = product || productName;
       let exportMethod = method || methodName;
-      
+      let exportBank = bank || bankName;
       
       // Sanitize method to backend-expected tokens
       if (/turnover/i.test(exportMethod)) {
@@ -209,8 +251,28 @@ export const UGROTurnoverMethod = () => {
         exportMethod = 'WC(Stock)';
       }
       
-      if (!clientId || !exportMethod || !exportProduct || !bank) {
-        Alert.alert('Error', `Missing required data for export:\nClientId: ${clientId}\nMethod: ${exportMethod}\nProduct: ${exportProduct}\nBank: ${bank}`);
+      // Debug logging for troubleshooting
+      console.log('Download parameters:', {
+        clientId,
+        exportMethod,
+        exportProduct,
+        exportBank,
+        method,
+        product,
+        bank,
+        methodName,
+        productName,
+        bankName
+      });
+      
+      if (!clientId || !exportMethod || !exportProduct || ! exportBank) {
+        const missingFields = [];
+        if (!clientId) missingFields.push('Client ID');
+        if (!exportMethod) missingFields.push('Method');
+        if (!exportProduct) missingFields.push('Product');
+        if (!exportBank) missingFields.push('Bank');
+        
+        Alert.alert('Error', `Missing required data for export:\n${missingFields.join(', ')}`);
         return;
       }
       
@@ -219,44 +281,69 @@ export const UGROTurnoverMethod = () => {
         clientId,
         exportMethod,
         exportProduct,
-        bank,
+        exportBank,
       );
       
+      console.log('Download URL:', url);
+      console.log('Download headers:', headers);
       
       const fileName = generateFileName();
       let filePath = '';
       let showPath = '';
+      
       if (Platform.OS === 'android') {
-        filePath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
-        showPath = 'Downloads folder';
         const androidVersion = Number(Platform.Version);
-        if (androidVersion <= 29) {
+        console.log('Android version:', androidVersion);
+        
+        // For Android 13+ (API 33+), use MANAGE_EXTERNAL_STORAGE if needed
+        if (androidVersion >= 33) {
+          // For Android 13+, we might not need explicit permissions for Downloads folder
+          filePath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+          showPath = 'Downloads folder';
+        } else if (androidVersion <= 29) {
+          // For Android 10 and below, request WRITE_EXTERNAL_STORAGE
           const granted = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
             {
               title: 'Storage Permission Required',
               message: 'App needs access to your storage to download the file',
-              buttonPositive: 'OK',
+              buttonPositive: 'Allow',
+              buttonNegative: 'Deny',
             },
           );
+          
           if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
             Alert.alert(
               'Permission Denied',
-              'Storage permission is required to download files.',
+              'Storage permission is required to download files. Please enable it in device settings.',
+              [
+                {text: 'Cancel', style: 'cancel'},
+                {text: 'Open Settings', onPress: () => Linking.openSettings()},
+              ],
             );
             return;
           }
+          filePath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+          showPath = 'Downloads folder';
+        } else {
+          // For Android 11-12, try Downloads folder without permission request
+          filePath = `${RNFS.DownloadDirectoryPath}/${fileName}`;
+          showPath = 'Downloads folder';
         }
       } else {
         filePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
         showPath = 'App private folder';
       }
 
+      console.log('Downloading file to:', filePath);
+      
       const downloadResult = await RNFS.downloadFile({
         fromUrl: url,
         toFile: filePath,
         headers: headers,  // Include authentication headers
       }).promise;
+
+      console.log('Download result:', downloadResult);
 
       if (downloadResult.statusCode === 200) {
         Toast.show({
@@ -265,23 +352,29 @@ export const UGROTurnoverMethod = () => {
           text2: `File "${fileName}" saved to ${showPath}.`,
         });
       } else {
+        console.error('Download failed with status:', downloadResult.statusCode);
         Toast.show({
           type: 'error',
           text1: 'Download failed',
           text2:
-            'Download failed. If this happens again, please contact the Admin team.',
+            `Download failed with status ${downloadResult.statusCode}. If this happens again, please contact the Admin team.`,
         });
       }
     } catch (e) {
+      console.error('Download error:', e);
       let errorMsg = 'Unknown error';
       const err: any = e;
       if (err && typeof err === 'object' && 'message' in err) {
         errorMsg = err.message;
+        if (err.code) {
+          errorMsg += ` (Code: ${err.code})`;
+        }
       } else if (typeof err === 'string') {
         errorMsg = err;
       } else if (err && err.toString) {
         errorMsg = err.toString();
       }
+      
       if (!errorMsg || errorMsg === 'Unknown error') {
         try {
           errorMsg = JSON.stringify(e);
@@ -289,6 +382,8 @@ export const UGROTurnoverMethod = () => {
           errorMsg = 'Uncatchable error';
         }
       }
+      
+      console.error('Final error message:', errorMsg);
       Alert.alert('Download Error', errorMsg);
       Toast.show({
         type: 'error',
@@ -346,7 +441,7 @@ export const UGROTurnoverMethod = () => {
               return (
                 <View key={label} style={styles.resultRow}>
                   <Text>
-                    <Text style={styles.resultLabel}>{label}:</Text>
+                    <Text style={styles.resultLabel}>{formatLabel(label)}:</Text>
                     <Text style={styles.resultValue}> {displayValue}</Text>
                   </Text>
                 </View>

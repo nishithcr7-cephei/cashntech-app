@@ -87,7 +87,9 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                     Client Information Master
                   </Text>
                 </View>
-                <UpChevron rotation={isOpen ? 0 : 180} />
+                <View style={styles.arrowContainer}>
+                  <UpChevron rotation={isOpen ? 0 : 180} />
+                </View>
               </TouchableOpacity>
               {isOpen && (
                 <View style={{marginLeft: scaleWidth(24)}}>
@@ -237,9 +239,14 @@ const styles = StyleSheet.create({
   button: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: scaleWidth(8),
     marginBottom: scaleHeight(12),
     borderRadius: scaleWidth(4),
+  },
+  arrowContainer: {
+    paddingLeft: scaleWidth(16),
+    paddingRight: scaleWidth(8),
   },
   buttonText: {
     color: '#252C32',

@@ -95,8 +95,8 @@ export const SubVisitDetail = () => {
   // Handle Android back button
   useEffect(() => {
     const backAction = () => {
-      // Go back to previous screen (VisitDetail) without re-mounting
-      navigation.goBack();
+      // Navigate back to VisitDetail in parent navigator
+      (navigation as any).getParent()?.navigate('VisitDetail');
       return true; // Prevent default back action
     };
 
@@ -203,18 +203,26 @@ export const SubVisitDetail = () => {
       <AppBar 
         title="Sub Visit Detail" 
         navigation={navigation as any}
-        renderLeftIcon={<LeftChevron height={20} width={20} />}
-        onPressLeftIcon={() => {
-          // Go back to previous screen (VisitDetail) without re-mounting
-          navigation.goBack();
-        }}
+        hideHamburger={true}
       />
       
-      <View style={styles.header}>
-        <Text style={styles.clientName}>{clientName}</Text>
-        <Text style={styles.subVisitCount}>
-          {subVisits.length} Sub Visit{subVisits.length !== 1 ? 's' : ''}
-        </Text>
+      {/* Custom Header with Back Button and Text */}
+      <View style={styles.customHeader}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => {
+            // Navigate back to VisitDetail in parent navigator
+            (navigation as any).getParent()?.navigate('VisitDetail');
+          }}
+        >
+          <LeftChevron height={20} width={20} />
+        </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>{clientName}</Text>
+          <Text style={styles.subVisitCountWithArrow}>
+            {subVisits.length} Sub Visit{subVisits.length !== 1 ? 's' : ''} → 
+          </Text>
+        </View>
       </View>
 
       {visitDetailsLoading ? (
@@ -244,6 +252,35 @@ export const SubVisitDetail = () => {
 };
 
 const styles = StyleSheet.create({
+  customHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.LimeGray,
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E5E5E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: scaleWidth(12),
+  },
+  headerContent: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: scaleFont(14),
+    fontWeight: 'bold',
+    color: Colors.black,
+    marginBottom: 4,
+  },
+  subVisitCountWithArrow: {
+    fontSize: scaleFont(12),
+    color: Colors.SteelGray,
+  },
   header: {
     padding: 16,
     backgroundColor: Colors.white,

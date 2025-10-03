@@ -8,13 +8,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import React, {useEffect, useState, useMemo, useRef} from 'react';
+import React, {useEffect, useState, useMemo} from 'react';
 import {AppBar, Container, KycDocumentCard, FilterModal} from '@components/index';
 import {Filter, Search} from '@assets/Icons';
 import Colors from '@constants/Colors';
 import fontWeight from '@constants/FontWeight';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {CompositeNavigationProp, useNavigation, useFocusEffect} from '@react-navigation/native';
+import {CompositeNavigationProp, useNavigation} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {HomeNavigatorType, KycNavigatorType} from '@type/NavigatorTypes';
@@ -46,9 +46,6 @@ export const KycDocument = () => {
   const [sourceOptions, setSourceOptions] = useState<string[]>([]);
   const [sectorOptions, setSectorOptions] = useState<string[]>([]);
   const [downloadingClientId, setDownloadingClientId] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
   const callGetKYC = () => {
     dispatch(kycActions.getKycDetailsRequest({
       byIntent: {
@@ -57,8 +54,7 @@ export const KycDocument = () => {
     }));
   };
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
+  const handlePullToRefresh = async () => {
     try {
       // Call the main KYC details API
       callGetKYC();
@@ -86,51 +82,12 @@ export const KycDocument = () => {
         text2: 'Unable to update KYC data',
         position: 'top',
       });
-    } finally {
-      setRefreshing(false);
     }
   };
 
   useEffect(() => {
     callGetKYC();
   }, []);
-
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    const startAutoRefresh = () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-      
-      refreshIntervalRef.current = setInterval(() => {
-        if (!refreshing) {
-          handleRefresh();
-        }
-      }, 30000); // 30 seconds
-    };
-
-    startAutoRefresh();
-
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
-    };
-  }, [refreshing]);
-
-  // Refresh when screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      // Small delay to ensure screen is fully focused
-      const timer = setTimeout(() => {
-        if (!refreshing) {
-          handleRefresh();
-        }
-      }, 500);
-
-      return () => clearTimeout(timer);
-    }, [refreshing])
-  );
 
   // Prepare filter data
   const filterData = {
@@ -333,7 +290,7 @@ export const KycDocument = () => {
         <FlatList
           data={filteredKYC}
           refreshing={KycLoading}
-          onRefresh={callGetKYC}
+          onRefresh={handlePullToRefresh}
           contentContainerStyle={{paddingBottom: scaleHeight(56)}}
           ListEmptyComponent={
             <Text style={styles.emptyList}>
