@@ -16,7 +16,7 @@ import {
   FooterButton,
   Input,
 } from '@components/index';
-import {LeftChevronCircle} from '@assets/Icons';
+import {LeftChevronCircle, LeftChevron} from '@assets/Icons';
 import Colors from '@constants/Colors';
 import fontWeight from '@constants/FontWeight';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -54,12 +54,7 @@ export const UpdateVisitDetails = () => {
   const params = route.params as UpdateVisitDetailsParams;
   const dispatch = useDispatch();
   
-  // Debug: Log all received parameters
-  console.log('=== UPDATE VISIT DETAILS PARAMS ===');
-  console.log('All params:', JSON.stringify(params, null, 2));
-  console.log('visitId:', params.visitId);
-  console.log('clientId:', params.clientId);
-  console.log('===================================');
+  
   
   // Get logged-in user info
   const userInfo = useSelector(userSelector.getUserInfo);
@@ -80,8 +75,8 @@ export const UpdateVisitDetails = () => {
   // Handle Android back button
   useEffect(() => {
     const backAction = () => {
-      // Go back to previous screen (VisitDetail) without re-mounting
-      navigation.goBack();
+      // Navigate to VisitDetail screen
+      (navigation as any).navigate('VisitDetail');
       return true; // Prevent default back action
     };
 
@@ -148,24 +143,14 @@ export const UpdateVisitDetails = () => {
       const clientId = params.clientId || params.visitId; // Fallback to visitId if clientId not provided
       const fullUrl = `/client-info-master/visit/update/${clientId}`;
       
-      console.log('=== SUBMIT BUTTON PRESSED ===');
-      console.log('Full URL:', fullUrl);
-      console.log('Visit ID (from params):', params.visitId);
-      console.log('Client ID (for API):', clientId);
-      console.log('POST Body:', JSON.stringify(updateData, null, 2));
-      console.log('=============================');
+     
       
       const {data, error} = await visitApi.updateVisitDetails(clientId, updateData);
       
-      console.log('API Response:', {data, error});
+    
       
       if (error) {
-        console.log('=== API ERROR DETAILS ===');
-        console.log('Error:', error);
-        console.log('Error Message:', error?.message);
-        console.log('Error Response:', (error as any)?.response?.data);
-        console.log('Error Status:', (error as any)?.response?.status);
-        console.log('========================');
+        
         Toast.show({
           type: 'error',
           text1: 'Error',
@@ -186,12 +171,10 @@ export const UpdateVisitDetails = () => {
       
       // Add delay to show toast before navigation
       setTimeout(() => {
-        navigation.goBack();
+        (navigation as any).navigate('VisitDetail');
       }, 2000);
     } catch (error) {
-      console.log('=== CATCH ERROR ===');
-      console.log('Catch Error:', error);
-      console.log('==================');
+      
       Toast.show({
         type: 'error',
         text1: 'Error',
@@ -214,14 +197,15 @@ export const UpdateVisitDetails = () => {
 
   return (
     <Container>
-      <AppBar title="Update Visit Details" navigation={navigation} />
-      <View>
-        <TouchableOpacity
-          style={styles.subContainer}
-          onPress={() => navigation.goBack()}>
-          <LeftChevronCircle height={26} width={26} />
-          <Text style={styles.subheader}>Update Visit Details</Text>
-        </TouchableOpacity>
+      <AppBar 
+        title="Update Visit Details" 
+        navigation={navigation}
+        renderLeftIcon={<LeftChevron height={20} width={20} />}
+        onPressLeftIcon={() => (navigation as any).navigate('VisitDetail')}
+      />
+      <View style={styles.subContainer}>
+        
+        <Text style={styles.subheader}>Update Visit Details - ID: {params.visitId}</Text>
       </View>
       <KeyboardAvoidingScrollView 
         style={{flexGrow: 1}}
@@ -291,7 +275,7 @@ export const UpdateVisitDetails = () => {
             
             <TouchableOpacity
               style={styles.cancelButton}
-              onPress={() => navigation.goBack()}>
+              onPress={() => (navigation as any).navigate('VisitDetail')}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -310,9 +294,8 @@ const styles = StyleSheet.create({
   subContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.LimeGray,
     paddingLeft: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   subheader: {
     marginLeft: 12,

@@ -124,6 +124,10 @@ export const SubVisitDetail = () => {
     return (
       <View style={styles.card}>
         <Text style={styles.label}>
+          <Text style={styles.bold}>ID :</Text> 
+          <Text style={styles.value}>{item.id}</Text>
+        </Text>
+        <Text style={styles.label}>
           <Text style={styles.bold}>Sr.No :</Text> 
           <Text style={styles.value}>{index + 1}</Text>
         </Text>

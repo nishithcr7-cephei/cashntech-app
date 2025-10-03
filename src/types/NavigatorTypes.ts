@@ -175,4 +175,14 @@ export type DocNavigatorType = {
     clientName: string;
     visitData: any;
   };
+  UpdateVisitDetails: {
+    visitId: string;
+    visit_date_time: string;
+    salesperson: string;
+    client_firm_name: string;
+    visit_type: string;
+    visit_number: number;
+    visit_remark: string;
+    clientId?: string;
+  };
 };

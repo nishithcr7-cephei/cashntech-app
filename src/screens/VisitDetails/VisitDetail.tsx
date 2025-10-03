@@ -33,6 +33,10 @@ import {
   selectLocationsError,
 } from '@store/visit/visit.selector';
 import {RootState} from '@store/app/store';
+import {CompositeNavigationProp} from '@react-navigation/native';
+import {DrawerNavigationProp} from '@react-navigation/drawer';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {HomeNavigatorType, DocNavigatorType} from '@type/NavigatorTypes';
 
 type VisitItem = {
   id: number;
@@ -53,8 +57,13 @@ type VisitItem = {
   };
 };
 
+type DocNavigationType = CompositeNavigationProp<
+  DrawerNavigationProp<HomeNavigatorType>,
+  NativeStackNavigationProp<DocNavigatorType>
+>;
+
 export const VisitDetail = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<DocNavigationType>();
   const dispatch = useDispatch();
   
   // Redux selectors
@@ -307,6 +316,10 @@ export const VisitDetail = () => {
     
     return (
       <TouchableOpacity style={styles.card} onPress={onCardPress}>
+        <Text style={styles.label}>
+          <Text style={styles.bold}>ID :</Text> 
+          <Text style={styles.value}>{item.id}</Text>
+        </Text>
         <View style={styles.cardHeader}>
           <Text style={styles.label}>
             <Text style={styles.bold}>Sr.No :</Text> 
@@ -380,16 +393,19 @@ export const VisitDetail = () => {
         item={item} 
         index={index} 
         onCardPress={() => {
-          // Always navigate to UpdateVisitDetails when card is tapped
-          (navigation as any).navigate('UpdateVisitDetails', {
-            visitId: String(item.id),
-            clientId: String(item.client?.id || ''), // Add client ID for API call
-            visit_date_time: item.visit_date_time,
-            salesperson: item.salesperson,
-            client_firm_name: item.client_firm_name,
-            visit_type: item.visit_type,
-            visit_number: item.visit_number,
-            visit_remark: item.visit_remark,
+          // Always navigate to UpdateVisitDetails through DocNavigator when card is tapped
+          (navigation as any).navigate('DocNavigator', {
+            screen: 'UpdateVisitDetails',
+            params: {
+              visitId: String(item.id),
+              clientId: String(item.client?.id || ''), // Add client ID for API call
+              visit_date_time: item.visit_date_time,
+              salesperson: item.salesperson,
+              client_firm_name: item.client_firm_name,
+              visit_type: item.visit_type,
+              visit_number: item.visit_number,
+              visit_remark: item.visit_remark,
+            },
           });
         }}
         onSubVisitPress={() => {
@@ -424,7 +440,7 @@ export const VisitDetail = () => {
 
   return (
     <Container>
-      <AppBar title="Visit Details" navigation={navigation as any} />
+      <AppBar title="Visit Details" navigation={navigation} />
       <View style={styles.subContainer}>
         <Text style={styles.Subheader}>Visit Report</Text>
       </View>
