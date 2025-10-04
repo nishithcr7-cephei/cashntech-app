@@ -59,6 +59,7 @@ export type HomeNavigatorType = {
 };
 
 export type ClientNavigatorType = {
+  InboundClientList: undefined;
   ClientInfo: undefined;
   FormSelectionScreen: undefined;
   BasicDetailForm: undefined;

@@ -1,0 +1,80 @@
+TODAY'S CODE CHANGES - MERGE REQUEST
+=====================================
+
+Date: 04-10-2025
+Branch: feature/assigntask
+Status: Ready for merge
+
+SUMMARY OF CHANGES:
+------------------
+Today's work includes updates to SoftSanction lead list functionality with 
+turnover changes, field reordering, sector addition, search improvements, 
+and fixes to financial input field restrictions. Additionally, implemented
+complete InboundClient functionality with card design, modal popup, 
+decryption, filtering, and serial numbering.
+
+COMMITS PUSHED TODAY:
+--------------------
+
+1. COMMIT: ae69710
+   Message: "Update SoftSanction lead list: change Monthly to Annual turnover, reorder fields, add sector, update search to firm name only"
+   
+2. COMMIT: b1be5c2
+   Message: "fix: Remove maxLength restrictions from financial input fields to allow unlimited digits"
+
+3. COMMIT: [NEW] - InboundClient Implementation
+   Message: "feat: Complete InboundClient functionality with card design, modal popup, decryption, and filtering"
+
+FILES MODIFIED TODAY:
+--------------------
+
+1. SOFT SANCTION SCREEN UPDATES:
+   - src/screens/SoftSanctionScreen/SoftsanctionProcess.tsx
+   - src/components/SoftSanctionLeadCard/SoftSanctionLeadCard.tsx
+   - src/components/Header/AppBar.tsx
+   - src/components/Container/Container.tsx
+
+2. CLIENT INFO FORM FIXES:
+   - src/screens/ClientInfo/FirmDetailForm.tsx
+
+3. INBOUND CLIENT IMPLEMENTATION:
+   - src/screens/InboundClient/InboundClientList.tsx
+   - src/components/InboundClientCard/InboundClientCard.tsx
+   - src/store/inboundclient/inboundclient.selector.ts
+   - src/services/api/inboundclient.api.ts
+   - src/store/inboundclient/inboundclient.slice.ts
+   - src/store/inboundclient/inboundclient.saga.ts
+   - src/store/inboundclient/inboundclient.types.ts
+   - src/store/inboundclient/index.ts
+
+4. BUILD ASSETS:
+   - android/app/src/main/assets/index.android.bundle
+
+TOTAL FILES CHANGED: 15 files
+
+CHANGES SUMMARY:
+----------------
+- Updated SoftSanction lead list to change Monthly to Annual turnover
+- Reordered fields in SoftSanction process
+- Added sector field to SoftSanction lead list
+- Updated search functionality to firm name only
+- Removed maxLength restrictions from financial input fields
+- Implemented complete InboundClient card design matching reference image
+- Added modal popup for client details with X close button
+- Implemented decryption for encrypted fields (firm name, owner name, contact number, city, GST)
+- Added city filter with decrypted city names
+- Implemented auto-incrementing Sr.No field in both card and modal
+- Added proper empty state message "No Inbound Clients Found"
+- Created Redux store, selectors, sagas, and API integration for InboundClient
+- Updated build assets for Android
+
+NOTES FOR REVIEW:
+----------------
+- SoftSanction functionality improvements for better user experience
+- Financial input fields now allow unlimited digits
+- Search functionality optimized for firm name search
+- Complete InboundClient module with professional UI/UX
+- All encrypted data properly decrypted for display
+- Modal popup provides quick access to client details
+- Serial numbering system for easy client reference
+- All changes tested and ready for production

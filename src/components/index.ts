@@ -7,6 +7,7 @@ export * from './Input/Input';
 export * from './Footer/TnCFooter';
 export * from './Footer/FooterButton';
 export * from './ClientCard/ClientCard';
+export * from './InboundClientCard/InboundClientCard';
 export * from './Dropdown/CustomDropdown';
 export * from './MultiSelectDropdown/MultiSelectDropdown';
 export * from './SoftSanctionLeadCard/SoftSanctionLeadCard';

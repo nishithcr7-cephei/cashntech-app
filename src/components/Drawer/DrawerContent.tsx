@@ -97,6 +97,15 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                     style={styles.button}
                     onPress={() =>
                       navigation.navigate('ClientNavigator', {
+                        screen: 'InboundClientList',
+                      })
+                    }>
+                    <Text style={styles.buttonText}>Inbound Client</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.button}
+                    onPress={() =>
+                      navigation.navigate('ClientNavigator', {
                         screen: 'ClientInfo',
                       })
                     }>

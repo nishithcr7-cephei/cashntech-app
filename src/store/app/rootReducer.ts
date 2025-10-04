@@ -9,6 +9,7 @@ import mngReducer from '@store/mng/mng.slice';
 import {visitReducer} from '@store/visit';
 import {softReducer} from '@store/softsan';
 import {leadReducer} from '@store/lead';
+import {inboundClientReducer} from '@store/inboundclient';
 
 
 const rootReducer = combineReducers({
@@ -22,6 +23,7 @@ const rootReducer = combineReducers({
   visit: visitReducer,
   softsan: softReducer,
   lead: leadReducer,
+  inboundClient: inboundClientReducer,
 });
 
 export default rootReducer;
