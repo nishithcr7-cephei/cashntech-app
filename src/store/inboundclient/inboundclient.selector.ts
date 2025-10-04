@@ -33,6 +33,18 @@ export const inboundClientSelectors = {
     (state: InboundClientState) => state.error
   ),
 
+  // Get client details
+  getClientDetails: createSelector(
+    [selectInboundClientState],
+    (state: InboundClientState) => state.clientDetails
+  ),
+
+  // Get details loading state
+  getDetailsLoading: createSelector(
+    [selectInboundClientState],
+    (state: InboundClientState) => state.detailsLoading
+  ),
+
   // Get applied filters
   getAppliedFilters: createSelector(
     [selectInboundClientState],

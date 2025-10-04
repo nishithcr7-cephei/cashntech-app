@@ -6,6 +6,8 @@ import {
 import {
   getInboundClientsSuccess,
   getInboundClientsFailure,
+  getInboundClientDetailsSuccess,
+  getInboundClientDetailsFailure,
   filterInboundClientsSuccess,
   filterInboundClientsFailure,
   setInboundClientsLoading,
@@ -92,6 +94,27 @@ function* getInboundClientsSaga(action: InboundClientActionTypes): Generator<any
   }
 }
 
+// Get Inbound Client Details Saga
+function* getInboundClientDetailsSaga(action: InboundClientActionTypes): Generator<any, void, any> {
+  try {
+    const registrationId = (action as any).payload;
+    const {data, error} = yield call(InboundClientApis.getInboundClientDetails, registrationId);
+    
+    if (error) {
+      yield put(getInboundClientDetailsFailure(error.message || 'Failed to fetch client details'));
+      return;
+    }
+
+    if (data && data.statusCode === 200) {
+      yield put(getInboundClientDetailsSuccess(data.data));
+    } else {
+      yield put(getInboundClientDetailsFailure('Invalid response from server'));
+    }
+  } catch (error: any) {
+    yield put(getInboundClientDetailsFailure(error.message || 'An unexpected error occurred'));
+  }
+}
+
 // Filter Inbound Clients Saga
 function* filterInboundClientsSaga(action: any): Generator<any, void, any> {
   try {
@@ -115,6 +138,7 @@ function* filterInboundClientsSaga(action: any): Generator<any, void, any> {
 // Root Saga
 export function* inboundClientSaga() {
   yield takeLatest(INBOUND_CLIENT_ACTION_TYPES.GET_INBOUND_CLIENTS_REQUEST, getInboundClientsSaga);
+  yield takeLatest(INBOUND_CLIENT_ACTION_TYPES.GET_INBOUND_CLIENT_DETAILS_REQUEST, getInboundClientDetailsSaga);
   yield takeLatest(INBOUND_CLIENT_ACTION_TYPES.FILTER_INBOUND_CLIENTS_REQUEST, filterInboundClientsSaga);
 }
 

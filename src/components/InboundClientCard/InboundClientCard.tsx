@@ -4,6 +4,7 @@ import {Colors} from '@constants/index';
 import {scaleHeight, scaleWidth, scaleFont} from '@utils/Scale';
 import {FontWeight} from '@constants/index';
 import {decryptConditionally} from '@utils/crypto';
+import {RightChevron} from '@assets/Icons';
 
 const Strings = {
   srNo: 'Sr.No:',
@@ -14,6 +15,7 @@ const Strings = {
   contactNumber: 'Contact Number:',
   city: 'City:',
   gstNumber: 'GST Number:',
+  cfaSupply: 'CFA Supply:',
   applicationStatus: 'Application Status:',
   registrationStatus: 'Registration Status:',
   overallStatus: 'Overall Status:',
@@ -51,24 +53,44 @@ type InboundClientCardProps = {
   data: InboundClientData;
   onPressCard: (clientData: InboundClientData) => void;
   srNo: number;
+  hasSubApplicants?: boolean;
+  subApplicantCount?: number;
+  onSubApplicantPress?: () => void;
 };
 
 export const InboundClientCard: React.FC<InboundClientCardProps> = ({
   data,
   onPressCard,
   srNo,
+  hasSubApplicants = false,
+  subApplicantCount = 0,
+  onSubApplicantPress,
 }) => {
-  const primaryClient = data.inboundClient[0]; // Get the first client as primary
-  const primaryApplicant = data.inboundApplicants[0]; // Get the first applicant as primary
+  const primaryClient = data.inboundClient && data.inboundClient.length > 0 ? data.inboundClient[0] : null;
+  const primaryApplicant = data.inboundApplicants && data.inboundApplicants.length > 0 ? data.inboundApplicants[0] : null;
   
   return (
     <View style={styles.card}>
       <TouchableOpacity
         onPress={() => onPressCard(data)}
         activeOpacity={0.7}>
-        <Text style={styles.label}>
-          <Text style={styles.bold}>{Strings.srNo}</Text> {srNo}
-        </Text>
+        <View style={styles.cardHeader}>
+          <Text style={styles.label}>
+            <Text style={styles.bold}>{Strings.srNo}</Text> {srNo}
+          </Text>
+          {hasSubApplicants && (
+            <TouchableOpacity 
+              style={styles.subApplicantContainer} 
+              onPress={onSubApplicantPress}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.subApplicantText}>
+                {subApplicantCount} Sub Applicant{subApplicantCount !== 1 ? 's' : ''} >
+              </Text>
+              <RightChevron height={16} width={16} />
+            </TouchableOpacity>
+          )}
+        </View>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.registrationId}</Text> {data.registration_id}
         </Text>
@@ -76,37 +98,32 @@ export const InboundClientCard: React.FC<InboundClientCardProps> = ({
           <Text style={styles.bold}>{Strings.firmName}</Text> {decryptConditionally(data.company_name || '') || 'N/A'}
         </Text>
         <Text style={styles.label}>
-          <Text style={styles.bold}>{Strings.sector}</Text> {data.sector}
+          <Text style={styles.bold}>{Strings.sector}</Text> {decryptConditionally(data.sector || '') || 'N/A'}
         </Text>
-        {primaryClient && (
-          <>
-            <Text style={styles.label}>
-              <Text style={styles.bold}>{Strings.ownerName}</Text> {decryptConditionally(primaryClient.name_of_client || '') || 'N/A'}
-            </Text>
-            <Text style={styles.label}>
-              <Text style={styles.bold}>{Strings.contactNumber}</Text> {decryptConditionally(primaryClient.contact_number || '') || 'N/A'}
-            </Text>
-          </>
-        )}
+        <Text style={styles.label}>
+          <Text style={styles.bold}>{Strings.ownerName}</Text> {primaryClient ? decryptConditionally(primaryClient.name_of_client || '') || 'N/A' : 'N/A'}
+        </Text>
+        <Text style={styles.label}>
+          <Text style={styles.bold}>{Strings.contactNumber}</Text> {primaryClient ? decryptConditionally(primaryClient.contact_number || '') || 'N/A' : 'N/A'}
+        </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.city}</Text> {decryptConditionally(data.city || '') || 'N/A'}
         </Text>
         <Text style={styles.label}>
           <Text style={styles.bold}>{Strings.gstNumber}</Text> {decryptConditionally(data.gst_number || '') || 'N/A'}
         </Text>
-        {primaryApplicant && (
-          <Text style={styles.label}>
-            <Text style={styles.bold}>{Strings.applicationStatus}</Text> {primaryApplicant.application_status}
-          </Text>
-        )}
         <Text style={styles.label}>
-          <Text style={styles.bold}>{Strings.registrationStatus}</Text> {data.registration_status ?? 'N/A'}
+          <Text style={styles.bold}>{Strings.cfaSupply}</Text> {primaryApplicant ? decryptConditionally(primaryApplicant.applied_for || '') || 'N/A' : 'N/A'}
         </Text>
-        {primaryApplicant && (
-          <Text style={styles.label}>
-            <Text style={styles.bold}>{Strings.overallStatus}</Text> {primaryApplicant.overall_status}
-          </Text>
-        )}
+        <Text style={styles.label}>
+          <Text style={styles.bold}>{Strings.applicationStatus}</Text> {primaryApplicant ? decryptConditionally(primaryApplicant.application_status || '') || 'N/A' : 'N/A'}
+        </Text>
+        <Text style={styles.label}>
+          <Text style={styles.bold}>{Strings.registrationStatus}</Text> {decryptConditionally(data.registration_status || '') || 'N/A'}
+        </Text>
+        <Text style={styles.label}>
+          <Text style={styles.bold}>{Strings.overallStatus}</Text> {primaryApplicant ? decryptConditionally(primaryApplicant.overall_status || '') || 'N/A' : 'N/A'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -123,6 +140,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  subApplicantContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  subApplicantText: {
+    fontSize: 12,
+    color: Colors.primaryColor,
+    fontWeight: '600',
   },
   label: {
     fontSize: scaleFont(14),

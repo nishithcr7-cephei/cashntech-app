@@ -10,7 +10,9 @@ import {InboundClientData} from '@components/InboundClientCard';
 const initialState: InboundClientState = {
   inboundClients: [],
   filteredClients: [],
+  clientDetails: null,
   loading: false,
+  detailsLoading: false,
   error: null,
   appliedFilters: {},
 };
@@ -28,6 +30,21 @@ export const inboundClientActions = {
 
   getInboundClientsFailure: (payload: string): InboundClientActionTypes => ({
     type: INBOUND_CLIENT_ACTION_TYPES.GET_INBOUND_CLIENTS_FAILURE,
+    payload,
+  }),
+
+  getInboundClientDetailsRequest: (payload: string): InboundClientActionTypes => ({
+    type: INBOUND_CLIENT_ACTION_TYPES.GET_INBOUND_CLIENT_DETAILS_REQUEST,
+    payload,
+  }),
+
+  getInboundClientDetailsSuccess: (payload: any): InboundClientActionTypes => ({
+    type: INBOUND_CLIENT_ACTION_TYPES.GET_INBOUND_CLIENT_DETAILS_SUCCESS,
+    payload,
+  }),
+
+  getInboundClientDetailsFailure: (payload: string): InboundClientActionTypes => ({
+    type: INBOUND_CLIENT_ACTION_TYPES.GET_INBOUND_CLIENT_DETAILS_FAILURE,
     payload,
   }),
 
@@ -77,6 +94,21 @@ const inboundClientSlice = createSlice({
       state.error = action.payload;
     },
 
+    // Get Inbound Client Details
+    getInboundClientDetailsRequest: (state) => {
+      state.detailsLoading = true;
+      state.error = null;
+    },
+    getInboundClientDetailsSuccess: (state, action: PayloadAction<any>) => {
+      state.detailsLoading = false;
+      state.clientDetails = action.payload;
+      state.error = null;
+    },
+    getInboundClientDetailsFailure: (state, action: PayloadAction<string>) => {
+      state.detailsLoading = false;
+      state.error = action.payload;
+    },
+
     // Filter Inbound Clients
     filterInboundClientsRequest: (state, action: PayloadAction<Record<string, string[]>>) => {
       state.loading = true;
@@ -112,6 +144,9 @@ export const {
   getInboundClientsRequest,
   getInboundClientsSuccess,
   getInboundClientsFailure,
+  getInboundClientDetailsRequest,
+  getInboundClientDetailsSuccess,
+  getInboundClientDetailsFailure,
   filterInboundClientsRequest,
   filterInboundClientsSuccess,
   filterInboundClientsFailure,

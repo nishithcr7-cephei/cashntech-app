@@ -38,6 +38,7 @@ export * from './ClientInfo/VisitDetailForm';
 export * from './ClientInfo/ProfileScreen';
 
 export * from './InboundClient/InboundClientList';
+export * from './InboundClient/SubInboundClientList';
 
 export * from './ClientInfo/AssignTask';
 export * from './FormSelectionScreen/FormSelectionScreen';

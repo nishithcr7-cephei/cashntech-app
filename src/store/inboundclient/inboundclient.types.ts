@@ -5,6 +5,9 @@ export const INBOUND_CLIENT_ACTION_TYPES = {
   GET_INBOUND_CLIENTS_REQUEST: 'GET_INBOUND_CLIENTS_REQUEST',
   GET_INBOUND_CLIENTS_SUCCESS: 'GET_INBOUND_CLIENTS_SUCCESS',
   GET_INBOUND_CLIENTS_FAILURE: 'GET_INBOUND_CLIENTS_FAILURE',
+  GET_INBOUND_CLIENT_DETAILS_REQUEST: 'GET_INBOUND_CLIENT_DETAILS_REQUEST',
+  GET_INBOUND_CLIENT_DETAILS_SUCCESS: 'GET_INBOUND_CLIENT_DETAILS_SUCCESS',
+  GET_INBOUND_CLIENT_DETAILS_FAILURE: 'GET_INBOUND_CLIENT_DETAILS_FAILURE',
   FILTER_INBOUND_CLIENTS_REQUEST: 'FILTER_INBOUND_CLIENTS_REQUEST',
   FILTER_INBOUND_CLIENTS_SUCCESS: 'FILTER_INBOUND_CLIENTS_SUCCESS',
   FILTER_INBOUND_CLIENTS_FAILURE: 'FILTER_INBOUND_CLIENTS_FAILURE',
@@ -16,7 +19,9 @@ export const INBOUND_CLIENT_ACTION_TYPES = {
 export interface InboundClientState {
   inboundClients: InboundClientData[];
   filteredClients: InboundClientData[];
+  clientDetails: any | null;
   loading: boolean;
+  detailsLoading: boolean;
   error: string | null;
   appliedFilters: Record<string, string[]>;
 }
@@ -33,6 +38,21 @@ export interface GetInboundClientsSuccessAction {
 
 export interface GetInboundClientsFailureAction {
   type: typeof INBOUND_CLIENT_ACTION_TYPES.GET_INBOUND_CLIENTS_FAILURE;
+  payload: string;
+}
+
+export interface GetInboundClientDetailsRequestAction {
+  type: typeof INBOUND_CLIENT_ACTION_TYPES.GET_INBOUND_CLIENT_DETAILS_REQUEST;
+  payload: string; // registrationId
+}
+
+export interface GetInboundClientDetailsSuccessAction {
+  type: typeof INBOUND_CLIENT_ACTION_TYPES.GET_INBOUND_CLIENT_DETAILS_SUCCESS;
+  payload: any; // client details data
+}
+
+export interface GetInboundClientDetailsFailureAction {
+  type: typeof INBOUND_CLIENT_ACTION_TYPES.GET_INBOUND_CLIENT_DETAILS_FAILURE;
   payload: string;
 }
 
@@ -65,6 +85,9 @@ export type InboundClientActionTypes =
   | GetInboundClientsRequestAction
   | GetInboundClientsSuccessAction
   | GetInboundClientsFailureAction
+  | GetInboundClientDetailsRequestAction
+  | GetInboundClientDetailsSuccessAction
+  | GetInboundClientDetailsFailureAction
   | FilterInboundClientsRequestAction
   | FilterInboundClientsSuccessAction
   | FilterInboundClientsFailureAction

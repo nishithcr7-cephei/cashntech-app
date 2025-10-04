@@ -1,2 +1,2 @@
 export {InboundClientCard} from './InboundClientCard';
-export type {InboundClientData} from './InboundClientCard';
+export type {InboundClientData, InboundApplicant} from './InboundClientCard';

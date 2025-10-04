@@ -60,6 +60,13 @@ export type HomeNavigatorType = {
 
 export type ClientNavigatorType = {
   InboundClientList: undefined;
+  SubInboundClientList: {
+    registrationId: string;
+    clientName: string;
+    applicants: any[];
+    registrationStatus: string | null;
+    sector: string;
+  };
   ClientInfo: undefined;
   FormSelectionScreen: undefined;
   BasicDetailForm: undefined;

@@ -2,6 +2,7 @@ import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {
   InboundClientList,
+  SubInboundClientList,
   ClientInfo,
   FormSelectionScreen,
   BasicDetailForm,
@@ -23,6 +24,7 @@ export const ClientNavigator = () => {
   return (
     <Stack.Navigator screenOptions={{headerShown: false}}>
       <Stack.Screen name={ClientScreens.InboundClientList} component={InboundClientList} />
+      <Stack.Screen name={ClientScreens.SubInboundClientList} component={SubInboundClientList} />
       <Stack.Screen name={ClientScreens.ClientInfo} component={ClientInfo} />
       <Stack.Screen
         name={ClientScreens.FormSelectionScreen}

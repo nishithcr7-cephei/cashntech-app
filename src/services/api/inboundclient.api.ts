@@ -34,6 +34,23 @@ export interface InboundClientDeleteResponse {
   message: string;
 }
 
+export interface InboundClientDetailsResponse {
+  statusCode: number;
+  data: {
+    registration_id: string;
+    sector: string;
+    company_name: string;
+    monthly_turnover: number;
+    estimated_funding_required: number;
+    inboundClient: Array<{
+      id: number;
+      name_of_client: string;
+      email: string;
+      contact_number: string;
+    }>;
+  };
+}
+
 // API Functions
 const getInboundClients = async () => {
   const {data, error} = await tryCatch<AxiosResponse<InboundClientListResponse>>(
@@ -55,8 +72,29 @@ const getInboundClients = async () => {
   };
 };
 
+const getInboundClientDetails = async (registrationId: string) => {
+  const {data, error} = await tryCatch<AxiosResponse<InboundClientDetailsResponse>>(
+    Api.get(Endpoints.apiGetInboundClientDetails(registrationId), {
+      authRequired: true,
+    } as CustomRequestConfig),
+  );
+  
+  if (error) {
+    return {
+      data: null,
+      error: error,
+    };
+  }
+
+  return {
+    data: data.data,
+    error: null,
+  };
+};
+
 const InboundClientApis = {
   getInboundClients,
+  getInboundClientDetails,
 };
 
 export default InboundClientApis;

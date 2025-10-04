@@ -19,6 +19,7 @@ const Endpoints = {
   apiGetClientsFilter: '/client-info-master/filter/',
   apiGetAllClients: '/client-info-master/list',
   apiInboundClientsList: '/client-info-master/inbound-clients',
+  apiGetInboundClientDetails: (registrationId: string) => `/client-info-master/inbound/${registrationId}`,
   apiSaveBasicDetails: '/client-info-master/basic-details/',
   apiGetBasicDetails: '/client-info-master/basic/',
   apiSaveClientsDetails: '/client-info-master/client-details/',

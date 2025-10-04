@@ -15,6 +15,7 @@ enum DrawerScreens {
 
 enum ClientScreens {
   InboundClientList = 'InboundClientList',
+  SubInboundClientList = 'SubInboundClientList',
   ClientInfo = 'ClientInfo',
   FormSelectionScreen = 'FormSelectionScreen',
   BasicDetailForm = 'BasicDetailForm',

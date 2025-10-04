@@ -42,6 +42,8 @@ export const InboundClientList: React.FC<NavigationType> = ({navigation}) => {
   const error = useSelector(inboundClientSelectors.getError);
   const appliedFilters = useSelector(inboundClientSelectors.getAppliedFilters);
   const filterOptions = useSelector(inboundClientSelectors.getFilterOptions);
+  const clientDetails = useSelector(inboundClientSelectors.getClientDetails);
+  const detailsLoading = useSelector(inboundClientSelectors.getDetailsLoading);
   
   // Local state
   const [searchQuery, setSearchQuery] = useState('');
@@ -71,6 +73,8 @@ export const InboundClientList: React.FC<NavigationType> = ({navigation}) => {
   const onPressCard = (clientData: InboundClientData) => {
     setSelectedClient(clientData);
     setShowClientModal(true);
+    // Fetch detailed client information
+    dispatch(inboundClientActions.getInboundClientDetailsRequest(clientData.registration_id) as any);
   };
 
   const closeClientModal = () => {
@@ -142,14 +146,30 @@ export const InboundClientList: React.FC<NavigationType> = ({navigation}) => {
           <FlatList
             data={filteredClients}
             contentContainerStyle={{paddingBottom: scaleHeight(56)}}
-            renderItem={({item, index}) => (
-              <InboundClientCard
-                key={item.registration_id}
-                data={item}
-                onPressCard={onPressCard}
-                srNo={index + 1}
-              />
-            )}
+            renderItem={({item, index}) => {
+              const hasSubApplicants = item.inboundApplicants && item.inboundApplicants.length > 1;
+              const subApplicantCount = hasSubApplicants ? item.inboundApplicants.length - 1 : 0;
+              
+              return (
+                <InboundClientCard
+                  key={item.registration_id}
+                  data={item}
+                  onPressCard={onPressCard}
+                  srNo={index + 1}
+                  hasSubApplicants={hasSubApplicants}
+                  subApplicantCount={subApplicantCount}
+                  onSubApplicantPress={() => {
+                    navigation.navigate('SubInboundClientList', {
+                      registrationId: item.registration_id,
+                      clientName: item.company_name || '',
+                      applicants: item.inboundApplicants || [],
+                      registrationStatus: item.registration_status,
+                      sector: item.sector,
+                    });
+                  }}
+                />
+              );
+            }}
             refreshing={loading}
             onRefresh={fetchInboundClients}
             ListEmptyComponent={
@@ -187,48 +207,39 @@ export const InboundClientList: React.FC<NavigationType> = ({navigation}) => {
             </View>
 
             {/* Modal Content */}
-            {selectedClient ? (
+            {detailsLoading ? (
+              <View style={styles.modalContent}>
+                <Text style={styles.modalLabel}>Loading client details...</Text>
+              </View>
+            ) : clientDetails ? (
               <View style={styles.modalContent}>
                 <Text style={styles.modalLabel}>
-                  <Text style={styles.modalLabelBold}>Sr.No:</Text> {inboundClients.findIndex(client => client.registration_id === selectedClient.registration_id) + 1}
+                  <Text style={styles.modalLabelBold}>Name of Company:</Text> {decryptConditionally(clientDetails.company_name || '') || 'N/A'}
                 </Text>
                 <Text style={styles.modalLabel}>
-                  <Text style={styles.modalLabelBold}>Registration ID:</Text> {selectedClient.registration_id || 'N/A'}
+                  <Text style={styles.modalLabelBold}>Sector:</Text> {clientDetails.sector || 'N/A'}
                 </Text>
                 <Text style={styles.modalLabel}>
-                  <Text style={styles.modalLabelBold}>Name of Company:</Text> {decryptConditionally(selectedClient.company_name || '') || 'N/A'}
+                  <Text style={styles.modalLabelBold}>Monthly Turnover:</Text> {clientDetails.monthly_turnover ? `${clientDetails.monthly_turnover.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '0'}
                 </Text>
                 <Text style={styles.modalLabel}>
-                  <Text style={styles.modalLabelBold}>Sector:</Text> {selectedClient.sector || 'N/A'}
+                  <Text style={styles.modalLabelBold}>Estimated Funding Required:</Text> {clientDetails.estimated_funding_required ? `${clientDetails.estimated_funding_required.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '0'}
                 </Text>
-                <Text style={styles.modalLabel}>
-                  <Text style={styles.modalLabelBold}>City:</Text> {decryptConditionally(selectedClient.city || '') || 'N/A'}
-                </Text>
-                <Text style={styles.modalLabel}>
-                  <Text style={styles.modalLabelBold}>GST Number:</Text> {decryptConditionally(selectedClient.gst_number || '') || 'N/A'}
-                </Text>
-                {selectedClient.inboundClient[0] && (
+                {clientDetails.inboundClient && clientDetails.inboundClient[0] && (
                   <>
                     <Text style={styles.modalLabel}>
-                      <Text style={styles.modalLabelBold}>Name of Client:</Text> {decryptConditionally(selectedClient.inboundClient[0].name_of_client || '') || 'N/A'}
+                      <Text style={styles.modalLabelBold}>Name of Client:</Text> {decryptConditionally(clientDetails.inboundClient[0].name_of_client || '') || 'N/A'}
                     </Text>
                     <Text style={styles.modalLabel}>
-                      <Text style={styles.modalLabelBold}>Contact Number:</Text> {decryptConditionally(selectedClient.inboundClient[0].contact_number || '') || 'N/A'}
-                    </Text>
-                  </>
-                )}
-                {selectedClient.inboundApplicants[0] && (
-                  <>
-                    <Text style={styles.modalLabel}>
-                      <Text style={styles.modalLabelBold}>Application Status:</Text> {selectedClient.inboundApplicants[0].application_status || 'N/A'}
+                      <Text style={styles.modalLabelBold}>Contact Number:</Text> {decryptConditionally(clientDetails.inboundClient[0].contact_number || '') || 'N/A'}
                     </Text>
                     <Text style={styles.modalLabel}>
-                      <Text style={styles.modalLabelBold}>Overall Status:</Text> {selectedClient.inboundApplicants[0].overall_status || 'N/A'}
+                      <Text style={styles.modalLabelBold}>E-mail:</Text> {decryptConditionally(clientDetails.inboundClient[0].email || '') || 'N/A'}
                     </Text>
                   </>
                 )}
                 <Text style={styles.modalLabel}>
-                  <Text style={styles.modalLabelBold}>Registration Status:</Text> {selectedClient.registration_status || 'N/A'}
+                  <Text style={styles.modalLabelBold}>Message:</Text> As per Email
                 </Text>
               </View>
             ) : (
@@ -383,3 +394,4 @@ const styles = StyleSheet.create({
     color: '#333333',
   },
 });
+
