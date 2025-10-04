@@ -171,9 +171,10 @@ export const SoftsanctionProcess = () => {
             lead.user.last_name || ''
           ).trim()}`.trim()
         : 'NA',
-      turnover: formatIndianNumber(lead.monthly_turnover) || 'NA',
+      turnover: formatIndianNumber(lead.annual_turnover) || 'NA',
       estimatedFunding: formatIndianNumber(lead.estimated_funding_required) || 'NA',
       creditPeriod: lead.credit_period_offer?.toString() || 'NA',
+      sector: lead.sector || 'NA',
     }))
     .sort((a: any, b: any) => {
       const idA = parseInt(a.clientId) || 0;
@@ -182,10 +183,7 @@ export const SoftsanctionProcess = () => {
     })
     .filter((lead: any) => {
       if (searchTerm === '') return true;
-      return (
-        lead.clientName.toLowerCase().includes(searchTerm) ||
-        lead.clientId.toLowerCase().includes(searchTerm)
-      );
+      return lead.clientName.toLowerCase().includes(searchTerm);
     });
 
   return (
@@ -343,7 +341,7 @@ export const SoftsanctionProcess = () => {
                 <Search width={16} height={16} style={styles.searchIcon} />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Search Leads"
+                  placeholder="Search by Firm name"
                   value={search}
                   onChangeText={setSearch}
                   placeholderTextColor={Colors.darkGray}
@@ -362,9 +360,10 @@ export const SoftsanctionProcess = () => {
             ) : (
               <FlatList
                 data={filteredLeads}
-                renderItem={({item}) => (
+                renderItem={({item, index}) => (
                   <LeadCard
                     lead={item}
+                    index={index}
                     bankName={
                       bankList
                         .find((b: any) => b.id.toString() === selectedBank)

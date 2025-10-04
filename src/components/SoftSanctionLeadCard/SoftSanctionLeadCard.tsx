@@ -42,11 +42,13 @@ type LeadProps = {
     turnover: string;
     estimatedFunding: string;
     creditPeriod: string;
+    sector: string;
   };
   bankName: string;
   productName: string;
   methodName: string;
   rulesetId: string;
+  index: number;
 };
 
 export const LeadCard: React.FC<LeadProps> = ({
@@ -55,6 +57,7 @@ export const LeadCard: React.FC<LeadProps> = ({
   productName,
   methodName,
   rulesetId,
+  index,
 }) => {
   const [showModal, setShowModal] = useState(false);
   // 1. Clean up initial state to use only IDs
@@ -381,20 +384,26 @@ export const LeadCard: React.FC<LeadProps> = ({
           <Text style={styles.label}>ID :</Text> {lead.clientId}
         </Text>
         <Text style={styles.text}>
+          <Text style={styles.label}>Sr.No :</Text> {index + 1}
+        </Text>
+        <Text style={styles.text}>
           <Text style={styles.label}>Firm Name :</Text> {lead.clientName}
+        </Text>
+        <Text style={styles.text}>
+          <Text style={styles.label}>Sector :</Text> {lead.sector}
         </Text>
         <Text style={styles.text}>
           <Text style={styles.label}>City :</Text>{' '}
           {lead.location ? decryptUtility(lead.location) : ''}
         </Text>
         <Text style={styles.text}>
+          <Text style={styles.label}>Estimated Funding Required :</Text> {lead.estimatedFunding}
+        </Text>
+        <Text style={styles.text}>
           <Text style={styles.label}>Initiator :</Text> {lead.initiator}
         </Text>
         <Text style={styles.text}>
-          <Text style={styles.label}>Monthly Turnover :</Text> {lead.turnover}
-        </Text>
-        <Text style={styles.text}>
-          <Text style={styles.label}>Estimated Funding Required :</Text> {lead.estimatedFunding}
+          <Text style={styles.label}>Annual Turnover :</Text> {lead.turnover}
         </Text>
         <Text style={styles.text}>
           <Text style={styles.label}>Credit Period (In Days) :</Text> {lead.creditPeriod}

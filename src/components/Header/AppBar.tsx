@@ -16,6 +16,7 @@ import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 export type AppBarProps = {
   title?: string;
@@ -50,8 +51,10 @@ export const AppBar = ({
   hideHamburger = false,
   navigation,
 }: AppBarProps) => {
+  const insets = useSafeAreaInsets();
+  
   return (
-    <View style={[styles.container, containerStyle]}>
+    <View style={[styles.container, {paddingTop: insets.top}, containerStyle]}>
       {!hideHamburger && (
         <TouchableOpacity
           onPress={() => {
@@ -89,6 +92,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFE9E9',
     paddingHorizontal: scaleWidth(16),
     paddingVertical: scaleHeight(10),
+    position: 'relative',
+    zIndex: 1000,
   },
   titleText: {
     color: Colors.primaryColor,

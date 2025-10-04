@@ -9,7 +9,7 @@ export const Container: React.FC<React.PropsWithChildren<ViewProps>> = ({
 }) => {
   const {style, ...rest} = props;
   return (
-    <SafeAreaView style={[styles.container, style]} {...rest}>
+    <SafeAreaView style={[styles.container, style]} {...rest} edges={['left', 'right', 'bottom']}>
       <StatusBar
         hidden={false}
         translucent={false}
