@@ -159,19 +159,15 @@ export enum VisitType {
 }
 
 export enum FirmType {
-  CHARITY = 'Charity',
-  EDUCATIONAL_INSTITUTE = 'Educational institute',
-  GOVERNMENT = 'Government',
-  HUF = ' HUF',
-  INDIVIDUAL_SALARIED = 'Individual/Salaried',
-  LIMITED_LIABILITY_PARTNERSHIP = 'Limited liability Partnership',
-  MNC = 'MNC',
-  NON_GOVERNMENT_ORGANIZATION = 'Non Government Organization',
-  PARTNERSHIP = 'Partnership',
-  PRIVATE_LTD = 'Private Ltd',
-  PROPRIETERSHIP = 'Proprietership',
-  PUBLIC_LTD = 'Public Ltd',
+  LIMITED_LIABILITY_PARTNERSHIP = 'Limited Liability Partnership (LLP)',
+  ONE_PERSON_COMPANY = 'One Person Company (OPC)',
+  PRIVATE_LIMITED_COMPANY = 'Private Limited Company (Pvt Ltd)',
+  PUBLIC_LIMITED_LISTED = 'Public Limited Company (Ltd) – Listed',
+  PUBLIC_LIMITED_UNLISTED = 'Public Limited Company (Ltd) – Unlisted',
+  HINDU_UNDIVIDED_FAMILY = 'Hindu Undivided Family (HUF)',
   TRUST = 'Trust',
+  SOCIETY = 'Society',
+  SECTION_8_COMPANY = 'Section 8 Company – Not-for-profit company under Companies Act, 2013',
 }
 
 export enum SectorType {
@@ -256,30 +252,10 @@ const typeOfVisit = [
   {label: VisitType.REPEAT, value: VisitType.REPEAT},
 ];
 
-const typeOfFirm = [
-  {label: FirmType.CHARITY, value: FirmType.CHARITY},
-  {
-    label: FirmType.EDUCATIONAL_INSTITUTE,
-    value: FirmType.EDUCATIONAL_INSTITUTE,
-  },
-  {label: FirmType.GOVERNMENT, value: FirmType.GOVERNMENT},
-  {label: FirmType.HUF, value: FirmType.HUF},
-  {label: FirmType.INDIVIDUAL_SALARIED, value: FirmType.INDIVIDUAL_SALARIED},
-  {
-    label: FirmType.LIMITED_LIABILITY_PARTNERSHIP,
-    value: FirmType.LIMITED_LIABILITY_PARTNERSHIP,
-  },
-  {label: FirmType.MNC, value: FirmType.MNC},
-  {
-    label: FirmType.NON_GOVERNMENT_ORGANIZATION,
-    value: FirmType.NON_GOVERNMENT_ORGANIZATION,
-  },
-  {label: FirmType.PARTNERSHIP, value: FirmType.PARTNERSHIP},
-  {label: FirmType.PRIVATE_LTD, value: FirmType.PRIVATE_LTD},
-  {label: FirmType.PROPRIETERSHIP, value: FirmType.PROPRIETERSHIP},
-  {label: FirmType.PUBLIC_LTD, value: FirmType.PUBLIC_LTD},
-  {label: FirmType.TRUST, value: FirmType.TRUST},
-];
+const typeOfFirm = Object.values(FirmType).map(item => ({
+  label: item,
+  value: item,
+}));
 
 const sector = [
   {label: SectorType.FMCG, value: SectorType.FMCG},

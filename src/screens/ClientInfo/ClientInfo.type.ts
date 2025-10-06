@@ -30,19 +30,15 @@ export enum ClientType {
 }
 
 export enum FirmType {
-  CHARITY = 'CHARITY',
-  EDUCATIONAL_INSTITUTE = 'EDUCATIONAL_INSTITUTE',
-  GOVERNMENT = 'GOVERNMENT',
-  HUF = 'HUF',
-  INDIVIDUAL_SALARIED = 'INDIVIDUAL/SALARIED',
   LIMITED_LIABILITY_PARTNERSHIP = 'Limited Liability Partnership (LLP)',
-  MNC = 'MNC',
-  NON_GOVERNMENT_ORGANIZATION = 'NON GOVERNMENT ORGANIZATION',
-  PARTNERSHIP = 'Partnership',
-  PRIVATE_LTD = 'Private Ltd',
-  PROPRIETORSHIP = 'Proprietorship',
-  PUBLIC_LTD = 'Public Ltd',
-  TRUST = 'TRUST',
+  ONE_PERSON_COMPANY = 'One Person Company (OPC)',
+  PRIVATE_LIMITED_COMPANY = 'Private Limited Company (Pvt Ltd)',
+  PUBLIC_LIMITED_LISTED = 'Public Limited Company (Ltd) – Listed',
+  PUBLIC_LIMITED_UNLISTED = 'Public Limited Company (Ltd) – Unlisted',
+  HINDU_UNDIVIDED_FAMILY = 'Hindu Undivided Family (HUF)',
+  TRUST = 'Trust',
+  SOCIETY = 'Society',
+  SECTION_8_COMPANY = 'Section 8 Company – Not-for-profit company under Companies Act, 2013',
 }
 
 export enum IndustryType {

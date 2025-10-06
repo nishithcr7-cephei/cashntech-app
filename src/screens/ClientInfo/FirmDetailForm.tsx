@@ -56,10 +56,12 @@ const listOfFacilityTypes = Object.values(FacilityType).map(item => ({
   value: item,
 }));
 
-const listOfCreditPeriodOffer = Object.values(CreditPeriodOffer).map(item => ({
-  label: item,
-  value: item,
-}));
+const listOfCreditPeriodOffer = Object.values(CreditPeriodOffer)
+  .map(item => ({
+    label: item,
+    value: item,
+  }))
+  .sort((a, b) => Number(a.value) - Number(b.value));
 
 type Props = NativeStackScreenProps<ClientNavigatorType, 'FirmDetailForm'>;
 
@@ -287,7 +289,7 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             label="Credit Period Offer (In Days)"
             data={listOfCreditPeriodOffer}
             value={creditPeriodOffer}
-            dropdownPosition="top"
+            dropdownPosition="bottom"
             onChange={value => setData('creditPeriodOffer', value)}
             showSearch={false}
           />
