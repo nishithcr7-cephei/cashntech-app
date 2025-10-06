@@ -1,4 +1,5 @@
 import {RightCheckmarkWhite} from '@assets/Icons';
+import {LeftChevronCircle} from '@assets/Icons';
 import {
   Container,
   AppBar,
@@ -412,8 +413,13 @@ export const KycUplaodPan = () => {
         </View>
       )}
       <AppBar title="KYC Document" navigation={navigation} />
-      <View style={styles.Subcontainer}>
-        <Text style={styles.Subheader}>Upload PAN Card Details</Text>
+      <View>
+        <TouchableOpacity
+          style={styles.Subcontainer}
+          onPress={navigation.goBack}>
+          <LeftChevronCircle height={26} width={26} />
+          <Text style={styles.Subheader}>Upload PAN Card Details</Text>
+        </TouchableOpacity>
       </View>
       <ScrollView 
         contentContainerStyle={styles.container}
@@ -825,14 +831,17 @@ const styles = StyleSheet.create({
     paddingBottom: scaleHeight(40),
   },
   Subcontainer: {
-    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.LimeGray,
+    paddingLeft: 16,
+    paddingVertical: 12,
   },
   Subheader: {
-    width: '100%',
-    padding: 16,
+    marginLeft: 12,
     fontSize: scaleFont(16),
     fontWeight: fontWeight.SemiBold,
-    backgroundColor: Colors.LimeGray,
+    color: Colors.darkblack,
   },
   sectionTitle: {
     fontSize: scaleFont(16),

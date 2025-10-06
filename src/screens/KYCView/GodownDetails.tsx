@@ -22,6 +22,7 @@ import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {Linking} from 'react-native';
 
 import {RightCheckmark} from '@assets/Icons';
+import {LeftChevronCircle} from '@assets/Icons';
 import {
   AppBar,
   Container,
@@ -286,8 +287,13 @@ export const GodownDetails = () => {
         </View>
       )}
       <AppBar title="KYC Document" navigation={navigation} />
-      <View style={styles.Subcontainer}>
-        <Text style={styles.Subheader}>Upload Godown Details</Text>
+      <View>
+        <TouchableOpacity
+          style={styles.Subcontainer}
+          onPress={navigation.goBack}>
+          <LeftChevronCircle height={26} width={26} />
+          <Text style={styles.Subheader}>Upload Godown Details</Text>
+        </TouchableOpacity>
       </View>
       <ScrollView style={styles.mainContainer} contentContainerStyle={styles.scrollContainer}>
         <View style={styles.contentContainer}>
@@ -519,14 +525,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   Subcontainer: {
-    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.LimeGray,
+    paddingLeft: 16,
+    paddingVertical: 12,
   },
   Subheader: {
-    width: '100%',
-    padding: 16,
+    marginLeft: 12,
     fontSize: scaleFont(16),
     fontWeight: fontWeight.SemiBold,
-    backgroundColor: Colors.LimeGray,
+    color: Colors.darkblack,
   },
   scrollContainer: {
     padding: scaleWidth(24),

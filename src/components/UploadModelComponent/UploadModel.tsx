@@ -6,6 +6,7 @@ import {
   pick,
   types,
 } from '@react-native-documents/picker';
+import {launchCamera, CameraOptions, Asset} from 'react-native-image-picker';
 import {scaleWidth, scaleHeight, scaleFont} from '@utils/Scale';
 import {tryCatch} from '@utils/TryCatch';
 import React, {useState} from 'react';
@@ -18,6 +19,8 @@ import {
   TouchableWithoutFeedback,
   Image,
   Alert,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
 
 export const UploadModal = ({
@@ -32,6 +35,49 @@ export const UploadModal = ({
   const [selectedFile, setSelectedFile] = useState<
     DocumentPickerResponse | undefined
   >();
+
+  const requestCameraPermission = async () => {
+    if (Platform.OS !== 'android') return true;
+    try {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } catch (_e) {
+      return false;
+    }
+  };
+
+  const assetToDocument = (asset: Asset): DocumentPickerResponse | undefined => {
+    if (!asset?.uri) return undefined;
+    return {
+      uri: asset.uri,
+      name: asset.fileName ?? `photo_${Date.now()}.jpg`,
+      type: asset.type ?? 'image/jpeg',
+      size: asset.fileSize ?? 0,
+      fileCopyUri: asset.uri,
+    } as DocumentPickerResponse;
+  };
+
+  const handleCaptureFromCamera = async () => {
+    const hasPermission = await requestCameraPermission();
+    if (!hasPermission) {
+      return Alert.alert('Permission Required', 'Camera permission is needed to capture a photo.');
+    }
+
+    const options: CameraOptions = {
+      mediaType: 'photo',
+      cameraType: 'back',
+      quality: 0.8,
+      saveToPhotos: false,
+    };
+
+    const result = await launchCamera(options);
+    if (result?.assets && result.assets.length > 0) {
+      const doc = assetToDocument(result.assets[0]);
+      if (doc) setSelectedFile(doc);
+    }
+  };
 
   const handleBrowseFile = async () => {
     const allowedMimeTypes = allowedFileTypes?.map(type => {
@@ -101,6 +147,11 @@ export const UploadModal = ({
 
                 <View style={{alignItems: 'center'}}>
                   <TouchableOpacity
+                    style={[styles.browseButton, {backgroundColor: '#16a34a'}]}
+                    onPress={handleCaptureFromCamera}>
+                    <Text style={styles.browseText}>Capture from Camera</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
                     style={styles.browseButton}
                     onPress={handleBrowseFile}>
                     <Text style={styles.browseText}>Browse File</Text>
@@ -151,6 +202,19 @@ export const UploadModal = ({
                           Unsupported file type
                         </Text>
                       )}
+
+                      <View style={styles.actionRow}>
+                        <TouchableOpacity
+                          style={[styles.secondaryButton, {marginRight: 8}]}
+                          onPress={() => setSelectedFile(undefined)}>
+                          <Text style={styles.secondaryText}>Retake</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.secondaryButton}
+                          onPress={() => onClose()}>
+                          <Text style={styles.secondaryText}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   )}
                 </View>
@@ -159,10 +223,14 @@ export const UploadModal = ({
               <TouchableOpacity
                 style={styles.saveButton}
                 activeOpacity={0.7}
+                disabled={!selectedFile}
                 onPress={() => {
                   handleSubmit();
                 }}>
-                <Text style={styles.saveText}>Submit</Text>
+                <Text style={[
+                  styles.saveText,
+                  !selectedFile ? {opacity: 0.7} : null,
+                ]}>Submit</Text>
                 <RightCheckmarkWhite width={12} height={12} />
               </TouchableOpacity>
             </View>
@@ -230,5 +298,21 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontFamily: Fonts.GilroyMedium,
     fontSize: scaleFont(14),
+  },
+  actionRow: {
+    flexDirection: 'row',
+    marginTop: 10,
+  },
+  secondaryButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    backgroundColor: '#fff',
+  },
+  secondaryText: {
+    color: '#111827',
+    fontWeight: '600',
   },
 });

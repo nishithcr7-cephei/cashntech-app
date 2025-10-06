@@ -1,4 +1,5 @@
 import {RightCheckmark} from '@assets/Icons';
+import {LeftChevronCircle} from '@assets/Icons';
 import {
   AppBar,
   Container,
@@ -255,8 +256,13 @@ export const UdhyamCertificate = () => {
       )}
       <AppBar title="KYC Document" navigation={navigation} />
       
-      <View style={styles.Subcontainer}>
-        <Text style={styles.Subheader}>Upload Udhyam Certificate Details</Text>
+      <View>
+        <TouchableOpacity
+          style={styles.Subcontainer}
+          onPress={navigation.goBack}>
+          <LeftChevronCircle height={26} width={26} />
+          <Text style={styles.Subheader}>Upload Udhyam Certificate Details</Text>
+        </TouchableOpacity>
       </View>
       <View style={styles.mainContainer}>
         <View style={styles.scrollContainer}>
@@ -447,14 +453,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   Subcontainer: {
-    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.LimeGray,
+    paddingLeft: 16,
+    paddingVertical: 12,
   },
   Subheader: {
-    width: '100%',
-    padding: 16,
+    marginLeft: 12,
     fontSize: scaleFont(16),
     fontWeight: fontWeight.SemiBold,
-    backgroundColor: Colors.LimeGray,
+    color: Colors.darkblack,
   },
   scrollContainer: {
     padding: scaleWidth(24),

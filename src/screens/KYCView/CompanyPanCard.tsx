@@ -21,6 +21,7 @@ import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {Linking} from 'react-native';
 
 import {RightCheckmarkWhite} from '@assets/Icons';
+import {LeftChevronCircle} from '@assets/Icons';
 import {
   AppBar,
   Container,
@@ -235,8 +236,13 @@ export const CompanyPanCard = () => {
         </View>
       )}
       <AppBar title="Client Information Master" navigation={navigation} />
-      <View style={styles.Subcontainer}>
-        <Text style={styles.Subheader}>Kyc Document</Text>
+      <View>
+        <TouchableOpacity
+          style={styles.Subcontainer}
+          onPress={navigation.goBack}>
+          <LeftChevronCircle height={26} width={26} />
+          <Text style={styles.Subheader}>Kyc Document</Text>
+        </TouchableOpacity>
       </View>
       <View style={styles.container}>
         {/* Main Applicant Section */}
@@ -418,14 +424,17 @@ export const CompanyPanCard = () => {
 
 const styles = StyleSheet.create({
   Subcontainer: {
-    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.LimeGray,
+    paddingLeft: 16,
+    paddingVertical: 12,
   },
   Subheader: {
-    width: '100%',
-    padding: 16,
+    marginLeft: 12,
     fontSize: scaleFont(16),
     fontWeight: fontWeight.SemiBold,
-    backgroundColor: Colors.LimeGray,
+    color: Colors.darkblack,
   },
   container: {
     flex: 1,
