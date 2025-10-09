@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {LeftChevronCircle} from '@assets/Icons';
 import {
   Container,
@@ -27,12 +27,15 @@ import {clientActions, clientSelector, FirmDetailsType} from '@store/client';
 import Toast from 'react-native-toast-message';
 import {ClientScreens} from '@constants/Screens';
 import {formatIndianNumber} from '@utils/Utils';
+import moment from 'moment';
+import {DateNTimePicker} from '@components/index';
 import {
   CreditPeriodOffer,
   FacilityType,
   FirmType,
   IndustryType,
   SectorType,
+  RatingType,
   industrySectorMapping,
 } from './ClientInfo.type';
 
@@ -63,6 +66,11 @@ const listOfCreditPeriodOffer = Object.values(CreditPeriodOffer)
   }))
   .sort((a, b) => Number(a.value) - Number(b.value));
 
+const listOfRatings = Object.values(RatingType).map(item => ({
+  label: item,
+  value: item,
+}));
+
 type Props = NativeStackScreenProps<ClientNavigatorType, 'FirmDetailForm'>;
 
 export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
@@ -77,9 +85,11 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
 
   const {
     firmType,
+    dateOfCorporation,
     businessVintage,
     industry,
     sector,
+    rating,
     bankName,
     cibilScore,
     facilityType,
@@ -100,6 +110,30 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
   ) {
     dispatch(clientActions.setFirmDetails({[field]: value}));
   }
+
+  // Calculate business vintage based on date of corporation
+  const calculatedBusinessVintage = useMemo(() => {
+    if (!dateOfCorporation) {
+      return '';
+    }
+    
+    const corporationDate = moment(dateOfCorporation);
+    const today = moment();
+    
+    if (corporationDate.isAfter(today)) {
+      return '0'; // Future date should show 0 years
+    }
+    
+    const years = today.diff(corporationDate, 'years');
+    return years.toString();
+  }, [dateOfCorporation]);
+
+  // Update business vintage when date of corporation changes
+  useEffect(() => {
+    if (calculatedBusinessVintage !== businessVintage) {
+      setData('businessVintage', calculatedBusinessVintage);
+    }
+  }, [calculatedBusinessVintage, businessVintage]);
 
   // Get filtered sectors based on selected industry
   const getFilteredSectors = () => {
@@ -157,9 +191,11 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
 
   const requiredFields = [
     {field: firmType, name: 'Type of Firm'},
+    {field: dateOfCorporation, name: 'Date of Corporation'},
     {field: businessVintage, name: 'Business Vintage'},
     {field: industry, name: 'Industry'},
     {field: sector, name: 'Sector'},
+    {field: rating, name: 'Rating'},
     {field: bankName, name: 'Bank Name'},
     {field: annualTurnover, name: 'Annual Turnover'},
     {field: cibilScore, name: 'CIBIL Score'},
@@ -216,13 +252,23 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             value={firmType}
             onChange={value => setData('firmType', value)}
           />
+          <DateNTimePicker
+            label="Date of Corporation"
+            placeholder="Select Date of Corporation"
+            value={dateOfCorporation ? moment(dateOfCorporation).format('DD/MM/YYYY') : ''}
+            onConfirm={date => setData('dateOfCorporation', date.toISOString())}
+            mode="date"
+            datePickerProps={{
+              maximumDate: new Date(), // Restrict to past dates only
+            }}
+          />
           <Input
             label="Business Vintage (in Years)"
-            placeholder="Enter Business vintage"
+            placeholder="Auto-calculated"
             value={businessVintage}
+            editable={false}
             keyboardType="numeric"
             maxLength={3}
-            onChangeText={value => setData('businessVintage', value)}
           />
           <CustomDropdown
             label="Industry"
@@ -235,6 +281,13 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             data={getFilteredSectors()}
             value={sector}
             onChange={value => setData('sector', value)}
+          />
+          <CustomDropdown
+            label="Rating"
+            data={listOfRatings}
+            value={rating}
+            onChange={value => setData('rating', value)}
+            showSearch={false}
           />
           <MultiSelectDropdown
             label="Bank Name"

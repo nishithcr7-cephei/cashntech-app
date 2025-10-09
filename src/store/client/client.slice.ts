@@ -44,9 +44,11 @@ const clientsDetails: ClientsDetailsType = [
 
 const firmDetails: FirmDetailsType = {
   firmType: '',
+  dateOfCorporation: undefined,
   businessVintage: '',
   industry: '',
   sector: '',
+  rating: '',
   bankName: [], // Ensure this is truly empty, not containing empty strings
   cibilScore: '',
   facilityType: [], // Changed to array to support multiple facility types
@@ -64,8 +66,8 @@ const vendorDetails: VendorDetailsType = [
     address: '',
     city: '',
     pinCode: '',
-    productCategory: undefined,
-    productType: '',
+    productCategory: [],
+    productType: [],
     state: undefined,
     vendorContactNumber: '',
     vendorContactEmail: '',
@@ -77,7 +79,7 @@ const visitDetails: VisitDetailsType = {
   dateOfNextVisit: undefined,
   intent: undefined,
   reasonForNotInterested: '',
-  interestedFor: '',
+  interestedFor: [],
   userResponse: undefined,
 };
 
@@ -99,6 +101,14 @@ const initialState: ClientState = {
   isSavedFirmDetails: false,
   isSavedVendorDetails: false,
   isSavedVisitDetails: false,
+
+  // Location options from pincode API
+  locationOptions: [],
+  locationLoading: false,
+
+  // Postal code options for vendor forms
+  postalCodeOptions: [],
+  postalCodeLoading: false,
 
   //Remark Report fields
   reportLoader: false,
@@ -347,8 +357,8 @@ const clientSlice = createSlice({
     addNewVendorDetails: state => {
       state.vendorDetails.push({
         key: Math.random().toString(36).substring(7),
-        productCategory: undefined,
-        productType: '',
+        productCategory: [],
+        productType: [],
         vendorName: '',
         address: '',
         state: undefined,
@@ -488,6 +498,30 @@ const clientSlice = createSlice({
       state.clientDetails = null;
       state.clientDetailsError = action.payload;
     },
+    // Location options from pincode API
+    fetchLocationOptions: (state, _action: PayloadAction<string>) => {
+      state.locationLoading = true;
+    },
+    setLocationOptions: (state, action: PayloadAction<Array<{label: string; value: string}>>) => {
+      state.locationLoading = false;
+      state.locationOptions = action.payload;
+    },
+    clearLocationOptions: state => {
+      state.locationOptions = [];
+      state.locationLoading = false;
+    },
+    // Postal code options for vendor forms
+    fetchPostalCodeOptions: (state, _action: PayloadAction<string>) => {
+      state.postalCodeLoading = true;
+    },
+    setPostalCodeOptions: (state, action: PayloadAction<Array<{label: string; value: string}>>) => {
+      state.postalCodeLoading = false;
+      state.postalCodeOptions = action.payload;
+    },
+    clearPostalCodeOptions: state => {
+      state.postalCodeOptions = [];
+      state.postalCodeLoading = false;
+    },
   },
 });
 
@@ -563,5 +597,11 @@ export const {
   getClientDetails,
   setClientDetails,
   setClientDetailsError,
+  fetchLocationOptions,
+  setLocationOptions,
+  clearLocationOptions,
+  fetchPostalCodeOptions,
+  setPostalCodeOptions,
+  clearPostalCodeOptions,
 } = clientSlice.actions;
 export default clientSlice.reducer;

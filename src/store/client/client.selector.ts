@@ -128,6 +128,26 @@ const getClientDetailsError = createSelector(
   _state => _state.clientDetailsError,
 );
 
+const getLocationOptions = createSelector(
+  _selectState,
+  _state => _state.locationOptions,
+);
+
+const getLocationLoading = createSelector(
+  _selectState,
+  _state => _state.locationLoading,
+);
+
+const getPostalCodeOptions = createSelector(
+  _selectState,
+  _state => _state.postalCodeOptions,
+);
+
+const getPostalCodeLoading = createSelector(
+  _selectState,
+  _state => _state.postalCodeLoading,
+);
+
 
 
 export default {
@@ -160,4 +180,8 @@ export default {
   getClientDetails,
   getClientDetailsLoading,
   getClientDetailsError,
+  getLocationOptions,
+  getLocationLoading,
+  getPostalCodeOptions,
+  getPostalCodeLoading,
 };

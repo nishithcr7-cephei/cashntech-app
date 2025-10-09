@@ -18,6 +18,14 @@ export type ClientState = {
   isSavedVendorDetails: boolean;
   isSavedVisitDetails: boolean;
 
+  // Location options from pincode API
+  locationOptions: Array<{label: string; value: string}>;
+  locationLoading: boolean;
+
+  // Postal code options for vendor forms
+  postalCodeOptions: Array<{label: string; value: string}>;
+  postalCodeLoading: boolean;
+
 
   basicLoader: boolean;
   clientId: null;
@@ -107,9 +115,11 @@ export type ClientsDetailsType = Array<{
 
 export type FirmDetailsType = {
   firmType: string;
+  dateOfCorporation: string | undefined;
   businessVintage: string;
   industry: string;
   sector: string;
+  rating: string;
   bankName: string[];
   cibilScore: string;
   facilityType: string[];
@@ -122,8 +132,8 @@ export type FirmDetailsType = {
 
 export type VendorDetailsType = Array<{
   key: string;
-  productCategory: ProductCategory | undefined;
-  productType: string;
+  productCategory: string[];
+  productType: string[];
   vendorName: string;
   address: string;
   state: keyof typeof Cities | undefined;
@@ -138,7 +148,7 @@ export type VisitDetailsType = {
   userResponse: UserResponse | undefined;
   intent: IntentType | undefined;
   dateOfNextVisit: string | undefined;
-  interestedFor: string;
+  interestedFor: string[];
   reasonForNotInterested: string;
 };
 
@@ -180,6 +190,7 @@ export type VisitDetailsPayload =
       client_response: UserResponse.INTERESTED;
       intent: string;
       date_of_next_visit: string;
+      are_you_interested_for: string;
       created_by: string;
     }
   | {
@@ -269,9 +280,11 @@ export type ClientsDetailsPayload = Array<{
 
 export type FirmDetailsPayload = {
   firm_type: string;
+  date_of_corporation?: string;
   business_vintage: string;
   industry: string;
   sector: string;
+  rating: string;
   bank_name: string; // API expects comma-separated string
   cibil_score: number;
   annual_turnover: number;
@@ -292,8 +305,10 @@ export type FirmDetailsData = {
   id: number;
   annual_turnover: number;
   firm_type: string;
+  date_of_corporation?: string;
   business_vintage: string;
   sector: string;
+  rating: string;
   bank_name: string | string[]; // Support both string and array for backward compatibility
   cibil_score: number;
   facility_type: string;

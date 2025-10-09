@@ -16,6 +16,7 @@ import {
   AppBar,
   Input,
   CustomDropdown,
+  MultiSelectDropdown,
   FooterButton,
 } from '@components/index';
 import Cities from '@constants/Cities';
@@ -57,9 +58,19 @@ const VendorForm = ({
   const dispatch = useDispatch();
 
   const listOfProductType = useMemo(() => {
-    if (!vendor.productCategory || !productTypeOptions[vendor.productCategory])
-      return [];
-    return productTypeOptions[vendor.productCategory].map(item => ({
+    if (!vendor.productCategory || vendor.productCategory.length === 0) return [];
+    
+    // Combine product types from all selected categories
+    const allProductTypes = new Set<string>();
+    vendor.productCategory.forEach(category => {
+      if (productTypeOptions[category as ProductCategory]) {
+        productTypeOptions[category as ProductCategory].forEach(type => {
+          allProductTypes.add(type);
+        });
+      }
+    });
+    
+    return Array.from(allProductTypes).map(item => ({
       label: item,
       value: item,
     }));
@@ -70,13 +81,33 @@ const VendorForm = ({
     return Cities[vendor.state] ?? [];
   }, [vendor.state]);
 
+  const postalCodeOptions = useSelector(clientSelector.getPostalCodeOptions);
+  const postalCodeLoading = useSelector(clientSelector.getPostalCodeLoading);
+
+  useEffect(() => {
+    console.log('VendorDetailForm: Postal code options updated:', postalCodeOptions);
+    console.log('VendorDetailForm: Postal code loading:', postalCodeLoading);
+  }, [postalCodeOptions, postalCodeLoading]);
+
   useEffect(() => {
     setData('city', '', index);
+    setData('pinCode', '', index);
   }, [vendor.state]);
 
   useEffect(() => {
-    setData('productType', '', index);
+    setData('productType', [], index);
   }, [vendor.productCategory]);
+
+  useEffect(() => {
+    console.log('VendorDetailForm: City changed to:', vendor.city);
+    if (vendor.city) {
+      console.log('VendorDetailForm: Dispatching fetchPostalCodeOptions for:', vendor.city);
+      dispatch(clientActions.fetchPostalCodeOptions(vendor.city));
+    } else {
+      console.log('VendorDetailForm: Clearing postal code options');
+      dispatch(clientActions.clearPostalCodeOptions());
+    }
+  }, [vendor.city, dispatch]);
 
   const removeVendor = (id: string) => {
     dispatch(clientActions.removeVendorDetails(id));
@@ -100,17 +131,19 @@ const VendorForm = ({
             </TouchableOpacity>
           )}
         </View>
-        <CustomDropdown
+        <MultiSelectDropdown
           label="Product Category"
           data={listOfProductCategories}
           value={vendor.productCategory}
           onChange={value => setData('productCategory', value, index)}
+          placeholder="Select multiple product categories"
         />
-        <CustomDropdown
+        <MultiSelectDropdown
           label="Product Type"
           data={listOfProductType}
           value={vendor.productType}
           onChange={value => setData('productType', value, index)}
+          placeholder="Select multiple product types"
         />
         <Input
           label="Vendor Name"
@@ -141,13 +174,13 @@ const VendorForm = ({
           onChange={value => setData('city', value, index)}
         />
 
-        <Input
+        <CustomDropdown
           label="Pincode"
-          placeholder="Enter Pincode"
-          keyboardType="numeric"
-          maxLength={6}
+          placeholder={postalCodeLoading ? "Loading..." : "Select Pincode"}
+          data={postalCodeOptions}
           value={vendor.pinCode}
-          onChangeText={value => setData('pinCode', value, index)}
+          onChange={value => setData('pinCode', value, index)}
+          showSearch={true}
         />
         <Input
           label="Vendor Contact Number"
@@ -214,8 +247,8 @@ export const VendorDetailForm: React.FC<Props> = ({navigation}) => {
     for (let i = 0; i < vendorDetails.length; i++) {
       const vendor = vendorDetails[i];
       if (
-        !vendor.productCategory?.trim() ||
-        !vendor.productType?.trim() ||
+        !vendor.productCategory || vendor.productCategory.length === 0 ||
+        !vendor.productType || vendor.productType.length === 0 ||
         !vendor.vendorName?.trim() ||
         !vendor.address?.trim() ||
         !vendor.state?.trim() ||

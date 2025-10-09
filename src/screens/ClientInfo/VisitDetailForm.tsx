@@ -13,6 +13,7 @@ import {
   AppBar,
   Input,
   CustomDropdown,
+  MultiSelectDropdown,
   DateNTimePicker,
   FooterButton,
 } from '@components/index';
@@ -151,14 +152,16 @@ export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
         });
         return false;
       }
-      if (!interestedFor?.trim()) {
-        Toast.show({
-          type: 'error',
-          text1: 'Validation Error',
-          text2: 'Please fill the "Are you Interested for?" field.',
-        });
-        return false;
-      }
+    }
+
+    // Validate interestedFor for both cases
+    if (!interestedFor || interestedFor.length === 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'Validation Error',
+        text2: 'Please select at least one option for "Are you additionally interested for?".',
+      });
+      return false;
     }
 
     return true;
@@ -210,22 +213,22 @@ export const VisitDetailForm: React.FC<Props> = ({navigation}) => {
             </>
           )}
           {userResponse === UserResponse.NOT_INTERESTED && (
-            <>
-              <Input
-                label="Reason for Not Interested"
-                placeholder="value"
-                maxLength={100}
-                value={reasonForNotInterested}
-                onChangeText={value => setData('reasonForNotInterested', value)}
-              />
-              <CustomDropdown
-                label="Are you Interested for ?"
-                data={listInterestedFor}
-                value={interestedFor}
-                onChange={value => setData('interestedFor', value)}
-                showSearch={false}
-              />
-            </>
+            <Input
+              label="Reason for Not Interested"
+              placeholder="value"
+              maxLength={100}
+              value={reasonForNotInterested}
+              onChangeText={value => setData('reasonForNotInterested', value)}
+            />
+          )}
+          {userResponse && (
+            <MultiSelectDropdown
+              label="Are you additionally interested for?"
+              data={listInterestedFor}
+              value={interestedFor}
+              onChange={value => setData('interestedFor', value)}
+              placeholder="Select multiple options"
+            />
           )}
         </View>
       </KeyboardAvoidingScrollView>

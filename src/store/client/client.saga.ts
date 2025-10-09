@@ -21,8 +21,10 @@ import {
   TaskRecordsFilterRequest,
   updateClientBasicDetails,
   updateClientsDetails,
+  fetchLocationOptions,
+  fetchPostalCodeOptions,
 } from './client.slice';
-import {ClientApis} from '@services/api';
+import {ClientApis, PostalApi} from '@services/api';
 import axiosInstance from '@services/api/api';
 import {
   clientActions,
@@ -524,10 +526,12 @@ function* saveFirmDetailsSaga(): unknown {
   
   const body: FirmDetailsPayload = {
     firm_type: firmDetails.firmType,
+    date_of_corporation: firmDetails.dateOfCorporation,
     bank_name: encryptedBankNames, // Join multiple banks with comma and encrypt
     business_vintage: firmDetails.businessVintage.trim(),
     industry: firmDetails.industry,
     sector: firmDetails.sector,
+    rating: firmDetails.rating,
     facility_type: facilityTypesString, // Join multiple facility types with comma
     cibil_score: Number(firmDetails.cibilScore),
     credit_period_offer: Number(firmDetails.creditPeriodOffer),
@@ -611,10 +615,12 @@ function* getFirmDetailsSaga(action: PayloadAction<number>): unknown {
 
     const firmDetails: Partial<FirmDetailsType> = {
       firmType: data.firm_type,
+      dateOfCorporation: data.date_of_corporation,
       bankName: bankNames,
       businessVintage: data.business_vintage,
       industry: data.industry,
       sector: data.sector,
+      rating: data.rating,
       facilityType: facilityTypes,
       cibilScore: data.cibil_score?.toString() ?? '',
       creditPeriodOffer: data.credit_period_offer?.toString() ?? '',
@@ -635,8 +641,12 @@ function* saveVendorDetailsSaga(): unknown {
     clientSelector.getVendorDetailsFormData,
   );
   const body: VendorDetailsPayload = vendorDetails.map(vendor => ({
-    product_category: vendor.productCategory ?? '',
-    product_type: vendor.productType,
+    product_category: Array.isArray(vendor.productCategory) 
+      ? vendor.productCategory.join(',') 
+      : vendor.productCategory ?? '',
+    product_type: Array.isArray(vendor.productType) 
+      ? vendor.productType.join(',') 
+      : vendor.productType,
     vendor_name: vendor.vendorName.trim(),
     address: vendor.address.trim(),
     city: vendor.city,
@@ -697,8 +707,12 @@ function* getVendorDetailsSaga(action: PayloadAction<number>): unknown {
     const vendorDetails: VendorDetailsType = data.map(vendor => {
       try {
         return {
-          productCategory: vendor.product_category as ProductCategory,
-          productType: vendor.product_type || '',
+          productCategory: vendor.product_category 
+            ? vendor.product_category.split(',').filter(cat => cat.trim() !== '')
+            : [],
+          productType: vendor.product_type 
+            ? vendor.product_type.split(',').filter(type => type.trim() !== '')
+            : [],
           vendorName: decryptUtility(vendor.vendor_name || ''),
           address: decryptUtility(vendor.vendor_address || ''),
           city: decryptUtility(vendor.vendor_city || ''),
@@ -713,8 +727,8 @@ function* getVendorDetailsSaga(action: PayloadAction<number>): unknown {
         console.error('getVendorDetailsSaga: Error processing vendor:', vendor, vendorError);
         // Return a safe default vendor object
         return {
-          productCategory: undefined,
-          productType: '',
+          productCategory: [],
+          productType: [],
           vendorName: '',
           address: '',
           city: '',
@@ -751,18 +765,24 @@ function* saveVisitDetailsSaga(): unknown {
 
   let body: VisitDetailsPayload;
   if (!visitDetails.userResponse) return;
+  
+  const interestedForString = Array.isArray(visitDetails.interestedFor) 
+    ? visitDetails.interestedFor.join(',') 
+    : visitDetails.interestedFor || '';
+    
   if (visitDetails.userResponse === UserResponse.INTERESTED) {
     body = {
       client_response: visitDetails.userResponse,
       intent: visitDetails.intent ?? ''.trim(),
       date_of_next_visit: moment(visitDetails.dateOfNextVisit).toISOString(),
+      are_you_interested_for: interestedForString,
       created_by: `${first_name} ${last_name}`,
     };
   } else {
     body = {
       client_response: visitDetails.userResponse,
-      are_you_interested_for: visitDetails.interestedFor.trim(),
       reason_for_not_interested: visitDetails.reasonForNotInterested.trim(),
+      are_you_interested_for: interestedForString,
       created_by: `${first_name} ${last_name}`,
     };
   }
@@ -798,18 +818,24 @@ function* saveVisitDetailsAndSubmitSaga(): unknown {
 
   let body: VisitDetailsPayload;
   if (!visitDetails.userResponse) return;
+  
+  const interestedForString = Array.isArray(visitDetails.interestedFor) 
+    ? visitDetails.interestedFor.join(',') 
+    : visitDetails.interestedFor || '';
+    
   if (visitDetails.userResponse === UserResponse.INTERESTED) {
     body = {
       client_response: visitDetails.userResponse,
       intent: visitDetails.intent ?? ''.trim(),
       date_of_next_visit: moment(visitDetails.dateOfNextVisit).toISOString(),
+      are_you_interested_for: interestedForString,
       created_by: `${first_name} ${last_name}`,
     };
   } else {
     body = {
       client_response: visitDetails.userResponse,
-      are_you_interested_for: visitDetails.interestedFor.trim(),
       reason_for_not_interested: visitDetails.reasonForNotInterested.trim(),
+      are_you_interested_for: interestedForString,
       created_by: `${first_name} ${last_name}`,
     };
   }
@@ -856,7 +882,9 @@ function* getVisitDetailsFormData(action: PayloadAction<number>): unknown {
     userResponse: data.client_response ?? undefined,
     intent: data.intent ?? undefined,
     dateOfNextVisit: data.date_of_next_visit ?? undefined,
-    interestedFor: data.are_you_interested_for ?? undefined,
+    interestedFor: data.are_you_interested_for 
+      ? data.are_you_interested_for.split(',').filter(item => item.trim() !== '')
+      : [],
     reasonForNotInterested: data.reason_for_not_interested ?? undefined,
   };
   yield put(clientActions.setVisitDetails(dataToSet));
@@ -928,6 +956,130 @@ function* handleGetClientDetails(action: PayloadAction<number>): Generator<any, 
   }
 }
 
+function* handleFetchLocationOptions(action: PayloadAction<string>): Generator<any, void, any> {
+  try {
+    const pincode = action.payload;
+    
+    // Validate pincode length
+    if (pincode.length !== 6) {
+      yield put(clientActions.clearLocationOptions());
+      return;
+    }
+
+    const response = yield call(PostalApi.getPostOfficesByPincode, pincode);
+    
+    // Check if the response is valid
+    if (!response) {
+      yield put(clientActions.setLocationOptions([]));
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Response',
+        text2: 'No data received from server',
+      });
+      return;
+    }
+    
+    // Check if the response indicates an error or invalid pincode
+    if (PostalApi.isErrorResponse(response)) {
+      yield put(clientActions.setLocationOptions([]));
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Pincode',
+        text2: response.Message || 'No records found for this pincode',
+      });
+      return;
+    }
+    
+    // Extract and set location options for successful response
+    const locationOptions = PostalApi.extractPostOfficeNames(response).map(name => ({
+      label: name,
+      value: name,
+    }));
+    
+    if (locationOptions.length > 0) {
+      yield put(clientActions.setLocationOptions(locationOptions));
+      console.log(`Found ${locationOptions.length} locations for pincode ${pincode}:`, locationOptions.map(opt => opt.label));
+    } else {
+      yield put(clientActions.setLocationOptions([]));
+      Toast.show({
+        type: 'error',
+        text1: 'No Locations Found',
+        text2: 'No post offices found for this pincode',
+      });
+    }
+  } catch (error: any) {
+    console.error('Error fetching location options:', error);
+    yield put(clientActions.setLocationOptions([]));
+    Toast.show({
+      type: 'error',
+      text1: 'Failed to fetch location options',
+      text2: 'Please check your internet connection',
+    });
+  }
+}
+
+function* handleFetchPostalCodeOptions(action: PayloadAction<string>): Generator<any, void, any> {
+  try {
+    const cityName = action.payload;
+    console.log('Saga: Fetching postal codes for city:', cityName);
+    
+    if (!cityName || cityName.trim() === '') {
+      console.log('Saga: City name is empty, clearing postal code options');
+      yield put(clientActions.clearPostalCodeOptions());
+      return;
+    }
+
+    const response = yield call(PostalApi.getPostalCodes, cityName);
+    console.log('Saga: Received response:', response);
+    
+    // Check if the response is valid
+    if (!response) {
+      console.log('Saga: No response received');
+      yield put(clientActions.setPostalCodeOptions([]));
+      return;
+    }
+
+    // Check if the response has the expected structure
+    if (!Array.isArray(response) || response.length === 0) {
+      console.log('Saga: Invalid response structure or empty array');
+      yield put(clientActions.setPostalCodeOptions([]));
+      return;
+    }
+
+    const firstResponse = response[0];
+    console.log('Saga: First response:', firstResponse);
+    
+    // Check if the first response has PostOffice data
+    if (!firstResponse.PostOffice || !Array.isArray(firstResponse.PostOffice)) {
+      console.log('Saga: No PostOffice data found');
+      yield put(clientActions.setPostalCodeOptions([]));
+      return;
+    }
+
+    // Transform the data to the expected format - get unique pincodes
+    const postalCodeOptions = firstResponse.PostOffice
+      .filter((office: any) => office.Pincode && office.Pincode.trim() !== '')
+      .map((office: any) => ({
+        label: office.Pincode,
+        value: office.Pincode,
+      }))
+      .filter((option: any, index: number, array: any[]) => 
+        array.findIndex(item => item.value === option.value) === index
+      );
+
+    console.log('Saga: Processed postal code options:', postalCodeOptions);
+    yield put(clientActions.setPostalCodeOptions(postalCodeOptions));
+  } catch (error) {
+    console.error('Saga: Error fetching postal code options:', error);
+    yield put(clientActions.setPostalCodeOptions([]));
+    Toast.show({
+      type: 'error',
+      text1: 'Error',
+      text2: 'Failed to fetch postal codes. Please try again.',
+    });
+  }
+}
+
 
 export default function* clientSaga() {
   yield takeLatest(getClients.type, handleGetClientsFilter);
@@ -954,4 +1106,6 @@ export default function* clientSaga() {
   yield takeLatest(FilterRequest.type, handleFilterbox);
   yield takeLatest(TaskRecordsFilterRequest.type, handleTaskRecordsFilter);
   yield takeLatest(clientActions.getClientDetails.type, handleGetClientDetails);
+  yield takeLatest(fetchLocationOptions.type, handleFetchLocationOptions);
+  yield takeLatest(fetchPostalCodeOptions.type, handleFetchPostalCodeOptions);
 }

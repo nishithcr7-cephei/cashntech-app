@@ -21,6 +21,7 @@ export enum ProductType {
   PID = 'PID',
   SID = 'SID',
   DYNAMIC_DISCOUNTING = 'Dynamic Discounting',
+  BL_OD = 'BL/OD',
 }
 
 export enum ClientType {
@@ -335,4 +336,27 @@ export enum ReasonNotInterested {
 export enum UserResponse {
   INTERESTED = 'Interested',
   NOT_INTERESTED = 'Not Interested',
+}
+
+export enum RatingType {
+  CRISIL_AAA = 'CRISIL AAA',
+  ICRA_AAA = 'ICRA AAA',
+  CARE_AAA = 'CARE AAA',
+  AA_PLUS = 'AA+',
+  AA = 'AA',
+  AA_MINUS = 'AA-',
+  A_PLUS = 'A+',
+  A = 'A',
+  A_MINUS = 'A-',
+  BBB_PLUS = 'BBB+',
+  BBB = 'BBB',
+  BBB_MINUS = 'BBB-',
+  BB_PLUS = 'BB+',
+  BB = 'BB',
+  BB_MINUS = 'BB-',
+  B_PLUS = 'B+',
+  B = 'B',
+  B_MINUS = 'B-',
+  C = 'C',
+  D = 'D',
 }

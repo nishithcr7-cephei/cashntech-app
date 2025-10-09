@@ -6,10 +6,11 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import React, {useEffect, useMemo} from 'react';
+import React, {useEffect, useMemo, useRef} from 'react';
 import {
   AppBar,
   Container,
+  
   CustomDropdown,
   DateNTimePicker,
   FooterButton,
@@ -57,6 +58,7 @@ type Props = CompositeScreenProps<
 
 export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
   const dispatch = useDispatch();
+  const isInitialLoad = useRef(true);
   const {
     sourceOfLead,
     firmName,
@@ -73,6 +75,8 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
   const clientFormId = useSelector(clientSelector.getClientFormId);
   const clientLoader = useSelector(clientSelector.getClientLoader);
   const fullName = useSelector(userSelector.getFullName);
+  const locationOptions = useSelector(clientSelector.getLocationOptions);
+  const locationLoading = useSelector(clientSelector.getLocationLoading);
 
   function setData<T extends keyof BasicDetailsType>(
     field: T,
@@ -87,6 +91,23 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
       setData('city', '');
     }
   }, [state, clientFormId]);
+
+  useEffect(() => {
+    // Skip API call on initial load to avoid calling with potentially invalid pincode
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+
+    // Fetch location options when pincode changes and is 6 digits
+    if (pincode && pincode.length === 6) {
+      dispatch(clientActions.fetchLocationOptions(pincode));
+    } else if (pincode && pincode.length < 6) {
+      // Clear location options if pincode is less than 6 digits
+      dispatch(clientActions.clearLocationOptions());
+      setData('location', '');
+    }
+  }, [pincode, dispatch]);
 
   const listOfCities = useMemo(() => {
     if (state) {
@@ -217,12 +238,13 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
             value={dateOfVisit ? moment(dateOfVisit).format('DD/MM/YYYY') : ''}
             onConfirm={date => setData('dateOfVisit', date.toISOString())}
           />
-          <Input
+          <CustomDropdown
             label="Location"
-            placeholder="Enter Location"
-            maxLength={50}
+            data={locationOptions}
+            onChange={value => setData('location', value)}
             value={location}
-            onChangeText={value => setData('location', value)}
+            showSearch={false}
+            placeholder={locationLoading ? "Loading..." : "Select Location"}
           />
           <Input
             label="Address"

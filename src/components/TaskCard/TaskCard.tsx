@@ -99,7 +99,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ item, index, hasSubTasks = false, s
         <Text style={styles.bold}>Assigned to :</Text> <Text style={styles.value}>{assignedTo}</Text>
       </Text>
       <Text style={styles.label}>
-        <Text style={styles.bold}>Assigned At :</Text> <Text style={styles.value}>{assignedAt}</Text>
+        <Text style={styles.bold}>Target Date :</Text> <Text style={styles.value}>{assignedAt}</Text>
       </Text>
       <Text style={styles.label}>
         <Text style={styles.bold}>Type :</Text> <Text style={styles.value}>{taskType}</Text>
