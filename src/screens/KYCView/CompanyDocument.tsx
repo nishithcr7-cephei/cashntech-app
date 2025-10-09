@@ -162,33 +162,8 @@ export const CompanyDocument = () => {
   };
 
   const handleSubmit = () => {
-    // Check if we have at least one document uploaded or existing
-    const hasAoaDoc = aoaDocument || (existingDocs.aoa && !documentsRemoved.aoa);
-    const hasMoaDoc = moaDocument || (existingDocs.moa && !documentsRemoved.moa);
-    const hasCoiDoc = coiDocument || (existingDocs.coi && !documentsRemoved.coi);
-    const hasOtherDoc = otherDocument || (existingDocs.others && !documentsRemoved.others);
-
-    if (!hasAoaDoc || !hasMoaDoc || !hasCoiDoc || !hasOtherDoc) {
-      setErrors({
-        aoaDocument: !hasAoaDoc,
-        moaDocument: !hasMoaDoc,
-        coiDocument: !hasCoiDoc,
-        otherDocument: !hasOtherDoc,
-      });
-
-      let missingFields = [];
-      if (!hasAoaDoc) missingFields.push('AOA Document');
-      if (!hasMoaDoc) missingFields.push('MOA Document');
-      if (!hasCoiDoc) missingFields.push('COI Document');
-      if (!hasOtherDoc) missingFields.push('Other Document');
-
-      Alert.alert(
-        'Missing Fields',
-        `Please provide the following: \n${missingFields.join('\n')}`,
-      );
-      return;
-    }
-
+    // All documents are now optional - no validation required
+    // Clear any existing errors
     setErrors({
       aoaDocument: false,
       moaDocument: false,
@@ -356,7 +331,7 @@ export const CompanyDocument = () => {
           ) : (
             <View>
               <DashedButton
-                label="Upload AOA Document"
+                label="Upload AOA Document (Optional)"
                 onPress={() => {
                   setUploadType('aoaDoc');
                   setIsVisible(true);
@@ -427,7 +402,7 @@ export const CompanyDocument = () => {
           ) : (
             <View>
               <DashedButton
-                label="Upload MOA Document"
+                label="Upload MOA Document (Optional)"
                 onPress={() => {
                   setUploadType('moaDoc');
                   setIsVisible(true);
@@ -498,7 +473,7 @@ export const CompanyDocument = () => {
           ) : (
             <View>
               <DashedButton
-                label="Upload COI Document"
+                label="Upload COI Document (Optional)"
                 onPress={() => {
                   setUploadType('coiDoc');
                   setIsVisible(true);
@@ -569,7 +544,7 @@ export const CompanyDocument = () => {
           ) : (
             <View>
               <DashedButton
-                label="Upload Other Document"
+                label="Upload Other Document (Optional)"
                 onPress={() => {
                   setUploadType('otherDoc');
                   setIsVisible(true);
