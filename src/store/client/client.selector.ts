@@ -148,6 +148,39 @@ const getPostalCodeLoading = createSelector(
   _state => _state.postalCodeLoading,
 );
 
+const getSalesmanList = createSelector(
+  _selectState,
+  _state => _state.salesmanList,
+);
+
+const getSalesmanListLoading = createSelector(
+  _selectState,
+  _state => _state.salesmanListLoading,
+);
+
+const getSalesmanListError = createSelector(
+  _selectState,
+  _state => _state.salesmanListError,
+);
+
+const getSalesmanDropdown = createSelector(
+  _selectState,
+  _state => {
+    console.log('Selector: getSalesmanDropdown called');
+    console.log('Selector: salesmanList:', _state.salesmanList);
+    console.log('Selector: salesmanList length:', _state.salesmanList.length);
+    console.log('Selector: salesmanListLoading:', _state.salesmanListLoading);
+    
+    const dropdownData = _state.salesmanList.map(salesman => ({
+      label: `${salesman.first_name} ${salesman.last_name}`,
+      value: salesman.id.toString(),
+    }));
+    
+    console.log('Selector: dropdownData:', dropdownData);
+    return dropdownData;
+  },
+);
+
 
 
 export default {
@@ -184,4 +217,8 @@ export default {
   getLocationLoading,
   getPostalCodeOptions,
   getPostalCodeLoading,
+  getSalesmanList,
+  getSalesmanListLoading,
+  getSalesmanListError,
+  getSalesmanDropdown,
 };

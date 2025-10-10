@@ -87,6 +87,11 @@ export type ClientState = {
   // Generic error field optionally set by reducers like deleteClientFailure
   error: string | null;
 
+  // Salesman list
+  salesmanList: Salesman[];
+  salesmanListLoading: boolean;
+  salesmanListError: string | null;
+
 };
 
 export type BasicDetailsType = {
@@ -101,6 +106,7 @@ export type BasicDetailsType = {
   programType: string;
   productType: string;
   filedBy: string;
+  salesmanId: number | undefined;
 };
 
 export type ClientsDetailsType = Array<{
@@ -239,6 +245,7 @@ export type BasicDetailsPayload = {
   address: string;
   program_type: string;
   product_type: string;
+  salesman_id?: number;
   clientId?: number;
 };
 
@@ -267,6 +274,7 @@ export type GetBasicDetailsData = {
   file_by: string;
   date_of_visit: string;
   firm_name: string;
+  salesman_id?: number;
 };
 
 export type ClientsDetailsPayload = Array<{
@@ -577,3 +585,15 @@ export interface IDeleteResponse {
   statusCode: number;
   message: string;
 }
+
+export type Salesman = {
+  id: number;
+  first_name: string;
+  last_name: string;
+};
+
+export type SalesmanListResponse = {
+  statusCode: number;
+  message: string;
+  data: Salesman[];
+};

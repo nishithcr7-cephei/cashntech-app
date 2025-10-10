@@ -51,8 +51,8 @@ export const FooterButton: React.FC<FooterButtonProps> = ({
 
       {showNext ? (
         <TouchableOpacity style={styles.nextButton} onPress={onPressNext}>
-          <RightChevronCircle width={24} height={24} />
           <Text style={styles.nextText}>Next</Text>
+          <RightChevronCircle width={24} height={24} />
         </TouchableOpacity>
       ) : (
         <TouchableOpacity 
@@ -114,11 +114,17 @@ const styles = StyleSheet.create({
   nextButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.white,
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(5),
+    borderRadius: scaleWidth(4),
+    gap: scaleWidth(8),
+    minWidth: scaleWidth(100),
   },
   nextText: {
     color: Colors.blueGray700,
     fontSize: 16,
-    marginStart: scaleWidth(10),
   },
   disabledButton: {
     backgroundColor: Colors.gray,

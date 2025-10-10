@@ -70,6 +70,7 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
     productType,
     programType,
     pincode,
+    salesmanId,
   } = useSelector(clientSelector.getBasicDetailFormData);
 
   const clientFormId = useSelector(clientSelector.getClientFormId);
@@ -77,6 +78,13 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
   const fullName = useSelector(userSelector.getFullName);
   const locationOptions = useSelector(clientSelector.getLocationOptions);
   const locationLoading = useSelector(clientSelector.getLocationLoading);
+  const salesmanDropdown = useSelector(clientSelector.getSalesmanDropdown);
+  const salesmanListLoading = useSelector(clientSelector.getSalesmanListLoading);
+  
+  // Debug logging for salesman dropdown
+  console.log('BasicDetailForm: salesmanDropdown:', salesmanDropdown);
+  console.log('BasicDetailForm: salesmanDropdown length:', salesmanDropdown.length);
+  console.log('BasicDetailForm: salesmanListLoading:', salesmanListLoading);
 
   function setData<T extends keyof BasicDetailsType>(
     field: T,
@@ -91,6 +99,11 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
       setData('city', '');
     }
   }, [state, clientFormId]);
+
+  useEffect(() => {
+    // Fetch salesman list when component mounts
+    dispatch(clientActions.fetchSalesmanList());
+  }, [dispatch]);
 
   useEffect(() => {
     // Skip API call on initial load to avoid calling with potentially invalid pincode
@@ -152,18 +165,22 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
     {field: dateOfVisit, name: 'Date of Visit'},
     {field: location, name: 'Location'},
     {field: address, name: 'Address'},
+    {field: salesmanId, name: 'Filled By'},
   ];
 
   const validateForm = () => {
     for (let i = 0; i < requiredFields.length; i++) {
+      const field = requiredFields[i].field;
       if (
-        !requiredFields[i].field ||
-        !(requiredFields[i].field ?? '').toString().trim()
+        field === undefined ||
+        field === null ||
+        (typeof field === 'string' && !field.trim()) ||
+        (typeof field === 'number' && field === 0)
       ) {
         Toast.show({
           type: 'error',
           text1: 'Error',
-          text2: `Please enter ${requiredFields[i].name}`,
+          text2: `Please select ${requiredFields[i].name}`,
         });
         return false;
       }
@@ -237,6 +254,7 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
             placeholder="Enter Date of Visit"
             value={dateOfVisit ? moment(dateOfVisit).format('DD/MM/YYYY') : ''}
             onConfirm={date => setData('dateOfVisit', date.toISOString())}
+            mode="date"
           />
           <CustomDropdown
             label="Location"
@@ -253,11 +271,15 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
              maxLength={100}
             onChangeText={value => setData('address', value)}
           />
-          <Input
-            label="Filed by"
-            placeholder="Enter Name"
-            value={fullName}
-            editable={false}
+          <CustomDropdown
+            label="Fill By"
+            data={salesmanDropdown}
+            onChange={value => setData('salesmanId', parseInt(value))}
+            value={salesmanId ? salesmanId.toString() : ''}
+            showSearch={false}
+            placeholder={salesmanListLoading ? "Loading..." : "Select Salesman"}
+            editable={!clientFormId} // Read-only in edit mode, editable in fresh mode
+            dropdownPosition="top"
           />
         </View>
       </KeyboardAvoidingScrollView>

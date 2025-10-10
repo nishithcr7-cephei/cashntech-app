@@ -23,6 +23,7 @@ import {
   updateClientsDetails,
   fetchLocationOptions,
   fetchPostalCodeOptions,
+  fetchSalesmanList,
 } from './client.slice';
 import {ClientApis, PostalApi} from '@services/api';
 import axiosInstance from '@services/api/api';
@@ -279,6 +280,7 @@ function* saveBasicDetails(): unknown {
     pin_code: encryptUtility(basicDetailForm.pincode.trim()),
     program_type: basicDetailForm.programType,
     product_type: basicDetailForm.productType,
+    salesman_id: basicDetailForm.salesmanId,
     userId: id,
   };
   const {data, error}: Result<BasicDetailsResponse> = yield call(
@@ -320,6 +322,7 @@ function* updateBasicDetails(): unknown {
     pin_code: encryptUtility(basicDetailForm.pincode.trim()),
     program_type: basicDetailForm.programType,
     product_type: basicDetailForm.productType,
+    salesman_id: basicDetailForm.salesmanId,
     userId: id,
     clientId: clientId,
   };
@@ -368,6 +371,7 @@ function* getBasicDetailsSaga(action: PayloadAction<number>): unknown {
       productType: data.product_type,
       programType: data.program_type,
       filedBy: data.file_by,
+      salesmanId: data.salesman_id,
     }),
   );
 }
@@ -1080,6 +1084,38 @@ function* handleFetchPostalCodeOptions(action: PayloadAction<string>): Generator
   }
 }
 
+function* handleFetchSalesmanList(): Generator<any, void, any> {
+  try {
+    console.log('Saga: Fetching salesman list');
+    
+    const response = yield call(clientApi.getSalesmanList);
+    console.log('Saga: Received salesman list response:', response);
+    console.log('Saga: Response type:', typeof response);
+    console.log('Saga: Response.data:', response.data);
+    console.log('Saga: Response.data type:', typeof response.data);
+    console.log('Saga: Response.data.data:', response.data?.data);
+    console.log('Saga: Is response.data.data array:', Array.isArray(response.data?.data));
+    
+    // Check if response has the expected structure
+    if (response && response.data && response.data.data && Array.isArray(response.data.data)) {
+      console.log('Saga: Setting salesman list with', response.data.data.length, 'items');
+      yield put(clientActions.setSalesmanList(response.data.data));
+    } else {
+      console.log('Saga: Invalid salesman list response structure');
+      console.log('Saga: Expected response.data.data to be an array, got:', response);
+      yield put(clientActions.setSalesmanList([]));
+    }
+  } catch (error) {
+    console.error('Saga: Error fetching salesman list:', error);
+    yield put(clientActions.setSalesmanListError('Failed to fetch salesman list'));
+    yield put(clientActions.setSalesmanList([]));
+    Toast.show({
+      type: 'error',
+      text1: 'Error',
+      text2: 'Failed to fetch salesman list. Please check your internet connection',
+    });
+  }
+}
 
 export default function* clientSaga() {
   yield takeLatest(getClients.type, handleGetClientsFilter);
@@ -1108,4 +1144,5 @@ export default function* clientSaga() {
   yield takeLatest(clientActions.getClientDetails.type, handleGetClientDetails);
   yield takeLatest(fetchLocationOptions.type, handleFetchLocationOptions);
   yield takeLatest(fetchPostalCodeOptions.type, handleFetchPostalCodeOptions);
+  yield takeLatest(fetchSalesmanList.type, handleFetchSalesmanList);
 }

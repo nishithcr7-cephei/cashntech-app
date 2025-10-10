@@ -19,6 +19,7 @@ type Props = {
   containerStyle?: StyleProp<ViewStyle>;
   showSearch?: boolean;
   dropdownPosition?: 'bottom' | 'top' | 'auto' | undefined;
+  editable?: boolean;
 };
 
 export const CustomDropdown = ({
@@ -30,18 +31,29 @@ export const CustomDropdown = ({
   showSearch = true,
   containerStyle,
   dropdownPosition,
+  editable = true,
 }: Props) => {
   const handleChange = (item: {label: string; value: string}) => {
-    onChange?.(item.value);
+    if (editable) {
+      onChange?.(item.value);
+    }
   };
+
+  const selectedItem = data.find(item => item.value === value);
 
   return (
     <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <Dropdown
-        style={styles.dropdown}
+        style={[
+          styles.dropdown,
+          !editable && styles.disabledDropdown,
+        ]}
         placeholderStyle={styles.placeholderStyle}
-        selectedTextStyle={styles.selectedTextStyle}
+        selectedTextStyle={[
+          styles.selectedTextStyle,
+          !editable && styles.disabledText,
+        ]}
         itemTextStyle={styles.itemTextStyle}
         data={data}
         dropdownPosition={dropdownPosition}
@@ -49,12 +61,13 @@ export const CustomDropdown = ({
         valueField="value"
         placeholder={placeholder}
         value={{
-          label: value,
+          label: selectedItem?.label || '',
           value: value,
         }}
         onChange={handleChange}
-        search={showSearch}
+        search={showSearch && editable}
         searchPlaceholder="Search"
+        disable={!editable}
       />
     </View>
   );
@@ -88,5 +101,12 @@ const styles = StyleSheet.create({
   itemTextStyle: {
     fontSize: scaleFont(16),
     color: '#333',
+  },
+  disabledDropdown: {
+    backgroundColor: Colors.gray100,
+    borderColor: Colors.gray200,
+  },
+  disabledText: {
+    color: Colors.gray400,
   },
 });

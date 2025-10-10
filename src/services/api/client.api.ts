@@ -415,14 +415,38 @@ const getLocations = async () => {
 };
 
 const getSalesmanList = async () => {
+  const fullUrl = `${Config.API_BASE_URL}${Endpoints.apiGetSalesmanList}`;
+  console.log('=== SALESMAN API CALL ===');
+  console.log('Full URL:', fullUrl);
+  console.log('Endpoint:', Endpoints.apiGetSalesmanList);
+  console.log('========================');
+  
   const {data, error} = await tryCatch<AxiosResponse<any>>(
-    Api.get('/client-info-master/salesman/list', {
+    Api.get(Endpoints.apiGetSalesmanList, {
       authRequired: true,
     } as CustomRequestConfig),
   );
+  
+  console.log('=== SALESMAN API RESPONSE ===');
+  console.log('Raw response:', data);
+  console.log('Response data:', data?.data);
+  console.log('Response status:', data?.status);
+  console.log('Error:', error);
+  console.log('=============================');
+  
   if (error) {
+    console.log('=== SALESMAN API ERROR ===');
+    console.log('Error details:', error);
+    console.log('Error response:', error?.response);
+    console.log('Error message:', error?.message);
+    console.log('==========================');
     return {data: []};
   }
+  
+  console.log('=== SALESMAN API SUCCESS ===');
+  console.log('Returning data:', data.data);
+  console.log('Data length:', data.data?.length);
+  console.log('============================');
   return {data: data.data};
 };
 

@@ -13,6 +13,7 @@ import {
   ITaskReordsFilterResponseDatum,
   VendorDetailsType,
   VisitDetailsType,
+  Salesman,
 } from './client.types';
 import {PayloadWithCallback} from '@type/global.types';
 
@@ -28,6 +29,7 @@ const basicDetails: BasicDetailsType = {
   programType: '',
   address: '',
   filedBy: '',
+  salesmanId: undefined,
 };
 
 const clientsDetails: ClientsDetailsType = [
@@ -168,6 +170,11 @@ const initialState: ClientState = {
   
   // Generic error holder (used by deleteClientFailure and others)
   error: null,
+
+  // Salesman list
+  salesmanList: [],
+  salesmanListLoading: false,
+  salesmanListError: null,
 
 };
 
@@ -522,6 +529,20 @@ const clientSlice = createSlice({
       state.postalCodeOptions = [];
       state.postalCodeLoading = false;
     },
+    // Salesman list actions
+    fetchSalesmanList: state => {
+      state.salesmanListLoading = true;
+      state.salesmanListError = null;
+    },
+    setSalesmanList: (state, action: PayloadAction<Salesman[]>) => {
+      state.salesmanListLoading = false;
+      state.salesmanList = action.payload;
+      state.salesmanListError = null;
+    },
+    setSalesmanListError: (state, action: PayloadAction<string>) => {
+      state.salesmanListLoading = false;
+      state.salesmanListError = action.payload;
+    },
   },
 });
 
@@ -603,5 +624,8 @@ export const {
   fetchPostalCodeOptions,
   setPostalCodeOptions,
   clearPostalCodeOptions,
+  fetchSalesmanList,
+  setSalesmanList,
+  setSalesmanListError,
 } = clientSlice.actions;
 export default clientSlice.reducer;
