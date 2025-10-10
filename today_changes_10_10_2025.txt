@@ -1,0 +1,48 @@
+TODAY'S CODE CHANGES - MERGE REQUEST
+====================================
+
+Date: 10-10-2025
+Branch: feature/assigntask
+
+
+SUMMARY OF CHANGES:
+------------------
+- Changed Date of Visit field to date-only picker (removed time selection)
+- Updated DateNTimePicker component to use mode='date' for Date of Visit field
+- Maintained DD/MM/YYYY format display for better user experience
+- Preserved all existing functionality and validation logic
+
+Today's updates focus on simplifying the Date of Visit input by removing time selection,
+making it easier for users to select only the date without unnecessary time components.
+This improves the user experience by focusing on what's actually needed - just the date.
+
+
+FILES MODIFIED TODAY:
+--------------------
+
+1. DATE PICKER UPDATES:
+   - src/screens/ClientInfo/BasicDetailForm.tsx
+
+Screen Files
+------------
+- src/screens/ClientInfo/BasicDetailForm.tsx
+
+
+SPECIFIC CHANGES MADE:
+---------------------
+1. DateNTimePicker Configuration:
+   - Added mode="date" prop to DateNTimePicker component
+   - Changed from datetime picker to date-only picker
+   - Removed time selection interface
+
+2. User Experience Improvements:
+   - Users now only see date selection (no time picker)
+   - Maintains DD/MM/YYYY format display
+   - Simplified interface reduces confusion
+
+3. Functionality Preserved:
+   - Date validation logic unchanged
+   - Form submission behavior maintained
+   - Data storage format remains ISO string
+   - All existing validation rules preserved
+
