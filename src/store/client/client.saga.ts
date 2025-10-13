@@ -545,6 +545,8 @@ function* saveFirmDetailsSaga(): unknown {
     ),
     annual_turnover: Number(firmDetails.annualTurnover),
     created_by: `${first_name} ${last_name}`,
+    id: clientId,
+    responseId: clientId,
   };
   
   const {
@@ -781,6 +783,8 @@ function* saveVisitDetailsSaga(): unknown {
       date_of_next_visit: moment(visitDetails.dateOfNextVisit).toISOString(),
       are_you_interested_for: interestedForString,
       created_by: `${first_name} ${last_name}`,
+      id: parseInt(clientId),
+      responseId: parseInt(clientId),
     };
   } else {
     body = {
@@ -788,6 +792,8 @@ function* saveVisitDetailsSaga(): unknown {
       reason_for_not_interested: visitDetails.reasonForNotInterested.trim(),
       are_you_interested_for: interestedForString,
       created_by: `${first_name} ${last_name}`,
+      id: parseInt(clientId),
+      responseId: parseInt(clientId),
     };
   }
   const {
@@ -834,6 +840,8 @@ function* saveVisitDetailsAndSubmitSaga(): unknown {
       date_of_next_visit: moment(visitDetails.dateOfNextVisit).toISOString(),
       are_you_interested_for: interestedForString,
       created_by: `${first_name} ${last_name}`,
+      id: parseInt(clientId),
+      responseId: parseInt(clientId),
     };
   } else {
     body = {
@@ -841,6 +849,8 @@ function* saveVisitDetailsAndSubmitSaga(): unknown {
       reason_for_not_interested: visitDetails.reasonForNotInterested.trim(),
       are_you_interested_for: interestedForString,
       created_by: `${first_name} ${last_name}`,
+      id: parseInt(clientId),
+      responseId: parseInt(clientId),
     };
   }
   const {
@@ -890,6 +900,8 @@ function* getVisitDetailsFormData(action: PayloadAction<number>): unknown {
       ? data.are_you_interested_for.split(',').filter(item => item.trim() !== '')
       : [],
     reasonForNotInterested: data.reason_for_not_interested ?? undefined,
+    id: data.id ?? undefined,
+    responseId: data.responseId ?? undefined,
   };
   yield put(clientActions.setVisitDetails(dataToSet));
 }

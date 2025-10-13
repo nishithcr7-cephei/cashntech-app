@@ -83,6 +83,8 @@ const visitDetails: VisitDetailsType = {
   reasonForNotInterested: '',
   interestedFor: [],
   userResponse: undefined,
+  id: undefined,
+  responseId: undefined,
 };
 
 const initialState: ClientState = {

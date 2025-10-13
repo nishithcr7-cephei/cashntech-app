@@ -171,6 +171,7 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
       existingFundingSanctionedAmount: strip(existingFundingSanctionedAmount),
       estimatedFundingRequired: strip(estimatedFundingRequired),
       bankName: bankName, // Ensure bank names are included in save
+      rating: rating || '', // Include rating with empty string default
     };
     
     dispatch(clientActions.setFirmDetails(firmDetailsToSave));
@@ -195,7 +196,6 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
     {field: businessVintage, name: 'Business Vintage'},
     {field: industry, name: 'Industry'},
     {field: sector, name: 'Sector'},
-    {field: rating, name: 'Rating'},
     {field: bankName, name: 'Bank Name'},
     {field: annualTurnover, name: 'Annual Turnover'},
     {field: cibilScore, name: 'CIBIL Score'},
@@ -282,12 +282,11 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
             value={sector}
             onChange={value => setData('sector', value)}
           />
-          <CustomDropdown
-            label="Rating"
-            data={listOfRatings}
+          <Input
+            label="Credit rating (optional)"
+            placeholder="Enter credit rating"
             value={rating}
-            onChange={value => setData('rating', value)}
-            showSearch={false}
+            onChangeText={value => setData('rating', value)}
           />
           <MultiSelectDropdown
             label="Bank Name"

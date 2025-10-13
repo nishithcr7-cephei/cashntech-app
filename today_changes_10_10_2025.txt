@@ -27,9 +27,17 @@ Screen Files
 ------------
 - src/screens/ClientInfo/BasicDetailForm.tsx
 
+and client saga file also changed for salesman api in fill by dropdown
+
 
 SPECIFIC CHANGES MADE:
 ---------------------
+Key Changes: 
+- Changed Location field from Input to CustomDropdown in BasicDetailForm.tsx
+- Added location options fetching based on pincode
+- Implemented dynamic location dropdown with API integration
+- Added postal API service for location data
+
 1. DateNTimePicker Configuration:
    - Added mode="date" prop to DateNTimePicker component
    - Changed from datetime picker to date-only picker
@@ -45,4 +53,14 @@ SPECIFIC CHANGES MADE:
    - Form submission behavior maintained
    - Data storage format remains ISO string
    - All existing validation rules preserved
+
+
+GIT COMMIT DETAILS:
+------------------
+Commit Hash: eaa9245
+Branch: feature/assigntask
+Commit Message: "Add today_changes_10_10_2025.txt"
+Files Changed: 1 file, 48 insertions(+)
+Push Status: Successfully pushed to origin/feature/assigntask
+
 

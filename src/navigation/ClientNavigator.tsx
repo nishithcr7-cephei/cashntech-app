@@ -5,6 +5,7 @@ import {
   SubInboundClientList,
   ClientInfo,
   FormSelectionScreen,
+  CreateClientForm,
   BasicDetailForm,
   ClientDetailForm,
   FirmDetailForm,
@@ -29,6 +30,10 @@ export const ClientNavigator = () => {
       <Stack.Screen
         name={ClientScreens.FormSelectionScreen}
         component={FormSelectionScreen}
+      />
+      <Stack.Screen
+        name={ClientScreens.CreateClientForm}
+        component={CreateClientForm}
       />
       <Stack.Screen
         name={ClientScreens.BasicDetailForm}

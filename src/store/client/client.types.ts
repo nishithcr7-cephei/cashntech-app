@@ -156,6 +156,8 @@ export type VisitDetailsType = {
   dateOfNextVisit: string | undefined;
   interestedFor: string[];
   reasonForNotInterested: string;
+  id?: number;
+  responseId?: number;
 };
 
 export type ClientsDetailsResponseType = {
@@ -198,12 +200,16 @@ export type VisitDetailsPayload =
       date_of_next_visit: string;
       are_you_interested_for: string;
       created_by: string;
+      id: number;
+      responseId: number;
     }
   | {
       client_response: UserResponse.NOT_INTERESTED;
       reason_for_not_interested: string;
       are_you_interested_for: string;
       created_by: string;
+      id: number;
+      responseId: number;
     };
 
 export type ClientsFilterPayload = {
@@ -301,6 +307,8 @@ export type FirmDetailsPayload = {
   estimated_funding_required: number;
   credit_period_offer: number;
   created_by: string;
+  id: number;
+  responseId: number;
 };
 
 export type FirmDetailsResponse = {
@@ -338,6 +346,7 @@ export type VisitDetailsData = {
   date_of_next_visit: null | string;
   reason_for_not_interested: null | string;
   are_you_interested_for: null | string;
+  responseId?: number;
 };
 
 export type VendorDetailsResponse = {

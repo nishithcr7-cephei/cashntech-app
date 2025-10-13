@@ -18,6 +18,7 @@ enum ClientScreens {
   SubInboundClientList = 'SubInboundClientList',
   ClientInfo = 'ClientInfo',
   FormSelectionScreen = 'FormSelectionScreen',
+  CreateClientForm = 'CreateClientForm',
   BasicDetailForm = 'BasicDetailForm',
   ClientDetailForm = 'ClientDetailForm',
   FirmDetailForm = 'FirmDetailForm',

@@ -69,6 +69,7 @@ export type ClientNavigatorType = {
   };
   ClientInfo: undefined;
   FormSelectionScreen: undefined;
+  CreateClientForm: undefined;
   BasicDetailForm: undefined;
   ClientDetailForm: undefined;
   FirmDetailForm: undefined;

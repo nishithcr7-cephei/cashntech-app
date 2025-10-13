@@ -494,7 +494,7 @@ export const formInputDetails: FormInputListType = {
     {label: 'Date of Next Visit', name: 'nextVisitDate', type: FieldType.DATE},
     {label: 'Reason for Not Interested', name: 'reason', type: FieldType.INPUT},
     {
-      label: 'Are you interested for?',
+      label: 'Are you additionally interested for?',
       name: 'interested',
       type: FieldType.DROPDOWN,
     },
