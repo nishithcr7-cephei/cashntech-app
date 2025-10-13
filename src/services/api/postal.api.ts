@@ -49,4 +49,45 @@ export const PostalApi = {
       throw error;
     }
   },
+
+  getPostOfficesByPincode: async (pincode: string): Promise<PostalCodeResponse[]> => {
+    try {
+      console.log('PostalApi: Fetching post offices for pincode:', pincode);
+      const url = `/pincode/${pincode}`;
+      console.log('PostalApi: Making request to:', url);
+      
+      const response = await postalApiInstance.get(url);
+      console.log('PostalApi: Response status:', response.status);
+      console.log('PostalApi: Response data:', response.data);
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('PostalApi: Error fetching post offices by pincode:', error);
+      console.error('PostalApi: Error message:', error.message);
+      console.error('PostalApi: Error response:', error.response?.data);
+      throw error;
+    }
+  },
+
+  isErrorResponse: (response: PostalCodeResponse[]): boolean => {
+    if (!response || !Array.isArray(response) || response.length === 0) {
+      return true;
+    }
+    
+    const firstResponse = response[0];
+    return firstResponse.Status !== 'Success' || !firstResponse.PostOffice || firstResponse.PostOffice.length === 0;
+  },
+
+  extractPostOfficeNames: (response: PostalCodeResponse[]): string[] => {
+    if (!response || !Array.isArray(response) || response.length === 0) {
+      return [];
+    }
+    
+    const firstResponse = response[0];
+    if (!firstResponse.PostOffice || !Array.isArray(firstResponse.PostOffice)) {
+      return [];
+    }
+    
+    return firstResponse.PostOffice.map(office => office.Name).filter(name => name && name.trim() !== '');
+  },
 };

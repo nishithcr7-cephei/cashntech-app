@@ -294,7 +294,7 @@ export type ClientsDetailsPayload = Array<{
 
 export type FirmDetailsPayload = {
   firm_type: string;
-  date_of_corporation?: string;
+  date_of_incorporation?: string;
   business_vintage: string;
   industry: string;
   sector: string;
@@ -321,7 +321,7 @@ export type FirmDetailsData = {
   id: number;
   annual_turnover: number;
   firm_type: string;
-  date_of_corporation?: string;
+  date_of_incorporation?: string;
   business_vintage: string;
   sector: string;
   rating: string;

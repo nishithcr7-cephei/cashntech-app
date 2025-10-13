@@ -46,6 +46,7 @@ const VendorForm = ({
   vendor,
   index,
   setData,
+  clientFormId,
 }: {
   vendor: VendorDetailsType[number];
   index: number;
@@ -54,6 +55,7 @@ const VendorForm = ({
     value: T,
     index: number,
   ) => void;
+  clientFormId: number | undefined;
 }) => {
   const dispatch = useDispatch();
 
@@ -90,13 +92,19 @@ const VendorForm = ({
   }, [postalCodeOptions, postalCodeLoading]);
 
   useEffect(() => {
-    setData('city', '', index);
-    setData('pinCode', '', index);
-  }, [vendor.state]);
+    // Only clear city and pincode if we're not in edit mode (no clientFormId)
+    if (!clientFormId) {
+      setData('city', '', index);
+      setData('pinCode', '', index);
+    }
+  }, [vendor.state, clientFormId]);
 
   useEffect(() => {
-    setData('productType', [], index);
-  }, [vendor.productCategory]);
+    // Only clear product type if we're not in edit mode (no clientFormId)
+    if (!clientFormId) {
+      setData('productType', [], index);
+    }
+  }, [vendor.productCategory, clientFormId]);
 
   useEffect(() => {
     console.log('VendorDetailForm: City changed to:', vendor.city);
@@ -211,6 +219,7 @@ export const VendorDetailForm: React.FC<Props> = ({navigation}) => {
   const isSavedVendorDetails = useSelector(
     clientSelector.getVendorDetailsFormStatus,
   );
+  const clientFormId = useSelector(clientSelector.getClientFormId);
   const setData = useCallback(
     <T,>(field: keyof VendorDetailsType[number], value: T, index: number) => {
       dispatch(clientActions.setVendorDetails([{[field]: value}, index]));
@@ -228,7 +237,11 @@ export const VendorDetailForm: React.FC<Props> = ({navigation}) => {
   const handleSave = () => {
     if (!validateForm()) return;
 
-    dispatch(clientActions.saveVendorDetails());
+    if (clientFormId) {
+      dispatch(clientActions.saveVendorDetails()); // Update existing vendor details
+    } else {
+      dispatch(clientActions.saveVendorDetails()); // Save new vendor details
+    }
   };
 
   const handleNext = () => {
@@ -286,6 +299,7 @@ export const VendorDetailForm: React.FC<Props> = ({navigation}) => {
             vendor={vendor}
             index={index}
             setData={setData}
+            clientFormId={clientFormId}
           />
         ))}
         <TouchableOpacity style={styles.addButton} onPress={handleAddVendor}>

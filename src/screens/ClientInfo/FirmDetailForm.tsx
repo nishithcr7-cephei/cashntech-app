@@ -129,11 +129,12 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
   }, [dateOfCorporation]);
 
   // Update business vintage when date of corporation changes
+  // Only auto-calculate if dateOfCorporation is present and businessVintage is empty
   useEffect(() => {
-    if (calculatedBusinessVintage !== businessVintage) {
+    if (dateOfCorporation && calculatedBusinessVintage && (!businessVintage || businessVintage === '')) {
       setData('businessVintage', calculatedBusinessVintage);
     }
-  }, [calculatedBusinessVintage, businessVintage]);
+  }, [calculatedBusinessVintage, businessVintage, dateOfCorporation]);
 
   // Get filtered sectors based on selected industry
   const getFilteredSectors = () => {
@@ -172,6 +173,14 @@ export const FirmDetailForm: React.FC<Props> = ({navigation}) => {
       estimatedFundingRequired: strip(estimatedFundingRequired),
       bankName: bankName, // Ensure bank names are included in save
       rating: rating || '', // Include rating with empty string default
+      dateOfCorporation: dateOfCorporation, // Include date of incorporation
+      businessVintage: businessVintage, // Include business vintage
+      firmType: firmType, // Include firm type
+      industry: industry, // Include industry
+      sector: sector, // Include sector
+      cibilScore: cibilScore, // Include CIBIL score
+      facilityType: facilityType, // Include facility type
+      creditPeriodOffer: creditPeriodOffer, // Include credit period offer
     };
     
     dispatch(clientActions.setFirmDetails(firmDetailsToSave));

@@ -530,7 +530,7 @@ function* saveFirmDetailsSaga(): unknown {
   
   const body: FirmDetailsPayload = {
     firm_type: firmDetails.firmType,
-    date_of_corporation: firmDetails.dateOfCorporation,
+    date_of_incorporation: firmDetails.dateOfCorporation,
     bank_name: encryptedBankNames, // Join multiple banks with comma and encrypt
     business_vintage: firmDetails.businessVintage.trim(),
     industry: firmDetails.industry,
@@ -621,7 +621,7 @@ function* getFirmDetailsSaga(action: PayloadAction<number>): unknown {
 
     const firmDetails: Partial<FirmDetailsType> = {
       firmType: data.firm_type,
-      dateOfCorporation: data.date_of_corporation,
+      dateOfCorporation: data.date_of_incorporation,
       bankName: bankNames,
       businessVintage: data.business_vintage,
       industry: data.industry,
@@ -1001,7 +1001,7 @@ function* handleFetchLocationOptions(action: PayloadAction<string>): Generator<a
       Toast.show({
         type: 'error',
         text1: 'Invalid Pincode',
-        text2: response.Message || 'No records found for this pincode',
+        text2: response[0]?.Message || 'No records found for this pincode',
       });
       return;
     }

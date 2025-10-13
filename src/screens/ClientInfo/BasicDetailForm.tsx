@@ -122,6 +122,14 @@ export const BasicDetailForm: React.FC<Props> = ({navigation}) => {
     }
   }, [pincode, dispatch]);
 
+  // Fetch location options in edit mode when pincode is already set
+  useEffect(() => {
+    // Only fetch if we're in edit mode (clientFormId exists) and have a valid pincode
+    if (clientFormId && pincode && pincode.length === 6 && locationOptions.length === 0) {
+      dispatch(clientActions.fetchLocationOptions(pincode));
+    }
+  }, [clientFormId, pincode, locationOptions.length, dispatch]);
+
   const listOfCities = useMemo(() => {
     if (state) {
       return Cities[state] ?? [];
