@@ -206,9 +206,11 @@ export const GodownDetails = () => {
       if (!documentType) missingFields.push('Document Type');
 
       if (ownershipStatus === 'rented' && !agreementCopy && !existingImageUrl) {
-        missingFields.push('Agreement Copy');
+        // Show selected document name if available
+        missingFields.push(documentType || 'Agreement Copy');
       } else if (ownershipStatus === 'owned' && !electricityBill && !existingImageUrl) {
-        missingFields.push('Electricity Bill');
+        // Show selected document name if available
+        missingFields.push(documentType || 'Electricity Bill');
       }
 
       Alert.alert(
@@ -391,8 +393,9 @@ export const GodownDetails = () => {
                   ownershipStatus === 'rented'
                     ? agreementCopy
                     : electricityBill;
-                const label =
-                  ownershipStatus === 'rented'
+                const label = documentType
+                  ? `Upload ${documentType}`
+                  : ownershipStatus === 'rented'
                     ? 'Upload Agreement Copy'
                     : 'Upload Electricity Bill';
 

@@ -66,14 +66,7 @@ export const KycDocument = () => {
         );
         await Promise.all(refreshPromises);
       }
-      
-      // Show success message
-      Toast.show({
-        type: 'success',
-        text1: 'KYC Data Refreshed',
-        text2: 'Document status updated successfully',
-        position: 'top',
-      });
+
     } catch (error) {
       console.error('Refresh error:', error);
       Toast.show({

@@ -39,6 +39,7 @@ import {
   kycSelector,
   IBankStatementPayload,
 } from '@store/kyc';
+import {clientActions, clientSelector} from '@store/client';
 import {HomeNavigatorType, KycNavigatorType} from '@type/NavigatorTypes';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {getUserFullName} from '@utils/Utils';
@@ -57,7 +58,7 @@ export const BankStatementUpload = () => {
   const [showBankForm, setShowBankForm] = useState(false);
 
   const dispatch = useDispatch();
-  const bankMasterList = useSelector(kycSelector.getBankMasterList);
+  const listOfBanks = useSelector(clientSelector.getMasterBankDropdown);
   const bankResponse = useSelector(kycSelector.getBankStatement);
   const bankStatementInfo = useSelector(kycSelector.getBankStatementInfoData);
   const bankStatementInfoLoading = useSelector(kycSelector.getBankStatementInfoLoading);
@@ -90,15 +91,15 @@ export const BankStatementUpload = () => {
   const [currentEditingIndex, setCurrentEditingIndex] = useState(0);
   
 
-  // Bank options - include master list and any additional banks from API
+  // Bank options - include client master list and any additional banks from API
   const bankOptions = [
-    ...bankMasterList.map(item => ({
+    ...listOfBanks.map(item => ({
       label: item.label,
       value: item.value,
     })),
     // Add any unique banks from bank statement info that aren't in master list
     ...(bankStatementInfo || [])
-      .filter(bank => !bankMasterList.some(master => 
+      .filter(bank => !listOfBanks.some(master =>
         master.value === bank.bank_name || master.label === bank.bank_name
       ))
       .map(bank => ({
@@ -125,13 +126,13 @@ export const BankStatementUpload = () => {
   // Helper functions to map API values to dropdown values
   const mapBankNameToValue = (apiValue: string) => {
     // First try exact match
-    let matchingBank = bankMasterList.find(bank => 
+    let matchingBank = listOfBanks.find(bank => 
       bank.value === apiValue || bank.label === apiValue
     );
     
     // If no exact match, try case-insensitive match
     if (!matchingBank) {
-      matchingBank = bankMasterList.find(bank => 
+      matchingBank = listOfBanks.find(bank => 
         bank.value?.toLowerCase() === apiValue?.toLowerCase() || 
         bank.label?.toLowerCase() === apiValue?.toLowerCase()
       );
@@ -139,7 +140,7 @@ export const BankStatementUpload = () => {
     
     // If still no match, try partial match
     if (!matchingBank) {
-      matchingBank = bankMasterList.find(bank => 
+      matchingBank = listOfBanks.find(bank => 
         bank.value?.toLowerCase().includes(apiValue?.toLowerCase()) || 
         bank.label?.toLowerCase().includes(apiValue?.toLowerCase()) ||
         apiValue?.toLowerCase().includes(bank.value?.toLowerCase()) ||
@@ -182,7 +183,8 @@ export const BankStatementUpload = () => {
   });
 
   useEffect(() => {
-    dispatch(kycActions.getBankList());
+    // Load client master bank list (same API as FirmDetailForm)
+    dispatch(clientActions.getMasterBankList());
     // Fetch bank statement info for the client
     if (params.clientID) {
       dispatch(kycActions.getBankStatementInfoRequest(params.clientID.toString()));
@@ -378,9 +380,9 @@ export const BankStatementUpload = () => {
     });
   };
 
-  // Bank Entry Form Component
-  const BankEntryForm = ({bank, index}: {bank: BankEntry; index: number}) => (
-    <View style={styles.bankEntryContainer}>
+  // Render function for bank entry form (avoids remounting TextInput on each keystroke)
+  const renderBankEntryForm = (bank: BankEntry, index: number) => (
+    <View key={index} style={styles.bankEntryContainer}>
       {bankEntries.length > 1 && (
         <TouchableOpacity
           style={styles.removeButton}
@@ -423,6 +425,12 @@ export const BankStatementUpload = () => {
               const formatted = numericOnly.slice(0, 18);
               updateBankEntry(index, 'accountNumber', formatted);
             }}
+            keyboardType="number-pad"
+            maxLength={18}
+            returnKeyType="done"
+            autoCorrect={false}
+            autoCapitalize="none"
+            onFocus={() => setCurrentEditingIndex(index)}
             containerStyle={{
               marginBottom: scaleHeight(20),
               borderColor: errors[`accountNumber_${index}`]
@@ -588,9 +596,7 @@ export const BankStatementUpload = () => {
             </TouchableOpacity>
           ) : (
             <>
-              {bankEntries.map((bank, index) => (
-                <BankEntryForm key={index} bank={bank} index={index} />
-              ))}
+              {bankEntries.map((bank, index) => renderBankEntryForm(bank, index))}
 
               <TouchableOpacity
                 style={styles.addBankButton}

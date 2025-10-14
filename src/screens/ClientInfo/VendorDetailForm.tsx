@@ -83,13 +83,7 @@ const VendorForm = ({
     return Cities[vendor.state] ?? [];
   }, [vendor.state]);
 
-  const postalCodeOptions = useSelector(clientSelector.getPostalCodeOptions);
-  const postalCodeLoading = useSelector(clientSelector.getPostalCodeLoading);
-
-  useEffect(() => {
-    console.log('VendorDetailForm: Postal code options updated:', postalCodeOptions);
-    console.log('VendorDetailForm: Postal code loading:', postalCodeLoading);
-  }, [postalCodeOptions, postalCodeLoading]);
+  // Pincode dropdown removed; user will enter pincode manually
 
   useEffect(() => {
     // Only clear city and pincode if we're not in edit mode (no clientFormId)
@@ -106,16 +100,7 @@ const VendorForm = ({
     }
   }, [vendor.productCategory, clientFormId]);
 
-  useEffect(() => {
-    console.log('VendorDetailForm: City changed to:', vendor.city);
-    if (vendor.city) {
-      console.log('VendorDetailForm: Dispatching fetchPostalCodeOptions for:', vendor.city);
-      dispatch(clientActions.fetchPostalCodeOptions(vendor.city));
-    } else {
-      console.log('VendorDetailForm: Clearing postal code options');
-      dispatch(clientActions.clearPostalCodeOptions());
-    }
-  }, [vendor.city, dispatch]);
+  // Do not fetch pincode options based on city; input is manual now
 
   const removeVendor = (id: string) => {
     dispatch(clientActions.removeVendorDetails(id));
@@ -182,13 +167,17 @@ const VendorForm = ({
           onChange={value => setData('city', value, index)}
         />
 
-        <CustomDropdown
+        <Input
           label="Pincode"
-          placeholder={postalCodeLoading ? "Loading..." : "Select Pincode"}
-          data={postalCodeOptions}
+          placeholder="Enter 6-digit pincode"
+          keyboardType="number-pad"
+          maxLength={6}
           value={vendor.pinCode}
-          onChange={value => setData('pinCode', value, index)}
-          showSearch={true}
+          onChangeText={value => {
+            const digitsOnly = value.replace(/[^0-9]/g, '');
+            const trimmed = digitsOnly.slice(0, 6);
+            setData('pinCode', trimmed, index);
+          }}
         />
         <Input
           label="Vendor Contact Number"
