@@ -16,7 +16,7 @@ const Stack = createNativeStackNavigator<SoftNavigatorType>();
 
 export const SoftNavigator = () => {
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Navigator id={undefined} screenOptions={{headerShown: false}}>
       <Stack.Screen name="Softsanction" component={Softsanction} />
       <Stack.Screen
         name="SoftsanctionProcess"

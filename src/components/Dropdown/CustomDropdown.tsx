@@ -17,6 +17,7 @@ type Props = {
   placeholder?: string;
   onChange?: (value: string) => void;
   containerStyle?: StyleProp<ViewStyle>;
+  dropdownStyle?: StyleProp<ViewStyle>;
   showSearch?: boolean;
   dropdownPosition?: 'bottom' | 'top' | 'auto' | undefined;
   editable?: boolean;
@@ -30,6 +31,7 @@ export const CustomDropdown = ({
   onChange,
   showSearch = true,
   containerStyle,
+  dropdownStyle,
   dropdownPosition,
   editable = true,
 }: Props) => {
@@ -47,6 +49,7 @@ export const CustomDropdown = ({
       <Dropdown
         style={[
           styles.dropdown,
+          dropdownStyle,
           !editable && styles.disabledDropdown,
         ]}
         placeholderStyle={styles.placeholderStyle}

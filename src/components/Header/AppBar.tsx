@@ -54,7 +54,7 @@ export const AppBar = ({
   const insets = useSafeAreaInsets();
   
   return (
-    <View style={[styles.container, {paddingTop: insets.top}, containerStyle]}>
+    <View style={[styles.container, hideHamburger ? styles.containerCentered : undefined, {paddingTop: insets.top}, containerStyle]}>
       {!hideHamburger && (
         <TouchableOpacity
           onPress={() => {
@@ -77,7 +77,7 @@ export const AppBar = ({
         </TouchableOpacity>
       )}
 
-      <Text style={[styles.titleText, hideHamburger ? styles.titleTextNoHamburger : undefined, titleTextStyle]} numberOfLines={1}>
+      <Text style={[styles.titleText, hideHamburger ? styles.titleTextCentered : undefined, titleTextStyle]} numberOfLines={1}>
         {title}
       </Text>
     </View>
@@ -103,5 +103,12 @@ const styles = StyleSheet.create({
   },
   titleTextNoHamburger: {
     marginStart: 0,
+  },
+  containerCentered: {
+    justifyContent: 'center',
+  },
+  titleTextCentered: {
+    marginStart: 0,
+    textAlign: 'center',
   },
 });

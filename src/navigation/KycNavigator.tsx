@@ -25,7 +25,7 @@ const Stack = createNativeStackNavigator<KycNavigatorType>();
 
 export const KycNavigator = () => {
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Navigator id={undefined} screenOptions={{headerShown: false}}>
       <Stack.Screen name="KycDocument" component={KycDocument} />
       <Stack.Screen name="KYCFormSelection" component={KYCFormSelection} />
       <Stack.Screen name="BankStatementUpload" component={BankStatementUpload} />

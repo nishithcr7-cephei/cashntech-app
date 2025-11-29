@@ -33,6 +33,7 @@ const Endpoints = {
   apiGetVisitDetails: `/client-info-master/follow-up/`,
   apiGetClientProfile: (id: string | number) => `/client-info-master/profile/${id}`,
   apiGetSoftSanctionDetails: (id: string | number) => `/client-info-master/soft-sanction/detail/${id}`,
+  apiRegisterClient: '/client-info-master/register',
 
   apiDeleteClient: `/client-info-master/delete/`,
 

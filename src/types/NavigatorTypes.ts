@@ -2,6 +2,11 @@ import {Country} from 'react-native-country-picker-modal';
 
 export type AuthNavigatorType = {
   OnBoarding: undefined;
+  SplashScreen: undefined;
+  MenuPageView: undefined;
+  RegisterView: undefined;
+  ApplyView: undefined;
+  ContactUs: undefined;
   SignupScreen: SignupScreenParams | undefined;
   OTPInputScreen: OTPInputScreenParams;
   PasswordScreen: PasswordScreenParams;
@@ -13,6 +18,8 @@ export type AuthNavigatorType = {
     firstName: string;
     lastName: string;
   };
+  OcrInvoice: undefined;
+  HomeNavigator: undefined;
 };
 
 export type SignupScreenParams = {
@@ -48,6 +55,11 @@ export type PasswordScreenParams = {
 };
 
 export type HomeNavigatorType = {
+  InvoiceDashboard: undefined;
+  InvoiceDetails: {
+    invoiceId?: string;
+    dealerName?: string;
+  };
   ClientNavigator: undefined;
   SoftNavigator: undefined;
   LeadNavigator: undefined;
@@ -56,6 +68,7 @@ export type HomeNavigatorType = {
   DocNavigator: undefined;
   ManageTask: undefined;
   VisitDetail: undefined;
+  OcrInvoice: undefined;
 };
 
 export type ClientNavigatorType = {

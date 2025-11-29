@@ -19,7 +19,7 @@ const Stack = createNativeStackNavigator<DocNavigatorType>();
 
 export const DocNavigator = () => {
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Navigator id={undefined} screenOptions={{headerShown: false}}>
       <Stack.Screen name="DocumentValidation" component={DocumentValidation} />
       <Stack.Screen name="DocValidForm" component={DocValidForm} />
       <Stack.Screen name="DocValidSelection" component={DocValidSelection} />

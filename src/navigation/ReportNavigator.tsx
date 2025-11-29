@@ -7,7 +7,7 @@ const Stack = createNativeStackNavigator<ReportNavigatorType>();
 
 export const ReportNavigator = () => {
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Navigator id={undefined} screenOptions={{headerShown: false}}>
       <Stack.Screen name="Report" component={Report} />
     </Stack.Navigator>
   );

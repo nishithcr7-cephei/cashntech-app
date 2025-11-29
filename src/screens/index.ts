@@ -51,6 +51,7 @@ export * from './ReadMore/ClientCardReadMore';
 export * from './Report/Report';
 export * from './SoftSanctionScreen';
 export * from './SplashScreen/SplashScreen';
+export {default as MenuPageView} from './SplashScreen/MenuPageView';
 export * from './TaskTabs/TaskLogTabs';
 export * from './TaskTabs/TaskHistTabs';
 export * from './TaskTabs/TaskUpdate';
@@ -58,3 +59,11 @@ export * from './TermsOfService/TermsOfService';
 export * from './VisitDetails/VisitDetail';
 export * from './VisitDetails/SubVisitDetail';
 export * from './VisitDetails/UpdateVisitDetails';
+
+// Register exports
+export * from './Register';
+export * from './Register/Applyview';
+export {default as ContactUs} from './Register/Contactus';
+export * from './Ocr/OcrInvoiceScreen';
+export * from './Invoice/InvoiceDashboard';
+export * from './Invoice/InvoiceDetails';

@@ -4,3 +4,6 @@ extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autoli
 rootProject.name = 'CashNTech'
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')
+// Manually include react-native-config for dotenv.gradle (excluded from CMake autolinking via react-native.config.js)
+include ':react-native-config'
+project(':react-native-config').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-config/android')

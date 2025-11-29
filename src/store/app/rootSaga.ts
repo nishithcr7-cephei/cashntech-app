@@ -9,8 +9,9 @@ import {visitSaga} from '@store/visit';
 import {softSaga} from '@store/softsan';
 import {leadSaga} from '@store/lead';
 import {inboundClientSaga} from '@store/inboundclient';
+import {contactSaga, registerSaga, gstLookupSaga, applySaga} from '@store/registerweb/register.saga';
 
 
 export default function* rootSaga() {
-  yield all([authSaga(), clientSaga(), kycSaga(), profileSaga(), tasklogSaga(), mngSaga(), visitSaga(), softSaga(), leadSaga(), inboundClientSaga()]);
+  yield all([authSaga(), clientSaga(), kycSaga(), profileSaga(), tasklogSaga(), mngSaga(), visitSaga(), softSaga(), leadSaga(), inboundClientSaga(), contactSaga(), registerSaga(), gstLookupSaga(), applySaga()]);
 }

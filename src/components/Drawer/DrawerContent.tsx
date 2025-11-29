@@ -75,6 +75,11 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
             <View>
               <TouchableOpacity
                 style={styles.button}
+                onPress={() => navigation.navigate('InvoiceDashboard')}>
+                <Text style={styles.buttonText}>Invoice Dashboard</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.button}
                 onPress={() => {
                   setIsOpen(!isOpen);
                 }}>

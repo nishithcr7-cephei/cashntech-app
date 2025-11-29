@@ -23,7 +23,7 @@ const Stack = createNativeStackNavigator<ClientNavigatorType>();
 
 export const ClientNavigator = () => {
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Navigator id={undefined} screenOptions={{headerShown: false}}>
       <Stack.Screen name={ClientScreens.InboundClientList} component={InboundClientList} />
       <Stack.Screen name={ClientScreens.SubInboundClientList} component={SubInboundClientList} />
       <Stack.Screen name={ClientScreens.ClientInfo} component={ClientInfo} />

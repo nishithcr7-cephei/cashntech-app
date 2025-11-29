@@ -7,7 +7,7 @@ const Stack = createNativeStackNavigator<LeadNavigatorType>();
 
 export const LeadNavigator = () => {
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Navigator id={undefined} screenOptions={{headerShown: false}}>
       <Stack.Screen name="LeadProgress" component={LeadProgress} />
       <Stack.Screen name="LeadProgressInfo" component={LeadProgressInfo} />
     </Stack.Navigator>

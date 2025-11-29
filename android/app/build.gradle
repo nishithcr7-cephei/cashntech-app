@@ -83,7 +83,7 @@ project.ext.envConfigFiles = [
     release: ".env.prod"
 ]
 
-apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
+apply from: rootProject.file("../node_modules/react-native-config/android/dotenv.gradle")
 
 
 android {
@@ -91,14 +91,14 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.cashntech"
+    namespace "com.webcashntech.app"
     defaultConfig {
-        applicationId "com.cashntech"
+        applicationId "com.webcashntech.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
-        resValue "string", "build_config_package", "com.cashntech"
+        resValue "string", "build_config_package", "com.webcashntech.app"
     }
     signingConfigs {
         debug {

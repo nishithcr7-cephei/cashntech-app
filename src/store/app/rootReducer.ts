@@ -10,6 +10,7 @@ import {visitReducer} from '@store/visit';
 import {softReducer} from '@store/softsan';
 import {leadReducer} from '@store/lead';
 import {inboundClientReducer} from '@store/inboundclient';
+import registerwebReducer from '@store/registerweb/register.slice';
 
 
 const rootReducer = combineReducers({
@@ -24,6 +25,7 @@ const rootReducer = combineReducers({
   softsan: softReducer,
   lead: leadReducer,
   inboundClient: inboundClientReducer,
+  ...registerwebReducer,
 });
 
 export default rootReducer;

@@ -10,13 +10,20 @@ import {LeadNavigator} from './LeadNavigator';
 import {ReportNavigator} from './ReportNavigator';
 import {KycNavigator} from './KycNavigator';
 import {DocNavigator} from './DocNavigator';
-import {ManageTask, VisitDetail} from '@screens/index';
+import {
+  ManageTask,
+  VisitDetail,
+  OcrInvoiceScreen,
+  InvoiceDashboard,
+  InvoiceDetails,
+} from '@screens/index';
 
 const Drawer = createDrawerNavigator<HomeNavigatorType>();
 
 export const HomeNavigator = () => {
   return (
     <Drawer.Navigator
+      id={undefined}
       screenOptions={{
         headerShown: false,
         drawerStyle: {
@@ -25,7 +32,10 @@ export const HomeNavigator = () => {
           width: Dimensions.get('window').width * 0.7,
         },
       }}
+      initialRouteName="InvoiceDashboard"
       drawerContent={DrawerContent}>
+      <Drawer.Screen name="InvoiceDashboard" component={InvoiceDashboard} />
+      <Drawer.Screen name="InvoiceDetails" component={InvoiceDetails} />
       <Drawer.Screen name="ClientNavigator" component={ClientNavigator} />
       <Drawer.Screen name="SoftNavigator" component={SoftNavigator} />
       <Drawer.Screen name="LeadNavigator" component={LeadNavigator} />
@@ -34,6 +44,7 @@ export const HomeNavigator = () => {
       <Drawer.Screen name="DocNavigator" component={DocNavigator} />
       <Drawer.Screen name="ManageTask" component={ManageTask} />
       <Drawer.Screen name="VisitDetail" component={VisitDetail} />
+      <Drawer.Screen name="OcrInvoice" component={OcrInvoiceScreen} />
     </Drawer.Navigator>
   );
 };
