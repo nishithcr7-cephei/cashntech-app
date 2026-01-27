@@ -19,6 +19,8 @@ export type AuthNavigatorType = {
     lastName: string;
   };
   OcrInvoice: undefined;
+  SelectUserTypeScreen: undefined;
+  SelectProgramScreen: undefined;
   HomeNavigator: undefined;
 };
 
@@ -59,6 +61,28 @@ export type HomeNavigatorType = {
   InvoiceDetails: {
     invoiceId?: string;
     dealerName?: string;
+  };
+  CreateInvoice: undefined;
+  UploadInvoiceList: undefined;
+  DealerInvoiceList: undefined;
+  DiscountingPayments: undefined;
+  PendingApprovals: undefined;
+  RejectedFinances: undefined;
+  DPDInvoiceList: undefined;
+  FundingLimitsForDealers: undefined;
+  ANCreditAccount: undefined;
+  CreditAccountDetails: {
+    dealerName?: string;
+    creditAccount?: string;
+    anchor?: string;
+  };
+  CreditAccountInvoiceNumber: {
+    creditAccountNo?: string;
+    invoiceNumber?: string;
+  };
+  CreditAccountDailyInterest: {
+    invoiceNumber?: string;
+    creditAccountNo?: string;
   };
   ClientNavigator: undefined;
   SoftNavigator: undefined;

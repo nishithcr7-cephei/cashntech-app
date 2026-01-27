@@ -7,8 +7,11 @@ import type { GSTInvoiceJSON } from './gstInvoiceExtractor';
 import RNFS from 'react-native-fs';
 
 // ✅ Gemini API Key
-const GEMINI_API_KEY = 'AIzaSyD60UFXxKbtwpL9sPpWtyG_6WiNMWnDxtQ';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent';
+// New account: My Project2
+const GEMINI_API_KEY = 'AIzaSyA2IZnB1q2RY6QJLpdgFLs3bCDCHOz9Wpw';
+// Using the model that AI Studio shows in the Playground: gemini-flash-latest
+const GEMINI_API_URL =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
 const INVOICE_EXTRACTION_SYSTEM_PROMPT = `
 You are an expert financial and accounting data extraction agent. Your sole task is to process the raw, unstructured image of a Tax Invoice (GST Invoice) and transform it into a perfectly structured JSON object.
@@ -86,14 +89,15 @@ export async function extractWithGemini(
     // Convert image to base64
     const base64Data = await imageToBase64(filePath);
 
-    // Prepare API payload
+    // Prepare API payload for gemini-flash-latest (multimodal, text + image)
     const payload = {
       contents: [
         {
-          role: 'user',
           parts: [
             {
-              text: 'Analyze the attached invoice image and return the structured JSON strictly based on the system instructions and schema. Extract all line items accurately.',
+              text:
+                INVOICE_EXTRACTION_SYSTEM_PROMPT +
+                '\n\nNow read this invoice image and return ONLY the JSON object in the exact schema above. Do not add any extra text, comments or markdown.',
             },
             {
               inlineData: {
@@ -104,12 +108,8 @@ export async function extractWithGemini(
           ],
         },
       ],
-      systemInstruction: {
-        parts: [{ text: INVOICE_EXTRACTION_SYSTEM_PROMPT }],
-      },
       generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.1, // Low temperature for consistent, factual extraction
+        temperature: 0.1,
       },
     };
 

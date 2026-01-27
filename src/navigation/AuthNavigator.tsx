@@ -11,6 +11,8 @@ import {
   SuccessScreen,
   TermsOfService,
   OcrInvoiceScreen,
+  SelectUserTypeScreen,
+  SelectProgramScreen,
 } from '@screens/index';
 import {OnBoarding} from '@screens/OnBoarding/OnBoarding';
 import {SplashScreen} from '@screens/SplashScreen/SplashScreen';
@@ -32,60 +34,45 @@ export const AuthNavigator = () => {
         component={SplashScreen}
       />
       <AuthStack.Screen
+        name={AuthScreens.SigninScreen}
+        component={SigninScreen}
+      />
+      <AuthStack.Screen
+        name={AuthScreens.SignupScreen}
+        component={SignupScreen}
+      />
+      <AuthStack.Screen
+        name={AuthScreens.OTPInputScreen}
+        component={OTPInputScreen}
+      />
+      <AuthStack.Screen
+        name={AuthScreens.PasswordScreen}
+        component={PasswordScreen}
+      />
+      <AuthStack.Screen
+        name={AuthScreens.SuccessScreen}
+        component={SuccessScreen}
+      />
+      <AuthStack.Screen
+        name={AuthScreens.TermsOfService}
+        component={TermsOfService}
+      />
+      <AuthStack.Screen
         name={AuthScreens.OcrInvoice}
         component={OcrInvoiceScreen}
+      />
+      <AuthStack.Screen
+        name="SelectUserTypeScreen"
+        component={SelectUserTypeScreen}
+      />
+      <AuthStack.Screen
+        name="SelectProgramScreen"
+        component={SelectProgramScreen}
       />
       <AuthStack.Screen
         name={AuthScreens.HomeNavigator}
         component={HomeNavigator}
       />
-      
-      {/* <AuthStack.Screen name={AuthScreens.OnBoarding} component={OnBoarding} /> */}
-      
-      {/* <AuthStack.Screen
-        name={AuthScreens.MenuPageView}
-        component={MenuPageView}
-      /> */}
-      
-      {/* <AuthStack.Screen
-        name={AuthScreens.RegisterView}
-        component={RegisterView}
-      /> */}
-      
-      {/* <AuthStack.Screen
-        name={AuthScreens.ApplyView}
-        component={ApplyView}
-      /> */}
-      
-      {/* <AuthStack.Screen
-        name={AuthScreens.ContactUs}
-        component={ContactUs}
-      /> */}
-      
-      {/* <AuthStack.Screen
-        name={AuthScreens.SignupScreen}
-        component={SignupScreen}
-      /> */}
-      {/* <AuthStack.Screen
-        name={AuthScreens.SigninScreen}
-        component={SigninScreen}
-      /> */}
-      {/* <AuthStack.Screen
-        name={AuthScreens.OTPInputScreen}
-        component={OTPInputScreen}
-      /> */}
-      {/* <AuthStack.Screen
-        name={AuthScreens.PasswordScreen}
-        component={PasswordScreen}
-      /> */}
-      {/* <AuthStack.Screen
-        name={AuthScreens.SuccessScreen}
-        component={SuccessScreen}
-      /> */}
-      {/* <AuthStack.Screen
-        name={AuthScreens.TermsOfService}
-        component={TermsOfService}
-      /> */}
     </AuthStack.Navigator>
   );
 };

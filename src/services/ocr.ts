@@ -1,4 +1,3 @@
-import TextRecognition from '@react-native-ml-kit/text-recognition';
 import type {OcrResult} from '../types/Invoice';
 import {intelligentParseInvoice} from '@utils/intelligentParser';
 import type {OCRBlock} from '../utils/mlFeatureExtractor';
@@ -129,40 +128,22 @@ export async function runGSTInvoiceExtraction(filePath: string): Promise<{rawTex
 }
 
 /**
- * Hybrid GST Invoice Extraction with ML Kit + Gemini AI
+ * GST Invoice Extraction using Gemini AI only
+ * No fallback - only Gemini AI is used for invoice reading
  * 
  * @param filePath - Path to invoice image
- * @param useGemini - If true, uses Gemini AI (paid but accurate). If false, uses ML Kit (free).
- * @returns Extracted invoice data with method used
+ * @returns Extracted invoice data
  */
 export async function runGSTInvoiceExtractionWithAI(
-  filePath: string,
-  useGemini: boolean = false
-): Promise<{rawText: string; gstInvoice: GSTInvoiceJSON; method: 'gemini' | 'mlkit'}> {
+  filePath: string
+): Promise<{rawText: string; gstInvoice: GSTInvoiceJSON}> {
+  console.log('🔮 Using Gemini AI extraction...');
+  const geminiResult = await extractWithGemini(filePath);
+  console.log('✅ Gemini extraction successful!', geminiResult.confidence);
   
-  if (useGemini) {
-    try {
-      console.log('🔮 Using Gemini AI extraction...');
-      const geminiResult = await extractWithGemini(filePath);
-      console.log('✅ Gemini extraction successful!', geminiResult.confidence);
-      
-      return {
-        rawText: geminiResult.rawText,
-        gstInvoice: geminiResult.gstInvoice,
-        method: 'gemini',
-      };
-    } catch (error: any) {
-      console.warn('⚠️ Gemini extraction failed, falling back to ML Kit:', error.message);
-      // Fall through to ML Kit fallback
-    }
-  }
-  
-  // Default: Use ML Kit (free, offline)
-  console.log('📱 Using ML Kit extraction...');
-  const result = await runGSTInvoiceExtraction(filePath);
   return {
-    ...result,
-    method: 'mlkit',
+    rawText: geminiResult.rawText,
+    gstInvoice: geminiResult.gstInvoice,
   };
 }
 

@@ -24,6 +24,7 @@ interface DateTimePickerProps {
   value?: string | Date;
   placeholder?: string;
   containerStyle?: ViewStyle;
+  inputStyle?: ViewStyle;
   mode?: 'date' | 'datetime';
 }
 
@@ -34,6 +35,7 @@ export const DateNTimePicker: React.FC<DateTimePickerProps> = ({
   value = '',
   datePickerProps,
   containerStyle,
+  inputStyle,
   mode = 'datetime',
 }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -48,7 +50,7 @@ export const DateNTimePicker: React.FC<DateTimePickerProps> = ({
   return (
     <View style={[styles.container, containerStyle]}>
       <Text style={styles.label}>{label}</Text>
-      <TouchableOpacity onPress={showPicker} style={styles.inputBox}>
+      <TouchableOpacity onPress={showPicker} style={[styles.inputBox, inputStyle]}>
         <View style={styles.inputRow}>
           {value ? (
             <Text style={styles.inputText}>
@@ -78,10 +80,11 @@ export const DateNTimePicker: React.FC<DateTimePickerProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginBottom: scaleHeight(4),
+    marginTop: 8,
   },
   label: {
     fontSize: scaleFont(14),
-    marginBottom: 8,
+    marginBottom: 6,
     color: '#333',
   },
   inputBox: {

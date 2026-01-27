@@ -7,10 +7,11 @@ import LottieView from 'lottie-react-native';
 import {successLottie} from '@assets/Lottie';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {useDispatch} from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
 import moment from 'moment';
 import {authActions} from '@store/auth';
 import {setStorage, getStorage} from '@services/localStorage';
+import {selectIsProgramSelected} from '@store/programSelection/programSelection.selector';
 
 const Strings = {
   copyright: `Copyright ${moment().year()}, CashnTech Pvt Ltd., All Rights Reserved`,
@@ -25,6 +26,7 @@ export const SuccessScreen = ({
   route: {params},
 }: SuccessScreenProps) => {
   const dispatch = useDispatch();
+  const isProgramSelected = useSelector(selectIsProgramSelected);
 
   const message = useMemo(() => {
     switch (params.authMode) {
@@ -54,6 +56,15 @@ export const SuccessScreen = ({
       if (params.authMode === 'signin') {
         dispatch(authActions.setIsLoggedIn(true));
         setStorage(StorageKeys.IS_LOGGED_IN, true);
+        // Navigate to SelectProgramScreen if program not selected, otherwise go to HomeNavigator
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: isProgramSelected ? 'HomeNavigator' : 'SelectProgramScreen',
+            },
+          ],
+        });
         clearTimeout(timer);
         return;
       }

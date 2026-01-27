@@ -3,7 +3,15 @@ export type InvoiceLineItem = {
   quantity: string;
   unit: string;
   pricePerQuantity: string;
-  total: string; // Auto calculated
+  total: string; // Auto calculated (qty * price)
+  // Item-level discount
+  discountType?: string; // 'percentage' | 'value' | ''
+  discountValue?: string; // Discount percentage or amount
+  discountAmount?: string; // Auto calculated discount amount
+  // Item-level tax
+  taxType?: string; // 'GST' | 'CST' | 'IGST' | ''
+  taxPercentage?: string; // Tax percentage
+  taxAmount?: string; // Auto calculated tax amount
 };
 
 export type InvoiceFields = {
@@ -16,15 +24,27 @@ export type InvoiceFields = {
   invoiceNumber: string; // Invoice / Unique Ref. No
   associatedPO: string;
   invoiceDate: string; // can be textual like "October 30, 2025"
-  invoiceDueDate: string;
+  paymentDate: string; // Payment Date
+  invoiceDueDate: string; // Invoice Due Date
+  grnDate: string; // GRN Date (Goods Receipt Note Date) - Optional
 
   // Additional Invoice Information
   earlyPaymentDiscount: string; // Percentage
   currency: string;
+  creditTo: string; // Credit To (bank account)
   remark: string;
 
   // Line Items
   items: InvoiceLineItem[];
+
+  // Discount Fields
+  discountType: string; // 'percentage' | 'absolute' | ''
+  discountValue: string; // Discount amount or percentage
+
+  // Tax Summary (Footer)
+  cgst: string; // Central GST
+  sgst: string; // State GST
+  grandTotal: string; // Grand Total (Final Amount + CGST + SGST)
 
   // Legacy fields (keep for backward compatibility / additional extraction)
   vendorName?: string;

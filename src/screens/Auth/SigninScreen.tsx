@@ -4,14 +4,11 @@ import {EyeClose, EyeOpen} from '@assets/Icons';
 import {Button, Container, Header, Input, TnCFooter} from '@components/index';
 import {AuthScreens, Colors, Fonts, StorageKeys} from '@constants/index';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {authSelector} from '@store/auth';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {handleEmailVerification} from '@utils/Utils';
 import Toast from 'react-native-toast-message';
 import {Feather} from '@react-native-vector-icons/feather';
-import {useDispatch, useSelector} from 'react-redux';
-import {signinRequest} from '@store/auth/auth.slice';
 import {setStorage} from '@services/localStorage';
 import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
 
@@ -56,62 +53,26 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
     }
   }, [params]);
 
-  const isLoading = useSelector(authSelector.getGlobalLoader);
-  const dispatch = useDispatch();
+  const onPressVerify = () => {
+    const isEmailValid = handleEmailVerification(email);
+    if (!isEmailValid) return;
 
-  const onSignupSuccess = (message: string, mobileNumber: string) => {
+    // Skip API call and navigate directly to OTPInputScreen
     setStorage(StorageKeys.REMEMBER_ME, rememberMe);
-    Toast.show({
-      type: 'success',
-      text1: message || Strings.otpSent,
-      visibilityTime: 2000,
-    });
+    
     const data = {
-      email: email,
-      password: passwordValue,
-      mobileNumber,
+      email: email.trim().toLowerCase(),
+      password: passwordValue.trim(),
+      mobileNumber: '9814756321', // Placeholder - will be replaced with API response later
     };
-    const params = {
+    
+    const otpParams = {
       showCreatePass: false,
       screen: 'signin',
       data,
     };
-    navigation.reset({
-      index: 0,
-      routes: [
-        {
-          name: AuthScreens.OTPInputScreen,
-          params,
-        },
-      ],
-    });
-  };
-
-  const onSignupError = (errorMessage: string) => {
-    Toast.show({
-      type: 'error',
-      text1: errorMessage,
-      visibilityTime: 2000,
-    });
-  };
-
-  const onPressVerify = async () => {
-    const isEmailValid = handleEmailVerification(email);
-    if (!isEmailValid) return;
-
-    const data = {
-      email: email.trim().toLowerCase(),
-      password: passwordValue.trim(),
-    };
-
-
-    // Make the API call directly
-    const payload = {
-      payload: data,
-      callbackSuccess: onSignupSuccess,
-      callbackError: onSignupError,
-    };
-    dispatch(signinRequest(payload));
+    
+    navigation.navigate(AuthScreens.OTPInputScreen, otpParams);
   };
 
   const onPressForgotPassword = () => {
@@ -136,7 +97,6 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
             maxLength={32}
             value={email}
             onChangeText={setEmail}
-            editable={!isLoading}
             keyboardType={'email-address'}
           />
           <Input
@@ -152,7 +112,6 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
             }
             onPressRightIcon={() => setShowPassword(prv => !prv)}
             secureTextEntry={!showPassword}
-            editable={!isLoading}
             containerStyle={styles.passwordInputContainer}
           />
           <View style={styles.extraInfoContainer}>
@@ -176,7 +135,6 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
           <Button
             buttonText={Strings.getVerificationCode}
             onPress={onPressVerify}
-            showLoader={isLoading}
           />
           <View style={styles.accountContainer}>
             <Text style={styles.accountText}>{Strings.noAccountText}</Text>

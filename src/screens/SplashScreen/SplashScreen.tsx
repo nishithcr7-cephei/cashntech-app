@@ -15,14 +15,14 @@ export const SplashScreen = () => {
   const navigation = useNavigation<SplashScreenNavigationProp>();
 
   useEffect(() => {
-    // Navigate to Invoice dashboard (drawer) after 2 seconds
+    // Navigate to SigninScreen after 2 seconds
     const timer = setTimeout(() => {
-      // Force navigation to HomeNavigator using reset to clear navigation stack
+      // Force navigation to SigninScreen using reset to clear navigation stack
       const resetAction = CommonActions.reset({
         index: 0,
         routes: [
           {
-            name: AuthScreens.HomeNavigator,
+            name: AuthScreens.SigninScreen,
           },
         ],
       });

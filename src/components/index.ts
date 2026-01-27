@@ -31,3 +31,6 @@ export * from './TaskCard/TaskCard';
 export * from './TaskFilterModal/TaskFilterModal';
 export * from './MonthYearFilter/MonthYearFilter';
 export * from './TabBar';
+export * from './CheckerApprovalModal/CheckerApprovalModal';
+export * from './ProgramSelector/ProgramSelectorPill';
+export * from './ProgramSelector/ProgramBreadcrumb';

@@ -12,12 +12,13 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {UserImg} from '@assets/Images';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
-  ClientMaster,
   LeftChevron,
   UpChevron,
   Logout,
+  File,
 } from '@assets/Icons';
 import {DrawerContentComponentProps} from '@react-navigation/drawer';
+import {useNavigationState} from '@react-navigation/native';
 import {Colors, Fonts} from '@constants/index';
 import {useDispatch, useSelector} from 'react-redux';
 import {Alert} from 'react-native';
@@ -26,9 +27,78 @@ import {logoutUser} from '@services/api/api';
 import Toast from 'react-native-toast-message';
 
 export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [isTransactionsOpen, setIsTransactionsOpen] = React.useState(false);
+  const [isInvoiceOpen, setIsInvoiceOpen] = React.useState(false);
+  const [isPaymentsOpen, setIsPaymentsOpen] = React.useState(false);
   const {top, bottom} = useSafeAreaInsets();
   const userInfo = useSelector(userSelector.getUserInfo);
+  
+  // Get current route name for highlighting active menu item
+  const currentRoute = useNavigationState(state => {
+    if (state) {
+      const route = state.routes[state.index];
+      if (route.state) {
+        // Handle nested navigators
+        const nestedState = route.state;
+        const nestedRoute = nestedState.routes[nestedState.index];
+        return nestedRoute.name;
+      }
+      return route.name;
+    }
+    return null;
+  });
+
+  // Auto-expand menus based on current route
+  React.useEffect(() => {
+    // Check if current route is under TRANSACTIONS
+    const isTransactionRoute = 
+      currentRoute === 'InvoiceDashboard' ||
+      currentRoute === 'InvoiceDetails' ||
+      currentRoute === 'CreateInvoice' ||
+      currentRoute === 'UploadInvoiceList' ||
+      currentRoute === 'PendingApprovals' ||
+      currentRoute === 'RejectedFinances' ||
+      currentRoute === 'DiscountingPayments' ||
+      currentRoute === 'DPDInvoiceList' ||
+      currentRoute === 'DealerInvoiceList' ||
+      currentRoute === 'FundingLimitsForDealers' ||
+      currentRoute === 'ANCreditAccount' ||
+      currentRoute === 'CreditAccountDetails' ||
+      currentRoute === 'CreditAccountInvoiceNumber' ||
+      currentRoute === 'CreditAccountDailyInterest';
+
+    if (isTransactionRoute) {
+      setIsTransactionsOpen(true);
+    }
+
+    // Check if current route is under Invoice
+    const isInvoiceRoute = 
+      currentRoute === 'InvoiceDashboard' ||
+      currentRoute === 'InvoiceDetails' ||
+      currentRoute === 'CreateInvoice' ||
+      currentRoute === 'UploadInvoiceList' ||
+      currentRoute === 'PendingApprovals' ||
+      currentRoute === 'RejectedFinances' ||
+      currentRoute === 'DiscountingPayments' ||
+      currentRoute === 'DPDInvoiceList';
+
+    if (isInvoiceRoute) {
+      setIsInvoiceOpen(true);
+    }
+
+    // Check if current route is under Payments
+    const isPaymentRoute = 
+      currentRoute === 'DealerInvoiceList' ||
+      currentRoute === 'FundingLimitsForDealers' ||
+      currentRoute === 'ANCreditAccount' ||
+      currentRoute === 'CreditAccountDetails' ||
+      currentRoute === 'CreditAccountInvoiceNumber' ||
+      currentRoute === 'CreditAccountDailyInterest';
+
+    if (isPaymentRoute) {
+      setIsPaymentsOpen(true);
+    }
+  }, [currentRoute]);
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to log out?', [
@@ -55,10 +125,10 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
             <Image source={UserImg} style={styles.image} resizeMode="contain" />
             <View style={styles.infoContainer}>
               <Text style={styles.title} numberOfLines={2}>
-                {userInfo.first_name + ' ' + userInfo.last_name}
+                {userInfo.email || 'test@gmail.com'}
               </Text>
               <Text style={styles.subTitle} numberOfLines={2}>
-                {userInfo.email}
+                {userInfo.mobile_number || '9814756321'}
               </Text>
             </View>
           </View>
@@ -73,109 +143,284 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
         <View style={styles.buttonContainer}>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View>
+              {/* TRANSACTIONS Root Menu */}
               <TouchableOpacity
-                style={styles.button}
-                onPress={() => navigation.navigate('InvoiceDashboard')}>
-                <Text style={styles.buttonText}>Invoice Dashboard</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.button}
+                style={[
+                  styles.button,
+                  isTransactionsOpen && styles.parentMenuButton,
+                ]}
                 onPress={() => {
-                  setIsOpen(!isOpen);
+                  setIsTransactionsOpen(!isTransactionsOpen);
                 }}>
                 <View style={styles.rowCenter}>
-                  <ClientMaster
+                  <File
                     height={scaleHeight(24)}
                     width={scaleWidth(24)}
                   />
-                  <Text style={styles.buttonText}>
-                    Client Information Master
+                  <Text
+                    style={[
+                      isTransactionsOpen ? styles.parentMenuText : styles.buttonText,
+                    ]}>
+                    TRANSACTIONS
                   </Text>
                 </View>
                 <View style={styles.arrowContainer}>
-                  <UpChevron rotation={isOpen ? 0 : 180} />
+                  <UpChevron rotation={isTransactionsOpen ? 0 : 180} />
                 </View>
               </TouchableOpacity>
-              {isOpen && (
+
+              {isTransactionsOpen && (
                 <View style={{marginLeft: scaleWidth(24)}}>
+                  {/* Invoice Submenu */}
                   <TouchableOpacity
-                    style={styles.button}
-                    onPress={() =>
-                      navigation.navigate('ClientNavigator', {
-                        screen: 'InboundClientList',
-                      })
-                    }>
-                    <Text style={styles.buttonText}>Inbound Client</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={() =>
-                      navigation.navigate('ClientNavigator', {
-                        screen: 'ClientInfo',
-                      })
-                    }>
-                    <Text style={styles.buttonText}>Client Information</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={() =>
-                      navigation.navigate('ManageTask', {} as any)
-                    }>
-                    <Text style={styles.buttonText}>Manage Task</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={() =>
-                      navigation.navigate('ClientNavigator', {
-                        screen: 'VisitDetail',
-                      })
-                    }>
-                    <Text style={styles.buttonText}>Visit Details</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={() =>
-                      navigation.navigate('SoftNavigator', {
-                        screen: 'Softsanction',
-                      })
-                    }>
-                    <Text style={styles.buttonText}>Soft Sanction</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.button}
-                    onPress={() =>
-                      navigation.navigate('KycNavigator', {
-                        screen: 'KycDocument',
-                      })
-                    }>
-                    <Text style={styles.buttonText}>KYC Document</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.button}
+                    style={[
+                      styles.button,
+                      isInvoiceOpen && styles.parentMenuButton,
+                    ]}
                     onPress={() => {
-                      Toast.show({
-                        type: 'info',
-                        text1: 'Document Validation',
-                        text2: 'This Feature under Development',
-                        visibilityTime: 3000,
-                      });
+                      setIsInvoiceOpen(!isInvoiceOpen);
                     }}>
-                    <Text style={styles.buttonText}>Document Validation</Text>
+                    <View style={styles.rowCenter}>
+                      <Text
+                        style={[
+                          isInvoiceOpen ? styles.parentMenuText : styles.buttonText,
+                        ]}>
+                        Invoice
+                      </Text>
+                    </View>
+                    <View style={styles.arrowContainer}>
+                      <UpChevron rotation={isInvoiceOpen ? 0 : 180} />
+                    </View>
                   </TouchableOpacity>
+
+                  {isInvoiceOpen && (
+                    <View style={{marginLeft: scaleWidth(24)}}>
+                      {/* Invoice Dashboard */}
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          currentRoute === 'InvoiceDashboard' && styles.activeButton,
+                        ]}
+                        onPress={() => {
+                          navigation.navigate('InvoiceDashboard');
+                          navigation.closeDrawer();
+                        }}>
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            currentRoute === 'InvoiceDashboard' && styles.activeButtonText,
+                          ]}>
+                          Invoice Dashboard
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Invoice Details */}
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          (currentRoute === 'InvoiceDetails' ||
+                            currentRoute === 'CreateInvoice' ||
+                            currentRoute === 'UploadInvoiceList') &&
+                            styles.activeButton,
+                        ]}
+                        onPress={() => {
+                          navigation.navigate('InvoiceDetails');
+                          navigation.closeDrawer();
+                        }}>
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            (currentRoute === 'InvoiceDetails' ||
+                              currentRoute === 'CreateInvoice' ||
+                              currentRoute === 'UploadInvoiceList') &&
+                              styles.activeButtonText,
+                          ]}>
+                          Invoice Details
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Pending Approvals */}
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          currentRoute === 'PendingApprovals' && styles.activeButton,
+                        ]}
+                        onPress={() => {
+                          navigation.navigate('PendingApprovals');
+                          navigation.closeDrawer();
+                        }}>
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            currentRoute === 'PendingApprovals' && styles.activeButtonText,
+                          ]}>
+                          Pending Approvals
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Rejected Finance */}
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          currentRoute === 'RejectedFinances' && styles.activeButton,
+                        ]}
+                        onPress={() => {
+                          navigation.navigate('RejectedFinances');
+                          navigation.closeDrawer();
+                        }}>
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            currentRoute === 'RejectedFinances' && styles.activeButtonText,
+                          ]}>
+                          Rejected Finance
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Discounting Invoices */}
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          currentRoute === 'DiscountingPayments' && styles.activeButton,
+                        ]}
+                        onPress={() => {
+                          navigation.navigate('DiscountingPayments');
+                          navigation.closeDrawer();
+                        }}>
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            currentRoute === 'DiscountingPayments' && styles.activeButtonText,
+                          ]}>
+                          Discounting Invoices
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* DPD Invoice List */}
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          currentRoute === 'DPDInvoiceList' && styles.activeButton,
+                        ]}
+                        onPress={() => {
+                          navigation.navigate('DPDInvoiceList');
+                          navigation.closeDrawer();
+                        }}>
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            currentRoute === 'DPDInvoiceList' && styles.activeButtonText,
+                          ]}>
+                          DPD Invoice List
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* Payments Submenu */}
                   <TouchableOpacity
-                    style={styles.button}
-                    onPress={() =>
-                      navigation.navigate('LeadNavigator', {
-                        screen: 'LeadProgress',
-                      })
-                    }>
-                    <Text style={styles.buttonText}>Lead Progress</Text>
+                    style={[
+                      styles.button,
+                      isPaymentsOpen && styles.parentMenuButton,
+                    ]}
+                    onPress={() => {
+                      setIsPaymentsOpen(!isPaymentsOpen);
+                    }}>
+                    <View style={styles.rowCenter}>
+                      <Text
+                        style={[
+                          isPaymentsOpen ? styles.parentMenuText : styles.buttonText,
+                        ]}>
+                        Payments
+                      </Text>
+                    </View>
+                    <View style={styles.arrowContainer}>
+                      <UpChevron rotation={isPaymentsOpen ? 0 : 180} />
+                    </View>
                   </TouchableOpacity>
+
+                  {isPaymentsOpen && (
+                    <View style={{marginLeft: scaleWidth(24)}}>
+                      {/* Dealers List */}
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          currentRoute === 'DealerInvoiceList' && styles.activeButton,
+                        ]}
+                        onPress={() => {
+                          navigation.navigate('DealerInvoiceList');
+                          navigation.closeDrawer();
+                        }}>
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            currentRoute === 'DealerInvoiceList' && styles.activeButtonText,
+                          ]}>
+                          Dealers List
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Funding Limits */}
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          currentRoute === 'FundingLimitsForDealers' && styles.activeButton,
+                        ]}
+                        onPress={() => {
+                          navigation.navigate('FundingLimitsForDealers');
+                          navigation.closeDrawer();
+                        }}>
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            currentRoute === 'FundingLimitsForDealers' && styles.activeButtonText,
+                          ]}>
+                          Funding Limits
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Anchor Credit Account */}
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          currentRoute === 'ANCreditAccount' && styles.activeButton,
+                        ]}
+                        onPress={() => {
+                          navigation.navigate('ANCreditAccount');
+                          navigation.closeDrawer();
+                        }}>
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            currentRoute === 'ANCreditAccount' && styles.activeButtonText,
+                          ]}>
+                          Anchor Credit Account
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Credit Account Details */}
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          currentRoute === 'CreditAccountDetails' && styles.activeButton,
+                        ]}
+                        onPress={() => {
+                          navigation.navigate('CreditAccountDetails');
+                          navigation.closeDrawer();
+                        }}>
+                        <Text
+                          style={[
+                            styles.buttonText,
+                            currentRoute === 'CreditAccountDetails' && styles.activeButtonText,
+                          ]}>
+                          Credit Account Details
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
-
-
           </ScrollView>
         </View>
         {/* Logout Button*/}
@@ -258,6 +503,16 @@ const styles = StyleSheet.create({
     marginBottom: scaleHeight(12),
     borderRadius: scaleWidth(4),
   },
+  activeButton: {
+    backgroundColor: '#FFE9E9',
+    borderLeftWidth: scaleWidth(3),
+    borderLeftColor: Colors.primaryColor,
+  },
+  parentMenuButton: {
+    backgroundColor: '#FFF5F5',
+    borderLeftWidth: scaleWidth(2),
+    borderLeftColor: 'rgba(227, 6, 19, 0.3)',
+  },
   arrowContainer: {
     paddingLeft: scaleWidth(16),
     paddingRight: scaleWidth(8),
@@ -267,6 +522,14 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroyMedium,
     fontSize: scaleFont(16),
     marginStart: scaleWidth(16),
+  },
+  activeButtonText: {
+    color: Colors.primaryColor,
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  parentMenuText: {
+    color: '#E30613',
+    fontFamily: Fonts.GilroySemiBold,
   },
   logOut: {
     marginHorizontal: scaleWidth(16),

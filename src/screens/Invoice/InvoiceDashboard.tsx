@@ -10,7 +10,7 @@ import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {AppBar, Container} from '@components/index';
+import {AppBar, Container, FilterModal, ProgramBreadcrumb} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -46,15 +46,25 @@ const unpaidRows = Array.from({length: 5}).map((_, index) => ({
   invoiceAmount: '₹20,000.00',
   piAmount: '₹20,00,000.00',
   invoiceDate: 'dd-mm-yyyy',
-  invoiceStatus: '-',
-  financeStatus: '-',
+  invoiceStatus: 'Created',
+  approvalStatus: 'Pending',
+  adminStatus: '-',
   disbursementDate: 'dd-mm-yyyy',
   disbAmount: '₹0.00',
   utrNo: '30',
 }));
 
+// Dummy filter data for Invoice Dashboard
+const dashboardFilterData = {
+  'Dealer Name': ['Hero Finance', 'ABC Finance', 'SK Finance', 'Seven Pharma', 'New Finance'],
+  'Status': ['Regular', 'Overdue', 'Pending'],
+  'OD Account': ['123101010', '12355253', '123101011'],
+};
+
 export const InvoiceDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dealers' | 'unpaid'>('dealers');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
   const navigation = useNavigation<CompositeNavigationProp<
     DrawerNavigationProp<HomeNavigatorType>,
     NativeStackNavigationProp<any>
@@ -67,7 +77,9 @@ export const InvoiceDashboard: React.FC = () => {
           <View style={styles.searchBox}>
             <Text style={styles.searchPlaceholder}>Search Entity</Text>
           </View>
-          <TouchableOpacity style={styles.filterBtn}>
+          <TouchableOpacity 
+            style={styles.filterBtn}
+            onPress={() => setShowFilterModal(true)}>
             <Text style={styles.filterText}>Filters</Text>
           </TouchableOpacity>
         </View>
@@ -133,18 +145,20 @@ export const InvoiceDashboard: React.FC = () => {
       <>
         <View style={styles.invoiceHeader}>
           <View style={styles.invoiceBadgeContainer}>
-            <Text style={styles.invoiceLabel}>Invoice</Text>
+            <Text style={styles.invoiceLabel}>Invoice List</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>100</Text>
+              <Text style={styles.badgeText}>{unpaidRows.length}</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.listToolbar}>
           <View style={styles.searchBox}>
-            <Text style={styles.searchPlaceholder}>Search Entity</Text>
+            <Text style={styles.searchPlaceholder}>Search by All</Text>
           </View>
-          <TouchableOpacity style={styles.filterBtn}>
+          <TouchableOpacity 
+            style={styles.filterBtn}
+            onPress={() => setShowFilterModal(true)}>
             <Text style={styles.filterText}>Filters</Text>
           </TouchableOpacity>
         </View>
@@ -169,7 +183,7 @@ export const InvoiceDashboard: React.FC = () => {
                 </View>
                 <View style={[styles.statusChip, styles.statusWarningChip]}>
                   <Text style={[styles.statusChipText, styles.statusWarningText]}>
-                    {row.invoiceStatus === '-' ? 'Unpaid' : row.invoiceStatus}
+                    {row.invoiceStatus}
                   </Text>
                 </View>
               </View>
@@ -192,8 +206,12 @@ export const InvoiceDashboard: React.FC = () => {
                   <Text style={styles.infoValue}>{row.invoiceStatus}</Text>
                 </View>
                 <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Finance Status</Text>
-                  <Text style={styles.infoValue}>{row.financeStatus}</Text>
+                  <Text style={styles.infoLabel}>Approval Status</Text>
+                  <Text style={styles.infoValue}>{row.approvalStatus}</Text>
+                </View>
+                <View style={styles.infoColumn}>
+                  <Text style={styles.infoLabel}>Admin Status</Text>
+                  <Text style={styles.infoValue}>{row.adminStatus}</Text>
                 </View>
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Disbursement Date</Text>
@@ -218,16 +236,24 @@ export const InvoiceDashboard: React.FC = () => {
 
   return (
     <Container>
-      <AppBar title="Invoice Dashboard" />
+      <AppBar 
+        title="Invoice Dashboard" 
+        navigation={navigation as any}
+      />
+      <ProgramBreadcrumb />
+      <View style={styles.pageTitleBar}>
+        <Text style={styles.pageTitleText}>Invoices</Text>
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionTitle}>Invoices</Text>
-        <Text style={styles.sectionSubtitle}>Invoice Details</Text>
+        <Text style={styles.sectionSubtitle}>Invoice List</Text>
 
         <View style={styles.cardGrid}>
           {cardMetrics.map(card => (
             <View key={card.label} style={styles.card}>
               <Text style={styles.cardLabel}>{card.label}</Text>
-              <Text style={styles.cardValue}>{card.value}</Text>
+              <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
+                {card.value}
+              </Text>
             </View>
           ))}
         </View>
@@ -252,7 +278,7 @@ export const InvoiceDashboard: React.FC = () => {
                 styles.tabText,
                 activeTab === 'unpaid' && styles.activeTabText,
               ]}>
-              Unpaid Invoices
+              Latest Invoices
             </Text>
           </TouchableOpacity>
         </View>
@@ -261,27 +287,46 @@ export const InvoiceDashboard: React.FC = () => {
           {activeTab === 'dealers' ? dealerTable : unpaidTable}
         </View>
       </ScrollView>
+
+      {/* Filter Modal */}
+      <FilterModal
+        visible={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        onApply={(filters) => {
+          setAppliedFilters(filters);
+          // TODO: Apply filters to data later
+        }}
+        filterData={dashboardFilterData}
+        appliedFilters={appliedFilters}
+      />
     </Container>
   );
 };
 
 const styles = StyleSheet.create({
+  pageTitleBar: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
+    backgroundColor: Colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E6E6E6',
+  },
+  pageTitleText: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
   content: {
     paddingHorizontal: scaleWidth(16),
     paddingBottom: scaleHeight(24),
     gap: scaleHeight(12),
-  },
-  sectionTitle: {
-    fontSize: scaleFont(22),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.darkblack,
-    marginTop: scaleHeight(16),
   },
   sectionSubtitle: {
     fontSize: scaleFont(16),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.graybase,
     marginBottom: scaleHeight(8),
+    marginTop: scaleHeight(12),
   },
   cardGrid: {
     flexDirection: 'row',
@@ -295,16 +340,20 @@ const styles = StyleSheet.create({
     padding: scaleWidth(16),
     borderWidth: 1,
     borderColor: '#FFD9D9',
+    minWidth: 0,
   },
   cardLabel: {
     fontSize: scaleFont(13),
     color: Colors.graybase,
     marginBottom: scaleHeight(6),
+    flexWrap: 'wrap',
   },
   cardValue: {
-    fontSize: scaleFont(18),
+    fontSize: scaleFont(16),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.primaryColor,
+    flexShrink: 1,
+    minWidth: 0,
   },
   tabRow: {
     flexDirection: 'row',
@@ -376,11 +425,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(12),
     padding: scaleWidth(16),
-    shadowColor: '#00000010',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E6E6E6',
+    shadowColor: '#00000035',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -463,5 +514,4 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
   },
 });
-
 

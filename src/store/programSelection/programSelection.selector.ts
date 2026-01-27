@@ -1,0 +1,38 @@
+import {createSelector} from '@reduxjs/toolkit';
+import {RootState} from '@store/app/store';
+
+const selectProgramSelectionState = (state: RootState) =>
+  state.programSelection;
+
+// Direct selector without createSelector since we're not transforming
+export const selectProgramSelection = (state: RootState) =>
+  state.programSelection;
+
+export const selectIsProgramSelected = createSelector(
+  [selectProgramSelectionState],
+  selection => !!selection.programId,
+);
+
+export const selectProgramDisplayText = createSelector(
+  [selectProgramSelectionState],
+  selection => {
+    if (!selection.bankName || !selection.programName) return null;
+    return `${selection.bankName} > ${selection.productName} > ${selection.programName}`;
+  },
+);
+
+export const selectProgramCompactText = createSelector(
+  [selectProgramSelectionState],
+  selection => {
+    if (!selection.bankName || !selection.programName) return null;
+    return `${selection.bankName} > ${selection.programName}`;
+  },
+);
+
+export const selectBankProductText = createSelector(
+  [selectProgramSelectionState],
+  selection => {
+    if (!selection.bankName || !selection.productName) return null;
+    return `${selection.bankName} > ${selection.productName}`;
+  },
+);

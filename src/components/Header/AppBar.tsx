@@ -17,12 +17,14 @@ import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {ProgramSelectorPill} from '@components/ProgramSelector/ProgramSelectorPill';
 
 export type AppBarProps = {
   title?: string;
   containerStyle?: StyleProp<ViewStyle>;
   titleTextStyle?: StyleProp<TextStyle>;
   hideHamburger?: boolean;
+  showProgramSelector?: boolean;
 
   renderLeftIcon?: React.ReactNode;
   onPressLeftIcon?: () => void;
@@ -49,6 +51,7 @@ export const AppBar = ({
   leftIconProps,
   titleTextStyle,
   hideHamburger = false,
+  showProgramSelector = false,
   navigation,
 }: AppBarProps) => {
   const insets = useSafeAreaInsets();
@@ -62,9 +65,9 @@ export const AppBar = ({
               onPressLeftIcon();
             } else if (
               navigation &&
-              typeof navigation?.openDrawer === 'function'
+              typeof navigation?.toggleDrawer === 'function'
             ) {
-              navigation.openDrawer();
+              navigation.toggleDrawer();
             }
           }}
           style={[leftIconContainerStyle]}
@@ -77,9 +80,12 @@ export const AppBar = ({
         </TouchableOpacity>
       )}
 
-      <Text style={[styles.titleText, hideHamburger ? styles.titleTextCentered : undefined, titleTextStyle]} numberOfLines={1}>
-        {title}
-      </Text>
+      <View style={[styles.titleSection, !showProgramSelector && styles.titleSectionFull]}>
+        <Text style={[styles.titleText, hideHamburger ? styles.titleTextCentered : undefined, titleTextStyle]} numberOfLines={1}>
+          {title}
+        </Text>
+        {showProgramSelector && <ProgramSelectorPill />}
+      </View>
     </View>
   );
 };
@@ -95,11 +101,22 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1000,
   },
+  titleSection: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginStart: scaleWidth(24),
+    gap: scaleWidth(12),
+  },
+  titleSectionFull: {
+    justifyContent: 'flex-start',
+  },
   titleText: {
+    flex: 1,
     color: Colors.primaryColor,
     fontFamily: Fonts.GilroyBold,
     fontSize: scaleFont(20),
-    marginStart: scaleWidth(24),
   },
   titleTextNoHamburger: {
     marginStart: 0,

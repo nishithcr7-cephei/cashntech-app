@@ -24,6 +24,13 @@ const emptyFields: InvoiceFields = {
   remark: '',
   // Line Items
   items: [],
+  // Discount Fields
+  discountType: '',
+  discountValue: '',
+  // Tax Summary
+  cgst: '',
+  sgst: '',
+  grandTotal: '',
 };
 
 export const OcrInvoiceScreen: React.FC = () => {

@@ -8,10 +8,7 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {AuthScreens, Colors, Fonts} from '@constants/index';
 import {EditIcon} from '@assets/Icons';
 import Toast from 'react-native-toast-message';
-import {useDispatch, useSelector} from 'react-redux';
-import {otpVerifyRequest, signinOtpVerifyRequest} from '@store/auth/auth.slice';
-import {authSelector} from '@store/auth';
-import {decodeJWT} from '@utils/Utils';
+import {useDispatch} from 'react-redux';
 import {userActions} from '@store/user';
 
 const OTP_TIMER = 60;
@@ -39,7 +36,6 @@ export const OTPInputScreen = ({
   const timerInterval = useRef<NodeJS.Timeout>(null);
 
   const dispatch = useDispatch();
-  const isLoading = useSelector(authSelector.getGlobalLoader);
 
   useEffect(() => {
     startTimer();
@@ -50,44 +46,25 @@ export const OTPInputScreen = ({
     };
   }, []);
 
-  const onSuccessOTPVerify = (token?: string) => {
-    Toast.show({
-      type: 'success',
-      text1: 'OTP verified successfully',
-      visibilityTime: 2000,
-    });
-
-    if (params.showCreatePass) {
-      navigation.navigate('PasswordScreen', {
-        screenMode: 'createPass',
-        token: token,
-      });
+  // Mock user data - will be replaced with API response later
+  const getMockUserData = () => {
+    if (params.screen === 'signin') {
+      return {
+        id: 1,
+        email: params.data.email || 'test@gmail.com',
+        first_name: 'Test',
+        last_name: 'User',
+        mobile_number: params.data.mobileNumber || '9814756321',
+      };
     } else {
-      if (!token) return;
-      const data = decodeJWT(token);
-      dispatch(
-        userActions.setUserInfo({
-          id: data?.id || 0,
-          email: data?.email || '',
-          first_name: data?.first_name || '',
-          last_name: data?.last_name || '',
-          mobile_number: data?.mobile_number || '',
-        }),
-      );
-      navigation.replace('SuccessScreen', {
-        authMode: 'signin',
-        firstName: data?.first_name || '',
-        lastName: data?.last_name || '',
-      });
+      return {
+        id: 1,
+        email: params.data.email || 'test@gmail.com',
+        first_name: params.data.firstName || 'Test',
+        last_name: params.data.lastName || 'User',
+        mobile_number: params.data.mobile || '9814756321',
+      };
     }
-  };
-
-  const onFailOTPVerify = (otpErrorMessage: string) => {
-    Toast.show({
-      type: 'error',
-      text1: otpErrorMessage,
-      visibilityTime: 2000,
-    });
   };
 
   const startTimer = () => {
@@ -127,36 +104,37 @@ export const OTPInputScreen = ({
   };
 
   const onPressVerifyOTP = () => {
-    if (otp.length < 6) {
-      Toast.show({
-        type: 'error',
-        text1: 'Please enter a valid OTP',
-        visibilityTime: 2000,
+    // Skip validation and API call - navigate directly to SuccessScreen
+    Toast.show({
+      type: 'success',
+      text1: 'OTP verified successfully',
+      visibilityTime: 2000,
+    });
+
+    if (params.showCreatePass) {
+      navigation.navigate('PasswordScreen', {
+        screenMode: 'createPass',
+        token: 'mock-token', // Placeholder - will be replaced with API response later
       });
-      return;
-    }
-    if (params.screen === 'signin') {
-      const data = {
-        mobile_number: params.data.mobileNumber.trim(),
-        otp,
-      };
-      const payload = {
-        payload: data,
-        callbackSuccess: onSuccessOTPVerify,
-        callbackError: onFailOTPVerify,
-      };
-      dispatch(signinOtpVerifyRequest(payload));
     } else {
-      const data = {
-        email: params.data.email.trim().toLocaleLowerCase(),
-        otp,
-      };
-      const payload = {
-        payload: data,
-        callbackSuccess: onSuccessOTPVerify,
-        callbackError: onFailOTPVerify,
-      };
-      dispatch(otpVerifyRequest(payload));
+      // Set mock user data
+      const mockUserData = getMockUserData();
+      dispatch(
+        userActions.setUserInfo({
+          id: mockUserData.id,
+          email: mockUserData.email,
+          first_name: mockUserData.first_name,
+          last_name: mockUserData.last_name,
+          mobile_number: mockUserData.mobile_number,
+        }),
+      );
+      
+      // Navigate to SuccessScreen
+      navigation.replace('SuccessScreen', {
+        authMode: params.screen === 'signin' ? 'signin' : 'signup',
+        firstName: mockUserData.first_name,
+        lastName: mockUserData.last_name,
+      });
     }
   };
 
@@ -206,8 +184,6 @@ export const OTPInputScreen = ({
             buttonText={'Verify'}
             style={styles.verifyButton}
             onPress={onPressVerifyOTP}
-            showLoader={isLoading}
-            disabled={isLoading}
           />
         </View>
         <View style={styles.resendContainer}>
