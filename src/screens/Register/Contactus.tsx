@@ -16,7 +16,7 @@ import fontWeight from '@constants/FontWeight';
 import {Button} from '@components/Button/Button';
 import {CustomDropdown} from '@components/Dropdown/CustomDropdown';
 import {AppBar, Container} from '@components/index';
-import {SectorType} from '@screens/ClientInfo/ClientInfo.type';
+import {SectorType} from '@type/common.types';
 import {
   setContactFormData,
   setCaptchaText,

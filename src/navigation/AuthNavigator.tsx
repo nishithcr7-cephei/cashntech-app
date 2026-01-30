@@ -14,7 +14,6 @@ import {
   SelectUserTypeScreen,
   SelectProgramScreen,
 } from '@screens/index';
-import {OnBoarding} from '@screens/OnBoarding/OnBoarding';
 import {SplashScreen} from '@screens/SplashScreen/SplashScreen';
 import MenuPageView from '@screens/SplashScreen/MenuPageView';
 import {AuthNavigatorType} from '@type/NavigatorTypes';

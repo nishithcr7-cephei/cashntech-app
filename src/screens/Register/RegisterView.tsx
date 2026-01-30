@@ -28,7 +28,7 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
 import Cities from '@constants/Cities';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
-import {SectorType} from '../ClientInfo/ClientInfo.type';
+import {SectorType} from '@type/common.types';
 import Toast from 'react-native-toast-message';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
 import {AuthScreens} from '@constants/Screens';
