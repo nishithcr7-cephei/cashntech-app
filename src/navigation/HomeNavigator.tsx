@@ -4,15 +4,7 @@ import {HomeNavigatorType} from '@type/NavigatorTypes';
 import {scaleWidth} from '@utils/Scale';
 import React from 'react';
 import {Dimensions} from 'react-native';
-import {ClientNavigator} from './ClientNavigator';
-import {SoftNavigator} from './SoftNavigator';
-import {LeadNavigator} from './LeadNavigator';
-import {ReportNavigator} from './ReportNavigator';
-import {KycNavigator} from './KycNavigator';
-import {DocNavigator} from './DocNavigator';
 import {
-  ManageTask,
-  VisitDetail,
   OcrInvoiceScreen,
   InvoiceDashboard,
   InvoiceDetails,
@@ -60,14 +52,6 @@ export const HomeNavigator = () => {
       <Drawer.Screen name="CreditAccountDetails" component={CreditAccountDetails} />
       <Drawer.Screen name="CreditAccountInvoiceNumber" component={CreditAccountInvoiceNumber} />
       <Drawer.Screen name="CreditAccountDailyInterest" component={CreditAccountDailyInterest} />
-      <Drawer.Screen name="ClientNavigator" component={ClientNavigator} />
-      <Drawer.Screen name="SoftNavigator" component={SoftNavigator} />
-      <Drawer.Screen name="LeadNavigator" component={LeadNavigator} />
-      <Drawer.Screen name="ReportNavigator" component={ReportNavigator} />
-      <Drawer.Screen name="KycNavigator" component={KycNavigator} />
-      <Drawer.Screen name="DocNavigator" component={DocNavigator} />
-      <Drawer.Screen name="ManageTask" component={ManageTask} />
-      <Drawer.Screen name="VisitDetail" component={VisitDetail} />
       <Drawer.Screen name="OcrInvoice" component={OcrInvoiceScreen} />
     </Drawer.Navigator>
   );

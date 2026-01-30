@@ -1,70 +1,26 @@
+// Auth exports
 export * from './Auth/OTPInputScreen';
 export * from './Auth/PasswordScreen';
 export * from './Auth/SigninScreen';
 export * from './Auth/SignupScreen';
 export * from './Auth/SuccessScreen';
 
-// KYCView exports
-export * from './KYCView/BankStatementUpload';
-export * from './KYCView/BusinessKYCValidation';
-export * from './KYCView/PersonalKYCValidation';
-export * from './KYCView/CompanyDocument';
-export * from './KYCView/CompanyPanCard';
-export * from './KYCView/DocumentValidation';
-export * from './KYCView/DocValidForm';
-export * from './KYCView/DocValidSelection';
-export * from './KYCView/ShareholdingCompany';
-export * from './KYCView/UdhyamCertificate';
-export * from './KYCView/GodownDetails';
-export * from './KYCView/GodownDetails2';
-export * from './KYCView/GSTDocument';
-export * from './KYCView/KycDocument';
-export * from './KYCView/KYCFormSelection';
-export * from './KYCView/KycOwner';
-export * from './KYCView/ResidenceDetail';
-export * from './KYCView/KycElectricityBill';
-export * from './KYCView/KycUploadAdhar';
-export * from './KYCView/KycUploadDoc';
-export * from './KYCView/KycUploadPan';
-export * from './KYCView/Fullimage';
-
-export * from './ClientInfo/ClientInfo.type';
-export * from './ClientInfo/ClientInfo';
-export * from './ClientInfo/BasicDetailForm';
-export * from './ClientInfo/ClientDetailForm';
-export * from './ClientInfo/FirmDetailForm';
-export * from './ClientInfo/VendorDetailForm';
-export * from './ClientInfo/VisitDetailForm';
-export * from './ClientInfo/ProfileScreen';
-
-export * from './InboundClient/InboundClientList';
-export * from './InboundClient/SubInboundClientList';
-
-export * from './ClientInfo/AssignTask';
-export * from './FormSelectionScreen/FormSelectionScreen';
-export * from './CreateClientForm/CreateClientForm';
-export * from './LeadProgress/LeadProgress';
-export * from './LeadProgressInfo/LeadProgressInfo';
-export * from './ManageTask/ManageTask';
-export * from './ManageTask/SubTask';
-export * from './ReadMore/ClientCardReadMore';
-export * from './Report/Report';
-export * from './SoftSanctionScreen';
+// SplashScreen exports
 export * from './SplashScreen/SplashScreen';
 export {default as MenuPageView} from './SplashScreen/MenuPageView';
-export * from './TaskTabs/TaskLogTabs';
-export * from './TaskTabs/TaskHistTabs';
-export * from './TaskTabs/TaskUpdate';
+
+// TermsOfService
 export * from './TermsOfService/TermsOfService';
-export * from './VisitDetails/VisitDetail';
-export * from './VisitDetails/SubVisitDetail';
-export * from './VisitDetails/UpdateVisitDetails';
 
 // Register exports
 export * from './Register';
 export * from './Register/Applyview';
 export {default as ContactUs} from './Register/Contactus';
+
+// OCR exports
 export * from './Ocr/OcrInvoiceScreen';
+
+// Invoice exports
 export * from './Invoice/InvoiceDashboard';
 export * from './Invoice/SelectUserTypeScreen';
 export * from './Invoice/SelectProgramScreen';

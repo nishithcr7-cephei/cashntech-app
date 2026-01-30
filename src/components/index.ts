@@ -1,3 +1,4 @@
+// Core components
 export * from './Button/Button';
 export * from './Header/Header';
 export * from './Header/AppBar';
@@ -6,31 +7,26 @@ export * from './Drawer/DrawerContent';
 export * from './Input/Input';
 export * from './Footer/TnCFooter';
 export * from './Footer/FooterButton';
-export * from './ClientCard/ClientCard';
-export * from './InboundClientCard/InboundClientCard';
+
+// Form components
 export * from './Dropdown/CustomDropdown';
 export * from './MultiSelectDropdown/MultiSelectDropdown';
-export * from './SoftSanctionLeadCard/SoftSanctionLeadCard';
-export * from './SoftRulesetCard/SoftRulestCard';
-export * from './RulesetTCPDCard/RulesetTCPDCard';
-export * from './LeadProgressCard/LeadProgressCard';
-export * from './KycCard/KycCard';
-export * from './KycDocumentCard/KycDocumentCard';
 export * from './DashedBox/DashedButton';
-export * from './DocValidCard/DocValidCard';
-export * from './PersonalKYCValidationCard/PersonalKYCValidationCard';
-export * from './UploadModelComponent/UploadModel';
-export * from './RemarkCard/RemarkCard';
 export * from './DateNTimePicker/DateNTimePicker';
-export * from './SoftsanctionModel/SoftSanctionModel';
+
+// Modal components
+export * from './UploadModelComponent/UploadModel';
+export * from './CheckerApprovalModal/CheckerApprovalModal';
+export * from './FilterModal/FilterModal';
+
+// Filter components
 export * from './ThreeDotsDropdown/ThreeDotsDropdown';
 export * from './FilterBox/FilterDropdown';
-export * from './TaskFilter/TaskFilterDropdown';
-export * from './FilterModal/FilterModal';
-export * from './TaskCard/TaskCard';
-export * from './TaskFilterModal/TaskFilterModal';
 export * from './MonthYearFilter/MonthYearFilter';
-export * from './TabBar';
-export * from './CheckerApprovalModal/CheckerApprovalModal';
+
+// Program selector
 export * from './ProgramSelector/ProgramSelectorPill';
 export * from './ProgramSelector/ProgramBreadcrumb';
+
+// Tab components
+export * from './TabBar';
