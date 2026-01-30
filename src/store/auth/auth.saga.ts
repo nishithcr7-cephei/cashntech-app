@@ -10,6 +10,7 @@ import {
   IOtpVerifySuccessResponse,
   IOtpVerifyErrorResponse,
   ICreatePasswordApiResponse,
+  ISigninOtpVerifySuccessResponse,
   SignupPayloadWithCallback,
   OtpVerifyPayloadWithCallback,
   CreatePasswordPayloadWithCallback,
@@ -33,6 +34,7 @@ import {
 } from './auth.slice';
 import {setStorage} from '@services/localStorage';
 import StorageKeys from '@constants/StorageKeys';
+import {userActions} from '@store/user';
 
 function* handleSignup(
   action: PayloadAction<SignupPayloadWithCallback>,
@@ -79,15 +81,17 @@ function* handleSignInOtpVerify(
     data,
     error,
   }: Result<
-    IOtpVerifySuccessResponse,
+    ISigninOtpVerifySuccessResponse,
     AxiosError<IOtpVerifyErrorResponse>
   > = yield call(AuthApis.apiSigninOtpVerify, action.payload.payload);
   yield put(setGlobalLoader(false));
   if (!error) {
-    setStorage(StorageKeys.TOKEN, data.data);
-    action.payload.callbackSuccess?.(data.data);
+    setStorage(StorageKeys.TOKEN, data.data.token);
+    setStorage(StorageKeys.USER_INFO, JSON.stringify(data.data.user));
+    yield put(userActions.setUserInfo(data.data.user));
+    action.payload.callbackSuccess?.(data.data.user);
   } else {
-    const errorMessage = error.response?.data.message ?? 'Something went wrong';
+    const errorMessage = error.response?.data?.message ?? 'Something went wrong';
     action.payload.callbackError?.(errorMessage);
   }
 }

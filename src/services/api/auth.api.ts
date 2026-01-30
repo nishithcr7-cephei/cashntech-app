@@ -11,6 +11,7 @@ import {
   IResetLinkPayload,
   IResetLinkSuccessResponse,
   ISigninOtpVerifyPayload,
+  ISigninOtpVerifySuccessResponse,
   ISigninPayload,
   ISigninSuccessResponse,
   ISignupPayload,
@@ -56,11 +57,11 @@ const apiSignupOtpVerify = async (payload: IOtpVerifyPayload) => {
 };
 
 /**
- * Verify signin OTP API
+ * Verify signin OTP API (LMS: POST /auth/verify-otp)
  */
 const apiSigninOtpVerify = async (payload: ISigninOtpVerifyPayload) => {
   const {data, error} = await tryCatch<
-    AxiosResponse<IOtpVerifySuccessResponse>
+    AxiosResponse<ISigninOtpVerifySuccessResponse>
   >(Api.post(Endpoints.apiSigninOtpVerify, payload));
   if (error) {
     return {
@@ -135,15 +136,23 @@ const apiResetPassword = async (payload: ICreatePasswordPayload) => {
  * Signin API
  */
 const apiSignin = async (payload: ISigninPayload) => {
+  const fullUrl = `${Api.defaults.baseURL}${Endpoints.apiSignin}`;
+  console.log('🟢 [auth.api] Signin API called');
+  console.log('🟢 [auth.api] Full URL:', fullUrl);
+  console.log('🟢 [auth.api] Method: POST');
+  console.log('🟢 [auth.api] Payload:', JSON.stringify(payload, null, 2));
+  
   const {data, error} = await tryCatch<AxiosResponse<ISigninSuccessResponse>>(
     Api.post(Endpoints.apiSignin, payload),
   );
   if (error) {
+    console.log('🔴 [auth.api] Signin API error:', error);
     return {
       data: null,
       error: error,
     };
   }
+  console.log('✅ [auth.api] Signin API success:', data.data);
   return {
     data: data.data,
     error: null,

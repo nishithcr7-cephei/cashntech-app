@@ -13,14 +13,23 @@ import {Alert} from 'react-native';
 
 const GENERAL_TIMEOUT = 10000;
 
+console.log('🌐 [api.ts] Creating axios instance...');
+console.log('🌐 [api.ts] Config.API_URL:', Config.API_URL);
+
+// Temporary hardcode for testing - replace with .env later
+const BASE_URL = Config.API_URL || 'http://192.168.31.225:3000';
+console.log('🌐 [api.ts] Using BASE_URL:', BASE_URL);
+
 const axiosInstance = axios.create({
-  baseURL: Config.API_URL,
+  baseURL: BASE_URL,
   headers: {
     Accept: 'application/json',
     'device-type': 'mobile',
   },
   timeout: GENERAL_TIMEOUT,
 });
+
+console.log('🌐 [api.ts] Axios instance created with baseURL:', axiosInstance.defaults.baseURL);
 
 export type CustomRequestConfig = InternalAxiosRequestConfig & {
   authRequired?: boolean;

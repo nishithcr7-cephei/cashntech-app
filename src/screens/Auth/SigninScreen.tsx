@@ -11,6 +11,9 @@ import Toast from 'react-native-toast-message';
 import {Feather} from '@react-native-vector-icons/feather';
 import {setStorage} from '@services/localStorage';
 import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
+import {useDispatch, useSelector} from 'react-redux';
+import {signinRequest} from '@store/auth/auth.slice';
+import {authSelector} from '@store/auth';
 
 type SigninProps = NativeStackScreenProps<
   AuthNavigatorType,
@@ -31,48 +34,68 @@ const Strings = {
 };
 
 export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
-  const [email, setEmail] = useState('piyush.sharma@cepheiinfotech.com');
-  const [passwordValue, setPassword] = useState('123456789@');
-
-  //const [email, setEmail] = useState('piyu.sharma007@gmail.com');
-  //const [passwordValue, setPassword] = useState('123456789@');
-  
-  //const [email, setEmail] = useState('sdkd@cashntech.com');
-  //const [passwordValue, setPassword] = useState('Sarthak@123');
-  
-  //const [email, setEmail] = useState('');
-  //const [passwordValue, setPassword] = useState('');
-  
+  const [email, setEmail] = useState('test@gmail.com');
+  const [passwordValue, setPassword] = useState('123456789');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
+  const dispatch = useDispatch();
+  const isLoading = useSelector(authSelector.getGlobalLoader);
+
   useEffect(() => {
-    if (params) {
-      setEmail(params.email);
-      setPassword(params.password);
-    }
+    if (params?.email != null) setEmail(params.email);
+    if (params?.password != null) setPassword(params.password);
   }, [params]);
 
   const onPressVerify = () => {
+    const payload = {
+      email: email.trim().toLowerCase(),
+      password: passwordValue.trim(),
+    };
+    
+    Toast.show({
+      type: 'info',
+      text1: 'API Call',
+      text2: 'POST http://192.168.31.225:3000/auth/login',
+      visibilityTime: 3000,
+    });
+
+    console.log('🔵 [SigninScreen] Login button pressed');
+    console.log('🔵 [SigninScreen] Payload:', JSON.stringify(payload, null, 2));
+
     const isEmailValid = handleEmailVerification(email);
     if (!isEmailValid) return;
 
-    // Skip API call and navigate directly to OTPInputScreen
     setStorage(StorageKeys.REMEMBER_ME, rememberMe);
-    
-    const data = {
-      email: email.trim().toLowerCase(),
-      password: passwordValue.trim(),
-      mobileNumber: '9814756321', // Placeholder - will be replaced with API response later
-    };
-    
-    const otpParams = {
-      showCreatePass: false,
-      screen: 'signin',
-      data,
-    };
-    
-    navigation.navigate(AuthScreens.OTPInputScreen, otpParams);
+
+    dispatch(
+      signinRequest({
+        payload,
+        callbackSuccess: (message, mobileNumber) => {
+          Toast.show({
+            type: 'success',
+            text1: message || Strings.otpSent,
+            visibilityTime: 2000,
+          });
+          navigation.navigate(AuthScreens.OTPInputScreen, {
+            showCreatePass: false,
+            screen: 'signin',
+            data: {
+              email: email.trim().toLowerCase(),
+              password: passwordValue.trim(),
+              mobileNumber: mobileNumber || '',
+            },
+          });
+        },
+        callbackError: errorMessage => {
+          Toast.show({
+            type: 'error',
+            text1: errorMessage || 'Login failed',
+            visibilityTime: 3000,
+          });
+        },
+      }),
+    );
   };
 
   const onPressForgotPassword = () => {
@@ -98,11 +121,13 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
             value={email}
             onChangeText={setEmail}
             keyboardType={'email-address'}
+            editable={!isLoading}
           />
           <Input
             label={Strings.passwordLabel}
             onChangeText={setPassword}
             value={passwordValue}
+            editable={!isLoading}
             renderRightIcon={
               showPassword ? (
                 <EyeOpen style={styles.icon} />
@@ -135,6 +160,8 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
           <Button
             buttonText={Strings.getVerificationCode}
             onPress={onPressVerify}
+            showLoader={isLoading}
+            disabled={isLoading}
           />
           <View style={styles.accountContainer}>
             <Text style={styles.accountText}>{Strings.noAccountText}</Text>

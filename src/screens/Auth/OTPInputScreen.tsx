@@ -8,7 +8,10 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {AuthScreens, Colors, Fonts} from '@constants/index';
 import {EditIcon} from '@assets/Icons';
 import Toast from 'react-native-toast-message';
-import {useDispatch} from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
+import {signinOtpVerifyRequest} from '@store/auth/auth.slice';
+import {authSelector} from '@store/auth';
+import type {ILmsUser} from '@store/auth/auth.types';
 import {userActions} from '@store/user';
 
 const OTP_TIMER = 60;
@@ -36,6 +39,7 @@ export const OTPInputScreen = ({
   const timerInterval = useRef<NodeJS.Timeout>(null);
 
   const dispatch = useDispatch();
+  const isLoading = useSelector(authSelector.getGlobalLoader);
 
   useEffect(() => {
     startTimer();
@@ -104,38 +108,71 @@ export const OTPInputScreen = ({
   };
 
   const onPressVerifyOTP = () => {
-    // Skip validation and API call - navigate directly to SuccessScreen
+    if (params.showCreatePass) {
+      navigation.navigate('PasswordScreen', {
+        screenMode: 'createPass',
+        token: 'mock-token',
+      });
+      return;
+    }
+
+    if (params.screen === 'signin') {
+      if (otp.length !== 6) {
+        Toast.show({
+          type: 'error',
+          text1: 'Please enter 6-digit OTP',
+          visibilityTime: 2000,
+        });
+        return;
+      }
+      const mobileNumber = params.data?.mobileNumber || params.data?.mobile || '';
+      dispatch(
+        signinOtpVerifyRequest({
+          payload: { mobile_number: mobileNumber, otp },
+          callbackSuccess: (user: ILmsUser) => {
+            Toast.show({
+              type: 'success',
+              text1: 'OTP verified successfully',
+              visibilityTime: 2000,
+            });
+            navigation.replace('SuccessScreen', {
+              authMode: 'signin',
+              firstName: user.first_name,
+              lastName: user.last_name,
+            });
+          },
+          callbackError: errorMessage => {
+            Toast.show({
+              type: 'error',
+              text1: errorMessage || 'Verification failed',
+              visibilityTime: 3000,
+            });
+          },
+        }),
+      );
+      return;
+    }
+
+    const mockUserData = getMockUserData();
+    dispatch(
+      userActions.setUserInfo({
+        id: mockUserData.id,
+        email: mockUserData.email,
+        first_name: mockUserData.first_name,
+        last_name: mockUserData.last_name,
+        mobile_number: mockUserData.mobile_number,
+      }),
+    );
     Toast.show({
       type: 'success',
       text1: 'OTP verified successfully',
       visibilityTime: 2000,
     });
-
-    if (params.showCreatePass) {
-      navigation.navigate('PasswordScreen', {
-        screenMode: 'createPass',
-        token: 'mock-token', // Placeholder - will be replaced with API response later
-      });
-    } else {
-      // Set mock user data
-      const mockUserData = getMockUserData();
-      dispatch(
-        userActions.setUserInfo({
-          id: mockUserData.id,
-          email: mockUserData.email,
-          first_name: mockUserData.first_name,
-          last_name: mockUserData.last_name,
-          mobile_number: mockUserData.mobile_number,
-        }),
-      );
-      
-      // Navigate to SuccessScreen
-      navigation.replace('SuccessScreen', {
-        authMode: params.screen === 'signin' ? 'signin' : 'signup',
-        firstName: mockUserData.first_name,
-        lastName: mockUserData.last_name,
-      });
-    }
+    navigation.replace('SuccessScreen', {
+      authMode: 'signup',
+      firstName: mockUserData.first_name,
+      lastName: mockUserData.last_name,
+    });
   };
 
   return (
@@ -184,6 +221,8 @@ export const OTPInputScreen = ({
             buttonText={'Verify'}
             style={styles.verifyButton}
             onPress={onPressVerifyOTP}
+            showLoader={isLoading}
+            disabled={isLoading}
           />
         </View>
         <View style={styles.resendContainer}>

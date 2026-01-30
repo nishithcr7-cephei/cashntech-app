@@ -21,9 +21,10 @@ export type SigninPayloadWithCallback = PayloadWithCallback<
 >;
 
 export interface ISigninSuccessResponse {
+  statusCode?: number;
   message: string;
-  success: boolean;
-  data: string;
+  success?: boolean;
+  data: string; // e.g. mobile number "9887114487" (LMS: Otp sent successfully)
 }
 
 export interface ISigninErrorResponse {
@@ -74,9 +75,35 @@ export interface ISigninOtpVerifyPayload {
   mobile_number: string;
   otp: string;
 }
+
+/** LMS verify-otp response – full user detail */
+export interface ILmsUser {
+  id: number;
+  is_client: boolean;
+  is_internal: boolean;
+  first_name: string;
+  last_name: string;
+  email: string;
+  mobile_number: string;
+  role?: string;
+  scope?: { program_ids?: string[] };
+  final_user_permission?: unknown;
+}
+
+export interface ILmsVerifyOtpData {
+  token: string;
+  user: ILmsUser;
+}
+
+export interface ISigninOtpVerifySuccessResponse {
+  statusCode: number;
+  message: string;
+  data: ILmsVerifyOtpData;
+}
+
 export type SigninOtpVerifyPayloadWithCallback = PayloadWithCallback<
   ISigninOtpVerifyPayload,
-  [string | undefined],
+  [ILmsUser],
   [string]
 >;
 
