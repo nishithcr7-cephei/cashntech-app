@@ -136,6 +136,14 @@ const Endpoints = {
 
   // Task Screen
   // apiRemarkReportTask:
+
+  // Invoice APIs
+  apiDealerInfo: (programId: string) => `/invoice/dealer-info/${programId}`,
+  apiBankProductList: '/master-data-management/bank-product/list',
+  apiCreateInvoice: '/invoice',
+
+  // User Scope (Program Selection)
+  apiUserScope: '/user/scope',
 } as const;
 
 export default Endpoints;

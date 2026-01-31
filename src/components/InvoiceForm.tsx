@@ -4,12 +4,9 @@ import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
-import {
-  dealerNameOptions,
-  dealerCodeOptions,
-  creditAccountOptions,
-  unitOptions,
-} from '@constants/invoiceDropdowns';
+import {unitOptions} from '@constants/invoiceDropdowns';
+
+export type DropdownOption = {label: string; value: string};
 
 const emptyFields: InvoiceFields = {
   dealer: '',
@@ -51,6 +48,11 @@ type Props = {
   errors?: ValidationErrors;
   isFormValid?: boolean;
   productType?: 'dealer_finance' | 'vendor_finance';
+  dealerOptions?: DropdownOption[];
+  creditToOptions?: DropdownOption[];
+  bankOptions?: DropdownOption[];
+  selectedBankId?: string;
+  onBankSelect?: (bankId: string) => void;
 };
 
 export const InvoiceForm: React.FC<Props> = ({
@@ -62,7 +64,14 @@ export const InvoiceForm: React.FC<Props> = ({
   errors = {},
   isFormValid = false,
   productType = 'dealer_finance',
+  dealerOptions,
+  creditToOptions,
+  bankOptions,
+  selectedBankId = '',
+  onBankSelect,
 }) => {
+  const dealerData = dealerOptions ?? [];
+  const creditToData = creditToOptions ?? [];
   const [showInvoiceNumberTooltip, setShowInvoiceNumberTooltip] = useState(false);
   const [showPOTooltip, setShowPOTooltip] = useState(false);
   const [showCreditAccountTooltip, setShowCreditAccountTooltip] = useState(false);
@@ -73,9 +82,10 @@ export const InvoiceForm: React.FC<Props> = ({
 
   const isDealerFinance = productType !== 'vendor_finance';
 
-  // Mock tenure days - will be replaced by API value later
-  // TODO: Replace with API value from program/dealer details
-  const TENURE_DAYS = 60; // Default 60 days, will come from API
+  // CODE-END DEFAULT: Backend has no tenure/credit terms yet. basic_parameters/interest_parameters
+  // are flexible JSON but invoice create flow doesn't use them. When backend adds credit_days,
+  // max_invoice_age_days etc. in basic_parameters, fetch from program API and make this dynamic.
+  const TENURE_DAYS = 60;
 
   // Calculate Invoice Due Date based on Invoice Date, GRN Date, and Tenure
   const calculateInvoiceDueDate = (
@@ -134,7 +144,7 @@ export const InvoiceForm: React.FC<Props> = ({
       return 'Invoice date cannot be in the future';
     }
 
-    // Check for stale invoice (older than 90 days - configurable)
+    // CODE-END DEFAULT: max_invoice_age_days - will be dynamic from backend basic_parameters later
     const STALE_DAYS_THRESHOLD = 90;
     if (daysDiff > STALE_DAYS_THRESHOLD) {
       return `Invoice is stale (older than ${STALE_DAYS_THRESHOLD} days)`;
@@ -143,7 +153,8 @@ export const InvoiceForm: React.FC<Props> = ({
     return undefined;
   };
 
-  // Validate Payment Date (should be future date, 7/21 days as per terms)
+  // Validate Payment Date (should be future date). CODE-END DEFAULT: min_days_from_invoice = 7,
+  // will be dynamic from backend credit terms / basic_parameters when available.
   const validatePaymentDate = (dateStr: string, invoiceDateStr?: string): string | undefined => {
     if (!dateStr) return undefined;
     
@@ -165,9 +176,9 @@ export const InvoiceForm: React.FC<Props> = ({
       const invoiceDate = moment(invoiceDateStr, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true);
       if (invoiceDate.isValid()) {
         const daysFromInvoice = paymentDate.diff(invoiceDate, 'days');
-        // Payment date should be at least 7 days from invoice date (as per terms)
-        if (daysFromInvoice < 7) {
-          return 'Payment date should be at least 7 days from invoice date';
+        const MIN_DAYS_FROM_INVOICE = 7; // CODE-END DEFAULT - will come from backend
+        if (daysFromInvoice < MIN_DAYS_FROM_INVOICE) {
+          return `Payment date should be at least ${MIN_DAYS_FROM_INVOICE} days from invoice date`;
         }
       }
     }
@@ -285,11 +296,23 @@ export const InvoiceForm: React.FC<Props> = ({
         <Text style={styles.sectionTitle}>
           {isDealerFinance ? 'Dealer Invoice' : 'Vendor Invoice'}
         </Text>
+        {bankOptions && bankOptions.length > 0 && onBankSelect && (
+          <View style={styles.field}>
+            <CustomDropdown
+              label="Bank *"
+              data={bankOptions}
+              value={selectedBankId}
+              onChange={onBankSelect}
+              placeholder="Select Bank"
+              containerStyle={styles.dropdownContainer}
+            />
+          </View>
+        )}
         <View style={styles.row}>
           <View style={styles.halfWidth}>
             <CustomDropdown
               label={isDealerFinance ? 'Dealer Name *' : 'Anchor Name *'}
-              data={dealerNameOptions}
+              data={dealerData}
               value={value.dealer}
               onChange={set('dealer')}
               placeholder={isDealerFinance ? 'Select Dealer' : 'Select Anchor'}
@@ -300,11 +323,12 @@ export const InvoiceForm: React.FC<Props> = ({
           <View style={styles.halfWidth}>
             <CustomDropdown
               label={isDealerFinance ? 'Dealer Code *' : 'Anchor Code *'}
-              data={dealerCodeOptions}
+              data={dealerOptions && value.dealerCode ? [{label: value.dealerCode, value: value.dealerCode}] : []}
               value={value.dealerCode}
               onChange={set('dealerCode')}
               placeholder={isDealerFinance ? 'Select Code' : 'Select Anchor Code'}
               containerStyle={styles.dropdownContainer}
+              editable={!dealerOptions || !dealerOptions.length}
             />
             {errors.dealerCode && <Text style={styles.errorText}>{errors.dealerCode}</Text>}
           </View>
@@ -325,11 +349,12 @@ export const InvoiceForm: React.FC<Props> = ({
           </View>
           <CustomDropdown
             label=""
-            data={creditAccountOptions}
+            data={dealerOptions && value.odAccountNumber ? [{label: value.odAccountNumber, value: value.odAccountNumber}] : []}
             value={value.odAccountNumber}
             onChange={set('odAccountNumber')}
             placeholder="Select Acc. No"
             containerStyle={styles.dropdownContainer}
+            editable={!dealerOptions || !dealerOptions.length}
           />
         </View>
       </View>
@@ -361,7 +386,7 @@ export const InvoiceForm: React.FC<Props> = ({
           <View style={styles.halfWidth}>
             <View style={styles.fieldInRow}>
               <View style={styles.labelRow}>
-                <Text style={styles.label}>Associated PO</Text>
+                <Text style={styles.label}>Associated PO (Optional)</Text>
                 <TouchableOpacity
                   onPress={() => setShowPOTooltip(true)}
                   style={styles.infoButton}
@@ -373,11 +398,7 @@ export const InvoiceForm: React.FC<Props> = ({
               </View>
               <CustomDropdown
                 label=""
-                data={[
-                  {label: 'PO-2024-001', value: 'PO-2024-001'},
-                  {label: 'PO-2024-002', value: 'PO-2024-002'},
-                  {label: 'PO-2024-003', value: 'PO-2024-003'},
-                ]}
+                data={[]}
                 value={value.associatedPO}
                 onChange={set('associatedPO')}
                 placeholder="Please Select"
@@ -421,7 +442,7 @@ export const InvoiceForm: React.FC<Props> = ({
           <View style={styles.halfWidth}>
             <View style={styles.fieldInRow}>
               <DateNTimePicker
-                label="Payment Date"
+                label="Payment Date (Optional)"
                 value={parseDateValue(value.paymentDate)}
                 onConfirm={(date) => {
                   const dateStr = formatDateForStorage(date);
@@ -458,7 +479,7 @@ export const InvoiceForm: React.FC<Props> = ({
               />
               {value.invoiceDueDate && (
                 <Text style={styles.calculatedInfoText}>
-                  Calculated: {value.grnDate ? 'GRN Date' : 'Invoice Date'} + {TENURE_DAYS} days
+                  Calculated: {value.grnDate ? 'GRN Date' : 'Invoice Date'} + {TENURE_DAYS} days (default - will be dynamic from backend)
                 </Text>
               )}
             </View>
@@ -471,7 +492,7 @@ export const InvoiceForm: React.FC<Props> = ({
         <Text style={styles.sectionTitle}>Additional Invoice Information</Text>
         <View style={styles.field}>
           <View style={styles.labelRow}>
-            <Text style={styles.label}>Early Payment Discount (%)</Text>
+            <Text style={styles.label}>Early Payment Discount (%) (Optional)</Text>
             <TouchableOpacity
               onPress={() => setShowDiscountTooltip(true)}
               style={styles.infoButton}
@@ -505,17 +526,18 @@ export const InvoiceForm: React.FC<Props> = ({
           <View style={styles.halfWidth}>
             <View style={styles.creditToField}>
               <CustomDropdown
-                label="Credit To"
-                data={creditAccountOptions}
+                label="Credit To *"
+                data={creditToData}
                 value={value.creditTo}
                 onChange={set('creditTo')}
                 placeholder="Select credit to"
                 containerStyle={styles.dropdownContainer}
               />
+              {errors.creditTo && <Text style={styles.errorText}>{errors.creditTo}</Text>}
             </View>
           </View>
         </View>
-        <L label="Remark">
+        <L label="Remark (Optional)">
           <TextInput style={styles.input} value={value.remark} onChangeText={set('remark')} placeholder="Value" multiline numberOfLines={3} />
         </L>
       </View>
@@ -636,7 +658,7 @@ export const InvoiceForm: React.FC<Props> = ({
             
             {/* Item-level Tax */}
             <View style={styles.itemDiscountTaxContainer}>
-              <Text style={styles.itemDiscountTaxLabelText}>Tax</Text>
+              <Text style={styles.itemDiscountTaxLabelText}>Tax %</Text>
               <View style={styles.itemDiscountTaxVertical}>
                 <View style={styles.discountTaxDropdownVertical}>
                   <CustomDropdown
@@ -656,13 +678,16 @@ export const InvoiceForm: React.FC<Props> = ({
                 </View>
                 {item.taxType && (
                   <View style={styles.itemDiscountTaxInputsVertical}>
-                    <TextInput
-                      style={styles.itemDiscountTaxInputVertical}
-                      value={item.taxPercentage || ''}
-                      onChangeText={(text) => updateItem(index, 'taxPercentage', text)}
-                      placeholder="Tax %"
-                      keyboardType="decimal-pad"
-                    />
+                    <View style={styles.taxPercentInputRow}>
+                      <TextInput
+                        style={styles.itemDiscountTaxInputVertical}
+                        value={item.taxPercentage || ''}
+                        onChangeText={(text) => updateItem(index, 'taxPercentage', text)}
+                        placeholder="e.g. 3 for 3%"
+                        keyboardType="decimal-pad"
+                      />
+                      <Text style={styles.taxPercentSuffix}>%</Text>
+                    </View>
                     <TextInput
                       style={[styles.itemDiscountTaxInputVertical, styles.autoCalculated]}
                       value={item.taxAmount || '0.00'}
@@ -1245,6 +1270,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     fontSize: 12,
     height: 38,
+  },
+  taxPercentInputRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  taxPercentSuffix: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
   },
   itemDropdownContainer: {
     marginBottom: 0,

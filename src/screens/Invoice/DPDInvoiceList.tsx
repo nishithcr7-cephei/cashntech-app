@@ -8,7 +8,7 @@ import {
   TextInput,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {AppBar, Container, FilterModal} from '@components/index';
+import {AppBar, Container, FilterModal, ProgramBreadcrumb} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Search, Filter} from '@assets/Icons';
@@ -104,10 +104,10 @@ export const DPDInvoiceList: React.FC = () => {
   return (
     <Container>
       <AppBar 
-        title="Invoice Dashboard" 
+        title="DPD Invoice List"
         navigation={navigation as any}
-        showProgramSelector={true}
       />
+      <ProgramBreadcrumb />
       <View style={styles.pageTitleBar}>
         <Text style={styles.pageTitleText}>DPD Invoice List</Text>
       </View>

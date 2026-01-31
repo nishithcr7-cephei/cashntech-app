@@ -10,11 +10,13 @@ import {
   Modal,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {AppBar, Container} from '@components/index';
+import {useDispatch, useSelector} from 'react-redux';
+import {AppBar, Container, ProgramBreadcrumb} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {ensureCameraPermission} from '@services/permissions';
-import {runOcrFromPath, runGSTInvoiceExtractionWithAI} from '@services/ocr';
+import {runGSTInvoiceExtractionWithAI} from '@services/ocr';
+import {pdfFirstPageToImage} from '@services/pdfToImage';
 import {InvoiceForm} from '@components/InvoiceForm';
 import {InvoiceCamera} from '@components/InvoiceCamera';
 import {UploadModal} from '@components/index';
@@ -23,6 +25,23 @@ import type {GSTInvoiceJSON} from '@services/gstInvoiceExtractor';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {Camera, Upload, AI, Plus, LeftChevron} from '@assets/Icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
+import {
+  fetchDealerInfoRequest,
+  fetchBankListRequest,
+  createInvoiceRequest,
+  resetCreateInvoiceState,
+} from '@store/invoice/inv.slice';
+import {
+  selectDealerInfo,
+  selectDealerInfoError,
+  selectBankList,
+  selectCreateInvoiceLoading,
+  selectCreateInvoiceSuccess,
+  selectCreateInvoiceError,
+} from '@store/invoice/inv.selector';
+import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import type {DealerInfoParticipant} from '@store/invoice/inv.types';
 
 const emptyFields: InvoiceFields = {
   dealer: '',
@@ -51,9 +70,21 @@ const convertGSTItemsToInvoiceItems = (gstItems: GSTInvoiceJSON['line_items']): 
   return gstItems.map(item => ({
     itemName: item.description || '',
     quantity: item.quantity.toString(),
-    unit: 'PCS', // Default unit - can be enhanced to extract from invoice
+    unit: item.unit || 'PCS',
     pricePerQuantity: item.rate_per_unit.toString(),
     total: item.taxable_amount.toString(),
+    discountType:
+      item.discount_type && item.discount_value != null && item.discount_value > 0
+        ? (item.discount_type === 'value' ? 'value' : 'percentage')
+        : '',
+    discountValue: item.discount_value != null && item.discount_value > 0 ? String(item.discount_value) : '',
+    discountAmount: item.discount_amount != null && item.discount_amount > 0 ? String(item.discount_amount) : '',
+    taxType:
+      item.tax_type && ((item.tax_percentage != null && item.tax_percentage > 0) || (item.tax_amount != null && item.tax_amount > 0))
+        ? (item.tax_type || 'GST')
+        : '',
+    taxPercentage: item.tax_percentage != null && item.tax_percentage > 0 ? String(item.tax_percentage) : '',
+    taxAmount: item.tax_amount != null && item.tax_amount > 0 ? String(item.tax_amount) : '',
   }));
 };
 
@@ -69,12 +100,25 @@ interface ValidationErrors {
 export const CreateInvoice: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
+  const dispatch = useDispatch();
+  const programSelection = useSelector(selectProgramSelection);
+  const dealerInfo = useSelector(selectDealerInfo);
+  const dealerInfoError = useSelector(selectDealerInfoError);
+  const bankList = useSelector(selectBankList);
+  const createInvoiceLoading = useSelector(selectCreateInvoiceLoading);
+  const createInvoiceSuccess = useSelector(selectCreateInvoiceSuccess);
+  const createInvoiceError = useSelector(selectCreateInvoiceError);
+  const userId = useSelector((s: any) => s.user?.id);
+
   const [fields, setFields] = useState<InvoiceFields>(emptyFields);
   const [loading, setLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
   const [errors, setErrors] = useState<ValidationErrors>({});
-  const disabled = useMemo(() => loading, [loading]);
+  const [selectedParticipant, setSelectedParticipant] = useState<DealerInfoParticipant | null>(null);
+  const [selectedPartnerBankId, setSelectedPartnerBankId] = useState<string>('');
+  const [selectedAttachment, setSelectedAttachment] = useState<DocumentPickerResponse | null>(null);
+  const disabled = useMemo(() => loading || createInvoiceLoading, [loading, createInvoiceLoading]);
   const [productType, setProductType] = useState<'dealer_finance' | 'vendor_finance'>('dealer_finance');
   const invoiceNo: string | undefined = route?.params?.invoiceNo;
   const mode: 'edit' | 'recreate' | undefined = route?.params?.mode;
@@ -89,6 +133,46 @@ export const CreateInvoice: React.FC = () => {
     ? `Invoice / Unique Ref. No: ${invoiceNo}`
     : undefined;
   
+  // Fetch dealer info and bank list when program is selected
+  useEffect(() => {
+    const programId = programSelection?.programId;
+    if (programId) {
+      dispatch(fetchDealerInfoRequest(programId));
+    }
+    dispatch(fetchBankListRequest());
+  }, [programSelection?.programId, dispatch]);
+
+  // Toast: programId debug - verify if program selection reached Create Invoice
+  useEffect(() => {
+    const programId = programSelection?.programId;
+    Toast.show({
+      type: programId ? 'success' : 'error',
+      text1: programId ? `Program selected: ${programId}` : 'No program selected',
+      text2: programId ? `Fetching dealer info...` : 'Select a program first from Select Program screen',
+    });
+  }, [programSelection?.programId]);
+
+  // Toast: dealer info API result (debug)
+  useEffect(() => {
+    if (dealerInfo) {
+      const count = dealerInfo?.participants?.length ?? 0;
+      Toast.show({
+        type: count > 0 ? 'success' : 'info',
+        text1: count > 0 ? `Dealer info loaded: ${count} dealer(s)` : 'No dealers found for this program',
+      });
+    }
+  }, [dealerInfo]);
+
+  useEffect(() => {
+    if (dealerInfoError) {
+      Toast.show({
+        type: 'error',
+        text1: 'Dealer info failed',
+        text2: dealerInfoError,
+      });
+    }
+  }, [dealerInfoError]);
+
   // Load last selected product type (Dealer Finance / Vendor Finance) for dynamic labels
   useEffect(() => {
     AsyncStorage.getItem('selectedProductType')
@@ -97,10 +181,30 @@ export const CreateInvoice: React.FC = () => {
           setProductType(stored);
         }
       })
-      .catch(() => {
-        // Ignore errors, default will be Dealer Finance
-      });
+      .catch(() => {});
   }, []);
+
+  // Handle create invoice success / error
+  useEffect(() => {
+    if (createInvoiceSuccess) {
+      dispatch(resetCreateInvoiceState());
+      setFields(emptyFields);
+      setSelectedParticipant(null);
+      setSelectedPartnerBankId('');
+      setSelectedAttachment(null);
+      Alert.alert('Success', 'Invoice created successfully.', [
+        {text: 'OK', onPress: () => (navigation as any).navigate('InvoiceDetails')},
+      ]);
+    }
+  }, [createInvoiceSuccess, dispatch, navigation]);
+
+  useEffect(() => {
+    if (createInvoiceError) {
+      Alert.alert('Error', createInvoiceError, [
+        {text: 'OK', onPress: () => dispatch(resetCreateInvoiceState())},
+      ]);
+    }
+  }, [createInvoiceError, dispatch]);
 
   // Ensure currency is always INR
   useEffect(() => {
@@ -130,6 +234,11 @@ export const CreateInvoice: React.FC = () => {
       case 'invoiceDate':
         if (!value?.trim()) {
           return 'Invoice Date is required';
+        }
+        return undefined;
+      case 'creditTo':
+        if (!value?.trim()) {
+          return 'Credit To is required';
         }
         return undefined;
       case 'items':
@@ -174,6 +283,9 @@ export const CreateInvoice: React.FC = () => {
     const invoiceDateError = validateField('invoiceDate', fields.invoiceDate);
     if (invoiceDateError) newErrors.invoiceDate = invoiceDateError;
     
+    const creditToError = validateField('creditTo', fields.creditTo);
+    if (creditToError) newErrors.creditTo = creditToError;
+    
     const itemsError = validateField('items', fields.items);
     if (itemsError) newErrors.items = itemsError;
     
@@ -188,6 +300,7 @@ export const CreateInvoice: React.FC = () => {
       fields.dealer?.trim() &&
       fields.dealerCode?.trim() &&
       fields.invoiceDate?.trim() &&
+      fields.creditTo?.trim() &&
       fields.items &&
       fields.items.length > 0 &&
       fields.items.every(item => 
@@ -202,26 +315,27 @@ export const CreateInvoice: React.FC = () => {
   }, [fields]);
   
   const applyPatch = (patch: Partial<InvoiceFields>) => {
-    // Prevent currency from being changed
-    if (patch.currency && patch.currency !== 'INR') {
-      patch.currency = 'INR';
+    if (patch.currency && patch.currency !== 'INR') patch.currency = 'INR';
+    if (patch.dealer && dealerInfo?.participants) {
+      const participant = dealerInfo.participants.find(
+        p => p.party.entity_name === patch.dealer,
+      );
+      if (participant) {
+        patch.dealerCode = participant.company_code;
+        patch.odAccountNumber = participant.od_account_no;
+        setSelectedParticipant(participant);
+      }
     }
     setFields(prev => {
       const updated = {...prev, ...patch};
-      
-      // Real-time validation for changed fields
       const newErrors = {...errors};
       Object.keys(patch).forEach(key => {
         const fieldName = key as keyof InvoiceFields;
         const error = validateField(fieldName, updated[fieldName]);
-        if (error) {
-          newErrors[fieldName] = error;
-        } else {
-          delete newErrors[fieldName];
-        }
+        if (error) newErrors[fieldName] = error;
+        else delete newErrors[fieldName];
       });
       setErrors(newErrors);
-      
       return updated;
     });
   };
@@ -243,12 +357,15 @@ export const CreateInvoice: React.FC = () => {
       }
       
       setFields(prev => {
+        const header = gstInvoice.invoice_header;
         const merged = {
           ...prev,
           // Extract invoice header fields from Gemini result
-          invoiceNumber: gstInvoice.invoice_header.invoice_number || prev.invoiceNumber,
-          invoiceDate: gstInvoice.invoice_header.invoice_date || prev.invoiceDate,
-          associatedPO: gstInvoice.invoice_header.order_no || prev.associatedPO,
+          invoiceNumber: header.invoice_number || prev.invoiceNumber,
+          invoiceDate: header.invoice_date || prev.invoiceDate,
+          associatedPO: header.order_no || prev.associatedPO,
+          earlyPaymentDiscount: header.early_payment_discount || prev.earlyPaymentDiscount || '',
+          grnDate: header.grn_date || prev.grnDate || '',
           // Keep dropdown fields empty (user must select manually - NOT filled by OCR)
           dealer: prev.dealer || '',
           dealerCode: prev.dealerCode || '',
@@ -256,26 +373,15 @@ export const CreateInvoice: React.FC = () => {
           // Additional fields (keep existing or empty)
           paymentDate: prev.paymentDate || '',
           invoiceDueDate: prev.invoiceDueDate || '',
-          grnDate: prev.grnDate || '',
           creditTo: prev.creditTo || '',
           remark: prev.remark || '',
-          earlyPaymentDiscount: prev.earlyPaymentDiscount || '',
         };
         // Ensure currency remains INR
         merged.currency = 'INR';
         
-        // Set items - number of rows will match number of items found
+        // Set items - number of rows will match number of items found (discount/tax from OCR if on invoice)
         if (extractedItems.length > 0) {
-          // Initialize item-level discount and tax fields
-          merged.items = extractedItems.map(item => ({
-            ...item,
-            discountType: '',
-            discountValue: '',
-            discountAmount: '',
-            taxType: '',
-            taxPercentage: '',
-            taxAmount: '',
-          }));
+          merged.items = extractedItems;
         }
         
         return merged;
@@ -301,16 +407,26 @@ export const CreateInvoice: React.FC = () => {
     setShowCamera(true);
   };
 
-  const handleUploadFile = (file: DocumentPickerResponse | undefined) => {
-    if (file) {
+  const handleUploadFile = async (file: DocumentPickerResponse | undefined) => {
+    if (!file) return;
+    setSelectedAttachment(file);
+    if (file.type?.startsWith('image/')) {
       handleImagePath(file.uri);
+    } else if (file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf')) {
+      try {
+        const imagePath = await pdfFirstPageToImage(file.uri);
+        handleImagePath(imagePath);
+      } catch (e: any) {
+        Alert.alert(
+          'PDF OCR Failed',
+          'Could not process PDF for OCR. File will still be attached for submit. Enter invoice details manually.',
+        );
+      }
     }
   };
 
   const handleSubmit = async () => {
-    // Validate all fields
     if (!validateForm()) {
-      // Scroll to first error if needed
       const firstErrorKey = Object.keys(errors)[0];
       if (firstErrorKey) {
         Alert.alert('Validation Error', errors[firstErrorKey] || 'Please fill all required fields');
@@ -318,61 +434,41 @@ export const CreateInvoice: React.FC = () => {
       return;
     }
 
-    // Simulate API call with loading state
-    setLoading(true);
-    
-    // Calculate totals for display
-    const subtotal = fields.items.reduce((sum, item) => {
-      return sum + (parseFloat(item.total) || 0);
-    }, 0);
-    
-    // Calculate discount
-    let discountAmount = 0;
-    const discountType = fields.discountType || '';
-    const discountValue = parseFloat(fields.discountValue || '0') || 0;
-    
-    if (discountType === 'percentage' && discountValue > 0) {
-      discountAmount = (subtotal * discountValue) / 100;
-    } else if (discountType === 'absolute' && discountValue > 0) {
-      discountAmount = discountValue;
-    }
-    
-    // Calculate final amount after discount
-    const finalAmount = Math.max(0, subtotal - discountAmount);
-    
-    const cgst = fields.cgst ? parseFloat(fields.cgst) : finalAmount * 0.025;
-    const sgst = fields.sgst ? parseFloat(fields.sgst) : finalAmount * 0.025;
-    const grandTotal = finalAmount + cgst + sgst;
+    const createdBy = userId != null ? String(userId) : '';
 
-    // Log the data that would be submitted (for debugging)
-    console.log('Invoice Data to be submitted:', {
-      ...fields,
-      calculatedSubtotal: subtotal.toFixed(2),
-      calculatedDiscountAmount: discountAmount.toFixed(2),
-      calculatedFinalAmount: finalAmount.toFixed(2),
-      calculatedCGST: cgst.toFixed(2),
-      calculatedSGST: sgst.toFixed(2),
-      calculatedGrandTotal: grandTotal.toFixed(2),
-    });
-
-    // Simulate API delay for better UX
-    setTimeout(() => {
-      setLoading(false);
+    if (dealerInfo && (!selectedParticipant || !selectedPartnerBankId)) {
       Alert.alert(
-        'Success',
-        'Invoice data validated successfully!\n\n(API integration pending)',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Reset form and navigate back
-              setFields(emptyFields);
-              (navigation as any).navigate('InvoiceDetails');
-            },
-          },
-        ]
+        'Validation Error',
+        'Please select Dealer and Bank from the dropdowns.',
       );
-    }, 1500); // 1.5 second delay to simulate API call
+      return;
+    }
+    if (dealerInfo && !createdBy) {
+      Alert.alert('Error', 'User session not found. Please log in again.');
+      return;
+    }
+
+    if (dealerInfo && selectedParticipant && programSelection?.programId) {
+      dispatch(
+        createInvoiceRequest({
+          fields,
+          createdBy,
+          partnerBank: selectedPartnerBankId,
+          program: programSelection.programId,
+          anchorParticipantMapping: selectedParticipant.id,
+          party: selectedParticipant.party.id,
+          counterPartyName: selectedParticipant.party.entity_name,
+          counterPartyCode: selectedParticipant.company_code,
+          counterPartyOdAccount: selectedParticipant.od_account_no,
+          attachment: selectedAttachment ?? undefined,
+        }),
+      );
+    } else {
+      Alert.alert(
+        'Setup Required',
+        'Please select a Program from the dashboard first, then try again.',
+      );
+    }
   };
 
   const handleCancel = () => {
@@ -396,13 +492,35 @@ export const CreateInvoice: React.FC = () => {
     );
   };
 
+  const dealerOptions = useMemo(
+    () =>
+      dealerInfo?.participants?.map(p => ({
+        label: p.party.entity_name,
+        value: p.party.entity_name,
+      })) ?? [],
+    [dealerInfo],
+  );
+  const creditToOptions = useMemo(
+    () =>
+      dealerInfo?.party?.party_bank_details?.map(b => ({
+        label: b.account_number,
+        value: b.account_number,
+      })) ?? [],
+    [dealerInfo],
+  );
+  const bankOptions = useMemo(
+    () =>
+      bankList?.map(b => ({
+        label: b.bank_name,
+        value: b.id,
+      })) ?? [],
+    [bankList],
+  );
+
   return (
     <Container>
-      <AppBar 
-        title="Invoice Dashboard" 
-        navigation={navigation as any}
-        showProgramSelector={true}
-      />
+      <AppBar title="Create Invoice" navigation={navigation as any} />
+      <ProgramBreadcrumb />
       <View style={styles.pageTitleBar}>
         <TouchableOpacity
           style={styles.backButton}
@@ -457,6 +575,16 @@ export const CreateInvoice: React.FC = () => {
               <Text style={styles.loadingText}>Extracting invoice data...</Text>
             </View>
           )}
+          {selectedAttachment && (
+            <View style={styles.selectedFileRow}>
+              <Text style={styles.selectedFileText} numberOfLines={1}>
+                Selected: {selectedAttachment.name}
+              </Text>
+              <TouchableOpacity onPress={() => setSelectedAttachment(null)} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                <Text style={styles.removeFileText}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Invoice Form */}
@@ -464,15 +592,20 @@ export const CreateInvoice: React.FC = () => {
           style={styles.formContainer}
           contentContainerStyle={styles.formContent}
           showsVerticalScrollIndicator={false}>
-          <InvoiceForm 
-            value={fields} 
-            onChange={applyPatch} 
+          <InvoiceForm
+            value={fields}
+            onChange={applyPatch}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
-            loading={loading}
+            loading={loading || createInvoiceLoading}
             errors={errors}
             isFormValid={isFormValid}
             productType={productType}
+            dealerOptions={dealerOptions.length > 0 ? dealerOptions : undefined}
+            creditToOptions={creditToOptions.length > 0 ? creditToOptions : undefined}
+            bankOptions={bankOptions.length > 0 ? bankOptions : undefined}
+            selectedBankId={selectedPartnerBankId}
+            onBankSelect={setSelectedPartnerBankId}
           />
         </ScrollView>
 
@@ -622,6 +755,28 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: scaleFont(12),
     color: Colors.graybase,
+  },
+  selectedFileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: scaleHeight(12),
+    paddingVertical: scaleHeight(8),
+    paddingHorizontal: scaleWidth(12),
+    backgroundColor: Colors.gray200,
+    borderRadius: scaleWidth(8),
+  },
+  selectedFileText: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+    flex: 1,
+  },
+  removeFileText: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+    marginLeft: scaleWidth(8),
   },
   formContainer: {
     flex: 1,

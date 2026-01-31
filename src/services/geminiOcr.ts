@@ -28,7 +28,9 @@ REQUIRED JSON SCHEMA:
     "seller_gstin": "STRING",
     "buyer_name": "STRING (e.g., SHREE ENTERPRISES UMBEDI (MARINO))",
     "buyer_gstin": "STRING",
-    "order_no": "STRING"
+    "order_no": "STRING",
+    "early_payment_discount": "STRING (e.g. 2 for 2% - only if mentioned on invoice, else empty)",
+    "grn_date": "STRING in YYYY-MM-DD (Goods Receipt Note date - only if on invoice, else empty)"
   },
   "line_items": [
     {
@@ -36,7 +38,14 @@ REQUIRED JSON SCHEMA:
       "hsn_code": "STRING",
       "quantity": "FLOAT",
       "rate_per_unit": "FLOAT (The item rate before tax)",
-      "taxable_amount": "FLOAT (The total amount for this line item, calculated as Qty * Rate)"
+      "taxable_amount": "FLOAT (The total amount for this line item)",
+      "unit": "STRING (PCS, KG, LTR, etc. - from invoice if visible, else PCS)",
+      "discount_type": "STRING (percentage or value - only if item has discount, else empty)",
+      "discount_value": "FLOAT (0 if no discount)",
+      "discount_amount": "FLOAT (0 if no discount)",
+      "tax_type": "STRING (GST/CGST/SGST/IGST - from invoice if item-level tax shown, else empty)",
+      "tax_percentage": "FLOAT (e.g. 2.5 for 2.5% - 0 if not on item)",
+      "tax_amount": "FLOAT (0 if not on item)"
     }
   ],
   "financial_summary": {
@@ -55,6 +64,9 @@ INSTRUCTIONS:
 3. Extract invoice number carefully - it should not include trailing text like "Invoice Date".
 4. Group multi-line product descriptions into a single description field.
 5. If a field is not found, use empty string "" for strings or 0 for numbers.
+6. early_payment_discount: Extract only if clearly mentioned on invoice (e.g. "2% early payment discount").
+7. grn_date: Extract only if Goods Receipt Note date or similar is visible on invoice.
+8. For line_items: Extract unit, discount, tax per item only if shown at item level. Otherwise use unit "PCS", discount 0, tax 0.
 `;
 
 export interface GeminiExtractionResult {

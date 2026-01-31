@@ -8,7 +8,7 @@ import {
   TextInput,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {AppBar, Container, FilterModal} from '@components/index';
+import {AppBar, Container, FilterModal, ProgramBreadcrumb} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Search, Filter} from '@assets/Icons';
@@ -122,11 +122,8 @@ export const ANCreditAccount: React.FC = () => {
 
   return (
     <Container>
-      <AppBar 
-        title="Payments" 
-        navigation={navigation as any}
-        showProgramSelector={true}
-      />
+      <AppBar title="Payments" navigation={navigation as any} />
+      <ProgramBreadcrumb />
       <View style={styles.pageTitleBar}>
         <Text style={styles.pageTitleText}>Credit Account Anchor</Text>
       </View>

@@ -6412,6 +6412,11 @@ react-native-otp-entry@^1.8.3:
   resolved "https://registry.npmjs.org/react-native-otp-entry/-/react-native-otp-entry-1.8.5.tgz"
   integrity sha512-TZNkIuUzZKAAWrC8X/A22ZHJdycLysxUNysrGf0yTmDLRUyf4zLXwVFcDYUcRNe763Hjaf5qvtKGILb6lDGzoA==
 
+react-native-pdf-thumbnail@^1.3.1:
+  version "1.3.1"
+  resolved "https://registry.npmjs.org/react-native-pdf-thumbnail/-/react-native-pdf-thumbnail-1.3.1.tgz"
+  integrity sha512-7c5I+XXpM2a0ijiYNfD6nj2qNTEqGaiILfw7s86igHBzLV18c27hefqR8VNpqkK+qRMmosDrpaJeIRITXsad0w==
+
 react-native-reanimated@^3.16.7:
   version "3.19.3"
   resolved "https://registry.npmjs.org/react-native-reanimated/-/react-native-reanimated-3.19.3.tgz"

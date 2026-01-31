@@ -13,6 +13,8 @@ export interface GSTInvoiceJSON {
     buyer_name: string;
     buyer_gstin: string;
     order_no: string;
+    early_payment_discount?: string; // e.g. "2" for 2%
+    grn_date?: string; // YYYY-MM-DD format - Goods Receipt Note date if on invoice
   };
   line_items: Array<{
     description: string;
@@ -20,6 +22,13 @@ export interface GSTInvoiceJSON {
     quantity: number;
     rate_per_unit: number;
     taxable_amount: number;
+    unit?: string; // PCS, KG, LTR, etc.
+    discount_type?: string; // 'percentage' | 'value' | ''
+    discount_value?: number;
+    discount_amount?: number;
+    tax_type?: string; // GST, CGST, SGST, IGST
+    tax_percentage?: number;
+    tax_amount?: number;
   }>;
   financial_summary: {
     sub_total_taxable_value: number;

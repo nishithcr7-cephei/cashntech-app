@@ -36,3 +36,10 @@ export const selectBankProductText = createSelector(
     return `${selection.bankName} > ${selection.productName}`;
   },
 );
+
+export const selectScopeData = (state: RootState) =>
+  state.programSelection.scopeData;
+export const selectScopeLoading = (state: RootState) =>
+  state.programSelection.scopeLoading;
+export const selectScopeError = (state: RootState) =>
+  state.programSelection.scopeError;

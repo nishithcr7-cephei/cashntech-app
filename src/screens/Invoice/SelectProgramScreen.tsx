@@ -1,10 +1,11 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -14,9 +15,17 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {RightChevron, UpChevron, RightCheckmark, File, BankBuilding} from '@assets/Icons';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
-import {BANKS_DATA, Bank, BankProgram, Program} from '@constants/programSelection';
-import {setProgramSelection} from '@store/programSelection/programSelection.slice';
-import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import type {Bank, BankProgram, Program} from '@constants/programSelection';
+import {
+  setProgramSelection,
+  fetchUserScopeRequest,
+} from '@store/programSelection/programSelection.slice';
+import {
+  selectProgramSelection,
+  selectScopeData,
+  selectScopeLoading,
+  selectScopeError,
+} from '@store/programSelection/programSelection.selector';
 
 // Simple icon components
 const FolderIcon = ({size = 20, color = '#7A7C82'}: {size?: number; color?: string}) => (
@@ -32,6 +41,16 @@ export const SelectProgramScreen: React.FC = () => {
     useNavigation<NativeStackNavigationProp<AuthNavigatorType>>();
   const dispatch = useDispatch();
   const currentSelection = useSelector(selectProgramSelection);
+  const scopeData = useSelector(selectScopeData);
+  const scopeLoading = useSelector(selectScopeLoading);
+  const scopeError = useSelector(selectScopeError);
+
+  const banksData = scopeData ?? [];
+
+  // Fetch user scope on mount
+  useEffect(() => {
+    dispatch(fetchUserScopeRequest());
+  }, [dispatch]);
 
   // Track which banks/products are expanded
   const [expandedBanks, setExpandedBanks] = useState<Set<string>>(new Set());
@@ -49,12 +68,13 @@ export const SelectProgramScreen: React.FC = () => {
     if (newExpanded.has(bankId)) {
       newExpanded.delete(bankId);
       // Also collapse all products of this bank
-      const bank = BANKS_DATA.find(b => b.id === bankId);
+      const bank = banksData.find(b => b.id === bankId);
       if (bank) {
+        const newExpandedProducts = new Set(expandedProducts);
         bank.products.forEach(product => {
-          expandedProducts.delete(`${bankId}_${product.id}`);
+          newExpandedProducts.delete(`${bankId}_${product.id}`);
         });
-        setExpandedProducts(new Set(expandedProducts));
+        setExpandedProducts(newExpandedProducts);
       }
     } else {
       newExpanded.add(bankId);
@@ -102,7 +122,7 @@ export const SelectProgramScreen: React.FC = () => {
 
   const renderBankItem = (bank: Bank, index: number) => {
     const isExpanded = isBankExpanded(bank.id);
-    const isLastBank = index === BANKS_DATA.length - 1;
+    const isLastBank = index === banksData.length - 1;
 
     return (
       <View key={bank.id}>
@@ -228,6 +248,40 @@ export const SelectProgramScreen: React.FC = () => {
     );
   };
 
+  if (scopeLoading) {
+    return (
+      <Container>
+        <AppBar title="Select Program" navigation={navigation} hideHamburger={true} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primaryColor} />
+          <Text style={styles.loadingText}>Loading programs...</Text>
+        </View>
+      </Container>
+    );
+  }
+
+  if (scopeError) {
+    return (
+      <Container>
+        <AppBar title="Select Program" navigation={navigation} hideHamburger={true} />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{scopeError}</Text>
+        </View>
+      </Container>
+    );
+  }
+
+  if (banksData.length === 0) {
+    return (
+      <Container>
+        <AppBar title="Select Program" navigation={navigation} hideHamburger={true} />
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>No programs available</Text>
+        </View>
+      </Container>
+    );
+  }
+
   return (
     <Container>
       <AppBar title="Select Program" navigation={navigation} hideHamburger={true} />
@@ -235,7 +289,7 @@ export const SelectProgramScreen: React.FC = () => {
         <View style={styles.contentWrapper}>
           <View style={styles.rootCard}>
             <FlatList
-              data={BANKS_DATA}
+              data={banksData}
               keyExtractor={item => item.id}
               renderItem={({item, index}) => renderBankItem(item, index)}
               showsVerticalScrollIndicator={false}
@@ -249,6 +303,27 @@ export const SelectProgramScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: scaleHeight(12),
+  },
+  loadingText: {
+    fontSize: scaleFont(14),
+    color: Colors.graybase,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: scaleWidth(24),
+  },
+  errorText: {
+    fontSize: scaleFont(14),
+    color: Colors.graybase,
+    textAlign: 'center',
+  },
   contentContainer: {
     flex: 1,
     backgroundColor: '#FFFEFC',
