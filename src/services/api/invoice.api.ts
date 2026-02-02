@@ -2,6 +2,7 @@ import axiosInstance from './api';
 import ApiEndPoints from '@constants/ApiEndPoints';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import type {DocumentPickerResponse} from '@react-native-documents/picker';
+import type {InvoiceListItemApi} from '@store/invoice/inv.types';
 
 // Unit mapping: PCS=1, KG=2, LTR=3, etc. (backend accepts any number)
 const UNIT_MAP: Record<string, number> = {
@@ -120,7 +121,27 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
   return payload;
 }
 
+export type InvoiceListFilters = {
+  byInvoiceStatus?: string[];
+  byApprovalStatus?: string[];
+};
+
 export const invoiceApi = {
+  getInvoiceList: async (
+    programId: string,
+    filters?: InvoiceListFilters,
+  ): Promise<InvoiceListItemApi[]> => {
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiInvoiceList(programId),
+      filters ?? {},
+      {authRequired: true} as any,
+    );
+    const data = response?.data;
+    if (Array.isArray(data)) return data;
+    if (data?.data && Array.isArray(data.data)) return data.data;
+    return [];
+  },
+
   getDealerInfo: async (programId: string): Promise<any> => {
     const response = await axiosInstance.get(ApiEndPoints.apiDealerInfo(programId), {
       authRequired: true,

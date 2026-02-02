@@ -4,6 +4,7 @@ import {
   initialInvoiceState,
   DealerInfoResponse,
   PartnerBank,
+  InvoiceListItemApi,
 } from './inv.types';
 
 const invoiceSlice = createSlice({
@@ -57,6 +58,22 @@ const invoiceSlice = createSlice({
       state.createInvoiceResponse = null;
       state.createInvoiceError = null;
     },
+    fetchInvoiceListRequest: (
+      state,
+      _action: PayloadAction<{programId: string; filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]}}>,
+    ) => {
+      state.invoiceListLoading = true;
+      state.invoiceListError = null;
+    },
+    fetchInvoiceListSuccess: (state, action: PayloadAction<InvoiceListItemApi[]>) => {
+      state.invoiceList = action.payload;
+      state.invoiceListLoading = false;
+      state.invoiceListError = null;
+    },
+    fetchInvoiceListFailure: (state, action: PayloadAction<string>) => {
+      state.invoiceListLoading = false;
+      state.invoiceListError = action.payload;
+    },
   },
 });
 
@@ -71,6 +88,9 @@ export const {
   createInvoiceSuccess,
   createInvoiceFailure,
   resetCreateInvoiceState,
+  fetchInvoiceListRequest,
+  fetchInvoiceListSuccess,
+  fetchInvoiceListFailure,
 } = invoiceSlice.actions;
 
 export default invoiceSlice.reducer;

@@ -16,7 +16,6 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {ensureCameraPermission} from '@services/permissions';
 import {runGSTInvoiceExtractionWithAI} from '@services/ocr';
-import {pdfFirstPageToImage} from '@services/pdfToImage';
 import {InvoiceForm} from '@components/InvoiceForm';
 import {InvoiceCamera} from '@components/InvoiceCamera';
 import {UploadModal} from '@components/index';
@@ -412,16 +411,6 @@ export const CreateInvoice: React.FC = () => {
     setSelectedAttachment(file);
     if (file.type?.startsWith('image/')) {
       handleImagePath(file.uri);
-    } else if (file.type === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf')) {
-      try {
-        const imagePath = await pdfFirstPageToImage(file.uri);
-        handleImagePath(imagePath);
-      } catch (e: any) {
-        Alert.alert(
-          'PDF OCR Failed',
-          'Could not process PDF for OCR. File will still be attached for submit. Enter invoice details manually.',
-        );
-      }
     }
   };
 
@@ -637,7 +626,7 @@ export const CreateInvoice: React.FC = () => {
       {/* UploadModal */}
       <UploadModal
         visible={isUploadModalVisible}
-        allowedFileTypes={['jpg', 'jpeg', 'png', 'pdf']}
+        allowedFileTypes={['jpg', 'jpeg', 'png']}
         onClose={(file) => {
           if (file) {
             handleUploadFile(file);

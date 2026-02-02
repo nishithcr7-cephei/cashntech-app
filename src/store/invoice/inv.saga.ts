@@ -10,6 +10,9 @@ import {
   createInvoiceRequest,
   createInvoiceSuccess,
   createInvoiceFailure,
+  fetchInvoiceListRequest,
+  fetchInvoiceListSuccess,
+  fetchInvoiceListFailure,
 } from './inv.slice';
 import {
   invoiceApi,
@@ -95,8 +98,25 @@ function* createInvoiceSaga(action: PayloadAction<CreateInvoicePayloadInput>) {
   }
 }
 
+function* fetchInvoiceListSaga(
+  action: PayloadAction<{programId: string; filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]}}>,
+) {
+  try {
+    const {programId, filters} = action.payload;
+    const data = yield call(invoiceApi.getInvoiceList, programId, filters);
+    yield put(fetchInvoiceListSuccess(data));
+  } catch (error: any) {
+    const msg =
+      error?.message?.includes('fetch') || error?.code === 'ECONNABORTED'
+        ? 'Network error. Check connection.'
+        : error?.message || 'Failed to fetch invoice list';
+    yield put(fetchInvoiceListFailure(msg));
+  }
+}
+
 export default function* invoiceSaga() {
   yield takeLatest(fetchDealerInfoRequest.type, fetchDealerInfoSaga);
   yield takeLatest(fetchBankListRequest.type, fetchBankListSaga);
   yield takeLatest(createInvoiceRequest.type, createInvoiceSaga);
+  yield takeLatest(fetchInvoiceListRequest.type, fetchInvoiceListSaga);
 }

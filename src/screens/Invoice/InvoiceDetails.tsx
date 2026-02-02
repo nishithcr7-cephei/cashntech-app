@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from 'react';
+import React, {useState, useMemo, useEffect} from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,10 @@ import {
   Pressable,
   Modal,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {useDispatch, useSelector} from 'react-redux';
 import {
   AppBar,
   CheckerApprovalModal,
@@ -25,109 +27,86 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Search, Filter, Upload, Plus, Dots} from '@assets/Icons';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
+import {fetchInvoiceListRequest} from '@store/invoice/inv.slice';
+import {
+  selectInvoiceList,
+  selectInvoiceListLoading,
+  selectInvoiceListError,
+} from '@store/invoice/inv.selector';
+import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import type {InvoiceListItemApi} from '@store/invoice/inv.types';
 
-// Sample data matching the screenshot
-const invoiceData = [
-  {
-    id: '1',
-    dealerName: 'Mahesh Motors',
-    dealerCode: 'DLR001',
-    invoiceNo: 'INV-1001',
-    invoiceAmount: '₹1,20,000',
-    requestedAmount: '₹1,18,000',
-    piAmount: '₹20,000',
-    netDisbursalAmount: '₹1,10,500',
-    invoiceDate: '12/10/2024',
-    invoiceStatus: 'Created',
-    approvalStatus: 'Pending',
-    adminStatus: '-',
-    disbursementDate: '15/10/2024',
-    tenorEndDate: '15/10/2025',
-    utrNo: 'UTR568920',
-  },
-  {
-    id: '2',
-    dealerName: 'Krishna Auto',
-    dealerCode: 'DLR002',
-    invoiceNo: 'INV-1002',
-    invoiceAmount: '₹95,000',
-    requestedAmount: '₹92,000',
-    piAmount: '₹20,000',
-    netDisbursalAmount: '₹90,500',
-    invoiceDate: '18/10/2024',
-    invoiceStatus: 'Created',
-    approvalStatus: 'Pending',
-    adminStatus: '-',
-    disbursementDate: '15/10/2024',
-    tenorEndDate: '15/10/2025',
-    utrNo: 'UTR568920',
-  },
-  {
-    id: '3',
-    dealerName: 'Shree Ganesh Trade',
-    dealerCode: 'DLR003',
-    invoiceNo: 'INV-1003',
-    invoiceAmount: '₹2,30,000',
-    requestedAmount: '₹2,25,000',
-    piAmount: '₹20,000',
-    netDisbursalAmount: '₹2,20,000',
-    invoiceDate: '20/10/2024',
-    invoiceStatus: 'Created',
-    approvalStatus: 'Pending',
-    adminStatus: '-',
-    disbursementDate: '15/10/2024',
-    tenorEndDate: '15/10/2025',
-    utrNo: 'UTR568920',
-  },
-  {
-    id: '4',
-    dealerName: 'Hero Finance',
-    dealerCode: '012',
-    invoiceNo: '123101010',
-    invoiceAmount: '₹20,000,000.00',
-    requestedAmount: '₹19,980,000',
-    piAmount: '₹20,000',
-    netDisbursalAmount: '₹0.00',
-    invoiceDate: 'dd-mm-yyyy',
-    invoiceStatus: 'Created',
-    approvalStatus: 'Pending',
-    adminStatus: '-',
-    disbursementDate: 'dd-mm-yyyy',
-    tenorEndDate: 'dd-mm-yyyy',
-    utrNo: '1234567877',
-  },
-  {
-    id: '5',
-    dealerName: 'ABC Finance',
-    dealerCode: '012',
-    invoiceNo: '123101010',
-    invoiceAmount: '₹20,000,000.00',
-    requestedAmount: '₹19,980,000',
-    piAmount: '₹20,000',
-    netDisbursalAmount: '₹0.00',
-    invoiceDate: 'dd-mm-yyyy',
-    invoiceStatus: 'Created',
-    approvalStatus: 'Pending',
-    adminStatus: '-',
-    disbursementDate: 'dd-mm-yyyy',
-    tenorEndDate: 'dd-mm-yyyy',
-    utrNo: '1234567877',
-  },
-];
+const NA_AD = 'N/A/AD';
 
-// Dummy filter data for Invoice Details
+function formatDate(isoDate: string): string {
+  if (!isoDate) return '';
+  try {
+    const d = new Date(isoDate);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  } catch {
+    return isoDate;
+  }
+}
+
+function formatStatus(str: string): string {
+  if (!str) return '';
+  return str
+    .split('_')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
+type InvoiceRow = {
+  id: string;
+  dealerName: string;
+  dealerCode: string;
+  invoiceNo: string;
+  invoiceDate: string;
+  invoiceDueDate: string;
+  invoiceStatus: string;
+  approvalStatus: string;
+};
+
+function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
+  return {
+    id: item.id,
+    dealerName: item.counter_party_name,
+    dealerCode: item.counter_party_code,
+    invoiceNo: item.invoice_ref_no,
+    invoiceDate: formatDate(item.invoice_date),
+    invoiceDueDate: formatDate(item.invoice_due_date),
+    invoiceStatus: formatStatus(item.invoice_status),
+    approvalStatus: formatStatus(item.approval_status),
+  };
+}
+
+// Filter options - API values (CREATED, IN_PROGRESS, etc.)
 const invoiceFilterData = {
-  'Invoice Status': ['Created', 'Pending', 'Approved', 'Rejected'],
-  'Dealer Name': ['Hero Finance', 'ABC Finance', 'SK Finance', 'Seven Pharma', 'New Finance'],
-  'Finance Status': ['Active', 'Inactive', 'Pending'],
+  'Invoice Status': ['CREATED', 'IN_PROGRESS', 'SUBMITTED', 'REJECTED'],
+  'Approval Status': [
+    'PENDING_ANCHOR_CHECKER',
+    'PENDING_DEALER_MAKER',
+    'PENDING_DEALER_CHECKER',
+    'APPROVAL_COMPLETE',
+    'REJECTED_BY_ANCHOR_CHECKER',
+    'REJECTED_BY_DEALER_MAKER',
+    'REJECTED_BY_DEALER_CHECKER',
+  ],
 };
 
 export const InvoiceDetails: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
+  const dispatch = useDispatch();
+  const programSelection = useSelector(selectProgramSelection);
+  const invoiceListRaw = useSelector(selectInvoiceList);
+  const invoiceListLoading = useSelector(selectInvoiceListLoading);
+  const invoiceListError = useSelector(selectInvoiceListError);
+
   const [searchText, setSearchText] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [entriesPerPage, setEntriesPerPage] = useState(5);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -136,6 +115,28 @@ export const InvoiceDetails: React.FC = () => {
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<{x: number; y: number; width: number; height: number} | null>(null);
   const menuButtonRefs = React.useRef<Record<string, View | null>>({});
+
+  const programId = programSelection?.programId;
+
+  const apiFilters = useMemo(() => {
+    const inv = appliedFilters['Invoice Status'];
+    const appr = appliedFilters['Approval Status'];
+    const body: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]} = {};
+    if (inv?.length) body.byInvoiceStatus = inv;
+    if (appr?.length) body.byApprovalStatus = appr;
+    return Object.keys(body).length ? body : undefined;
+  }, [appliedFilters]);
+
+  useEffect(() => {
+    if (programId) {
+      dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
+    }
+  }, [programId, apiFilters, dispatch]);
+
+  const invoiceData = useMemo(
+    () => invoiceListRaw.map(mapApiToRow),
+    [invoiceListRaw],
+  );
 
   const filteredData = useMemo(() => {
     if (!searchText.trim()) return invoiceData;
@@ -146,15 +147,8 @@ export const InvoiceDetails: React.FC = () => {
         item.dealerCode.toLowerCase().includes(term) ||
         item.invoiceNo.toLowerCase().includes(term),
     );
-  }, [searchText]);
+  }, [invoiceData, searchText]);
 
-  const paginatedData = useMemo(() => {
-    const startIndex = (currentPage - 1) * entriesPerPage;
-    const endIndex = startIndex + entriesPerPage;
-    return filteredData.slice(startIndex, endIndex);
-  }, [filteredData, currentPage, entriesPerPage]);
-
-  const totalPages = Math.ceil(filteredData.length / entriesPerPage);
 
   const handleMenuToggle = (invoiceId: string) => {
     if (openMenuId === invoiceId) {
@@ -181,7 +175,9 @@ export const InvoiceDetails: React.FC = () => {
     setMenuAnchor(null);
 
     const invoiceNo =
-      invoiceData.find(item => item.id === invoiceId)?.invoiceNo ?? invoiceId;
+      filteredData.find(item => item.id === invoiceId)?.invoiceNo ??
+      invoiceData.find(item => item.id === invoiceId)?.invoiceNo ??
+      invoiceId;
     
     switch (action) {
       case 'edit':
@@ -269,6 +265,19 @@ export const InvoiceDetails: React.FC = () => {
           setMenuAnchor(null);
         }}>
         <Text style={styles.sectionSubtitle}>Invoice Details</Text>
+
+        {!programId ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>
+              Select a program first to view invoice list.
+            </Text>
+          </View>
+        ) : invoiceListError ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.errorStateText}>{invoiceListError}</Text>
+          </View>
+        ) : (
+          <>
         {/* Controls Section */}
         <View style={styles.controlsSection}>
           {/* Row 1: Dealers Badge */}
@@ -325,8 +334,14 @@ export const InvoiceDetails: React.FC = () => {
 
         {/* Card List - Same style as unpaid invoices */}
         <View style={styles.listTopSeparator} />
+        {invoiceListLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primaryColor} />
+            <Text style={styles.loadingText}>Loading invoices...</Text>
+          </View>
+        ) : (
         <View style={styles.verticalList}>
-          {paginatedData.map((row, index) => (
+          {filteredData.map((row) => (
             <View key={row.id} style={styles.cardWrapper}>
               <View style={styles.listCard}>
                 {/* 3 Dots Action Button */}
@@ -374,19 +389,23 @@ export const InvoiceDetails: React.FC = () => {
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+                    <Text style={[styles.infoValue, styles.infoValueNaAd]}>{NA_AD}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Requested Amount</Text>
-                    <Text style={styles.infoValue}>{row.requestedAmount}</Text>
+                    <Text style={[styles.infoValue, styles.infoValueNaAd]}>{NA_AD}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Disbursed Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.netDisbursalAmount}</Text>
+                    <Text style={[styles.infoValue, styles.infoValueNaAd]}>{NA_AD}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Invoice Date</Text>
                     <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Invoice Due Date</Text>
+                    <Text style={styles.infoValue}>{row.invoiceDueDate}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Invoice Status</Text>
@@ -398,90 +417,28 @@ export const InvoiceDetails: React.FC = () => {
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Admin Status</Text>
-                    <Text style={styles.infoValue}>{row.adminStatus}</Text>
+                    <Text style={[styles.infoValue, styles.infoValueNaAd]}>{NA_AD}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Disbursement Date</Text>
-                    <Text style={styles.infoValue}>{row.disbursementDate}</Text>
+                    <Text style={[styles.infoValue, styles.infoValueNaAd]}>{NA_AD}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Tenor End Date</Text>
-                    <Text style={styles.infoValue}>{row.tenorEndDate}</Text>
+                    <Text style={[styles.infoValue, styles.infoValueNaAd]}>{NA_AD}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>UTR No.</Text>
-                    <Text style={styles.infoValue}>{row.utrNo}</Text>
+                    <Text style={[styles.infoValue, styles.infoValueNaAd]}>{NA_AD}</Text>
                   </View>
                 </View>
               </View>
             </View>
           ))}
         </View>
-
-        {/* Pagination */}
-        <View style={styles.paginationContainer}>
-          <View style={styles.paginationLeft}>
-            <Text style={styles.paginationText}>Show</Text>
-            <View style={styles.paginationDropdown}>
-              <Text style={styles.paginationDropdownText}>
-                {entriesPerPage}
-              </Text>
-            </View>
-            <Text style={styles.paginationText}>Entries</Text>
-          </View>
-
-          <View style={styles.paginationRight}>
-            <TouchableOpacity
-              style={[
-                styles.paginationButton,
-                currentPage === 1 && styles.paginationButtonDisabled,
-              ]}
-              onPress={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}>
-              <Text
-                style={[
-                  styles.paginationButtonText,
-                  currentPage === 1 && styles.paginationButtonTextDisabled,
-                ]}>
-                Prev
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.paginationPageButton,
-                currentPage === 1 && styles.paginationPageButtonActive,
-              ]}
-              onPress={() => setCurrentPage(1)}>
-              <Text
-                style={[
-                  styles.paginationPageButtonText,
-                  currentPage === 1 && styles.paginationPageButtonTextActive,
-                ]}>
-                1
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.paginationButton,
-                currentPage === totalPages && styles.paginationButtonDisabled,
-              ]}
-              onPress={() =>
-                setCurrentPage(prev => Math.min(totalPages, prev + 1))
-              }
-              disabled={currentPage === totalPages}>
-              <Text
-                style={[
-                  styles.paginationButtonText,
-                  currentPage === totalPages &&
-                    styles.paginationButtonTextDisabled,
-                ]}>
-                Next
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        )}
+        </>
+        )}
       </ScrollView>
 
       {/* Filter Modal */}
@@ -490,7 +447,7 @@ export const InvoiceDetails: React.FC = () => {
         onClose={() => setShowFilterModal(false)}
         onApply={(filters) => {
           setAppliedFilters(filters);
-          // TODO: Apply filters to data later
+          setShowFilterModal(false);
         }}
         filterData={invoiceFilterData}
         appliedFilters={appliedFilters}
@@ -859,6 +816,38 @@ const styles = StyleSheet.create({
     color: Colors.darkblack,
     fontFamily: Fonts.GilroyMedium,
   },
+  infoValueNaAd: {
+    color: Colors.tertiaryBlue,
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  loadingContainer: {
+    paddingVertical: scaleHeight(40),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: scaleHeight(12),
+    fontSize: scaleFont(14),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  emptyState: {
+    paddingVertical: scaleHeight(40),
+    paddingHorizontal: scaleWidth(16),
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: scaleFont(14),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
+    textAlign: 'center',
+  },
+  errorStateText: {
+    fontSize: scaleFont(14),
+    color: Colors.red,
+    fontFamily: Fonts.GilroyMedium,
+    textAlign: 'center',
+  },
   threeDotsButton: {
     position: 'absolute',
     top: scaleHeight(12),
@@ -906,83 +895,6 @@ const styles = StyleSheet.create({
   },
   deleteMenuText: {
     color: Colors.red,
-  },
-  // Pagination styles
-  paginationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: scaleHeight(16),
-    paddingVertical: scaleHeight(12),
-  },
-  paginationLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scaleWidth(8),
-  },
-  paginationText: {
-    fontSize: scaleFont(14),
-    color: Colors.darkblack,
-    fontFamily: Fonts.GilroyMedium,
-  },
-  paginationDropdown: {
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: scaleWidth(4),
-    paddingHorizontal: scaleWidth(8),
-    paddingVertical: scaleHeight(4),
-    minWidth: scaleWidth(50),
-  },
-  paginationDropdownText: {
-    fontSize: scaleFont(14),
-    color: Colors.darkblack,
-    fontFamily: Fonts.GilroyMedium,
-  },
-  paginationRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scaleWidth(8),
-  },
-  paginationButton: {
-    paddingHorizontal: scaleWidth(12),
-    paddingVertical: scaleHeight(6),
-    borderRadius: scaleWidth(4),
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  paginationButtonDisabled: {
-    opacity: 0.5,
-  },
-  paginationButtonText: {
-    fontSize: scaleFont(14),
-    color: Colors.darkblack,
-    fontFamily: Fonts.GilroyMedium,
-  },
-  paginationButtonTextDisabled: {
-    color: Colors.graybase,
-  },
-  paginationPageButton: {
-    paddingHorizontal: scaleWidth(12),
-    paddingVertical: scaleHeight(6),
-    borderRadius: scaleWidth(4),
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  paginationPageButtonActive: {
-    backgroundColor: Colors.primaryColor,
-    borderColor: Colors.primaryColor,
-  },
-  paginationPageButtonText: {
-    fontSize: scaleFont(14),
-    color: Colors.darkblack,
-    fontFamily: Fonts.GilroyMedium,
-  },
-  paginationPageButtonTextActive: {
-    color: Colors.white,
-    fontFamily: Fonts.GilroySemiBold,
   },
 });
 

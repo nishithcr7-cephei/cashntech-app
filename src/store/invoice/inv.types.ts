@@ -27,6 +27,17 @@ export type PartnerBank = {
   bank_name: string;
 };
 
+export type InvoiceListItemApi = {
+  id: string;
+  invoice_ref_no: string;
+  counter_party_name: string;
+  counter_party_code: string;
+  invoice_date: string;
+  invoice_due_date: string;
+  invoice_status: string;
+  approval_status: string;
+};
+
 export type InvoiceState = {
   dealerInfo: DealerInfoResponse | null;
   dealerInfoLoading: boolean;
@@ -38,6 +49,9 @@ export type InvoiceState = {
   createInvoiceError: string | null;
   createInvoiceSuccess: boolean;
   createInvoiceResponse: unknown | null;
+  invoiceList: InvoiceListItemApi[];
+  invoiceListLoading: boolean;
+  invoiceListError: string | null;
 };
 
 export const initialInvoiceState: InvoiceState = {
@@ -51,4 +65,7 @@ export const initialInvoiceState: InvoiceState = {
   createInvoiceError: null,
   createInvoiceSuccess: false,
   createInvoiceResponse: null,
+  invoiceList: [],
+  invoiceListLoading: false,
+  invoiceListError: null,
 };

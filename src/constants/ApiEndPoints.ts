@@ -141,6 +141,7 @@ const Endpoints = {
   apiDealerInfo: (programId: string) => `/invoice/dealer-info/${programId}`,
   apiBankProductList: '/master-data-management/bank-product/list',
   apiCreateInvoice: '/invoice',
+  apiInvoiceList: (programId: string) => `/invoice/list/${programId}`,
 
   // User Scope (Program Selection)
   apiUserScope: '/user/scope',
