@@ -241,9 +241,6 @@ export const InvoiceDashboard: React.FC = () => {
         navigation={navigation as any}
       />
       <ProgramBreadcrumb />
-      <View style={styles.pageTitleBar}>
-        <Text style={styles.pageTitleText}>Invoices</Text>
-      </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.sectionSubtitle}>Invoice List</Text>
 

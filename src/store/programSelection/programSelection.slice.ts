@@ -1,5 +1,5 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
-import {ProgramSelectionState} from './programSelection.types';
+import {ProgramSelectionState, SelectedProgram} from './programSelection.types';
 import type {Bank, UserType} from '@constants/programSelection';
 
 const initialState: ProgramSelectionState = {
@@ -10,6 +10,7 @@ const initialState: ProgramSelectionState = {
   programId: null,
   programName: null,
   userType: null,
+  selectedPrograms: [],
   scopeData: null,
   scopeLoading: false,
   scopeError: null,
@@ -54,6 +55,60 @@ const programSelectionSlice = createSlice({
       state.scopeLoading = false;
       state.scopeError = action.payload;
     },
+    toggleProgramSelection: (state, action: PayloadAction<SelectedProgram>) => {
+      const program = action.payload;
+      const existingIndex = state.selectedPrograms.findIndex(
+        p => p.programId === program.programId,
+      );
+      if (existingIndex >= 0) {
+        // Remove if already selected
+        const updatedPrograms = state.selectedPrograms.filter(
+          p => p.programId !== program.programId,
+        );
+        state.selectedPrograms = updatedPrograms;
+        // Update single selection to first remaining program, or clear if none
+        if (updatedPrograms.length > 0) {
+          const first = updatedPrograms[0];
+          state.bankId = first.bankId;
+          state.bankName = first.bankName;
+          state.productId = first.productId;
+          state.productName = first.productName;
+          state.programId = first.programId;
+          state.programName = first.programName;
+          state.userType = first.userType;
+        } else {
+          state.bankId = null;
+          state.bankName = null;
+          state.productId = null;
+          state.productName = null;
+          state.programId = null;
+          state.programName = null;
+          state.userType = null;
+        }
+      } else {
+        // Add if not selected
+        const updatedPrograms = [...state.selectedPrograms, program];
+        state.selectedPrograms = updatedPrograms;
+        // Update single selection to this program (or keep first if multiple)
+        if (updatedPrograms.length === 1) {
+          // First selection - set as primary
+          state.bankId = program.bankId;
+          state.bankName = program.bankName;
+          state.productId = program.productId;
+          state.productName = program.productName;
+          state.programId = program.programId;
+          state.programName = program.programName;
+          state.userType = program.userType;
+        }
+        // If multiple selections, keep the first one as primary
+      }
+    },
+    setSelectedPrograms: (state, action: PayloadAction<SelectedProgram[]>) => {
+      state.selectedPrograms = action.payload;
+    },
+    clearSelectedPrograms: state => {
+      state.selectedPrograms = [];
+    },
   },
 });
 
@@ -63,5 +118,8 @@ export const {
   fetchUserScopeRequest,
   fetchUserScopeSuccess,
   fetchUserScopeFailure,
+  toggleProgramSelection,
+  setSelectedPrograms,
+  clearSelectedPrograms,
 } = programSelectionSlice.actions;
 export default programSelectionSlice.reducer;

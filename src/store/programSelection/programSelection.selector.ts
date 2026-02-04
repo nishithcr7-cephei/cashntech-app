@@ -43,3 +43,5 @@ export const selectScopeLoading = (state: RootState) =>
   state.programSelection.scopeLoading;
 export const selectScopeError = (state: RootState) =>
   state.programSelection.scopeError;
+export const selectSelectedPrograms = (state: RootState) =>
+  state.programSelection.selectedPrograms;

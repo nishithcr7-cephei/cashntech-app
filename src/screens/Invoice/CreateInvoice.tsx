@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
-import {AppBar, Container, ProgramBreadcrumb} from '@components/index';
+import {AppBar, Container} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {ensureCameraPermission} from '@services/permissions';
@@ -509,7 +509,6 @@ export const CreateInvoice: React.FC = () => {
   return (
     <Container>
       <AppBar title="Create Invoice" navigation={navigation as any} />
-      <ProgramBreadcrumb />
       <View style={styles.pageTitleBar}>
         <TouchableOpacity
           style={styles.backButton}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo, useState} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {useSelector} from 'react-redux';
 import {useNavigation} from '@react-navigation/native';
@@ -6,44 +6,92 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
-import {BankBuilding, Folder, File, RightChevron, EditIcon} from '@assets/Icons';
+import {BankBuilding, Folder, File, RightChevron, EditIcon, UpChevron} from '@assets/Icons';
 import {
-  selectIsProgramSelected,
+  selectProgramSelection,
+  selectSelectedPrograms,
 } from '@store/programSelection/programSelection.selector';
-import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 
 export const ProgramBreadcrumb: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthNavigatorType>>();
-  const isSelected = useSelector(selectIsProgramSelected);
   const selection = useSelector(selectProgramSelection);
+  const selectedPrograms = useSelector(selectSelectedPrograms);
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  if (
-    !isSelected ||
-    !selection.bankName ||
-    !selection.productName ||
-    !selection.programName
-  )
-    return null;
+  // Get all programs to display
+  const programsToDisplay = useMemo(() => {
+    if (selectedPrograms && selectedPrograms.length > 0) {
+      return selectedPrograms;
+    }
+    // Fallback to old single selection
+    if (selection.programId && selection.bankName && selection.productName && selection.programName) {
+      return [{
+        bankId: selection.bankId || '',
+        bankName: selection.bankName,
+        productId: selection.productId || '',
+        productName: selection.productName,
+        programId: selection.programId,
+        programName: selection.programName,
+        userType: selection.userType || 'dealer',
+      }];
+    }
+    return [];
+  }, [selectedPrograms, selection]);
 
-  const bankLabel =
-    selection.bankName.toLowerCase().includes('tata capital') ? 'TCL' : selection.bankName;
-  const productLabel =
-    selection.productName.toLowerCase().includes('dealer finance')
-      ? 'DF'
-      : selection.productName;
+  if (programsToDisplay.length === 0) return null;
 
-  return (
-    <View style={styles.breadcrumbContainer}>
-      <TouchableOpacity
-        style={styles.breadcrumbButton}
-        activeOpacity={0.75}
-        hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-        accessibilityRole="button"
-        accessibilityLabel="Change selected bank and program"
-        accessibilityHint="Double tap to open select program screen"
-        onPress={() => navigation.navigate('SelectProgramScreen')}>
-        <View style={styles.row} pointerEvents="none">
+  const getBankLabel = (bankName: string) => {
+    return bankName.toLowerCase().includes('tata capital') ? 'TCL' : bankName;
+  };
+
+  const getProductLabel = (productName: string) => {
+    return productName.toLowerCase().includes('dealer finance') ? 'DF' : productName;
+  };
+
+  // Collapsed: show first program, Expanded: show all
+  const displayPrograms = isExpanded 
+    ? programsToDisplay 
+    : programsToDisplay.slice(0, 1);
+  
+  const hasMultiplePrograms = programsToDisplay.length > 1;
+  const remainingCount = programsToDisplay.length - 1;
+
+  // Render compact chip format for each program
+  const renderProgramChip = (program: typeof programsToDisplay[0], index: number) => {
+    const bankLabel = getBankLabel(program.bankName);
+    const productLabel = getProductLabel(program.productName);
+    const chipText = `${bankLabel}-${productLabel}-${program.programName}`;
+
+    return (
+      <View key={index} style={styles.chipContainer}>
+        <View style={styles.chip}>
+          <View style={styles.chipContent}>
+            <BankBuilding
+              width={scaleWidth(12)}
+              height={scaleWidth(12)}
+              color={Colors.primaryColor}
+            />
+            <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
+              {chipText}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.chipChangeButton}
+            onPress={() => navigation.navigate('SelectProgramScreen')}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+            <EditIcon />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  // Render full breadcrumb format (for collapsed first item)
+  const renderFullBreadcrumb = (program: typeof programsToDisplay[0]) => {
+    return (
+      <View style={styles.fullBreadcrumb}>
+        <View style={styles.breadcrumbRow}>
           <View style={styles.itemFixed}>
             <BankBuilding
               width={scaleWidth(14)}
@@ -51,7 +99,7 @@ export const ProgramBreadcrumb: React.FC = () => {
               color={Colors.primaryColor}
             />
             <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">
-              {bankLabel}
+              {getBankLabel(program.bankName)}
             </Text>
           </View>
 
@@ -68,7 +116,7 @@ export const ProgramBreadcrumb: React.FC = () => {
               color={Colors.primaryColor}
             />
             <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">
-              {productLabel}
+              {getProductLabel(program.productName)}
             </Text>
           </View>
 
@@ -85,17 +133,61 @@ export const ProgramBreadcrumb: React.FC = () => {
               color={Colors.primaryColor}
             />
             <Text style={styles.breadcrumbTextGrow} numberOfLines={1} ellipsizeMode="tail">
-              {selection.programName}
+              {program.programName}
             </Text>
           </View>
 
-          {/* Visual affordance that this is clickable */}
-          <View style={styles.changePill}>
+          {/* Badge for remaining count */}
+          {hasMultiplePrograms && !isExpanded && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>+{remainingCount}</Text>
+            </View>
+          )}
+
+          {/* Change button */}
+          <TouchableOpacity
+            style={styles.changePill}
+            onPress={() => navigation.navigate('SelectProgramScreen')}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
             <EditIcon />
             <Text style={styles.changeText}>Change</Text>
-          </View>
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.breadcrumbContainer}>
+      <View style={styles.cardWrapper}>
+        {/* Collapsed: Show full breadcrumb of first program */}
+        {!isExpanded && renderFullBreadcrumb(programsToDisplay[0])}
+
+        {/* Expanded: Show all programs as chips */}
+        {isExpanded && (
+          <View style={styles.chipsContainer}>
+            {programsToDisplay.map((program, index) => renderProgramChip(program, index))}
+          </View>
+        )}
+
+        {/* Expand/Collapse button - only show if multiple programs */}
+        {hasMultiplePrograms && (
+          <TouchableOpacity
+            style={styles.expandButton}
+            onPress={() => setIsExpanded(!isExpanded)}
+            activeOpacity={0.7}
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            <Text style={styles.expandText}>
+              {isExpanded ? 'Show Less' : `+${remainingCount} More`}
+            </Text>
+            {isExpanded ? (
+              <UpChevron height={scaleHeight(14)} width={scaleWidth(14)} />
+            ) : (
+              <RightChevron height={scaleHeight(14)} width={scaleWidth(14)} />
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
@@ -108,16 +200,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E6E6E6',
   },
-  breadcrumbButton: {
-    alignSelf: 'stretch',
+  cardWrapper: {
     backgroundColor: '#FFF9F9',
     borderWidth: 1,
     borderColor: '#FFD9D9',
     borderRadius: scaleWidth(10),
-    paddingHorizontal: scaleWidth(10),
-    paddingVertical: scaleHeight(6),
+    overflow: 'hidden',
   },
-  row: {
+  fullBreadcrumb: {
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(8),
+  },
+  breadcrumbRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'nowrap',
@@ -153,6 +247,21 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexShrink: 1,
   },
+  badge: {
+    backgroundColor: Colors.primaryColor,
+    borderRadius: scaleWidth(10),
+    paddingHorizontal: scaleWidth(6),
+    paddingVertical: scaleHeight(2),
+    marginLeft: scaleWidth(4),
+    minWidth: scaleWidth(24),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    fontSize: scaleFont(10),
+    fontFamily: Fonts.GilroyBold,
+    color: Colors.white,
+  },
   changePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -163,11 +272,63 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#FFD9D9',
-    marginLeft: scaleWidth(2),
+    marginLeft: scaleWidth(4),
     flexShrink: 0,
   },
   changeText: {
     fontSize: scaleFont(10),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+  },
+  chipsContainer: {
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(8),
+    gap: scaleHeight(8),
+  },
+  chipContainer: {
+    width: '100%',
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FFD9D9',
+    borderRadius: scaleWidth(8),
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(8),
+  },
+  chipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(6),
+    flex: 1,
+    minWidth: 0,
+  },
+  chipText: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.primaryColor,
+    flex: 1,
+  },
+  chipChangeButton: {
+    padding: scaleWidth(4),
+    marginLeft: scaleWidth(8),
+  },
+  expandButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: scaleWidth(10),
+    borderTopWidth: 1,
+    borderTopColor: '#FFD9D9',
+    gap: scaleWidth(6),
+    backgroundColor: '#FFFFFF',
+  },
+  expandText: {
+    fontSize: scaleFont(11),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.primaryColor,
   },

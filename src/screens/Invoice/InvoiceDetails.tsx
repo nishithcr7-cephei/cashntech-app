@@ -254,7 +254,7 @@ export const InvoiceDetails: React.FC = () => {
       />
       <ProgramBreadcrumb />
       <View style={styles.pageTitleBar}>
-        <Text style={styles.pageTitleText}>Invoice Details</Text>
+        <Text style={styles.pageTitleText}>Invoice List</Text>
       </View>
       <ScrollView
         style={styles.scroll}
@@ -264,8 +264,6 @@ export const InvoiceDetails: React.FC = () => {
           setOpenMenuId(null);
           setMenuAnchor(null);
         }}>
-        <Text style={styles.sectionSubtitle}>Invoice Details</Text>
-
         {!programId ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>
@@ -283,7 +281,7 @@ export const InvoiceDetails: React.FC = () => {
           {/* Row 1: Dealers Badge */}
           <View style={styles.topRow}>
             <View style={styles.dealersBadgeContainer}>
-              <Text style={styles.dealersLabel}>Dealer Wise Invoice Details</Text>
+              <Text style={styles.dealersLabel}>Dealer Wise Invoice List Details</Text>
               <View style={styles.dealersBadge}>
                 <Text style={styles.dealersBadgeText}>{invoiceData.length}</Text>
               </View>

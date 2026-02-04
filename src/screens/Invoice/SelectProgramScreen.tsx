@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useMemo} from 'react';
 import {
   View,
   Text,
@@ -10,21 +10,21 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useDispatch, useSelector} from 'react-redux';
-import {AppBar, Container} from '@components/index';
+import {AppBar, Container, Button} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {RightChevron, UpChevron, RightCheckmark, File, BankBuilding} from '@assets/Icons';
+import {RightChevron, UpChevron, File, BankBuilding, Tick} from '@assets/Icons';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
 import type {Bank, BankProgram, Program} from '@constants/programSelection';
 import {
-  setProgramSelection,
   fetchUserScopeRequest,
+  toggleProgramSelection,
 } from '@store/programSelection/programSelection.slice';
 import {
-  selectProgramSelection,
   selectScopeData,
   selectScopeLoading,
   selectScopeError,
+  selectSelectedPrograms,
 } from '@store/programSelection/programSelection.selector';
 
 // Simple icon components
@@ -40,12 +40,39 @@ export const SelectProgramScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthNavigatorType>>();
   const dispatch = useDispatch();
-  const currentSelection = useSelector(selectProgramSelection);
   const scopeData = useSelector(selectScopeData);
   const scopeLoading = useSelector(selectScopeLoading);
   const scopeError = useSelector(selectScopeError);
+  const selectedPrograms = useSelector(selectSelectedPrograms);
 
-  const banksData = scopeData ?? [];
+  // Show all banks and all products, but only show DF programs for selection
+  const banksData = useMemo(() => {
+    if (!scopeData) return [];
+    return scopeData
+      .map(bank => ({
+        ...bank,
+        products: bank.products
+          .map(product => ({
+            ...product,
+            // Show all programs, but we'll filter selection to DF programs only
+            programs: product.programs,
+          })),
+      }));
+  }, [scopeData]);
+
+  // Helper function to check if a program is selectable
+  // Allow DF programs OR UGRO programs to be selectable
+  const isDFProgram = (bank: Bank, product: BankProgram, program: Program): boolean => {
+    // UGRO bank ke saare programs selectable hain
+    if (bank.name.toLowerCase() === 'ugro') {
+      return true;
+    }
+    // Baaki banks ke liye sirf DF programs
+    const isDFProduct = product.name.toLowerCase().includes('dealer finance');
+    const isDFProgramName = program.name.toLowerCase().includes('df') || 
+                           program.name.toLowerCase().includes('dealer finance');
+    return isDFProduct || isDFProgramName;
+  };
 
   // Fetch user scope on mount
   useEffect(() => {
@@ -56,11 +83,6 @@ export const SelectProgramScreen: React.FC = () => {
   const [expandedBanks, setExpandedBanks] = useState<Set<string>>(new Set());
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(
     new Set(),
-  );
-
-  // Track selected program
-  const [selectedProgramId, setSelectedProgramId] = useState<string | null>(
-    currentSelection.programId || null,
   );
 
   const toggleBank = (bankId: string) => {
@@ -93,13 +115,13 @@ export const SelectProgramScreen: React.FC = () => {
     setExpandedProducts(newExpanded);
   };
 
-  const handleProgramSelect = (bank: Bank, product: BankProgram, program: Program) => {
-    // Set selected program
-    setSelectedProgramId(program.id);
-
-    // Redux mein save karo
+  const handleProgramToggle = (bank: Bank, product: BankProgram, program: Program) => {
+    // Only allow selecting DF programs or UGRO programs
+    if (!isDFProgram(bank, product, program)) {
+      return;
+    }
     dispatch(
-      setProgramSelection({
+      toggleProgramSelection({
         bankId: bank.id,
         bankName: bank.name,
         productId: product.id,
@@ -109,16 +131,25 @@ export const SelectProgramScreen: React.FC = () => {
         userType: program.userType,
       }),
     );
+  };
 
-    // HomeNavigator par navigate karo
-    navigation.navigate('HomeNavigator');
+  const handleDone = () => {
+    // Check if we can go back, otherwise navigate to HomeNavigator
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      // If no screen to go back to, navigate to HomeNavigator
+      navigation.navigate('HomeNavigator');
+    }
   };
 
   const isBankExpanded = (bankId: string) => expandedBanks.has(bankId);
   const isProductExpanded = (bankId: string, productId: string) =>
     expandedProducts.has(`${bankId}_${productId}`);
   const isProgramSelected = (programId: string) =>
-    selectedProgramId === programId;
+    selectedPrograms.some(p => p.programId === programId);
+  const isProgramSelectable = (bank: Bank, product: BankProgram, program: Program) =>
+    isDFProgram(bank, product, program);
 
   const renderBankItem = (bank: Bank, index: number) => {
     const isExpanded = isBankExpanded(bank.id);
@@ -211,6 +242,7 @@ export const SelectProgramScreen: React.FC = () => {
     program: Program,
   ) => {
     const isSelected = isProgramSelected(program.id);
+    const selectable = isProgramSelectable(bank, product, program);
 
     return (
       <TouchableOpacity
@@ -218,10 +250,24 @@ export const SelectProgramScreen: React.FC = () => {
         style={[
           styles.programItem,
           isSelected && styles.programItemSelected,
+          !selectable && styles.programItemDisabled,
         ]}
-        onPress={() => handleProgramSelect(bank, product, program)}>
+        onPress={() => handleProgramToggle(bank, product, program)}
+        disabled={!selectable}>
         <View style={styles.programItemContent}>
           {isSelected && <View style={styles.selectedIndicator} />}
+          {/* Checkbox - show for all programs, but disabled for non-DF */}
+          <View style={styles.checkboxContainer}>
+            <View style={[
+              styles.checkbox, 
+              isSelected && styles.checkboxSelected,
+              !selectable && styles.checkboxDisabled
+            ]}>
+              {isSelected && selectable && (
+                <Tick width={scaleWidth(12)} height={scaleHeight(12)} stroke={Colors.white} />
+              )}
+            </View>
+          </View>
           <View style={styles.iconContainer}>
             <File 
               height={scaleHeight(18)} 
@@ -233,17 +279,11 @@ export const SelectProgramScreen: React.FC = () => {
             style={[
               styles.programName,
               isSelected && styles.programNameSelected,
+              !selectable && styles.programNameDisabled,
             ]}>
             {program.name}
           </Text>
         </View>
-        {isSelected && (
-          <RightCheckmark
-            height={scaleHeight(18)}
-            width={scaleWidth(18)}
-            color={Colors.primaryColor}
-          />
-        )}
       </TouchableOpacity>
     );
   };
@@ -284,7 +324,7 @@ export const SelectProgramScreen: React.FC = () => {
 
   return (
     <Container>
-      <AppBar title="Select Program" navigation={navigation} hideHamburger={true} />
+      <AppBar title="Select DF Programs" navigation={navigation} hideHamburger={true} />
       <View style={styles.contentContainer}>
         <View style={styles.contentWrapper}>
           <View style={styles.rootCard}>
@@ -297,6 +337,18 @@ export const SelectProgramScreen: React.FC = () => {
             />
           </View>
         </View>
+      </View>
+      {/* Done Button */}
+      <View style={styles.footer}>
+        <Button
+          buttonText={`Done (${selectedPrograms.length} selected)`}
+          onPress={handleDone}
+          disabled={selectedPrograms.length === 0}
+          style={[
+            styles.doneButton,
+            selectedPrograms.length === 0 && styles.doneButtonDisabled,
+          ]}
+        />
       </View>
     </Container>
   );
@@ -332,6 +384,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: scaleWidth(16),
     paddingTop: scaleHeight(16),
+    paddingBottom: scaleHeight(16),
   },
   listContent: {
     paddingBottom: scaleHeight(24),
@@ -460,5 +513,48 @@ const styles = StyleSheet.create({
   programNameSelected: {
     fontFamily: Fonts.GilroySemiBold,
     color: '#C41E3A', // Dark red for selected (matching screenshot)
+  },
+  programItemDisabled: {
+    opacity: 0.5,
+  },
+  programNameDisabled: {
+    color: '#9A9A9A',
+  },
+  checkboxContainer: {
+    marginRight: scaleWidth(12),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: scaleWidth(20),
+    height: scaleWidth(20),
+    borderWidth: 2,
+    borderColor: Colors.graybase,
+    borderRadius: scaleWidth(4),
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+  },
+  checkboxSelected: {
+    backgroundColor: Colors.primaryColor,
+    borderColor: Colors.primaryColor,
+  },
+  checkboxDisabled: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#D0D0D0',
+    opacity: 0.5,
+  },
+  footer: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(16),
+    borderTopWidth: 1,
+    borderTopColor: '#E6E6E6',
+    backgroundColor: Colors.white,
+  },
+  doneButton: {
+    width: '100%',
+  },
+  doneButtonDisabled: {
+    opacity: 0.5,
   },
 });
