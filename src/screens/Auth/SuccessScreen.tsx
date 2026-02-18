@@ -56,12 +56,12 @@ export const SuccessScreen = ({
       if (params.authMode === 'signin') {
         dispatch(authActions.setIsLoggedIn(true));
         setStorage(StorageKeys.IS_LOGGED_IN, true);
-        // Navigate to SelectProgramScreen if program not selected, otherwise go to HomeNavigator
+        // Navigate to SelectRoleScreen after login
         navigation.reset({
           index: 0,
           routes: [
             {
-              name: isProgramSelected ? 'HomeNavigator' : 'SelectProgramScreen',
+              name: 'SelectRoleScreen',
             },
           ],
         });

@@ -136,103 +136,60 @@ export const UploadModal = ({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback onPress={() => {}}>
             <View style={styles.popup}>
-              <Text style={styles.title}>Upload your File</Text>
-              <Text style={styles.subtitle}>
-                Supports {allowedFileTypes.map(e => e.toUpperCase()).join(', ')}
-                only
-              </Text>
-
-              <View style={styles.uploadBox}>
-                <File width={20} height={26} />
-
-                <View style={{alignItems: 'center'}}>
-                  <TouchableOpacity
-                    style={[styles.browseButton, {backgroundColor: '#16a34a'}]}
-                    onPress={handleCaptureFromCamera}>
-                    <Text style={styles.browseText}>Capture from Camera</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.browseButton}
-                    onPress={handleBrowseFile}>
-                    <Text style={styles.browseText}>Browse File</Text>
-                  </TouchableOpacity>
-
-                  {selectedFile && (
-                    <View style={{marginTop: 10, alignItems: 'center'}}>
-                      <Text
-                        style={{
-                          marginTop: 8,
-                          color: Colors.balancedGray,
-                          fontSize: scaleFont(14),
-                        }}>
-                        Selected: {selectedFile.name}
-                      </Text>
-
-                      {selectedFile.type?.startsWith('image/') ? (
-                        <View
-                          style={{
-                            borderRadius: 8,
-                            overflow: 'hidden',
-                            borderColor: '#ccc',
-                            borderWidth: 1,
-                          }}>
-                          <Image
-                            source={{uri: selectedFile.uri}}
-                            style={{
-                              width: 150,
-                              height: 150,
-                              resizeMode: 'cover',
-                            }}
-                          />
-                        </View>
-                      ) : selectedFile.name?.endsWith('.pdf') ? (
-                        <Text
-                          style={{
-                            color: Colors.lightGray,
-                            fontSize: scaleFont(12),
-                          }}>
-                          PDF Preview: {selectedFile.name}
-                        </Text>
-                      ) : (
-                        <Text
-                          style={{
-                            color: Colors.lightGray,
-                            fontSize: scaleFont(12),
-                          }}>
-                          Unsupported file type
-                        </Text>
-                      )}
-
-                      <View style={styles.actionRow}>
-                        <TouchableOpacity
-                          style={[styles.secondaryButton, {marginRight: 8}]}
-                          onPress={() => setSelectedFile(undefined)}>
-                          <Text style={styles.secondaryText}>Retake</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.secondaryButton}
-                          onPress={() => onClose()}>
-                          <Text style={styles.secondaryText}>Cancel</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-                </View>
+              {/* Header with Title and Close Button */}
+              <View style={styles.modalHeader}>
+                <Text style={styles.title}>Upload Attachment</Text>
+                <TouchableOpacity
+                  onPress={() => onClose()}
+                  style={styles.closeButton}
+                  hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.closeButtonText}>×</Text>
+                </TouchableOpacity>
               </View>
 
+              {/* Upload Area */}
               <TouchableOpacity
-                style={styles.saveButton}
+                style={styles.uploadBox}
                 activeOpacity={0.7}
-                disabled={!selectedFile}
-                onPress={() => {
-                  handleSubmit();
-                }}>
-                <Text style={[
-                  styles.saveText,
-                  !selectedFile ? {opacity: 0.7} : null,
-                ]}>Submit</Text>
-                <RightCheckmarkWhite width={12} height={12} />
+                onPress={handleBrowseFile}>
+                <File width={scaleWidth(40)} height={scaleHeight(40)} />
+                <Text style={styles.uploadText}>Upload your document.</Text>
               </TouchableOpacity>
+
+              {/* Selected File Preview */}
+              {selectedFile && (
+                <View style={styles.selectedFileContainer}>
+                  <Text style={styles.selectedFileText}>
+                    Selected: {selectedFile.name}
+                  </Text>
+                  {selectedFile.type?.startsWith('image/') && (
+                    <Image
+                      source={{uri: selectedFile.uri}}
+                      style={styles.previewImage}
+                    />
+                  )}
+                </View>
+              )}
+
+              {/* Action Buttons */}
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => onClose()}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.uploadButton,
+                    !selectedFile && styles.uploadButtonDisabled,
+                  ]}
+                  activeOpacity={0.7}
+                  disabled={!selectedFile}
+                  onPress={handleSubmit}>
+                  <Text style={styles.uploadButtonText}>Upload</Text>
+                  <RightCheckmarkWhite width={scaleWidth(16)} height={scaleHeight(16)} />
+                </TouchableOpacity>
+              </View>
             </View>
           </TouchableWithoutFeedback>
         </View>
@@ -244,75 +201,121 @@ export const UploadModal = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   popup: {
     width: '85%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(12),
+    overflow: 'hidden',
   },
-  title: {fontSize: 20, fontWeight: '600', marginBottom: 4},
-  subtitle: {fontSize: 14, color: '#666', marginBottom: 16},
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(16),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E6E6E6',
+  },
+  title: {
+    fontSize: scaleFont(18),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    flex: 1,
+    textAlign: 'center',
+  },
+  closeButton: {
+    width: scaleWidth(24),
+    height: scaleWidth(24),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeButtonText: {
+    fontSize: scaleFont(24),
+    color: Colors.darkblack,
+    fontWeight: '300',
+  },
   uploadBox: {
     borderWidth: 2,
     borderStyle: 'dashed',
     borderColor: '#B0B0B0',
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: scaleWidth(12),
+    paddingVertical: scaleHeight(40),
+    paddingHorizontal: scaleWidth(20),
     alignItems: 'center',
-    width: '100%',
+    justifyContent: 'center',
+    margin: scaleWidth(16),
     backgroundColor: '#FAFAFA',
+    minHeight: scaleHeight(200),
   },
-  icon: {width: 40, height: 40, marginBottom: 10},
-  info: {fontSize: 14, color: '#666', textAlign: 'center'},
-  browseButton: {
-    backgroundColor: '#007bff',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    marginTop: 10,
+  uploadText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: '#808080',
+    marginTop: scaleHeight(12),
+    textAlign: 'center',
   },
-  browseText: {
-    color: '#fff',
-    fontWeight: '600',
+  selectedFileContainer: {
+    paddingHorizontal: scaleWidth(16),
+    paddingBottom: scaleHeight(12),
+    alignItems: 'center',
   },
-  saveButton: {
+  selectedFileText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(8),
+  },
+  previewImage: {
+    width: scaleWidth(150),
+    height: scaleWidth(150),
+    borderRadius: scaleWidth(8),
+    resizeMode: 'cover',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: scaleWidth(12),
+    paddingHorizontal: scaleWidth(16),
+    paddingBottom: scaleHeight(16),
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: scaleHeight(12),
+    paddingHorizontal: scaleWidth(16),
+    borderRadius: scaleWidth(8),
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  uploadButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: scaleHeight(12),
+    paddingHorizontal: scaleWidth(16),
+    borderRadius: scaleWidth(8),
     backgroundColor: Colors.green,
-    marginTop: scaleHeight(20),
-    paddingHorizontal: scaleWidth(12),
-    paddingVertical: scaleHeight(5),
-    borderRadius: scaleWidth(4),
     gap: scaleWidth(8),
-    borderWidth: 1,
-    borderColor: Colors.green,
-    minWidth: scaleWidth(100),
   },
-  saveText: {
+  uploadButtonDisabled: {
+    backgroundColor: '#E6E6E6',
+    opacity: 0.6,
+  },
+  uploadButtonText: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
     color: Colors.white,
-    fontFamily: Fonts.GilroyMedium,
-    fontSize: scaleFont(14),
-  },
-  actionRow: {
-    flexDirection: 'row',
-    marginTop: 10,
-  },
-  secondaryButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    backgroundColor: '#fff',
-  },
-  secondaryText: {
-    color: '#111827',
-    fontWeight: '600',
   },
 });

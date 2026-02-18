@@ -1,6 +1,7 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {UserState} from './user.types';
 import { decodeJWT } from '@utils/Utils';
+import {AppRole} from '@constants/roles';
 
 const initialState: UserState = {
   id: 0,
@@ -11,6 +12,7 @@ const initialState: UserState = {
   is_client: false,
   is_internal: false,
   role: '',
+  appRole: null,
   scope: undefined,
   final_user_permission: undefined,
 };
@@ -28,8 +30,12 @@ const userSlice = createSlice({
       state.is_client = action.payload.is_client ?? state.is_client;
       state.is_internal = action.payload.is_internal ?? state.is_internal;
       state.role = action.payload.role ?? state.role;
+      state.appRole = action.payload.appRole ?? state.appRole;
       state.scope = action.payload.scope ?? state.scope;
       state.final_user_permission = action.payload.final_user_permission ?? state.final_user_permission;
+    },
+    setUserRole: (state, action: PayloadAction<AppRole | null>) => {
+      state.appRole = action.payload;
     },
     loadInfoFromToken: (state, action: PayloadAction<string>) => {
       const data = decodeJWT(action.payload);
@@ -50,11 +56,12 @@ const userSlice = createSlice({
       state.is_client = false;
       state.is_internal = false;
       state.role = '';
+      state.appRole = null;
       state.scope = undefined;
       state.final_user_permission = undefined;
     },
   },
 });
 
-export const {setUserInfo, loadInfoFromToken, clearUserInfo} = userSlice.actions;
+export const {setUserInfo, setUserRole, loadInfoFromToken, clearUserInfo} = userSlice.actions;
 export default userSlice.reducer;

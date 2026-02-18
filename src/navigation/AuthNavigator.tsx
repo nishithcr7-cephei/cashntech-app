@@ -13,6 +13,7 @@ import {
   OcrInvoiceScreen,
   SelectUserTypeScreen,
   SelectProgramScreen,
+  SelectRoleScreen,
 } from '@screens/index';
 import {SplashScreen} from '@screens/SplashScreen/SplashScreen';
 import MenuPageView from '@screens/SplashScreen/MenuPageView';
@@ -67,6 +68,10 @@ export const AuthNavigator = () => {
       <AuthStack.Screen
         name="SelectProgramScreen"
         component={SelectProgramScreen}
+      />
+      <AuthStack.Screen
+        name="SelectRoleScreen"
+        component={SelectRoleScreen}
       />
       <AuthStack.Screen
         name={AuthScreens.HomeNavigator}

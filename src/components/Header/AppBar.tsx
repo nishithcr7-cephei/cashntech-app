@@ -9,7 +9,7 @@ import {
   TouchableOpacityProps,
 } from 'react-native';
 import React from 'react';
-import {Colors, Fonts} from '@constants/index';
+import {Colors, Fonts, ROLE_HEADER_COLORS} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {MenuIcon} from '@assets/Icons';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
@@ -18,6 +18,9 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ProgramSelectorPill} from '@components/ProgramSelector/ProgramSelectorPill';
+import {useSelector} from 'react-redux';
+import {userSelector} from '@store/user';
+import {AppRole} from '@constants/roles';
 
 export type AppBarProps = {
   title?: string;
@@ -55,10 +58,21 @@ export const AppBar = ({
   navigation,
 }: AppBarProps) => {
   const insets = useSafeAreaInsets();
+  const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  
+  // Get role-based header color (default to anchor_maker if no role)
+  const headerColors = userRole 
+    ? ROLE_HEADER_COLORS[userRole] 
+    : ROLE_HEADER_COLORS.anchor_maker;
   
   return (
-    <View style={[styles.container, hideHamburger ? styles.containerCentered : undefined, {paddingTop: insets.top}, containerStyle]}>
-      {!hideHamburger && (
+    <View style={[
+      styles.container, 
+      {backgroundColor: headerColors.bg},
+      {paddingTop: insets.top}, 
+      containerStyle
+    ]}>
+      {(renderLeftIcon || !hideHamburger) && (
         <TouchableOpacity
           onPress={() => {
             if (onPressLeftIcon) {
@@ -80,8 +94,12 @@ export const AppBar = ({
         </TouchableOpacity>
       )}
 
-      <View style={[styles.titleSection, !showProgramSelector && styles.titleSectionFull]}>
-        <Text style={[styles.titleText, hideHamburger ? styles.titleTextCentered : undefined, titleTextStyle]} numberOfLines={1}>
+      <View style={[
+        styles.titleSection, 
+        !showProgramSelector && styles.titleSectionFull,
+        (hideHamburger && !renderLeftIcon) && styles.titleSectionNoHamburger
+      ]}>
+        <Text style={[styles.titleText, titleTextStyle]} numberOfLines={1}>
           {title}
         </Text>
         {showProgramSelector && <ProgramSelectorPill />}
@@ -95,7 +113,6 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFE9E9',
     paddingHorizontal: scaleWidth(16),
     paddingVertical: scaleHeight(10),
     position: 'relative',
@@ -112,20 +129,14 @@ const styles = StyleSheet.create({
   titleSectionFull: {
     justifyContent: 'flex-start',
   },
+  titleSectionNoHamburger: {
+    marginStart: 0,
+  },
   titleText: {
     flex: 1,
     color: Colors.primaryColor,
     fontFamily: Fonts.GilroyBold,
     fontSize: scaleFont(20),
-  },
-  titleTextNoHamburger: {
-    marginStart: 0,
-  },
-  containerCentered: {
-    justifyContent: 'center',
-  },
-  titleTextCentered: {
-    marginStart: 0,
-    textAlign: 'center',
+    textAlign: 'left',
   },
 });

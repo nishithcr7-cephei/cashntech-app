@@ -13,7 +13,13 @@ const getFullName = createSelector(
   (user) => `${user.first_name} ${user.last_name}`
 );
 
+const getUserRole = createSelector(
+  _selectState,
+  (user) => user.appRole
+);
+
 export default {
   getUserInfo,
-  getFullName
+  getFullName,
+  getUserRole
 };

@@ -4,6 +4,9 @@ import {HomeNavigatorType} from '@type/NavigatorTypes';
 import {scaleWidth} from '@utils/Scale';
 import React from 'react';
 import {Dimensions} from 'react-native';
+import {useSelector} from 'react-redux';
+import {userSelector} from '@store/user';
+import {AppRole} from '@constants/roles';
 import {
   OcrInvoiceScreen,
   InvoiceDashboard,
@@ -20,11 +23,23 @@ import {
   CreditAccountDetails,
   CreditAccountInvoiceNumber,
   CreditAccountDailyInterest,
+  FinancingRequestScreen,
+  LimitDetailsScreen,
+  DealerMakerDashboardScreen,
+  ODDetailsScreen,
+  ODRepaymentsScreen,
+  AnchorsListScreen,
+  InvoiceDetailView,
+  DealerInvoiceDetailsScreen,
+  DisbursementScreen,
 } from '@screens/index';
 
 const Drawer = createDrawerNavigator<HomeNavigatorType>();
 
 export const HomeNavigator = () => {
+  const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const initialRoute = 'InvoiceDashboard';
+
   return (
     <Drawer.Navigator
       id={undefined}
@@ -36,7 +51,7 @@ export const HomeNavigator = () => {
           width: Dimensions.get('window').width * 0.7,
         },
       }}
-      initialRouteName="InvoiceDashboard"
+      initialRouteName={initialRoute}
       drawerContent={DrawerContent}>
       <Drawer.Screen name="InvoiceDashboard" component={InvoiceDashboard} />
       <Drawer.Screen name="InvoiceDetails" component={InvoiceDetails} />
@@ -52,6 +67,15 @@ export const HomeNavigator = () => {
       <Drawer.Screen name="CreditAccountDetails" component={CreditAccountDetails} />
       <Drawer.Screen name="CreditAccountInvoiceNumber" component={CreditAccountInvoiceNumber} />
       <Drawer.Screen name="CreditAccountDailyInterest" component={CreditAccountDailyInterest} />
+      <Drawer.Screen name="FinancingRequestScreen" component={FinancingRequestScreen} />
+      <Drawer.Screen name="LimitDetailsScreen" component={LimitDetailsScreen} />
+      <Drawer.Screen name="DealerMakerDashboardScreen" component={DealerMakerDashboardScreen} />
+      <Drawer.Screen name="ODDetailsScreen" component={ODDetailsScreen} />
+      <Drawer.Screen name="ODRepaymentsScreen" component={ODRepaymentsScreen} />
+      <Drawer.Screen name="AnchorsListScreen" component={AnchorsListScreen} />
+      <Drawer.Screen name="InvoiceDetailView" component={InvoiceDetailView} />
+      <Drawer.Screen name="DealerInvoiceDetailsScreen" component={DealerInvoiceDetailsScreen} />
+      <Drawer.Screen name="DisbursementScreen" component={DisbursementScreen} />
       <Drawer.Screen name="OcrInvoice" component={OcrInvoiceScreen} />
     </Drawer.Navigator>
   );

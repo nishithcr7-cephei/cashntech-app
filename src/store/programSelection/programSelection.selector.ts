@@ -10,12 +10,13 @@ export const selectProgramSelection = (state: RootState) =>
 
 export const selectIsProgramSelected = createSelector(
   [selectProgramSelectionState],
-  selection => !!selection.programId,
+  selection => selection.programScope === 'all' || !!selection.programId,
 );
 
 export const selectProgramDisplayText = createSelector(
   [selectProgramSelectionState],
   selection => {
+    if (selection.programScope === 'all') return 'All Program';
     if (!selection.bankName || !selection.programName) return null;
     return `${selection.bankName} > ${selection.productName} > ${selection.programName}`;
   },
@@ -24,6 +25,7 @@ export const selectProgramDisplayText = createSelector(
 export const selectProgramCompactText = createSelector(
   [selectProgramSelectionState],
   selection => {
+    if (selection.programScope === 'all') return 'All Program';
     if (!selection.bankName || !selection.programName) return null;
     return `${selection.bankName} > ${selection.programName}`;
   },

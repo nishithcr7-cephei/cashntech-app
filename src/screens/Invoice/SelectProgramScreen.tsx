@@ -19,6 +19,7 @@ import type {Bank, BankProgram, Program} from '@constants/programSelection';
 import {
   fetchUserScopeRequest,
   toggleProgramSelection,
+  setProgramScope,
 } from '@store/programSelection/programSelection.slice';
 import {
   selectScopeData,
@@ -26,6 +27,8 @@ import {
   selectScopeError,
   selectSelectedPrograms,
 } from '@store/programSelection/programSelection.selector';
+import {userSelector} from '@store/user';
+import {AppRole} from '@constants/roles';
 
 // Simple icon components
 const FolderIcon = ({size = 20, color = '#7A7C82'}: {size?: number; color?: string}) => (
@@ -40,6 +43,10 @@ export const SelectProgramScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthNavigatorType>>();
   const dispatch = useDispatch();
+  const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const isAnchorMaker = userRole === 'anchor_maker';
+  const isDealerMaker = userRole === 'dealer_maker';
+  const canUseAllProgramScope = isAnchorMaker || isDealerMaker;
   const scopeData = useSelector(selectScopeData);
   const scopeLoading = useSelector(selectScopeLoading);
   const scopeError = useSelector(selectScopeError);
@@ -115,6 +122,18 @@ export const SelectProgramScreen: React.FC = () => {
     setExpandedProducts(newExpanded);
   };
 
+  // ============================================================================
+  // SINGLE SELECTION MODE (Current Implementation)
+  // ============================================================================
+  // When a program is selected, navigation happens immediately.
+  // No checkboxes or Done button - user selects and goes back automatically.
+  //
+  // TO REVERT TO MULTIPLE SELECTION IN THE FUTURE:
+  // 1. Remove navigation code from handleProgramToggle (lines 134-140)
+  // 2. Uncomment checkbox rendering in renderProgramItem (lines 260-270)
+  // 3. Uncomment Done button in footer (lines 341-352)
+  // 4. Ensure Tick icon is imported
+  // ============================================================================
   const handleProgramToggle = (bank: Bank, product: BankProgram, program: Program) => {
     // Only allow selecting DF programs or UGRO programs
     if (!isDFProgram(bank, product, program)) {
@@ -131,17 +150,26 @@ export const SelectProgramScreen: React.FC = () => {
         userType: program.userType,
       }),
     );
+    // Navigate immediately after selection (single selection behavior)
+    // Always navigate to HomeNavigator after program selection (for role-based flow)
+    navigation.replace('HomeNavigator');
   };
 
-  const handleDone = () => {
-    // Check if we can go back, otherwise navigate to HomeNavigator
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      // If no screen to go back to, navigate to HomeNavigator
-      navigation.navigate('HomeNavigator');
-    }
+  const handleAllProgram = () => {
+    dispatch(setProgramScope('all'));
+    navigation.replace('HomeNavigator');
   };
+
+  // handleDone function - Commented for single selection, uncomment for multiple selection
+  // const handleDone = () => {
+  //   // Check if we can go back, otherwise navigate to HomeNavigator
+  //   if (navigation.canGoBack()) {
+  //     navigation.goBack();
+  //   } else {
+  //     // If no screen to go back to, navigate to HomeNavigator
+  //     navigation.navigate('HomeNavigator');
+  //   }
+  // };
 
   const isBankExpanded = (bankId: string) => expandedBanks.has(bankId);
   const isProductExpanded = (bankId: string, productId: string) =>
@@ -256,7 +284,8 @@ export const SelectProgramScreen: React.FC = () => {
         disabled={!selectable}>
         <View style={styles.programItemContent}>
           {isSelected && <View style={styles.selectedIndicator} />}
-          {/* Checkbox - show for all programs, but disabled for non-DF */}
+          {/* CHECKBOX CODE - Commented for single selection, uncomment for multiple selection */}
+          {/* 
           <View style={styles.checkboxContainer}>
             <View style={[
               styles.checkbox, 
@@ -268,6 +297,7 @@ export const SelectProgramScreen: React.FC = () => {
               )}
             </View>
           </View>
+          */}
           <View style={styles.iconContainer}>
             <File 
               height={scaleHeight(18)} 
@@ -327,6 +357,16 @@ export const SelectProgramScreen: React.FC = () => {
       <AppBar title="Select DF Programs" navigation={navigation} hideHamburger={true} />
       <View style={styles.contentContainer}>
         <View style={styles.contentWrapper}>
+          {/* Anchor/Dealer Maker: allow "All Program" scope at UI level */}
+          {canUseAllProgramScope && (
+            <TouchableOpacity
+              style={styles.allProgramBtn}
+              onPress={handleAllProgram}
+              activeOpacity={0.85}>
+              <Text style={styles.allProgramText}>All Program</Text>
+              <RightChevron height={scaleHeight(16)} width={scaleWidth(16)} />
+            </TouchableOpacity>
+          )}
           <View style={styles.rootCard}>
             <FlatList
               data={banksData}
@@ -338,7 +378,8 @@ export const SelectProgramScreen: React.FC = () => {
           </View>
         </View>
       </View>
-      {/* Done Button */}
+      {/* DONE BUTTON - Commented for single selection, uncomment for multiple selection */}
+      {/* 
       <View style={styles.footer}>
         <Button
           buttonText={`Done (${selectedPrograms.length} selected)`}
@@ -350,6 +391,7 @@ export const SelectProgramScreen: React.FC = () => {
           ]}
         />
       </View>
+      */}
     </Container>
   );
 };
@@ -385,6 +427,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaleWidth(16),
     paddingTop: scaleHeight(16),
     paddingBottom: scaleHeight(16),
+  },
+  allProgramBtn: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    borderRadius: scaleWidth(12),
+    paddingHorizontal: scaleWidth(14),
+    paddingVertical: scaleHeight(12),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: scaleHeight(12),
+  },
+  allProgramText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
   },
   listContent: {
     paddingBottom: scaleHeight(24),

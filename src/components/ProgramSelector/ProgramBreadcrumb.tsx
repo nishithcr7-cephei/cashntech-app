@@ -11,22 +11,42 @@ import {
   selectProgramSelection,
   selectSelectedPrograms,
 } from '@store/programSelection/programSelection.selector';
+import {userSelector} from '@store/user';
+import {AppRole} from '@constants/roles';
 
 export const ProgramBreadcrumb: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthNavigatorType>>();
   const selection = useSelector(selectProgramSelection);
   const selectedPrograms = useSelector(selectSelectedPrograms);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const isAnchorMaker = userRole === 'anchor_maker';
+  const isDealerMaker = userRole === 'dealer_maker';
+  const canUseAllProgramScope = isAnchorMaker || isDealerMaker;
+  // isExpanded state - Commented for single selection, uncomment for multiple selection
+  // const [isExpanded, setIsExpanded] = useState(false);
 
-  // Get all programs to display
-  const programsToDisplay = useMemo(() => {
+  // ============================================================================
+  // SINGLE SELECTION MODE (Current Implementation)
+  // ============================================================================
+  // Currently displays only one selected program.
+  //
+  // TO REVERT TO MULTIPLE SELECTION IN THE FUTURE:
+  // 1. Uncomment isExpanded state (line 20)
+  // 2. Change programToDisplay to return array (programsToDisplay)
+  // 3. Uncomment renderProgramChip function
+  // 4. Uncomment expand/collapse button logic
+  // 5. Uncomment badge (+X More) display
+  // ============================================================================
+  
+  // Get single program to display
+  const programToDisplay = useMemo(() => {
     if (selectedPrograms && selectedPrograms.length > 0) {
-      return selectedPrograms;
+      return selectedPrograms[0]; // Only first program for single selection
     }
     // Fallback to old single selection
     if (selection.programId && selection.bankName && selection.productName && selection.programName) {
-      return [{
+      return {
         bankId: selection.bankId || '',
         bankName: selection.bankName,
         productId: selection.productId || '',
@@ -34,12 +54,13 @@ export const ProgramBreadcrumb: React.FC = () => {
         programId: selection.programId,
         programName: selection.programName,
         userType: selection.userType || 'dealer',
-      }];
+      };
     }
-    return [];
+    return null;
   }, [selectedPrograms, selection]);
 
-  if (programsToDisplay.length === 0) return null;
+  // Anchor/Dealer Maker can be in "All Program" scope even without a selected program
+  if (!programToDisplay && !(canUseAllProgramScope && selection.programScope === 'all')) return null;
 
   const getBankLabel = (bankName: string) => {
     return bankName.toLowerCase().includes('tata capital') ? 'TCL' : bankName;
@@ -49,46 +70,47 @@ export const ProgramBreadcrumb: React.FC = () => {
     return productName.toLowerCase().includes('dealer finance') ? 'DF' : productName;
   };
 
+  // MULTIPLE SELECTION CODE - Commented for single selection, uncomment for multiple selection
   // Collapsed: show first program, Expanded: show all
-  const displayPrograms = isExpanded 
-    ? programsToDisplay 
-    : programsToDisplay.slice(0, 1);
-  
-  const hasMultiplePrograms = programsToDisplay.length > 1;
-  const remainingCount = programsToDisplay.length - 1;
+  // const displayPrograms = isExpanded 
+  //   ? programsToDisplay 
+  //   : programsToDisplay.slice(0, 1);
+  // 
+  // const hasMultiplePrograms = programsToDisplay.length > 1;
+  // const remainingCount = programsToDisplay.length - 1;
 
-  // Render compact chip format for each program
-  const renderProgramChip = (program: typeof programsToDisplay[0], index: number) => {
-    const bankLabel = getBankLabel(program.bankName);
-    const productLabel = getProductLabel(program.productName);
-    const chipText = `${bankLabel}-${productLabel}-${program.programName}`;
+  // Render compact chip format for each program (for multiple selection)
+  // const renderProgramChip = (program: typeof programsToDisplay[0], index: number) => {
+  //   const bankLabel = getBankLabel(program.bankName);
+  //   const productLabel = getProductLabel(program.productName);
+  //   const chipText = `${bankLabel}-${productLabel}-${program.programName}`;
+  //
+  //   return (
+  //     <View key={index} style={styles.chipContainer}>
+  //       <View style={styles.chip}>
+  //         <View style={styles.chipContent}>
+  //           <BankBuilding
+  //             width={scaleWidth(12)}
+  //             height={scaleWidth(12)}
+  //             color={Colors.primaryColor}
+  //           />
+  //           <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
+  //             {chipText}
+  //           </Text>
+  //         </View>
+  //         <TouchableOpacity
+  //           style={styles.chipChangeButton}
+  //           onPress={() => navigation.navigate('SelectProgramScreen')}
+  //           hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+  //           <EditIcon />
+  //         </TouchableOpacity>
+  //       </View>
+  //     </View>
+  //   );
+  // };
 
-    return (
-      <View key={index} style={styles.chipContainer}>
-        <View style={styles.chip}>
-          <View style={styles.chipContent}>
-            <BankBuilding
-              width={scaleWidth(12)}
-              height={scaleWidth(12)}
-              color={Colors.primaryColor}
-            />
-            <Text style={styles.chipText} numberOfLines={1} ellipsizeMode="tail">
-              {chipText}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.chipChangeButton}
-            onPress={() => navigation.navigate('SelectProgramScreen')}
-            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-            <EditIcon />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
-  // Render full breadcrumb format (for collapsed first item)
-  const renderFullBreadcrumb = (program: typeof programsToDisplay[0]) => {
+  // Render full breadcrumb format (for single program)
+  const renderFullBreadcrumb = (program: typeof programToDisplay) => {
     return (
       <View style={styles.fullBreadcrumb}>
         <View style={styles.breadcrumbRow}>
@@ -137,14 +159,43 @@ export const ProgramBreadcrumb: React.FC = () => {
             </Text>
           </View>
 
-          {/* Badge for remaining count */}
+          {/* BADGE CODE - Commented for single selection, uncomment for multiple selection */}
+          {/* 
           {hasMultiplePrograms && !isExpanded && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>+{remainingCount}</Text>
             </View>
           )}
+          */}
 
           {/* Change button */}
+          <TouchableOpacity
+            style={styles.changePill}
+            onPress={() => navigation.navigate('SelectProgramScreen')}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+            <EditIcon />
+            <Text style={styles.changeText}>Change</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderAllProgramBreadcrumb = () => {
+    return (
+      <View style={styles.fullBreadcrumb}>
+        <View style={styles.breadcrumbRow}>
+          <View style={styles.itemGrow}>
+            <File
+              width={scaleWidth(14)}
+              height={scaleWidth(14)}
+              color={Colors.primaryColor}
+            />
+            <Text style={styles.breadcrumbTextGrow} numberOfLines={1} ellipsizeMode="tail">
+              All Program
+            </Text>
+          </View>
+
           <TouchableOpacity
             style={styles.changePill}
             onPress={() => navigation.navigate('SelectProgramScreen')}
@@ -160,17 +211,13 @@ export const ProgramBreadcrumb: React.FC = () => {
   return (
     <View style={styles.breadcrumbContainer}>
       <View style={styles.cardWrapper}>
-        {/* Collapsed: Show full breadcrumb of first program */}
-        {!isExpanded && renderFullBreadcrumb(programsToDisplay[0])}
+        {/* Single program display */}
+        {canUseAllProgramScope && selection.programScope === 'all'
+          ? renderAllProgramBreadcrumb()
+          : renderFullBreadcrumb(programToDisplay)}
 
-        {/* Expanded: Show all programs as chips */}
-        {isExpanded && (
-          <View style={styles.chipsContainer}>
-            {programsToDisplay.map((program, index) => renderProgramChip(program, index))}
-          </View>
-        )}
-
-        {/* Expand/Collapse button - only show if multiple programs */}
+        {/* EXPAND/COLLAPSE BUTTON - Commented for single selection, uncomment for multiple selection */}
+        {/* 
         {hasMultiplePrograms && (
           <TouchableOpacity
             style={styles.expandButton}
@@ -187,6 +234,7 @@ export const ProgramBreadcrumb: React.FC = () => {
             )}
           </TouchableOpacity>
         )}
+        */}
       </View>
     </View>
   );

@@ -5,37 +5,60 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Pressable,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {AppBar, Container, FilterModal, ProgramBreadcrumb} from '@components/index';
+import {useSelector} from 'react-redux';
+import {
+  AppBar,
+  Container,
+  FilterModal,
+  ProgramBreadcrumb,
+  CheckerApprovalModal,
+  ApproveRejectModal,
+  UploadModal,
+} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
+import {Dots, RightChevron} from '@assets/Icons';
+import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
+import {DocumentPickerResponse} from '@react-native-documents/picker';
+import {userSelector} from '@store/user';
+import {AppRole} from '@constants/roles';
 
-const cardMetrics = [
-  {label: 'Total Program Limit', value: '₹ 100,000,000.00'},
-  {label: "No. of Dealer's Accounts", value: '1'},
-  {label: 'Dealer Limit Uploaded', value: '₹ 20,000,000.00'},
-  {label: 'Utilized Limit', value: '₹ 1,100.00'},
-  {label: 'Available Limit', value: '₹ 19,998,900.00'},
-  {label: 'Overdue Amount', value: '₹ 0'},
-];
+type ProductTabType = 'all_product' | 'dealer_finance' | 'vendor_finance' | 'pid';
 
+const getCardMetrics = (productTab: ProductTabType) => {
+  const isAll = productTab === 'all_product' || productTab === 'vendor_finance' || productTab === 'pid';
+  return [
+    {label: 'Total Program Limit', value: '₹ 100,000,000.00'},
+    {label: isAll ? 'No. of Accounts' : "No. of Dealer's Accounts", value: '1'},
+    {label: isAll ? 'Limit Uploaded' : 'Dealer Limit Uploaded', value: '₹ 20,000,000.00'},
+    {label: 'Utilized Limit', value: '₹ 1,100.00'},
+    {label: 'Available Limit', value: '₹ 19,998,900.00'},
+    {label: 'Overdue Amount', value: '₹ 0'},
+  ];
+};
+
+// Summary of All Program – same structure as table/card screen (Program Name, Dealer Name, Primary Party, OD Account, etc.)
 const dealerSummaryRows = Array.from({length: 6}).map((_, index) => ({
   id: `dealer-${index}`,
-  dealer: 'Hero Finance',
+  programName: 'Sun Pharma PGM',
+  dealer: 'Sun Pharma',
+  primaryParty: 'Hero Finance',
   odAccount: '123101010',
   totalLimit: '₹20,000,000.00',
   drawingPower: '₹20,000,000.00',
   utilizedLimit: '₹1,100.00',
   pipelineRequests: '₹0.00',
   availableLimit: '₹19,998,900.00',
-  odExpiry: 'dd-mm-yyyy',
   overdueAmount: '₹0.00',
-  dpdDays: '30',
   status: 'Regular',
 }));
 
@@ -49,6 +72,7 @@ const unpaidRows = Array.from({length: 5}).map((_, index) => ({
   invoiceStatus: 'Created',
   approvalStatus: 'Pending',
   adminStatus: '-',
+  financeStatus: index === 0 ? '-' : '₹19,998,900.00',
   disbursementDate: 'dd-mm-yyyy',
   disbAmount: '₹0.00',
   utrNo: '30',
@@ -62,17 +86,136 @@ const dashboardFilterData = {
 };
 
 export const InvoiceDashboard: React.FC = () => {
+  const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  
+  // Role-based visibility flags
+  const isAnchorMaker = userRole === 'anchor_maker';
+  const isDealerMaker = userRole === 'dealer_maker';
+  const isAnchorChecker = userRole === 'anchor_checker';
+  const isDealerChecker = userRole === 'dealer_checker';
+  const isCheckerRole = isAnchorChecker || isDealerChecker;
+  
   const [activeTab, setActiveTab] = useState<'dealers' | 'unpaid'>('dealers');
+  const [productTab, setProductTab] = useState<ProductTabType>('all_product');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [showCheckerApprovalModal, setShowCheckerApprovalModal] = useState(false);
+  const [showApproveRejectModal, setShowApproveRejectModal] = useState(false);
+  const [selectedDealerId, setSelectedDealerId] = useState<string | null>(null);
+  const [selectedDealerNo, setSelectedDealerNo] = useState<string | null>(null);
+  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<{x: number; y: number; width: number; height: number} | null>(null);
+  const menuButtonRefs = React.useRef<Record<string, View | null>>({});
   const navigation = useNavigation<CompositeNavigationProp<
     DrawerNavigationProp<HomeNavigatorType>,
     NativeStackNavigationProp<any>
   >>();
 
+  const handleMenuToggle = (dealerId: string) => {
+    if (openMenuId === dealerId) {
+      setOpenMenuId(null);
+      setMenuAnchor(null);
+      return;
+    }
+
+    const ref = menuButtonRefs.current[dealerId] as any;
+    if (ref?.measureInWindow) {
+      ref.measureInWindow((x: number, y: number, width: number, height: number) => {
+        setMenuAnchor({x, y, width, height});
+        setOpenMenuId(dealerId);
+      });
+    } else {
+      // Fallback: open without anchor (top-right)
+      setMenuAnchor(null);
+      setOpenMenuId(dealerId);
+    }
+  };
+
+  const handleMenuAction = (action: string, dealerId: string) => {
+    setOpenMenuId(null);
+    setMenuAnchor(null);
+
+    switch (action) {
+      case 'checkerApproval':
+        // Show checker approval modal
+        setSelectedDealerId(dealerId);
+        setShowCheckerApprovalModal(true);
+        break;
+      case 'attachment':
+        // Show attachment upload modal
+        setSelectedDealerId(dealerId);
+        setShowAttachmentModal(true);
+        break;
+      case 'print':
+        // Print functionality
+        console.log('Print dealer summary:', dealerId);
+        break;
+      case 'approveReject':
+        // Show approve/reject modal
+        setSelectedDealerId(dealerId);
+        setSelectedDealerNo(dealerId); // Using dealerId as invoiceNo for now
+        setShowApproveRejectModal(true);
+        break;
+    }
+  };
+
+  const handleAttachmentUpload = (file?: DocumentPickerResponse) => {
+    if (file && selectedDealerId) {
+      // TODO: Upload file to API
+      console.log('Upload attachment for dealer:', selectedDealerId, file.name);
+    }
+    setShowAttachmentModal(false);
+    setSelectedDealerId(null);
+  };
+
+  const getMenuPosition = (anchor: {x: number; y: number; width: number; height: number} | null) => {
+    const screen = Dimensions.get('window');
+    const menuWidth = scaleWidth(180);
+    const horizontalPadding = scaleWidth(12);
+    const topPadding = scaleHeight(8);
+
+    if (!anchor) {
+      return {
+        position: 'absolute' as const,
+        top: topPadding + scaleHeight(60),
+        right: horizontalPadding,
+      };
+    }
+
+    const desiredLeft = anchor.x + anchor.width - menuWidth;
+    const left = Math.max(
+      horizontalPadding,
+      Math.min(desiredLeft, screen.width - menuWidth - horizontalPadding),
+    );
+
+    const top = Math.max(topPadding, anchor.y + anchor.height + scaleHeight(6));
+
+    return {
+      position: 'absolute' as const,
+      top,
+      left,
+    };
+  };
+
+  // Dealer Checker: default to "Latest Unpaid Invoices" tab
+  React.useEffect(() => {
+    if (userRole === 'dealer_checker') {
+      setActiveTab('unpaid');
+    }
+  }, [userRole]);
+
   const dealerTable = useMemo(
     () => (
       <>
+        {(isAnchorMaker || isDealerMaker) && (
+          <View style={styles.allProgramHeader}>
+            <Text style={styles.allProgramTitle}>All Program</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{dealerSummaryRows.length}</Text>
+            </View>
+          </View>
+        )}
         <View style={styles.listToolbar}>
           <View style={styles.searchBox}>
             <Text style={styles.searchPlaceholder}>Search Entity</Text>
@@ -85,59 +228,85 @@ export const InvoiceDashboard: React.FC = () => {
         </View>
         <View style={styles.verticalList}>
           {dealerSummaryRows.map(row => (
-            <View key={row.id} style={styles.listCard}>
-              <View style={styles.cardHeaderRow}>
-                <View>
-                  <Text style={styles.cardTitle}>{row.dealer}</Text>
-                  <Text style={styles.cardSubtitle}>
-                    OD Account: {row.odAccount}
-                  </Text>
-                </View>
-                <View style={styles.statusChip}>
-                  <Text style={styles.statusChipText}>{row.status}</Text>
-                </View>
-              </View>
+            <View key={row.id} style={styles.cardWrapper}>
+              <View style={styles.listCard}>
+                <TouchableOpacity
+                  style={styles.cardHeaderRow}
+                  onPress={() => {
+                    (navigation as any).navigate('InvoiceDetails', {
+                      dealerName: row.dealer,
+                      fromInvoiceDashboard: true,
+                    });
+                  }}>
+                  <View style={styles.cardHeaderContent}>
+                    <View style={styles.cardTitleRow}>
+                      <Text style={styles.cardTitle}>{row.programName}</Text>
+                      <RightChevron
+                        width={scaleWidth(14)}
+                        height={scaleHeight(14)}
+                        style={styles.cardTitleChevron}
+                      />
+                    </View>
+                    <Text style={styles.cardSubtitle}>
+                      OD Account: {row.odAccount}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
 
-              <View style={styles.infoGrid}>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Total Limit</Text>
-                  <Text style={styles.infoValue}>{row.totalLimit}</Text>
+                {/* Same columns as table: Program Name, Dealer Name, Primary Party, OD Account, Total Limit, Drawing Power, Utilized Limit, Pipeline Requests, Available Limit, Overdue Amount, Status */}
+                <View style={styles.infoGrid}>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Program Name</Text>
+                    <Text style={styles.infoValue}>{row.programName}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Dealer Name</Text>
+                    <Text style={styles.infoValue}>{row.dealer}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Primary Party</Text>
+                    <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>OD Account</Text>
+                    <Text style={styles.infoValue}>{row.odAccount}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Total Limit (₹)</Text>
+                    <Text style={styles.infoValue}>{row.totalLimit}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Drawing Power (₹)</Text>
+                    <Text style={styles.infoValue}>{row.drawingPower}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Utilized Limit (₹)</Text>
+                    <Text style={styles.infoValue}>{row.utilizedLimit}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Pipeline Requests (₹)</Text>
+                    <Text style={styles.infoValue}>{row.pipelineRequests}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Available Limit (₹)</Text>
+                    <Text style={styles.infoValue}>{row.availableLimit}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Overdue Amount (₹)</Text>
+                    <Text style={styles.infoValue}>{row.overdueAmount}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Status</Text>
+                    <Text style={[styles.infoValue, styles.statusGreenText]}>{row.status}</Text>
+                  </View>
                 </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Drawing Power</Text>
-                  <Text style={styles.infoValue}>{row.drawingPower}</Text>
-                </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Utilized Limit</Text>
-                  <Text style={styles.infoValue}>{row.utilizedLimit}</Text>
-                </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Pipeline Requests</Text>
-                  <Text style={styles.infoValue}>{row.pipelineRequests}</Text>
-                </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Available Limit</Text>
-                  <Text style={styles.infoValue}>{row.availableLimit}</Text>
-                </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>OD Expiry Date</Text>
-                  <Text style={styles.infoValue}>{row.odExpiry}</Text>
-                </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Overdue Amount</Text>
-                  <Text style={styles.infoValue}>{row.overdueAmount}</Text>
-                </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>DPD Days</Text>
-                  <Text style={styles.infoValue}>{row.dpdDays}</Text>
-                </View>
-              </View>
+            </View>
             </View>
           ))}
         </View>
       </>
     ),
-    [],
+    [isCheckerRole, isAnchorMaker, isDealerMaker],
   );
 
   const unpaidTable = useMemo(
@@ -181,11 +350,6 @@ export const InvoiceDashboard: React.FC = () => {
                     Invoice / Unique Ref. No: {row.invoiceNo}
                   </Text>
                 </View>
-                <View style={[styles.statusChip, styles.statusWarningChip]}>
-                  <Text style={[styles.statusChipText, styles.statusWarningText]}>
-                    {row.invoiceStatus}
-                  </Text>
-                </View>
               </View>
 
               <View style={styles.infoGrid}>
@@ -214,6 +378,10 @@ export const InvoiceDashboard: React.FC = () => {
                   <Text style={styles.infoValue}>{row.adminStatus}</Text>
                 </View>
                 <View style={styles.infoColumn}>
+                  <Text style={styles.infoLabel}>Finance Status</Text>
+                  <Text style={styles.infoValue}>{row.financeStatus}</Text>
+                </View>
+                <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Disbursement Date</Text>
                   <Text style={styles.infoValue}>{row.disbursementDate}</Text>
                 </View>
@@ -237,15 +405,93 @@ export const InvoiceDashboard: React.FC = () => {
   return (
     <Container>
       <AppBar 
-        title="Invoice Dashboard" 
+        title={
+          isDealerChecker
+            ? "Invoice"
+            : isAnchorChecker
+              ? "Transactions > Invoice Overview"
+              : "Transactions > Invoice Overview"
+        }
         navigation={navigation as any}
       />
       <ProgramBreadcrumb />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionSubtitle}>Invoice List</Text>
+        {/* Anchor Maker: Product tabs (All Product / Dealer Finance / Vendor Finance / PID) */}
+        {(isAnchorMaker || isDealerMaker) && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.productTabsScroll}>
+            <View style={styles.productTabsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.productTabBtn,
+                  productTab === 'all_product' && styles.productTabBtnActive,
+                ]}
+                onPress={() => setProductTab('all_product')}
+                activeOpacity={0.8}>
+                <Text
+                  style={[
+                    styles.productTabText,
+                    productTab === 'all_product' && styles.productTabTextActive,
+                  ]}>
+                  All Product
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.productTabBtn,
+                  productTab === 'dealer_finance' && styles.productTabBtnActive,
+                ]}
+                onPress={() => setProductTab('dealer_finance')}
+                activeOpacity={0.8}>
+                <Text
+                  style={[
+                    styles.productTabText,
+                    productTab === 'dealer_finance' && styles.productTabTextActive,
+                  ]}>
+                  Dealer Finance (DF)
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.productTabBtn,
+                  productTab === 'vendor_finance' && styles.productTabBtnActive,
+                ]}
+                onPress={() => setProductTab('vendor_finance')}
+                activeOpacity={0.8}>
+                <Text
+                  style={[
+                    styles.productTabText,
+                    productTab === 'vendor_finance' && styles.productTabTextActive,
+                  ]}>
+                  Vendor Finance
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.productTabBtn,
+                  productTab === 'pid' && styles.productTabBtnActive,
+                ]}
+                onPress={() => setProductTab('pid')}
+                activeOpacity={0.8}>
+                <Text
+                  style={[
+                    styles.productTabText,
+                    productTab === 'pid' && styles.productTabTextActive,
+                  ]}>
+                  PID
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        )}
 
+        {isDealerChecker && (
+          <Text style={styles.sectionSubtitle}>Invoice</Text>
+        )}
+        {!isAnchorChecker && (
+          <Text style={styles.keyFigureHeading}>Invoice Dashboard: Key Figure</Text>
+        )}
         <View style={styles.cardGrid}>
-          {cardMetrics.map(card => (
+          {getCardMetrics(productTab).map(card => (
             <View key={card.label} style={styles.card}>
               <Text style={styles.cardLabel}>{card.label}</Text>
               <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
@@ -264,7 +510,7 @@ export const InvoiceDashboard: React.FC = () => {
                 styles.tabText,
                 activeTab === 'dealers' && styles.activeTabText,
               ]}>
-              Summary of Dealers
+              {(isAnchorMaker || isDealerMaker) ? 'Summary of All Program' : 'Summary of Dealers'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -275,7 +521,7 @@ export const InvoiceDashboard: React.FC = () => {
                 styles.tabText,
                 activeTab === 'unpaid' && styles.activeTabText,
               ]}>
-              Latest Invoices
+              {isCheckerRole ? 'Latest Unpaid Invoices' : 'Latest Invoices'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -296,6 +542,75 @@ export const InvoiceDashboard: React.FC = () => {
         filterData={dashboardFilterData}
         appliedFilters={appliedFilters}
       />
+
+      {/* Checker Approval Modal */}
+      <CheckerApprovalModal
+        visible={showCheckerApprovalModal}
+        onClose={() => {
+          setShowCheckerApprovalModal(false);
+          setSelectedDealerId(null);
+        }}
+        approvalEntries={[
+          {
+            id: '1',
+            approvedBy: 'Company Name_Checker',
+            approvalDate: '01-02-2026',
+            status: 'Approved',
+          },
+          {
+            id: '2',
+            approvedBy: 'Another Checker',
+            approvalDate: '05-02-2026',
+            status: 'Rejected',
+          },
+        ]}
+      />
+
+      {/* Approve/Reject Modal */}
+      <ApproveRejectModal
+        visible={showApproveRejectModal}
+        invoiceId={selectedDealerId}
+        invoiceNo={selectedDealerNo || undefined}
+        invoiceDetails={{
+          subTotal: '10,80,025/-',
+          withholdingTaxesPercent: '0.00/-',
+          withholdingAmount: '0.00/-',
+          finalPayableAmount: '10,80,025/-',
+          finalDueDate: 'dd-mm-yyyy',
+        }}
+        onClose={() => {
+          setShowApproveRejectModal(false);
+          setSelectedDealerId(null);
+          setSelectedDealerNo(null);
+        }}
+        onApprove={(dealerId, remarks) => {
+          // TODO: Call approve API
+          console.log('Approve dealer:', dealerId, remarks);
+          // After API success, navigate to invoice detail view
+          setShowApproveRejectModal(false);
+          const invoiceNo = selectedDealerNo || dealerId;
+          (navigation as any).navigate('InvoiceDetailView', {
+            invoiceId: dealerId,
+            invoiceNo,
+          });
+          setSelectedDealerId(null);
+          setSelectedDealerNo(null);
+        }}
+        onReject={(dealerId, remarks) => {
+          // TODO: Call reject API
+          console.log('Reject dealer:', dealerId, remarks);
+          setSelectedDealerId(null);
+          setSelectedDealerNo(null);
+        }}
+      />
+
+      {/* Attachment Upload Modal */}
+      <UploadModal
+        visible={showAttachmentModal}
+        allowedFileTypes={['jpg', 'jpeg', 'png', 'pdf']}
+        onClose={handleAttachmentUpload}
+      />
+
     </Container>
   );
 };
@@ -324,6 +639,38 @@ const styles = StyleSheet.create({
     color: Colors.graybase,
     marginBottom: scaleHeight(8),
     marginTop: scaleHeight(12),
+  },
+  productTabsScroll: {
+    marginTop: scaleHeight(6),
+    marginBottom: scaleHeight(4),
+  },
+  productTabsRow: {
+    flexDirection: 'row',
+    gap: scaleWidth(18),
+    paddingRight: scaleWidth(24),
+  },
+  productTabBtn: {
+    paddingVertical: scaleHeight(8),
+  },
+  productTabBtnActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.primaryColor,
+  },
+  productTabText: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
+  productTabTextActive: {
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+  },
+  keyFigureHeading: {
+    fontSize: scaleFont(15),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(10),
+    marginTop: scaleHeight(4),
   },
   cardGrid: {
     flexDirection: 'row',
@@ -385,6 +732,17 @@ const styles = StyleSheet.create({
   tabContent: {
     marginTop: scaleHeight(18),
   },
+  allProgramHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(8),
+    marginBottom: scaleHeight(12),
+  },
+  allProgramTitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
   listToolbar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -418,6 +776,9 @@ const styles = StyleSheet.create({
   verticalList: {
     gap: scaleHeight(12),
   },
+  cardWrapper: {
+    position: 'relative',
+  },
   listCard: {
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(12),
@@ -430,16 +791,45 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
+  threeDotsButton: {
+    position: 'absolute',
+    top: scaleHeight(12),
+    right: scaleWidth(12),
+    width: scaleWidth(32),
+    height: scaleWidth(32),
+    borderRadius: scaleWidth(16),
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  threeDotsTouchable: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: scaleHeight(12),
+    paddingRight: scaleWidth(50),
+  },
+  cardHeaderContent: {
+    flex: 1,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   cardTitle: {
     fontSize: scaleFont(16),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
+  },
+  cardTitleChevron: {
+    marginLeft: scaleWidth(6),
   },
   cardSubtitle: {
     fontSize: scaleFont(13),
@@ -456,6 +846,10 @@ const styles = StyleSheet.create({
     color: Colors.green,
     fontFamily: Fonts.GilroySemiBold,
     fontSize: scaleFont(12),
+  },
+  statusGreenText: {
+    color: Colors.green,
+    fontFamily: Fonts.GilroySemiBold,
   },
   statusWarningChip: {
     backgroundColor: '#FFF4E0',
@@ -509,6 +903,33 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
+  },
+  menuModalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  actionMenu: {
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(8),
+    paddingVertical: scaleHeight(8),
+    paddingHorizontal: scaleWidth(12),
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    minWidth: scaleWidth(180),
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(12),
+    paddingVertical: scaleHeight(8),
+  },
+  menuText: {
+    fontSize: scaleFont(14),
+    color: Colors.darkblack,
+    fontFamily: Fonts.GilroyMedium,
   },
 });
 

@@ -21,6 +21,7 @@ export type AuthNavigatorType = {
   OcrInvoice: undefined;
   SelectUserTypeScreen: undefined;
   SelectProgramScreen: undefined;
+  SelectRoleScreen: undefined;
   HomeNavigator: undefined;
 };
 
@@ -84,5 +85,21 @@ export type HomeNavigatorType = {
     invoiceNumber?: string;
     creditAccountNo?: string;
   };
+  FinancingRequestScreen: undefined;
+  LimitDetailsScreen: undefined;
+  DealerMakerDashboardScreen: undefined;
+  ODDetailsScreen: undefined;
+  ODRepaymentsScreen: undefined;
+  AnchorsListScreen: {
+    companyName?: string;
+  };
+  InvoiceDetailView: {
+    invoiceId?: string;
+    invoiceNo?: string;
+  };
+  DealerInvoiceDetailsScreen: {
+    dealerName?: string;
+  };
+  DisbursementScreen: undefined;
   OcrInvoice: undefined;
 };

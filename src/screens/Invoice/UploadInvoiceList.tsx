@@ -8,6 +8,7 @@ import {
   TextInput,
   Image,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {AppBar, Container, UploadModal, DashedButton, FilterModal, ProgramBreadcrumb} from '@components/index';
@@ -123,6 +124,30 @@ export const UploadInvoiceList: React.FC = () => {
               )}
             </View>
           )}
+          
+          {/* Role-based links */}
+          <View style={styles.linksContainer}>
+            <TouchableOpacity
+              onPress={() => {
+                // TODO: Download sample Excel file
+                console.log('Download Sample Excel File');
+                // Linking.openURL('https://example.com/sample.xlsx');
+              }}
+              style={styles.linkButton}>
+              <Text style={styles.linkText}>Download Sample Excel File</Text>
+            </TouchableOpacity>
+            
+            {/* Same as Anchor Maker: List of Dealers */}
+            <TouchableOpacity
+              onPress={() => {
+                // TODO: Navigate to DealerInvoiceList (or existing dealer list screen)
+                console.log('Navigate to List of Dealers');
+                // (navigation as any).navigate('DealerInvoiceList');
+              }}
+              style={styles.linkButton}>
+              <Text style={styles.linkText}>List of Dealers</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Search and Filter Toolbar */}
@@ -369,6 +394,19 @@ const styles = StyleSheet.create({
   uploadSection: {
     marginTop: scaleHeight(12),
     marginBottom: scaleHeight(16),
+  },
+  linksContainer: {
+    marginTop: scaleHeight(16),
+    gap: scaleHeight(12),
+  },
+  linkButton: {
+    paddingVertical: scaleHeight(8),
+  },
+  linkText: {
+    fontSize: scaleFont(14),
+    color: Colors.primaryColor,
+    fontFamily: Fonts.GilroyMedium,
+    textDecorationLine: 'underline',
   },
   uploadedFilePreview: {
     marginTop: scaleHeight(12),

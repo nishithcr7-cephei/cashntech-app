@@ -32,10 +32,13 @@ export type InvoiceListItemApi = {
   invoice_ref_no: string;
   counter_party_name: string;
   counter_party_code: string;
+  invoice_amount?: string;
   invoice_date: string;
+  request_date?: string;
   invoice_due_date: string;
   invoice_status: string;
   approval_status: string;
+  admin_status?: string;
 };
 
 export type InvoiceState = {

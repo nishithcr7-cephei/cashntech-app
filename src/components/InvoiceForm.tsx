@@ -5,6 +5,9 @@ import {DateNTimePicker, CustomDropdown} from '@components/index';
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {unitOptions} from '@constants/invoiceDropdowns';
+import {useSelector} from 'react-redux';
+import {userSelector} from '@store/user';
+import {AppRole} from '@constants/roles';
 
 export type DropdownOption = {label: string; value: string};
 
@@ -48,6 +51,7 @@ type Props = {
   errors?: ValidationErrors;
   isFormValid?: boolean;
   productType?: 'dealer_finance' | 'vendor_finance';
+  entityType?: 'dealer' | 'anchor'; // Role-based: 'dealer' for Anchor Maker/Checker, 'anchor' for Dealer Maker
   dealerOptions?: DropdownOption[];
   creditToOptions?: DropdownOption[];
   bankOptions?: DropdownOption[];
@@ -64,6 +68,7 @@ export const InvoiceForm: React.FC<Props> = ({
   errors = {},
   isFormValid = false,
   productType = 'dealer_finance',
+  entityType,
   dealerOptions,
   creditToOptions,
   bankOptions,
@@ -80,7 +85,18 @@ export const InvoiceForm: React.FC<Props> = ({
   const [showSGSTTooltip, setShowSGSTTooltip] = useState(false);
   const [showPaymentDateTooltip, setShowPaymentDateTooltip] = useState(false);
 
+  // Role-based entity type: use entityType prop if provided, otherwise derive from productType or user role
+  const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const isDealerMaker = userRole === 'dealer_maker';
+  const effectiveEntityType = entityType ?? (isDealerMaker ? 'anchor' : 'dealer');
   const isDealerFinance = productType !== 'vendor_finance';
+  
+  // Determine labels based on entityType (role-based)
+  const entityLabel = effectiveEntityType === 'anchor' ? 'Anchor' : 'Dealer';
+  const entityCodeLabel = effectiveEntityType === 'anchor' ? 'Anchor Code' : 'Dealer Code';
+  const entityNameLabel = effectiveEntityType === 'anchor' ? 'Anchor Name' : 'Dealer Name';
+  const entityODLabel = effectiveEntityType === 'anchor' ? 'Anchor OD Account' : 'Dealer OD Account';
+  const entityInvoiceLabel = effectiveEntityType === 'anchor' ? 'Anchor Invoice' : 'Dealer Invoice';
 
   // CODE-END DEFAULT: Backend has no tenure/credit terms yet. basic_parameters/interest_parameters
   // are flexible JSON but invoice create flow doesn't use them. When backend adds credit_days,
@@ -294,7 +310,7 @@ export const InvoiceForm: React.FC<Props> = ({
       {/* Party Information Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
-          {isDealerFinance ? 'Dealer Invoice' : 'Vendor Invoice'}
+          {isDealerFinance ? entityInvoiceLabel : 'Vendor Invoice'}
         </Text>
         {bankOptions && bankOptions.length > 0 && onBankSelect && (
           <View style={styles.field}>
@@ -311,22 +327,22 @@ export const InvoiceForm: React.FC<Props> = ({
         <View style={styles.row}>
           <View style={styles.halfWidth}>
             <CustomDropdown
-              label={isDealerFinance ? 'Dealer Name *' : 'Anchor Name *'}
+              label={`${entityNameLabel} *`}
               data={dealerData}
               value={value.dealer}
               onChange={set('dealer')}
-              placeholder={isDealerFinance ? 'Select Dealer' : 'Select Anchor'}
+              placeholder={`Select ${entityLabel}`}
               containerStyle={styles.dropdownContainer}
             />
             {errors.dealer && <Text style={styles.errorText}>{errors.dealer}</Text>}
           </View>
           <View style={styles.halfWidth}>
             <CustomDropdown
-              label={isDealerFinance ? 'Dealer Code *' : 'Anchor Code *'}
+              label={`${entityCodeLabel} *`}
               data={dealerOptions && value.dealerCode ? [{label: value.dealerCode, value: value.dealerCode}] : []}
               value={value.dealerCode}
               onChange={set('dealerCode')}
-              placeholder={isDealerFinance ? 'Select Code' : 'Select Anchor Code'}
+              placeholder={`Select ${entityLabel} Code`}
               containerStyle={styles.dropdownContainer}
               editable={!dealerOptions || !dealerOptions.length}
             />
@@ -336,7 +352,7 @@ export const InvoiceForm: React.FC<Props> = ({
         <View style={styles.field}>
           <View style={styles.labelRow}>
             <Text style={styles.label}>
-              {isDealerFinance ? 'Dealer OD Account' : 'Anchor Loan Account for Vendor'}
+              {isDealerFinance ? entityODLabel : 'Anchor Loan Account for Vendor'}
             </Text>
             <TouchableOpacity
               onPress={() => setShowCreditAccountTooltip(true)}

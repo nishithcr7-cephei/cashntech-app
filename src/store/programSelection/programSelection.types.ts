@@ -12,6 +12,8 @@ export type SelectedProgram = {
 };
 
 export type ProgramSelectionState = {
+  // UI scope: "all programs" vs "specific program"
+  programScope: 'all' | 'selected';
   bankId: string | null;
   bankName: string | null;
   productId: string | null;

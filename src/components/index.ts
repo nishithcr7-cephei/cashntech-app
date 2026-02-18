@@ -17,6 +17,8 @@ export * from './DateNTimePicker/DateNTimePicker';
 // Modal components
 export * from './UploadModelComponent/UploadModel';
 export * from './CheckerApprovalModal/CheckerApprovalModal';
+export * from './ApproveRejectModal/ApproveRejectModal';
+export * from './AddFundModal/AddFundModal';
 export * from './FilterModal/FilterModal';
 
 // Filter components

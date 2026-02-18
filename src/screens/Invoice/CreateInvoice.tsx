@@ -40,6 +40,8 @@ import {
   selectCreateInvoiceError,
 } from '@store/invoice/inv.selector';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import {userSelector} from '@store/user';
+import {AppRole} from '@constants/roles';
 import type {DealerInfoParticipant} from '@store/invoice/inv.types';
 
 const emptyFields: InvoiceFields = {
@@ -108,6 +110,9 @@ export const CreateInvoice: React.FC = () => {
   const createInvoiceSuccess = useSelector(selectCreateInvoiceSuccess);
   const createInvoiceError = useSelector(selectCreateInvoiceError);
   const userId = useSelector((s: any) => s.user?.id);
+  const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const isAnchorMaker = userRole === 'anchor_maker';
+  const isDealerMaker = userRole === 'dealer_maker';
 
   const [fields, setFields] = useState<InvoiceFields>(emptyFields);
   const [loading, setLoading] = useState(false);
@@ -131,6 +136,24 @@ export const CreateInvoice: React.FC = () => {
   const headerRefTitle = invoiceNo
     ? `Invoice / Unique Ref. No: ${invoiceNo}`
     : undefined;
+  
+  // Role-based access control: Prevent anchor_checker from accessing Create Invoice screen
+  useEffect(() => {
+    if (userRole === 'anchor_checker') {
+      Alert.alert(
+        'Access Denied',
+        'Anchor Checker cannot create invoices. You can only approve/reject invoices.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              (navigation as any).navigate('InvoiceDetails');
+            },
+          },
+        ],
+      );
+    }
+  }, [userRole, navigation]);
   
   // Fetch dealer info and bank list when program is selected
   useEffect(() => {
@@ -508,15 +531,16 @@ export const CreateInvoice: React.FC = () => {
 
   return (
     <Container>
-      <AppBar title="Create Invoice" navigation={navigation as any} />
+      <AppBar 
+        title={(isAnchorMaker || isDealerMaker) ? "Transactions > Invoice List & Approval" : "Create Invoice"} 
+        navigation={navigation as any}
+        hideHamburger={isAnchorMaker || isDealerMaker}
+        renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
+        onPressLeftIcon={() => {
+          (navigation as any).navigate('InvoiceDetails');
+        }}
+      />
       <View style={styles.pageTitleBar}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            (navigation as any).navigate('InvoiceDetails');
-          }}>
-          <LeftChevron height={scaleWidth(16)} width={scaleHeight(16)} />
-        </TouchableOpacity>
         <View style={styles.titleContainer}>
           <Text style={styles.pageTitleText} numberOfLines={1}>
             {headerModeTitle}

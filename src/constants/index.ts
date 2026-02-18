@@ -5,3 +5,4 @@ export {default as StorageKeys} from './StorageKeys';
 export {default as ApiEndPoints} from './ApiEndPoints';
 export {default as Cities} from './Cities';
 export * from './Screens';
+export * from './roles';

@@ -3,6 +3,7 @@ import {ProgramSelectionState, SelectedProgram} from './programSelection.types';
 import type {Bank, UserType} from '@constants/programSelection';
 
 const initialState: ProgramSelectionState = {
+  programScope: 'selected',
   bankId: null,
   bankName: null,
   productId: null,
@@ -20,6 +21,9 @@ const programSelectionSlice = createSlice({
   name: 'programSelection',
   initialState,
   reducers: {
+    setProgramScope: (state, action: PayloadAction<'all' | 'selected'>) => {
+      state.programScope = action.payload;
+    },
     setProgramSelection: (
       state,
       action: PayloadAction<{
@@ -55,6 +59,40 @@ const programSelectionSlice = createSlice({
       state.scopeLoading = false;
       state.scopeError = action.payload;
     },
+    // ============================================================================
+    // SINGLE SELECTION MODE (Current Implementation)
+    // ============================================================================
+    // Currently, users can only select one program at a time.
+    // When a new program is selected, it replaces any previously selected program.
+    //
+    // TO REVERT TO MULTIPLE SELECTION IN THE FUTURE:
+    // 1. Replace this reducer with the commented code below (lines 88-134)
+    // 2. In SelectProgramScreen.tsx: Uncomment checkbox rendering (lines 260-270)
+    // 3. In SelectProgramScreen.tsx: Uncomment Done button in footer (lines 341-352)
+    // 4. In SelectProgramScreen.tsx: Remove immediate navigation from handleProgramToggle
+    // 5. In ProgramBreadcrumb.tsx: Uncomment expand/collapse logic and multi-program display
+    // ============================================================================
+    toggleProgramSelection: (state, action: PayloadAction<SelectedProgram>) => {
+      const program = action.payload;
+      // Selecting a specific program implies "selected" scope
+      state.programScope = 'selected';
+      // Single selection: Clear all previous selections and only keep the new one
+      state.selectedPrograms = [program];
+      // Update single selection fields
+      state.bankId = program.bankId;
+      state.bankName = program.bankName;
+      state.productId = program.productId;
+      state.productName = program.productName;
+      state.programId = program.programId;
+      state.programName = program.programName;
+      state.userType = program.userType;
+    },
+    
+    // ============================================================================
+    // MULTIPLE SELECTION CODE (Commented for future use)
+    // ============================================================================
+    // Uncomment this code if multiple selection is needed in the future:
+    /*
     toggleProgramSelection: (state, action: PayloadAction<SelectedProgram>) => {
       const program = action.payload;
       const existingIndex = state.selectedPrograms.findIndex(
@@ -103,6 +141,7 @@ const programSelectionSlice = createSlice({
         // If multiple selections, keep the first one as primary
       }
     },
+    */
     setSelectedPrograms: (state, action: PayloadAction<SelectedProgram[]>) => {
       state.selectedPrograms = action.payload;
     },
@@ -113,6 +152,7 @@ const programSelectionSlice = createSlice({
 });
 
 export const {
+  setProgramScope,
   setProgramSelection,
   clearProgramSelection,
   fetchUserScopeRequest,
