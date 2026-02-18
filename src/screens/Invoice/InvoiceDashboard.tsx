@@ -46,19 +46,20 @@ const getCardMetrics = (productTab: ProductTabType) => {
   ];
 };
 
-// Summary of All Program – same structure as table/card screen (Program Name, Dealer Name, Primary Party, OD Account, etc.)
+// Summary – columns match web. Include bankName for breadcrumb when navigating to Invoice List & Approval.
 const dealerSummaryRows = Array.from({length: 6}).map((_, index) => ({
   id: `dealer-${index}`,
-  programName: 'Sun Pharma PGM',
-  dealer: 'Sun Pharma',
-  primaryParty: 'Hero Finance',
-  odAccount: '123101010',
-  totalLimit: '₹20,000,000.00',
-  drawingPower: '₹20,000,000.00',
-  utilizedLimit: '₹1,100.00',
-  pipelineRequests: '₹0.00',
-  availableLimit: '₹19,998,900.00',
-  overdueAmount: '₹0.00',
+  bankName: index === 0 ? 'UGRO' : 'TCL',
+  programName: index === 0 ? 'UGRO DF Program' : 'TCL DF Program',
+  primaryParty: 'Sun Pharma',
+  counterParty: index === 0 ? '24 hrs medical' : 'All India Medicc',
+  odAccount: index === 0 ? '' : '98765432101234',
+  drawingPower: index === 0 ? '4,50,00,000.00' : '20,00,000.00',
+  utilizedLimit: '-',
+  pipelineRequests: '-',
+  availableLimit: '-',
+  overdueAmount: '-',
+  dpdDays: '-',
   status: 'Regular',
 }));
 
@@ -234,8 +235,10 @@ export const InvoiceDashboard: React.FC = () => {
                   style={styles.cardHeaderRow}
                   onPress={() => {
                     (navigation as any).navigate('InvoiceDetails', {
-                      dealerName: row.dealer,
                       fromInvoiceDashboard: true,
+                      bankName: row.bankName,
+                      dealerName: row.counterParty,
+                      programName: row.programName,
                     });
                   }}>
                   <View style={styles.cardHeaderContent}>
@@ -248,32 +251,28 @@ export const InvoiceDashboard: React.FC = () => {
                       />
                     </View>
                     <Text style={styles.cardSubtitle}>
-                      OD Account: {row.odAccount}
+                      OD Account: {row.odAccount || '-'}
                     </Text>
                   </View>
                 </TouchableOpacity>
 
-                {/* Same columns as table: Program Name, Dealer Name, Primary Party, OD Account, Total Limit, Drawing Power, Utilized Limit, Pipeline Requests, Available Limit, Overdue Amount, Status */}
+                {/* Columns same order as web: Program Name, Primary Party, Counter Party, OD Account, Drawing Power (₹), Utilized Limit (₹), Pipeline Requests (₹), Available Limit (₹), Overdue Amount (₹), DPD Days, Status */}
                 <View style={styles.infoGrid}>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Program Name</Text>
                     <Text style={styles.infoValue}>{row.programName}</Text>
                   </View>
                   <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Dealer Name</Text>
-                    <Text style={styles.infoValue}>{row.dealer}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Primary Party</Text>
                     <Text style={styles.infoValue}>{row.primaryParty}</Text>
                   </View>
                   <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>OD Account</Text>
-                    <Text style={styles.infoValue}>{row.odAccount}</Text>
+                    <Text style={styles.infoLabel}>Counter Party</Text>
+                    <Text style={styles.infoValue}>{row.counterParty}</Text>
                   </View>
                   <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Total Limit (₹)</Text>
-                    <Text style={styles.infoValue}>{row.totalLimit}</Text>
+                    <Text style={styles.infoLabel}>OD Account</Text>
+                    <Text style={styles.infoValue}>{row.odAccount || '-'}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Drawing Power (₹)</Text>
@@ -294,6 +293,10 @@ export const InvoiceDashboard: React.FC = () => {
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Overdue Amount (₹)</Text>
                     <Text style={styles.infoValue}>{row.overdueAmount}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>DPD Days</Text>
+                    <Text style={styles.infoValue}>{row.dpdDays}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Status</Text>

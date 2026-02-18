@@ -29,22 +29,25 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   return (
     <View style={styles.cardWrapper}>
       <View style={styles.listCard}>
-        <View
-          ref={(r: View | null) => registerMenuRef(row.id, r)}
-          collapsable={false}
-          style={styles.threeDotsButton}>
-          <TouchableOpacity
-            onPress={() => onMenuToggle(row.id)}
-            activeOpacity={0.7}
-            hitSlop={10}
-            style={styles.threeDotsTouchable}>
-            <Dots
-              width={scaleWidth(20)}
-              height={scaleHeight(20)}
-              style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}}
-            />
-          </TouchableOpacity>
-        </View>
+        {/* 3-dot action menu - only for Checker roles */}
+        {(isDealerChecker || isAnchorChecker) && (
+          <View
+            ref={(r: View | null) => registerMenuRef(row.id, r)}
+            collapsable={false}
+            style={styles.threeDotsButton}>
+            <TouchableOpacity
+              onPress={() => onMenuToggle(row.id)}
+              activeOpacity={0.7}
+              hitSlop={10}
+              style={styles.threeDotsTouchable}>
+              <Dots
+                width={scaleWidth(20)}
+                height={scaleHeight(20)}
+                style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.cardHeaderContainer}>
           {(isDealerChecker || isAnchorChecker) ? (
@@ -80,18 +83,38 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
           )}
         </View>
 
-        {/* Column order and labels match table: Dealer Code, Invoice No, Invoice Amount, Invoice Date, Request Date, Due Date, Invoice Status, Approval Status, Admin Status */}
+        {/* Columns aligned with web: Loan Ref No., Invoice No, Bank Name, Product Name, Program Name, Primary Party, Counter Party, Invoice Amount (₹), Invoice Date, Request Date, Due Date, Invoice Status, Approval Status, Admin Status */}
         <View style={styles.infoGrid}>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Dealer Code</Text>
-            <Text style={styles.infoValue}>{row.dealerCode}</Text>
+            <Text style={styles.infoLabel}>Loan Ref No.</Text>
+            <Text style={styles.infoValue}>{row.loanRefNo}</Text>
           </View>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Invoice No</Text>
             <Text style={styles.infoValue}>{row.invoiceNo}</Text>
           </View>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice Amount</Text>
+            <Text style={styles.infoLabel}>Bank Name</Text>
+            <Text style={styles.infoValue}>{row.bankName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Product Name</Text>
+            <Text style={styles.infoValue}>{row.productName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Program Name</Text>
+            <Text style={styles.infoValue}>{row.programName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Primary Party</Text>
+            <Text style={styles.infoValue}>{row.primaryParty}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Counter Party</Text>
+            <Text style={styles.infoValue}>{row.counterParty}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
             <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
           </View>
           <View style={styles.infoColumn}>
@@ -142,7 +165,7 @@ const styles = StyleSheet.create({
   },
   cardHeaderContainer: {
     marginBottom: scaleHeight(12),
-    paddingRight: scaleWidth(50),
+    paddingRight: scaleWidth(50), // Space for 3-dot button when visible (Checker roles)
   },
   cardHeaderRow: {
     flexDirection: 'row',

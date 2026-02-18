@@ -22,7 +22,10 @@ export const ProgramBreadcrumb: React.FC = () => {
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isAnchorMaker = userRole === 'anchor_maker';
   const isDealerMaker = userRole === 'dealer_maker';
-  const canUseAllProgramScope = isAnchorMaker || isDealerMaker;
+  const isAnchorChecker = userRole === 'anchor_checker';
+  const isDealerChecker = userRole === 'dealer_checker';
+  // All four roles can use "All Program" scope when Dealer Finance Program is selected
+  const canUseAllProgramScope = isAnchorMaker || isDealerMaker || isAnchorChecker || isDealerChecker;
   // isExpanded state - Commented for single selection, uncomment for multiple selection
   // const [isExpanded, setIsExpanded] = useState(false);
 

@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useMemo, useState, useRef} from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   View,
   TextInput,
+  Modal,
+  Pressable,
+  Dimensions,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -18,10 +21,12 @@ import {
   FilterModal,
   ProgramBreadcrumb,
 } from '@components/index';
+import {MarkAsDisbursedModal} from './DisbursementScreen/MarkAsDisbursedModal';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
-import {Search, Filter} from '@assets/Icons';
+import {Search, Filter, Dots} from '@assets/Icons';
+import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
@@ -35,18 +40,24 @@ const disbursementMetrics = [
   {label: 'Pending Dis. Amount', value: '₹ 8,20,000'},
 ];
 
-// Disbursement invoice rows
+// Disbursement rows – columns aligned with Invoice List & Approval + Disburse Date
 const disbursementRows = Array.from({length: 5}).map((_, index) => ({
   id: `disbursement-${index}`,
-  primaryParty: 'Hero Finanace',
   loanRefNo: '125423',
   invoiceNo: '1234566',
+  bankName: 'UGRO',
+  productName: 'Dealer Finance',
+  programName: 'UGRO DF Program',
+  primaryParty: 'Hero Finanace',
+  counterParty: 'Sun Pharma',
   invoiceAmount: '25,000.00/-',
   invoiceDate: 'dd-mm-yyyy',
   requestDate: 'dd-mm-yyyy',
   dueDate: 'dd-mm-yyyy',
-  disbursedDate: 'dd-mm-yyyy',
+  disburseDate: 'dd-mm-yyyy',
   invoiceStatus: 'Submitted',
+  approvalStatus: 'Approval Complete',
+  adminStatus: 'Verify',
 }));
 
 // Filter data
@@ -59,12 +70,19 @@ const disbursementFilterData = {
 export const DisbursementScreen: React.FC = () => {
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const programSelection = useSelector(selectProgramSelection);
-  const isAnchorMaker = userRole === 'anchor_maker';
   const programName = programSelection?.programName ?? 'Sun Pharma PGM';
-  
+  const isAnchorChecker = userRole === 'anchor_checker';
+  const isDealerChecker = userRole === 'dealer_checker';
+  const isCheckerRole = isAnchorChecker || isDealerChecker;
+
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<{x: number; y: number; width: number; height: number} | null>(null);
+  const [showDisbursedModal, setShowDisbursedModal] = useState(false);
+  const [selectedDisbursementId, setSelectedDisbursementId] = useState<string | null>(null);
+  const menuButtonRefs = useRef<Record<string, any>>({});
 
   const navigation = useNavigation<CompositeNavigationProp<
     DrawerNavigationProp<HomeNavigatorType>,
@@ -78,12 +96,77 @@ export const DisbursementScreen: React.FC = () => {
       data = data.filter(
         item =>
           (item.primaryParty?.toLowerCase() || '').includes(term) ||
+          (item.counterParty?.toLowerCase() || '').includes(term) ||
           (item.loanRefNo?.toLowerCase() || '').includes(term) ||
           (item.invoiceNo?.toLowerCase() || '').includes(term),
       );
     }
     return data;
   }, [searchText]);
+
+  const handleMenuToggle = (disbursementId: string) => {
+    if (openMenuId === disbursementId) {
+      setOpenMenuId(null);
+      setMenuAnchor(null);
+      return;
+    }
+
+    const ref = menuButtonRefs.current[disbursementId] as any;
+    if (ref?.measureInWindow) {
+      ref.measureInWindow((x: number, y: number, width: number, height: number) => {
+        setMenuAnchor({x, y, width, height});
+        setOpenMenuId(disbursementId);
+      });
+    } else {
+      setMenuAnchor(null);
+      setOpenMenuId(disbursementId);
+    }
+  };
+
+  const handleMenuAction = (action: string, disbursementId: string) => {
+    setOpenMenuId(null);
+    setMenuAnchor(null);
+
+    switch (action) {
+      case 'markAsDisbursed':
+        setSelectedDisbursementId(disbursementId);
+        setShowDisbursedModal(true);
+        break;
+      case 'sendMail':
+        // TODO: Send Mail to Bank
+        break;
+      case 'delete':
+        // TODO: Delete
+        break;
+    }
+  };
+
+  const getMenuPosition = (anchor: {x: number; y: number; width: number; height: number} | null) => {
+    const screen = Dimensions.get('window');
+    const menuWidth = scaleWidth(180);
+    const horizontalPadding = scaleWidth(12);
+    const topPadding = scaleHeight(8);
+
+    if (!anchor) {
+      return {
+        position: 'absolute' as const,
+        top: topPadding + scaleHeight(60),
+        right: horizontalPadding,
+      };
+    }
+
+    const desiredLeft = anchor.x + anchor.width - menuWidth;
+    const left = Math.max(
+      horizontalPadding,
+      Math.min(desiredLeft, screen.width - menuWidth - horizontalPadding),
+    );
+
+    return {
+      position: 'absolute' as const,
+      top: anchor.y + anchor.height + topPadding,
+      left,
+    };
+  };
 
 
   return (
@@ -93,7 +176,12 @@ export const DisbursementScreen: React.FC = () => {
         navigation={navigation as any}
       />
       <ProgramBreadcrumb />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        onScrollBeginDrag={() => {
+          setOpenMenuId(null);
+          setMenuAnchor(null);
+        }}>
         {/* Program Title */}
         <View style={styles.pageTitleBar}>
           <Text style={styles.pageTitleText}>{programName}</Text>
@@ -139,50 +227,91 @@ export const DisbursementScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Invoice List */}
+        {/* Invoice List - Same columns as Invoice List & Approval + Disburse Date; 3-dot action only for Checker */}
         <View style={styles.verticalList}>
           {filteredData.map(row => (
-            <View key={row.id} style={styles.listCard}>
-              <View style={styles.infoGrid}>
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Primary Party</Text>
-                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
-                    </View>
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Loan Ref No.</Text>
-                      <Text style={styles.infoValue}>{row.loanRefNo}</Text>
-                    </View>
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Invoice No</Text>
-                      <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-                    </View>
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Invoice Amount</Text>
-                      <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-                    </View>
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Invoice Date</Text>
-                      <Text style={styles.infoValue}>{row.invoiceDate}</Text>
-                    </View>
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Request Date</Text>
-                      <Text style={styles.infoValue}>{row.requestDate}</Text>
-                    </View>
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Due Date</Text>
-                      <Text style={styles.infoValue}>{row.dueDate}</Text>
-                    </View>
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Disbursed Date</Text>
-                      <Text style={styles.infoValue}>{row.disbursedDate}</Text>
-                    </View>
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Invoice Status</Text>
-                      <Text style={[styles.infoValue, styles.statusGreen]}>
-                        {row.invoiceStatus}
-                      </Text>
-                    </View>
+            <View key={row.id} style={styles.cardWrapper}>
+              <View style={styles.listCard}>
+                {isCheckerRole && (
+                  <TouchableOpacity
+                    ref={ref => {
+                      if (ref) {
+                        menuButtonRefs.current[row.id] = ref;
+                      }
+                    }}
+                    style={styles.threeDotsButton}
+                    onPress={() => handleMenuToggle(row.id)}
+                    activeOpacity={0.7}>
+                    <Dots
+                      width={scaleWidth(20)}
+                      height={scaleHeight(20)}
+                      style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}}
+                    />
+                  </TouchableOpacity>
+                )}
+                <View style={styles.infoGrid}>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Loan Ref No.</Text>
+                    <Text style={styles.infoValue}>{row.loanRefNo}</Text>
                   </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Invoice No</Text>
+                    <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Bank Name</Text>
+                    <Text style={styles.infoValue}>{row.bankName}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Product Name</Text>
+                    <Text style={styles.infoValue}>{row.productName}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Program Name</Text>
+                    <Text style={styles.infoValue}>{row.programName}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Primary Party</Text>
+                    <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Counter Party</Text>
+                    <Text style={styles.infoValue}>{row.counterParty}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                    <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Invoice Date</Text>
+                    <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Request Date</Text>
+                    <Text style={styles.infoValue}>{row.requestDate}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Due Date</Text>
+                    <Text style={styles.infoValue}>{row.dueDate}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Disburse Date</Text>
+                    <Text style={styles.infoValue}>{row.disburseDate}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Invoice Status</Text>
+                    <Text style={[styles.infoValue, styles.statusGreen]}>{row.invoiceStatus}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Approval Status</Text>
+                    <Text style={[styles.infoValue, styles.statusGreen]}>{row.approvalStatus}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Admin Status</Text>
+                    <Text style={[styles.infoValue, styles.statusGreen]}>{row.adminStatus}</Text>
+                  </View>
+                </View>
+              </View>
             </View>
           ))}
         </View>
@@ -198,6 +327,67 @@ export const DisbursementScreen: React.FC = () => {
         }}
         filterData={disbursementFilterData}
         appliedFilters={appliedFilters}
+      />
+
+      {/* 3-dot Action Menu - Disbursal list view, Checker role only: Send Mail to Bank, Mark as Disbursed, Delete */}
+      {isCheckerRole && (
+        <Modal
+          transparent
+          visible={!!openMenuId}
+          animationType="fade"
+          onRequestClose={() => {
+            setOpenMenuId(null);
+            setMenuAnchor(null);
+          }}>
+          <Pressable
+            style={styles.menuOverlay}
+            onPress={() => {
+              setOpenMenuId(null);
+              setMenuAnchor(null);
+            }}>
+            <Pressable style={[styles.actionMenu, getMenuPosition(menuAnchor)]} onPress={e => e.stopPropagation()}>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('sendMail', openMenuId as string)}>
+                <FontAwesome6 name="envelope" iconStyle="regular" color={Colors.darkblack} size={16} />
+                <Text style={styles.menuItemText}>Send Mail to Bank</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('markAsDisbursed', openMenuId as string)}>
+                <FontAwesome6 name="square-check" iconStyle="regular" color={Colors.darkblack} size={16} />
+                <Text style={styles.menuItemText}>Mark as Disbursed</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => handleMenuAction('delete', openMenuId as string)}>
+                <FontAwesome6 name="trash" iconStyle="solid" color={Colors.red} size={16} />
+                <Text style={[styles.menuItemText, styles.menuItemTextDanger]}>Delete</Text>
+              </TouchableOpacity>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
+
+      {/* Mark as Disbursed Modal */}
+      <MarkAsDisbursedModal
+        visible={showDisbursedModal}
+        onClose={() => {
+          setShowDisbursedModal(false);
+          setSelectedDisbursementId(null);
+        }}
+        invoiceAmount={
+          filteredData.find(item => item.id === selectedDisbursementId)?.invoiceAmount?.replace('/-', '') || '15,556'
+        }
+        invoiceNo={
+          filteredData.find(item => item.id === selectedDisbursementId)?.invoiceNo
+        }
+        onSubmit={data => {
+          // TODO: Call API to mark as disbursed
+          console.log('Mark as Disbursed:', selectedDisbursementId, data);
+          setShowDisbursedModal(false);
+          setSelectedDisbursementId(null);
+        }}
       />
     </Container>
   );
@@ -316,10 +506,14 @@ const styles = StyleSheet.create({
   verticalList: {
     gap: scaleHeight(12),
   },
+  cardWrapper: {
+    position: 'relative',
+  },
   listCard: {
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(12),
     padding: scaleWidth(16),
+    paddingRight: scaleWidth(50),
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E6E6E6',
     shadowColor: '#00000035',
@@ -327,6 +521,49 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 10,
     elevation: 8,
+  },
+  threeDotsButton: {
+    position: 'absolute',
+    top: scaleHeight(12),
+    right: scaleWidth(12),
+    width: scaleWidth(32),
+    height: scaleWidth(32),
+    borderRadius: scaleWidth(16),
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  actionMenu: {
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(8),
+    paddingVertical: scaleHeight(8),
+    paddingHorizontal: scaleWidth(12),
+    minWidth: scaleWidth(180),
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(12),
+    paddingVertical: scaleHeight(8),
+  },
+  menuItemText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+  },
+  menuItemTextDanger: {
+    color: Colors.red,
+    fontFamily: Fonts.GilroySemiBold,
   },
   infoGrid: {
     flexDirection: 'row',

@@ -46,7 +46,10 @@ export const SelectProgramScreen: React.FC = () => {
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isAnchorMaker = userRole === 'anchor_maker';
   const isDealerMaker = userRole === 'dealer_maker';
-  const canUseAllProgramScope = isAnchorMaker || isDealerMaker;
+  const isAnchorChecker = userRole === 'anchor_checker';
+  const isDealerChecker = userRole === 'dealer_checker';
+  // All four roles can use "All Program" scope when Dealer Finance Program is selected
+  const canUseAllProgramScope = isAnchorMaker || isDealerMaker || isAnchorChecker || isDealerChecker;
   const scopeData = useSelector(selectScopeData);
   const scopeLoading = useSelector(selectScopeLoading);
   const scopeError = useSelector(selectScopeError);
@@ -68,12 +71,21 @@ export const SelectProgramScreen: React.FC = () => {
   }, [scopeData]);
 
   // Helper function to check if a program is selectable
-  // Allow DF programs OR UGRO programs to be selectable
+  // For anchor_maker, anchor_checker, dealer_maker, dealer_checker: Allow ALL programs 
+  // (they have right to select all programs when Dealer Finance Program context)
+  // Otherwise: Allow DF programs OR UGRO programs to be selectable
   const isDFProgram = (bank: Bank, product: BankProgram, program: Program): boolean => {
+    // If user is one of the four roles (anchor_maker, anchor_checker, dealer_maker, dealer_checker),
+    // allow ALL programs to be selectable (they have right to select all programs in Dealer Finance Program context)
+    if (canUseAllProgramScope) {
+      return true; // Allow all programs for these roles
+    }
+    
     // UGRO bank ke saare programs selectable hain
     if (bank.name.toLowerCase() === 'ugro') {
       return true;
     }
+    
     // Baaki banks ke liye sirf DF programs
     const isDFProduct = product.name.toLowerCase().includes('dealer finance');
     const isDFProgramName = program.name.toLowerCase().includes('df') || 

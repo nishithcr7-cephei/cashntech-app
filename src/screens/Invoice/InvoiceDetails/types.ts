@@ -39,16 +39,23 @@ export function formatStatus(str: string): string {
 
 export type InvoiceRow = {
   id: string;
-  dealerName: string;       // Primary Party (Anchors)
+  dealerName: string;       // Primary Party (Anchors) / counter party display
   dealerCode: string;
   invoiceNo: string;
-  invoiceAmount: string;    // e.g. "25,000.00/-"
+  invoiceAmount: string;   // e.g. "25,000.00/-"
   invoiceDate: string;
-  requestDate: string;      // Request Date
-  dueDate: string;          // Due Date (invoice_due_date)
+  requestDate: string;
+  dueDate: string;
   invoiceStatus: string;
   approvalStatus: string;
-  adminStatus: string;      // e.g. "Verify", "Hold", "Reject"
+  adminStatus: string;
+  /** Web-aligned columns */
+  loanRefNo: string;
+  bankName: string;
+  productName: string;
+  programName: string;
+  primaryParty: string;
+  counterParty: string;
 };
 
 export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
@@ -64,10 +71,22 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
     invoiceStatus: formatStatus(item.invoice_status),
     approvalStatus: formatStatus(item.approval_status),
     adminStatus: item.admin_status ? formatStatus(item.admin_status) : 'Verify',
+    loanRefNo: item.loan_ref_no ?? '-',
+    bankName: item.bank_name ?? '-',
+    productName: item.product_name ?? '-',
+    programName: item.program_name ?? '-',
+    primaryParty: item.primary_party_name ?? item.counter_party_name ?? '-',
+    counterParty: item.counter_party_name ?? '-',
   };
 }
 
+/** Filter view for Invoice List & Approvals – matches web: Bank, Product, Program, Primary Party, Counter Party */
 export const invoiceFilterData = {
+  'Bank': ['UGRO', 'HDFC Bank', 'ICICI Bank', 'Axis Bank', 'SBI'],
+  'Product': ['Dealer Finance', 'Vendor Finance', 'PID', 'SID', 'OD'],
+  'Program': ['UGRO DF Program', 'TCL DF Program', 'Sun Pharma PGM', 'Demo Program'],
+  'Primary Party': ['Sun Pharma', 'Cipla', '24 hrs medical bodakdev', 'Hero Finance'],
+  'Counter Party': ['24 hrs medical', 'All India Medicc', 'Rudraksh Medic...', 'Demo Dealer Pv...'],
   'Invoice Status': ['CREATED', 'IN_PROGRESS', 'SUBMITTED', 'REJECTED'],
   'Approval Status': [
     'PENDING_ANCHOR_CHECKER',

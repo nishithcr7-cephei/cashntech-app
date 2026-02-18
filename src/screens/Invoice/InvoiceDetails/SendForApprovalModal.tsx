@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   Modal,
   Pressable,
@@ -13,14 +13,22 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {NA_AD} from './types';
 import type {InvoiceRow} from './types';
 
+export type BulkActionType = 'approve' | 'reject' | 'verify' | 'cancel';
+
+const BULK_ACTIONS: {value: BulkActionType; label: string}[] = [
+  {value: 'approve', label: 'Approve'},
+  {value: 'reject', label: 'Reject'},
+  {value: 'verify', label: 'Verify'},
+  {value: 'cancel', label: 'Cancel'},
+];
+
 type Props = {
   visible: boolean;
   onClose: () => void;
   selectedRows: InvoiceRow[];
   selectedIds: string[];
   onToggleSelection: (id: string) => void;
-  onApprove: () => void;
-  onReject: () => void;
+  onApply: (action: BulkActionType) => void;
 };
 
 export const SendForApprovalModal: React.FC<Props> = ({
@@ -29,9 +37,22 @@ export const SendForApprovalModal: React.FC<Props> = ({
   selectedRows,
   selectedIds,
   onToggleSelection,
-  onApprove,
-  onReject,
+  onApply,
 }) => {
+  const [selectedAction, setSelectedAction] = useState<BulkActionType>('approve');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setSelectedAction('approve');
+      setDropdownOpen(false);
+    }
+  }, [visible]);
+
+  const handleApply = () => {
+    onApply(selectedAction);
+  };
+
   return (
     <Modal
       visible={visible}
@@ -40,10 +61,40 @@ export const SendForApprovalModal: React.FC<Props> = ({
       onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.content} onPress={e => e.stopPropagation()}>
-          <Text style={styles.title}>Review Selected Invoices</Text>
+          <Text style={styles.title}>Bulk Action</Text>
           <Text style={styles.subtitle}>
-            Review selected invoices. Uncheck to remove from selection.
+            Choose an action and apply to selected invoices. Uncheck to remove from selection.
           </Text>
+
+          <Text style={styles.dropdownLabel}>Action</Text>
+          <TouchableOpacity
+            style={styles.dropdown}
+            onPress={() => setDropdownOpen(prev => !prev)}
+            activeOpacity={0.8}>
+            <Text style={styles.dropdownText}>
+              {BULK_ACTIONS.find(a => a.value === selectedAction)?.label ?? 'Select action'}
+            </Text>
+            <Text style={styles.dropdownArrow}>{dropdownOpen ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          {dropdownOpen && (
+            <View style={styles.dropdownList}>
+              {BULK_ACTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.dropdownItem, selectedAction === opt.value && styles.dropdownItemSelected]}
+                  onPress={() => {
+                    setSelectedAction(opt.value);
+                    setDropdownOpen(false);
+                  }}
+                  activeOpacity={0.7}>
+                  <Text style={[styles.dropdownItemText, selectedAction === opt.value && styles.dropdownItemTextSelected]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
@@ -91,21 +142,14 @@ export const SendForApprovalModal: React.FC<Props> = ({
           <View style={styles.actions}>
             <TouchableOpacity
               style={[
-                styles.approveBtn,
+                styles.applyBtn,
                 selectedIds.length === 0 && styles.btnDisabled,
               ]}
               disabled={selectedIds.length === 0}
-              onPress={onApprove}>
-              <Text style={styles.approveBtnText}>Approve</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.rejectBtn,
-                selectedIds.length === 0 && styles.btnDisabled,
-              ]}
-              disabled={selectedIds.length === 0}
-              onPress={onReject}>
-              <Text style={styles.rejectBtnText}>Reject</Text>
+              onPress={handleApply}>
+              <Text style={styles.applyBtnText}>
+                Apply {BULK_ACTIONS.find(a => a.value === selectedAction)?.label ?? selectedAction} to {selectedIds.length} invoice{selectedIds.length !== 1 ? 's' : ''}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.closeBtn}
@@ -142,6 +186,59 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(13),
     color: Colors.graybase,
     marginBottom: scaleHeight(12),
+  },
+  dropdownLabel: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(6),
+  },
+  dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: scaleWidth(8),
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: scaleWidth(12),
+    marginBottom: scaleHeight(12),
+    backgroundColor: Colors.white,
+  },
+  dropdownText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+  },
+  dropdownArrow: {
+    fontSize: scaleFont(10),
+    color: Colors.graybase,
+  },
+  dropdownList: {
+    marginBottom: scaleHeight(12),
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: scaleWidth(8),
+    backgroundColor: Colors.white,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: scaleWidth(12),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEE',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#FFF5F5',
+  },
+  dropdownItemText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+  },
+  dropdownItemTextSelected: {
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
   },
   scroll: {
     maxHeight: scaleHeight(280),
@@ -218,44 +315,32 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E6E6E6',
   },
-  approveBtn: {
+  applyBtn: {
     flex: 1,
     paddingVertical: scaleHeight(10),
     paddingHorizontal: scaleWidth(12),
     borderRadius: scaleWidth(8),
-    backgroundColor: '#10B981',
+    backgroundColor: Colors.green,
     alignItems: 'center',
   },
-  approveBtnText: {
-    fontSize: scaleFont(14),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.white,
-  },
-  rejectBtn: {
-    flex: 1,
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(12),
-    borderRadius: scaleWidth(8),
-    backgroundColor: Colors.primaryColor,
-    alignItems: 'center',
-  },
-  rejectBtnText: {
-    fontSize: scaleFont(14),
+  applyBtnText: {
+    fontSize: scaleFont(13),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.white,
   },
   closeBtn: {
-    flex: 1,
     paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(12),
+    paddingHorizontal: scaleWidth(20),
     borderRadius: scaleWidth(8),
-    backgroundColor: '#9CA3AF',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: '#D0D0D0',
     alignItems: 'center',
   },
   closeBtnText: {
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
-    color: Colors.white,
+    color: Colors.darkblack,
   },
   btnDisabled: {
     opacity: 0.5,

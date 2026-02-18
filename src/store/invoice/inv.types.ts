@@ -39,6 +39,12 @@ export type InvoiceListItemApi = {
   invoice_status: string;
   approval_status: string;
   admin_status?: string;
+  /** Web columns: Loan Ref No., Bank Name, Product Name, Program Name, Primary Party, Counter Party */
+  loan_ref_no?: string;
+  bank_name?: string;
+  product_name?: string;
+  program_name?: string;
+  primary_party_name?: string;
 };
 
 export type InvoiceState = {

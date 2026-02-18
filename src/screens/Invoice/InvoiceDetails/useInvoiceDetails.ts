@@ -26,10 +26,25 @@ export function useInvoiceDetails() {
   const invoiceListError = useSelector(selectInvoiceListError);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   
-  // Get dealerName and fromInvoiceDashboard from route params (when navigating from Invoice Dashboard dealer card)
-  const routeParams = route.params as {dealerName?: string; fromInvoiceDashboard?: boolean} | undefined;
+  // Route params: from Invoice Overview (bank/dealer/program breadcrumb) or from drawer (All Program breadcrumb)
+  const routeParams = route.params as {
+    fromInvoiceDashboard?: boolean;
+    bankName?: string;
+    dealerName?: string;
+    programName?: string;
+  } | undefined;
   const selectedDealerName = routeParams?.dealerName;
   const fromInvoiceDashboard = routeParams?.fromInvoiceDashboard === true;
+  const breadcrumbBank = routeParams?.bankName;
+  const breadcrumbDealer = routeParams?.dealerName;
+  const breadcrumbProgram = routeParams?.programName;
+
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
+  const showAllProgramBreadcrumb = useMemo(() => {
+    const programCount = appliedFilters['Program']?.length ?? 0;
+    const bankCount = appliedFilters['Bank']?.length ?? 0;
+    return programCount > 1 || bankCount > 1;
+  }, [appliedFilters]);
 
   const isAnchorMaker = userRole === 'anchor_maker';
   const isAnchorChecker = userRole === 'anchor_checker';
@@ -40,7 +55,6 @@ export function useInvoiceDetails() {
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showCheckerApprovalModal, setShowCheckerApprovalModal] = useState(false);
   const [showApproveRejectModal, setShowApproveRejectModal] = useState(false);
@@ -213,6 +227,14 @@ export function useInvoiceDetails() {
         setSelectedInvoiceNo(invoiceNo);
         setShowApproveRejectModal(true);
         break;
+      case 'attachment':
+        setSelectedInvoiceId(invoiceId);
+        setShowAttachmentModal(true);
+        break;
+      case 'print':
+        console.log('Print invoice:', invoiceId, invoiceNo);
+        // TODO: Implement print functionality
+        break;
       case 'payMeEarly':
         console.log('Pay me Early for invoice:', invoiceId);
         break;
@@ -282,27 +304,15 @@ export function useInvoiceDetails() {
     setSelectedInvoiceNo(null);
   };
 
-  const onBulkApprove = () => {
-    // TODO: Call API to approve selected invoices
-    console.log('Bulk approve:', selectedInvoiceIds);
+  const onBulkApply = (action: 'approve' | 'reject' | 'verify' | 'cancel') => {
+    // TODO: Call API to apply bulk action (approve/reject/verify/cancel) to selectedInvoiceIds
+    console.log('Bulk apply:', action, selectedInvoiceIds);
     setShowSendForApprovalModal(false);
     setSelectedInvoiceIds([]);
     if (programId) {
       dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
     }
   };
-
-  const onBulkReject = () => {
-    // TODO: Call API to reject selected invoices
-    console.log('Bulk reject:', selectedInvoiceIds);
-    setShowSendForApprovalModal(false);
-    setSelectedInvoiceIds([]);
-    if (programId) {
-      dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
-    }
-  };
-
-  const onSendForApprovalConfirm = onBulkApprove;
 
   const getMenuPosition = useCallback(
     (anchor: {x: number; y: number; width: number; height: number} | null) => {
@@ -372,6 +382,11 @@ export function useInvoiceDetails() {
     setShowSendForApprovalModal,
     selectedRowsForModal,
     allSelectedOnScreen,
+    fromInvoiceDashboard,
+    breadcrumbBank,
+    breadcrumbDealer,
+    breadcrumbProgram,
+    showAllProgramBreadcrumb,
     handleMenuToggle,
     handleMenuAction,
     handleAttachmentUpload,
@@ -379,9 +394,7 @@ export function useInvoiceDetails() {
     toggleSelectAllVisible,
     onApproveRejectApprove,
     onApproveRejectReject,
-    onSendForApprovalConfirm,
-    onBulkApprove,
-    onBulkReject,
+    onBulkApply,
     getMenuPosition,
   };
 }

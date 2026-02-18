@@ -50,7 +50,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
         <Pressable
           style={[styles.menu, getMenuPosition(menuAnchor)]}
           onPress={() => {}}>
-          {isAnchorMaker && (
+          {(isAnchorMaker || isDealerMaker) && (
             <>
               <TouchableOpacity
                 onPress={() => onMenuAction('edit', openMenuId)}
@@ -59,16 +59,28 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 <Text style={styles.menuText}>Edit</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                onPress={() => onMenuAction('checkerApproval', openMenuId)}
+                style={styles.menuItem}>
+                <FontAwesome6 name="calendar-check" iconStyle="solid" color="#3B82F6" size={16} />
+                <Text style={styles.menuText}>Checker Approval</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={() => onMenuAction('recreateInvoice', openMenuId)}
                 style={styles.menuItem}>
                 <FontAwesome6 name="square-plus" iconStyle="solid" color={Colors.darkblack} size={16} />
                 <Text style={styles.menuText}>Recreate Invoice</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => onMenuAction('approvalHistory', openMenuId)}
+                onPress={() => onMenuAction('attachment', openMenuId)}
                 style={styles.menuItem}>
-                <FontAwesome6 name="calendar-check" iconStyle="solid" color={Colors.darkblack} size={16} />
-                <Text style={styles.menuText}>Approval History</Text>
+                <FontAwesome6 name="paperclip" iconStyle="solid" color={Colors.darkblack} size={16} />
+                <Text style={styles.menuText}>Attachment</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onMenuAction('print', openMenuId)}
+                style={styles.menuItem}>
+                <FontAwesome6 name="print" iconStyle="solid" color={Colors.darkblack} size={16} />
+                <Text style={styles.menuText}>Print</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => onMenuAction('delete', openMenuId)}
@@ -89,7 +101,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
               <TouchableOpacity
                 onPress={() => onMenuAction('checkerApproval', openMenuId)}
                 style={styles.menuItem}>
-                <FontAwesome6 name="calendar-check" iconStyle="solid" color={Colors.darkblack} size={16} />
+                <FontAwesome6 name="calendar-check" iconStyle="solid" color="#3B82F6" size={16} />
                 <Text style={styles.menuText}>Checker Approval</Text>
               </TouchableOpacity>
             </>

@@ -4,6 +4,7 @@ import {
   Text,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import {
   AppBar,
@@ -11,12 +12,12 @@ import {
   ApproveRejectModal,
   Container,
   FilterModal,
-  ProgramBreadcrumb,
   UploadModal,
 } from '@components/index';
-import {Colors} from '@constants/index';
-import {LeftChevron} from '@assets/Icons';
+import {Colors, Fonts} from '@constants/index';
+import {LeftChevron, RightChevron} from '@assets/Icons';
 import {scaleWidth, scaleHeight} from '@utils/Scale';
+import {BankBuilding, Folder, File, EditIcon} from '@assets/Icons';
 import {useInvoiceDetails} from './useInvoiceDetails';
 import {invoiceFilterData} from './types';
 import {InvoiceDetailsControls} from './InvoiceDetailsControls';
@@ -67,6 +68,10 @@ export const InvoiceDetails: React.FC = () => {
     selectedRowsForModal,
     allSelectedOnScreen,
     fromInvoiceDashboard,
+    breadcrumbBank,
+    breadcrumbDealer,
+    breadcrumbProgram,
+    showAllProgramBreadcrumb,
     handleMenuToggle,
     handleMenuAction,
     handleAttachmentUpload,
@@ -74,9 +79,7 @@ export const InvoiceDetails: React.FC = () => {
     toggleSelectAllVisible,
     onApproveRejectApprove,
     onApproveRejectReject,
-    onSendForApprovalConfirm,
-    onBulkApprove,
-    onBulkReject,
+    onBulkApply,
     getMenuPosition,
   } = useInvoiceDetails();
 
@@ -93,7 +96,47 @@ export const InvoiceDetails: React.FC = () => {
         renderLeftIcon={fromInvoiceDashboard ? <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} /> : undefined}
         onPressLeftIcon={fromInvoiceDashboard ? () => navigation.goBack() : undefined}
       />
-      <ProgramBreadcrumb />
+      {fromInvoiceDashboard && breadcrumbBank && breadcrumbDealer && breadcrumbProgram && !showAllProgramBreadcrumb ? (
+        <View style={styles.breadcrumbContainer}>
+          <View style={styles.breadcrumbCard}>
+            <View style={styles.breadcrumbRow}>
+              <View style={styles.breadcrumbItem}>
+                <BankBuilding width={scaleWidth(14)} height={scaleWidth(14)} color={Colors.primaryColor} />
+                <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">{breadcrumbBank}</Text>
+              </View>
+              <RightChevron height={scaleHeight(12)} width={scaleWidth(12)} style={styles.breadcrumbChev} />
+              <View style={styles.breadcrumbItem}>
+                <Folder width={scaleWidth(14)} height={scaleWidth(14)} color={Colors.primaryColor} />
+                <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">{breadcrumbDealer}</Text>
+              </View>
+              <RightChevron height={scaleHeight(12)} width={scaleWidth(12)} style={styles.breadcrumbChev} />
+              <View style={styles.breadcrumbItemGrow}>
+                <File width={scaleWidth(14)} height={scaleWidth(14)} color={Colors.primaryColor} />
+                <Text style={styles.breadcrumbTextGrow} numberOfLines={1} ellipsizeMode="tail">{breadcrumbProgram}</Text>
+              </View>
+              <TouchableOpacity style={styles.breadcrumbChangePill} onPress={() => (navigation as any).navigate('SelectProgramScreen')} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <EditIcon />
+                <Text style={styles.breadcrumbChangeText}>Change</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.breadcrumbContainer}>
+          <View style={styles.breadcrumbCard}>
+            <View style={styles.breadcrumbRow}>
+              <View style={styles.breadcrumbItemGrow}>
+                <File width={scaleWidth(14)} height={scaleWidth(14)} color={Colors.primaryColor} />
+                <Text style={styles.breadcrumbTextGrow} numberOfLines={1} ellipsizeMode="tail">All Program</Text>
+              </View>
+              <TouchableOpacity style={styles.breadcrumbChangePill} onPress={() => (navigation as any).navigate('SelectProgramScreen')} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <EditIcon />
+                <Text style={styles.breadcrumbChangeText}>Change</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
       <View style={styles.pageTitleBar}>
           <Text style={styles.pageTitleText}>
             Sun Pharma PGM
@@ -269,8 +312,7 @@ export const InvoiceDetails: React.FC = () => {
         selectedRows={selectedRowsForModal}
         selectedIds={selectedInvoiceIds}
         onToggleSelection={toggleInvoiceSelection}
-        onApprove={onBulkApprove}
-        onReject={onBulkReject}
+        onApply={onBulkApply}
       />
 
       <InvoiceActionMenuModal
