@@ -7,16 +7,23 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {useSelector} from 'react-redux';
 import {AppBar, Container, UploadModal} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Download, LeftChevron} from '@assets/Icons';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
+import {userSelector} from '@store/user';
+import {AppRole} from '@constants/roles';
 
 export const InvoiceDetailView: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
+  const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const isAnchorChecker = userRole === 'anchor_checker';
+  const isDealerChecker = userRole === 'dealer_checker';
+  const isCheckerRole = isAnchorChecker || isDealerChecker;
   const [showUploadModal, setShowUploadModal] = useState(false);
 
   // Get data from route params
@@ -86,16 +93,32 @@ export const InvoiceDetailView: React.FC = () => {
 
   return (
     <Container>
-      <AppBar title="Invoice Detail" navigation={navigation as any} />
+      <AppBar
+        title="Invoice Detail"
+        navigation={navigation as any}
+        hideHamburger={isCheckerRole}
+        renderLeftIcon={
+          isCheckerRole ? (
+            <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />
+          ) : undefined
+        }
+        onPressLeftIcon={
+          isCheckerRole
+            ? () => (navigation as any).navigate('InvoiceDetails')
+            : undefined
+        }
+      />
       
       {/* Header with Invoice Number and Action Buttons */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}>
-            <LeftChevron height={scaleWidth(16)} width={scaleHeight(16)} />
-          </TouchableOpacity>
+          {!isCheckerRole && (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}>
+              <LeftChevron height={scaleWidth(16)} width={scaleHeight(16)} />
+            </TouchableOpacity>
+          )}
           <View style={styles.invoiceTitleContainer}>
             <Text style={styles.invoiceTitle}>
               Invoice / Unique Ref. No - {invoiceNo}

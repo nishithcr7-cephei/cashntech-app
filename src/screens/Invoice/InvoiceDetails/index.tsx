@@ -24,6 +24,7 @@ import {InvoiceDetailsControls} from './InvoiceDetailsControls';
 import {InvoiceDetailsCard} from './InvoiceDetailsCard';
 import {SendForApprovalModal} from './SendForApprovalModal';
 import {InvoiceActionMenuModal} from './InvoiceActionMenuModal';
+import {SelectProgramModal} from './SelectProgramModal';
 import {styles} from './InvoiceDetails.styles';
 
 export const InvoiceDetails: React.FC = () => {
@@ -81,6 +82,10 @@ export const InvoiceDetails: React.FC = () => {
     onApproveRejectReject,
     onBulkApply,
     getMenuPosition,
+    showSelectProgramForCreateModal,
+    setShowSelectProgramForCreateModal,
+    onCreateInvoicePress,
+    onProgramSelectedForCreate,
   } = useInvoiceDetails();
 
   const registerMenuRef = (id: string, ref: View | null) => {
@@ -206,6 +211,7 @@ export const InvoiceDetails: React.FC = () => {
               onToggleSelectAllVisible={toggleSelectAllVisible}
               selectedInvoiceIdsLength={selectedInvoiceIds.length}
               onOpenSendForApprovalModal={() => setShowSendForApprovalModal(true)}
+              onCreateInvoicePress={onCreateInvoicePress}
             />
 
             <View style={styles.listTopSeparator} />
@@ -228,6 +234,7 @@ export const InvoiceDetails: React.FC = () => {
                   <InvoiceDetailsCard
                     key={row.id}
                     row={row}
+                    isAnchorMaker={isAnchorMaker}
                     isDealerMaker={isDealerMaker}
                     isDealerChecker={isDealerChecker}
                     isAnchorChecker={isAnchorChecker}
@@ -329,6 +336,12 @@ export const InvoiceDetails: React.FC = () => {
         isAnchorChecker={isAnchorChecker}
         isDealerMaker={isDealerMaker}
         isDealerChecker={isDealerChecker}
+      />
+
+      <SelectProgramModal
+        visible={showSelectProgramForCreateModal}
+        onClose={() => setShowSelectProgramForCreateModal(false)}
+        onProgramSelected={onProgramSelectedForCreate}
       />
     </Container>
   );

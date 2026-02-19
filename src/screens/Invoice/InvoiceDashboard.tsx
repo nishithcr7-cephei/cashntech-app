@@ -256,20 +256,23 @@ export const InvoiceDashboard: React.FC = () => {
                   </View>
                 </TouchableOpacity>
 
-                {/* Columns same order as web: Program Name, Primary Party, Counter Party, OD Account, Drawing Power (₹), Utilized Limit (₹), Pipeline Requests (₹), Available Limit (₹), Overdue Amount (₹), DPD Days, Status */}
                 <View style={styles.infoGrid}>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Program Name</Text>
                     <Text style={styles.infoValue}>{row.programName}</Text>
                   </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Primary Party</Text>
-                    <Text style={styles.infoValue}>{row.primaryParty}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Counter Party</Text>
-                    <Text style={styles.infoValue}>{row.counterParty}</Text>
-                  </View>
+                  {/* anchor-maker: Primary Party first; dealer-maker: Counter Party first */}
+                  {isDealerMaker ? (
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Counter Party</Text>
+                      <Text style={styles.infoValue}>{row.counterParty}</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Primary Party</Text>
+                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                    </View>
+                  )}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>OD Account</Text>
                     <Text style={styles.infoValue}>{row.odAccount || '-'}</Text>
@@ -302,6 +305,18 @@ export const InvoiceDashboard: React.FC = () => {
                     <Text style={styles.infoLabel}>Status</Text>
                     <Text style={[styles.infoValue, styles.statusGreenText]}>{row.status}</Text>
                   </View>
+                  {/* Secondary party chip at the end */}
+                  {isDealerMaker ? (
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Primary Party</Text>
+                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Counter Party</Text>
+                      <Text style={styles.infoValue}>{row.counterParty}</Text>
+                    </View>
+                  )}
                 </View>
             </View>
             </View>

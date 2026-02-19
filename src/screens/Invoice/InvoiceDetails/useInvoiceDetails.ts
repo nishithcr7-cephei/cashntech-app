@@ -70,6 +70,7 @@ export function useInvoiceDetails() {
   const menuButtonRefs = React.useRef<Record<string, View | null>>({});
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [showSendForApprovalModal, setShowSendForApprovalModal] = useState(false);
+  const [showSelectProgramForCreateModal, setShowSelectProgramForCreateModal] = useState(false);
 
   const programId = programSelection?.programId;
 
@@ -338,6 +339,15 @@ export function useInvoiceDetails() {
     [],
   );
 
+  const onCreateInvoicePress = useCallback(() => {
+    setShowSelectProgramForCreateModal(true);
+  }, []);
+
+  const onProgramSelectedForCreate = useCallback(() => {
+    setShowSelectProgramForCreateModal(false);
+    (navigation as any).navigate('CreateInvoice');
+  }, [navigation]);
+
   return {
     programId,
     programName: programSelection?.programName ?? null,
@@ -396,5 +406,9 @@ export function useInvoiceDetails() {
     onApproveRejectReject,
     onBulkApply,
     getMenuPosition,
+    showSelectProgramForCreateModal,
+    setShowSelectProgramForCreateModal,
+    onCreateInvoicePress,
+    onProgramSelectedForCreate,
   };
 }

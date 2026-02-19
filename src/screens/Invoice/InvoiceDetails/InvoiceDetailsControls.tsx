@@ -26,6 +26,7 @@ type Props = {
   onToggleSelectAllVisible: () => void;
   selectedInvoiceIdsLength: number;
   onOpenSendForApprovalModal: () => void;
+  onCreateInvoicePress?: () => void;
 };
 
 export const InvoiceDetailsControls: React.FC<Props> = ({
@@ -44,6 +45,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   onToggleSelectAllVisible,
   selectedInvoiceIdsLength,
   onOpenSendForApprovalModal,
+  onCreateInvoicePress,
 }) => {
   return (
     <View style={styles.controlsSection}>
@@ -108,7 +110,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.primaryButton, styles.primaryButtonHalf]}
-              onPress={() => navigation.navigate('CreateInvoice' as never)}>
+              onPress={onCreateInvoicePress ?? (() => navigation.navigate('CreateInvoice' as never))}>
               <View style={styles.buttonIconContainer}>
                 <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
               </View>
@@ -128,7 +130,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.primaryButton, styles.primaryButtonHalf]}
-              onPress={() => navigation.navigate('CreateInvoice' as never)}>
+              onPress={onCreateInvoicePress ?? (() => navigation.navigate('CreateInvoice' as never))}>
               <View style={styles.buttonIconContainer}>
                 <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
               </View>

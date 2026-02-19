@@ -50,22 +50,22 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   // Show TRANSACTIONS menu for all roles
   const showTransactions = true;
   
-  // Show Payments section for Anchor Maker and Anchor Checker only
-  const showPayments = isAnchorMaker || isAnchorChecker;
+  // Show Payments section for Anchor Maker, Anchor Checker, and Dealer Checker
+  const showPayments = isAnchorMaker || isAnchorChecker || isDealerChecker;
   
-  // Show Fund Planner for Dealer Maker and Dealer Checker
-  const showFundPlanner = isDealerMaker || isDealerChecker;
+  // Show Fund Planner for Dealer Maker only (removed dealer_checker)
+  const showFundPlanner = isDealerMaker;
   
-  // Show Loan Accounts for Dealer Maker and Dealer Checker
-  const showLoanAccounts = isDealerMaker || isDealerChecker;
+  // Show Loan Accounts for Dealer Maker only (removed dealer_checker)
+  const showLoanAccounts = isDealerMaker;
   
   // Use shared role labels so all roles (including dealer_checker) are supported
   const roleLabel = userRole ? ROLE_LABELS[userRole] : '';
   
-  // Show specific Invoice menu items based on role
-  const showPendingApprovals = isAnchorMaker || isAnchorChecker;
-  const showRejectedFinances = isAnchorMaker || isAnchorChecker;
-  const showDiscountingPayments = isAnchorMaker || isAnchorChecker;
+  // Show specific Invoice menu items based on role (added dealer_checker)
+  const showPendingApprovals = isAnchorMaker || isAnchorChecker || isDealerChecker;
+  const showRejectedFinances = isAnchorMaker || isAnchorChecker || isDealerChecker;
+  const showDiscountingPayments = isAnchorMaker || isAnchorChecker || isDealerChecker;
   
   // Get current route (name + params) for highlighting active menu item
   const currentRouteInfo = useNavigationState(state => {
@@ -134,9 +134,9 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       setIsPaymentsOpen(true);
     }
 
-    // Check if current route is under Fund Planner (Dealer Maker & Dealer Checker)
+    // Check if current route is under Fund Planner (Dealer Maker only)
     const isFundPlannerRoute = 
-      (isDealerMaker || isDealerChecker) &&
+      isDealerMaker &&
       (currentRoute === 'FinancingRequestScreen' ||
        currentRoute === 'LimitDetailsScreen');
 
@@ -144,9 +144,9 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       setIsFundPlannerOpen(true);
     }
 
-    // Check if current route is under Loan Accounts (Dealer Maker & Dealer Checker)
+    // Check if current route is under Loan Accounts (Dealer Maker only)
     const isLoanAccountsRoute = 
-      (isDealerMaker || isDealerChecker) &&
+      isDealerMaker &&
       (currentRoute === 'ODDetailsScreen' ||
        currentRoute === 'ODRepaymentsScreen' ||
        currentRoute === 'AnchorsListScreen');
@@ -243,112 +243,8 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
 
               {isTransactionsOpen && (
                 <View style={{marginLeft: scaleWidth(24)}}>
-                  {isDealerChecker ? (
-                    // FLAT STRUCTURE FOR DEALER CHECKER (5 direct items)
-                    <>
-                      {/* 1. Invoice - Direct item (InvoiceDashboard with 2 tabs: Summary, Latest Unpaid Invoices) */}
-                      <TouchableOpacity
-                        style={[
-                          styles.button,
-                          currentRoute === 'InvoiceDashboard' && styles.activeButton,
-                        ]}
-                        onPress={() => {
-                          navigation.navigate('InvoiceDashboard');
-                          navigation.closeDrawer();
-                        }}>
-                        <Text
-                          style={[
-                            styles.buttonText,
-                            currentRoute === 'InvoiceDashboard' && styles.activeButtonText,
-                          ]}>
-                          Invoice Overview
-                        </Text>
-                      </TouchableOpacity>
-
-                      {/* 2. Invoice Details - Direct item */}
-                      <TouchableOpacity
-                        style={[
-                          styles.button,
-                          (currentRoute === 'InvoiceDetails' ||
-                            currentRoute === 'CreateInvoice' ||
-                            currentRoute === 'UploadInvoiceList') &&
-                            styles.activeButton,
-                        ]}
-                        onPress={() => {
-                          navigation.navigate('InvoiceDetails');
-                          navigation.closeDrawer();
-                        }}>
-                        <Text
-                          style={[
-                            styles.buttonText,
-                            (currentRoute === 'InvoiceDetails' ||
-                              currentRoute === 'CreateInvoice' ||
-                              currentRoute === 'UploadInvoiceList') &&
-                              styles.activeButtonText,
-                          ]}>
-                          Invoice List & Approvals
-                        </Text>
-                      </TouchableOpacity>
-
-                      {/* 3. Credit Account - Direct item */}
-                      <TouchableOpacity
-                        style={[
-                          styles.button,
-                          currentRoute === 'ANCreditAccount' && styles.activeButton,
-                        ]}
-                        onPress={() => {
-                          navigation.navigate('ANCreditAccount');
-                          navigation.closeDrawer();
-                        }}>
-                        <Text
-                          style={[
-                            styles.buttonText,
-                            currentRoute === 'ANCreditAccount' && styles.activeButtonText,
-                          ]}>
-                          Credit Account
-                        </Text>
-                      </TouchableOpacity>
-
-                      {/* 4. DPD Invoice List - Direct item */}
-                      <TouchableOpacity
-                        style={[
-                          styles.button,
-                          currentRoute === 'DPDInvoiceList' && styles.activeButton,
-                        ]}
-                        onPress={() => {
-                          navigation.navigate('DPDInvoiceList');
-                          navigation.closeDrawer();
-                        }}>
-                        <Text
-                          style={[
-                            styles.buttonText,
-                            currentRoute === 'DPDInvoiceList' && styles.activeButtonText,
-                          ]}>
-                          DPD Invoice List
-                        </Text>
-                      </TouchableOpacity>
-
-                      {/* 5. Payments - Direct item */}
-                      <TouchableOpacity
-                        style={[
-                          styles.button,
-                          currentRoute === 'DiscountingPayments' && styles.activeButton,
-                        ]}
-                        onPress={() => {
-                          navigation.navigate('DiscountingPayments');
-                          navigation.closeDrawer();
-                        }}>
-                        <Text
-                          style={[
-                            styles.buttonText,
-                            currentRoute === 'DiscountingPayments' && styles.activeButtonText,
-                          ]}>
-                          Payments
-                        </Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    // FLAT STRUCTURE UNDER TRANSACTIONS (Anchor Maker, Anchor Checker, Dealer Maker) – no Invoice submenu
+                  {/* Same structure for Anchor Maker, Anchor Checker, and Dealer Checker */}
+                  {(isAnchorMaker || isAnchorChecker || isDealerChecker || isDealerMaker) && (
                     <>
                       {/* 1. Invoice Overview - Direct item */}
                       <TouchableOpacity
@@ -396,8 +292,8 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                         </Text>
                       </TouchableOpacity>
 
-                      {/* 3. Disbursement - Anchor Maker, Anchor Checker & Dealer Maker */}
-                      {(isAnchorMaker || isAnchorChecker || isDealerMaker) && (
+                      {/* 3. Disbursement - Anchor Maker, Anchor Checker, Dealer Maker & Dealer Checker */}
+                      {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker) && (
                         <TouchableOpacity
                           style={[
                             styles.button,

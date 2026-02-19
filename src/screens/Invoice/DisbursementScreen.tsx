@@ -71,6 +71,8 @@ export const DisbursementScreen: React.FC = () => {
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const programSelection = useSelector(selectProgramSelection);
   const programName = programSelection?.programName ?? 'Sun Pharma PGM';
+  const isAnchorMaker = userRole === 'anchor_maker';
+  const isDealerMaker = userRole === 'dealer_maker';
   const isAnchorChecker = userRole === 'anchor_checker';
   const isDealerChecker = userRole === 'dealer_checker';
   const isCheckerRole = isAnchorChecker || isDealerChecker;
@@ -250,6 +252,18 @@ export const DisbursementScreen: React.FC = () => {
                   </TouchableOpacity>
                 )}
                 <View style={styles.infoGrid}>
+                  {/* First chip: Counter Party for dealer-maker, Primary Party for all others */}
+                  {isDealerMaker ? (
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Counter Party</Text>
+                      <Text style={styles.infoValue}>{row.counterParty}</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Primary Party</Text>
+                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                    </View>
+                  )}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Loan Ref No.</Text>
                     <Text style={styles.infoValue}>{row.loanRefNo}</Text>
@@ -257,26 +271,6 @@ export const DisbursementScreen: React.FC = () => {
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Invoice No</Text>
                     <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Bank Name</Text>
-                    <Text style={styles.infoValue}>{row.bankName}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Product Name</Text>
-                    <Text style={styles.infoValue}>{row.productName}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Program Name</Text>
-                    <Text style={styles.infoValue}>{row.programName}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Primary Party</Text>
-                    <Text style={styles.infoValue}>{row.primaryParty}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Counter Party</Text>
-                    <Text style={styles.infoValue}>{row.counterParty}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
@@ -295,13 +289,38 @@ export const DisbursementScreen: React.FC = () => {
                     <Text style={styles.infoValue}>{row.dueDate}</Text>
                   </View>
                   <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Disburse Date</Text>
+                    <Text style={styles.infoLabel}>Disbursed Date</Text>
                     <Text style={styles.infoValue}>{row.disburseDate}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Invoice Status</Text>
                     <Text style={[styles.infoValue, styles.statusGreen]}>{row.invoiceStatus}</Text>
                   </View>
+                  {/* Additional attributes */}
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Bank Name</Text>
+                    <Text style={styles.infoValue}>{row.bankName}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Product Name</Text>
+                    <Text style={styles.infoValue}>{row.productName}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Program Name</Text>
+                    <Text style={styles.infoValue}>{row.programName}</Text>
+                  </View>
+                  {/* Second party chip: flipped vs the first */}
+                  {isDealerMaker ? (
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Primary Party</Text>
+                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Counter Party</Text>
+                      <Text style={styles.infoValue}>{row.counterParty}</Text>
+                    </View>
+                  )}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Approval Status</Text>
                     <Text style={[styles.infoValue, styles.statusGreen]}>{row.approvalStatus}</Text>
