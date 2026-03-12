@@ -1,27 +1,42 @@
-import React, {useState, useMemo, useEffect, useCallback} from 'react';
+import * as React from 'react';
+import {useState, useEffect, useCallback} from 'react';
 import {View, Alert, Dimensions} from 'react-native';
 import {scaleWidth, scaleHeight} from '@utils/Scale';
-import {useNavigation, useRoute} from '@react-navigation/native';
+import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
-import {fetchInvoiceListRequest} from '@store/invoice/inv.slice';
+import {
+  fetchInvoiceListRequest,
+  updateInvoiceStatusRequest,
+  updateInvoiceVerificationRequest,
+} from '@store/invoice/inv.slice';
+import {setProgramSelection} from '@store/programSelection/programSelection.slice';
 import {
   selectInvoiceList,
   selectInvoiceListLoading,
   selectInvoiceListError,
 } from '@store/invoice/inv.selector';
-import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import {
+  selectProgramSelection,
+  selectScopeData,
+} from '@store/programSelection/programSelection.selector';
+import {ProgramSelectionState} from '@store/programSelection/programSelection.types';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
-import {mapApiToRow} from './types';
+import {mapApiToRow, formatDateDash, mapApprovalLogToEntry} from './types';
 import type {InvoiceRow} from './types';
+import {InvoiceListItemApi} from '@store/invoice/inv.types';
+import {invoiceApi} from '@services/api/invoice.api';
+import type {CheckerApprovalEntry} from '@components/CheckerApprovalModal/CheckerApprovalModal';
+import type {ApproveRejectInvoiceDetails} from '@components/ApproveRejectModal/ApproveRejectModal';
 
 export function useInvoiceDetails() {
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useDispatch();
-  const programSelection = useSelector(selectProgramSelection);
-  const invoiceListRaw = useSelector(selectInvoiceList);
+  const programSelection = useSelector(selectProgramSelection) as ProgramSelectionState;
+  const scopeData = useSelector(selectScopeData);
+  const invoiceListRaw = useSelector(selectInvoiceList) as InvoiceListItemApi[];
   const invoiceListLoading = useSelector(selectInvoiceListLoading);
   const invoiceListError = useSelector(selectInvoiceListError);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
@@ -32,26 +47,25 @@ export function useInvoiceDetails() {
     bankName?: string;
     dealerName?: string;
     programName?: string;
+    programId?: string;
   } | undefined;
   const selectedDealerName = routeParams?.dealerName;
   const fromInvoiceDashboard = routeParams?.fromInvoiceDashboard === true;
-  const breadcrumbBank = routeParams?.bankName;
-  const breadcrumbDealer = routeParams?.dealerName;
-  const breadcrumbProgram = routeParams?.programName;
+  const breadcrumbBank = routeParams?.bankName || (programSelection?.programScope !== 'all' ? programSelection?.bankName : undefined);
+  const breadcrumbDealer = routeParams?.dealerName || (programSelection?.programScope !== 'all' ? programSelection?.productName : undefined);
+  const breadcrumbProgram = routeParams?.programName || (programSelection?.programScope !== 'all' ? programSelection?.programName : undefined);
 
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
-  const showAllProgramBreadcrumb = useMemo(() => {
-    const programCount = appliedFilters['Program']?.length ?? 0;
-    const bankCount = appliedFilters['Bank']?.length ?? 0;
-    return programCount > 1 || bankCount > 1;
-  }, [appliedFilters]);
+  // Global "All Program" scope from Program selector (breadcrumb).
+  const isAllProgramScope = programSelection?.programScope === 'all';
 
   const isAnchorMaker = userRole === 'anchor_maker';
   const isAnchorChecker = userRole === 'anchor_checker';
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
+  const isCashnTechUser = userRole === 'cashntech_user';
 
-  const dealerListTitle = 'Invoices';
+  const dealerListTitle = 'Dealer Wise Invoice Details';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -71,91 +85,218 @@ export function useInvoiceDetails() {
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [showSendForApprovalModal, setShowSendForApprovalModal] = useState(false);
   const [showSelectProgramForCreateModal, setShowSelectProgramForCreateModal] = useState(false);
+  const [anchorCheckerInvoiceDetails, setAnchorCheckerInvoiceDetails] = useState<ApproveRejectInvoiceDetails | null>(null);
+  const [anchorCheckerDetailsLoading, setAnchorCheckerDetailsLoading] = useState(false);
+  const [approvalHistoryEntries, setApprovalHistoryEntries] = useState<CheckerApprovalEntry[]>([]);
+  const [approvalHistoryLoading, setApprovalHistoryLoading] = useState(false);
 
-  const programId = programSelection?.programId;
+  // Use programId from Redux; fallback to route params when navigating back from InvoiceDetailView.
+  // When Program scope is "All", we intentionally pass an empty string – API then returns all
+  // invoices within the user's scope (no program filter applied).
+  const programIdFromParams = routeParams?.programId;
+  const concreteProgramId = programSelection?.programId ?? programIdFromParams;
+  const programId = isAllProgramScope ? '' : concreteProgramId ?? '';
 
-  const apiFilters = useMemo(() => {
-    const inv = appliedFilters['Invoice Status'];
-    const appr = appliedFilters['Approval Status'];
+  // Restore program selection when coming back with programId in params (e.g. from InvoiceDetailView)
+  useEffect(() => {
+    if (!programIdFromParams || programSelection?.programId) return;
+    // Try to restore full selection from scopeData if available
+    if (scopeData?.length) {
+      for (const bank of scopeData) {
+        for (const product of bank.products || []) {
+          const program = product.programs?.find((p: any) => p.id === programIdFromParams);
+          if (program) {
+            dispatch(
+              setProgramSelection({
+                bankId: bank.id,
+                bankName: bank.name,
+                productId: product.id,
+                productName: product.name,
+                programId: program.id,
+                programName: program.name,
+              }),
+            );
+            return;
+          }
+        }
+      }
+    }
+    dispatch(setProgramSelection({programId: programIdFromParams}));
+  }, [programIdFromParams, programSelection?.programId, scopeData, dispatch]);
+
+  const inv = appliedFilters['Invoice Status'];
+  const appr = appliedFilters['Approval Status'];
+  const apiFilters: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]} | undefined = (() => {
     const body: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]} = {};
     if (inv?.length) body.byInvoiceStatus = inv;
     if (appr?.length) body.byApprovalStatus = appr;
     return Object.keys(body).length ? body : undefined;
-  }, [appliedFilters]);
+  })();
+
+  const hasAnyProgramContext = isAllProgramScope || !!concreteProgramId;
 
   useEffect(() => {
-    if (programId) {
-      dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
-    }
-  }, [programId, apiFilters, dispatch]);
+    if (!hasAnyProgramContext) return;
+    dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
+  }, [hasAnyProgramContext, programId, apiFilters, dispatch]);
 
-  const invoiceData = useMemo(
-    () => invoiceListRaw.map(mapApiToRow),
-    [invoiceListRaw],
+  // Refetch list when screen comes into focus (e.g. back from InvoiceDetailView)
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasAnyProgramContext) return;
+      dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
+    }, [hasAnyProgramContext, programId, apiFilters, dispatch]),
   );
 
-  // Summary metrics for Invoice List & Approval (match design: Dealers, Total Invoices, Amount, Pending, Approved, Rejected)
-  const summaryStats = useMemo(() => {
-    const dealers = new Set(invoiceData.map(r => r.dealerName)).size;
-    const total = invoiceData.length;
-    let pending = 0;
-    let approved = 0;
-    let rejected = 0;
-    invoiceData.forEach(r => {
-      const a = (r.approvalStatus || '').toLowerCase();
-      const s = (r.invoiceStatus || '').toLowerCase();
-      if (a.includes('reject') || s.includes('reject')) rejected += 1;
-      else if (a.includes('approval_complete') || a.includes('approved') || a.includes('complete')) approved += 1;
-      else pending += 1;
-    });
-    return {
-      dealers,
-      totalInvoices: total,
-      totalInvoiceAmount: '₹ 20,000,000.00', // placeholder until API provides amount
-      pendingInvoices: pending,
-      approvedInvoices: approved,
-      rejectedInvoices: rejected,
-    };
-  }, [invoiceData]);
-
-  const filteredData = useMemo(() => {
-    let data = invoiceData;
-    
-    // Filter by dealerName if provided (from Summary tab click)
-    // Use flexible matching (includes) to handle slight variations in dealer name
-    // Only filter if we have invoice data, otherwise show all invoices
-    if (selectedDealerName && invoiceData.length > 0) {
-      const dealerNameLower = selectedDealerName.toLowerCase().trim();
-      const filteredByDealer = data.filter(item => {
-        const itemDealerName = item.dealerName?.toLowerCase().trim() || '';
-        const itemDealerCode = item.dealerCode?.toLowerCase().trim() || '';
-        // Match by dealer name or dealer code (flexible matching)
-        return itemDealerName.includes(dealerNameLower) || 
-               dealerNameLower.includes(itemDealerName) ||
-               itemDealerCode.includes(dealerNameLower) ||
-               dealerNameLower.includes(itemDealerCode);
+  // Fetch invoice details for anchor_checker or CashnTech when ApproveReject modal opens
+  useEffect(() => {
+    if ((!isAnchorChecker && !isCashnTechUser) || !showApproveRejectModal || !selectedInvoiceId) {
+      setAnchorCheckerInvoiceDetails(null);
+      return;
+    }
+    let cancelled = false;
+    setAnchorCheckerDetailsLoading(true);
+    setAnchorCheckerInvoiceDetails(null);
+    invoiceApi
+      .getInvoiceDetails(selectedInvoiceId)
+      .then((data: any) => {
+        if (cancelled) return;
+        const apm = data?.anchorParticipantMapping;
+        const party = data?.party;
+        const dealerName = apm?.party?.entity_name ?? apm?.party?.name ?? '-';
+        const creditAccountNumber = apm?.od_account_no ?? '-';
+        const anchorName = party?.entity_name ?? party?.name ?? '-';
+        const invoiceDate = data?.invoice_date ? formatDateDash(data.invoice_date) : 'DD / MM / YYYY';
+        const invoiceDueDate = data?.invoice_due_date ? formatDateDash(data.invoice_due_date) : 'DD / MM / YYYY';
+        // Use final_total (total invoice amount including tax/discount) for approval modal
+        const totalAmount = data?.final_total ?? data?.sub_total;
+        const invoiceAmount =
+          totalAmount != null
+            ? `Rs. ${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /-`
+            : 'Rs. 0 /-';
+        setAnchorCheckerInvoiceDetails({
+          dealerName,
+          creditAccountNumber,
+          anchorName,
+          invoiceDate,
+          invoiceDueDate,
+          invoiceAmount,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setAnchorCheckerInvoiceDetails(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAnchorCheckerDetailsLoading(false);
       });
-      
-      // Only apply dealer filter if we get results, otherwise show all invoices
-      // This ensures list shows invoices like before when dealerName doesn't match
-      if (filteredByDealer.length > 0) {
-        data = filteredByDealer;
-      }
+    return () => {
+      cancelled = true;
+    };
+  }, [isAnchorChecker, isCashnTechUser, showApproveRejectModal, selectedInvoiceId]);
+
+  // Fetch approval history when Approval History modal opens
+  useEffect(() => {
+    if (!showCheckerApprovalModal || !selectedInvoiceId) {
+      setApprovalHistoryEntries([]);
+      setApprovalHistoryLoading(false);
+      return;
     }
-    
-    // Apply search text filter
-    if (searchText.trim()) {
-      const term = searchText.toLowerCase();
-      data = data.filter(
-        item =>
-          (item.dealerName?.toLowerCase() || '').includes(term) ||
-          (item.dealerCode?.toLowerCase() || '').includes(term) ||
-          (item.invoiceNo?.toLowerCase() || '').includes(term),
+    let cancelled = false;
+    setApprovalHistoryLoading(true);
+    setApprovalHistoryEntries([]);
+    invoiceApi
+      .getInvoiceApprovalHistory(selectedInvoiceId)
+      .then((logs: any[]) => {
+        if (cancelled) return;
+        const entries = (Array.isArray(logs) ? logs : [])
+          .map(log => {
+            try {
+              return mapApprovalLogToEntry(log);
+            } catch {
+              return null;
+            }
+          })
+          .filter((entry): entry is CheckerApprovalEntry => entry !== null);
+        setApprovalHistoryEntries(entries);
+      })
+      .catch(() => {
+        if (!cancelled) setApprovalHistoryEntries([]);
+      })
+      .finally(() => {
+        if (!cancelled) setApprovalHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showCheckerApprovalModal, selectedInvoiceId]);
+
+  const invoiceData = invoiceListRaw.map(mapApiToRow);
+
+  const banks = [...new Set(invoiceData.map(r => r.bankName).filter(Boolean))].sort();
+  const products = [...new Set(invoiceData.map(r => r.productName).filter(Boolean))].sort();
+  const programs = [...new Set(invoiceData.map(r => r.programName).filter(Boolean))].sort();
+  const primaryParties = [...new Set(invoiceData.map(r => r.primaryParty).filter(Boolean))].sort();
+  const counterParties = [...new Set(invoiceData.map(r => r.counterParty).filter(Boolean))].sort();
+  const invoiceStatuses = [...new Set(invoiceData.map(r => r.invoiceStatus).filter(Boolean))].sort();
+  const approvalStatuses = [...new Set(invoiceData.map(r => r.approvalStatus).filter(Boolean))].sort();
+  const invoiceFilterData = {
+    Bank: banks.length ? banks : ['No data'],
+    Product: products.length ? products : ['No data'],
+    Program: programs.length ? programs : ['No data'],
+    'Primary Party': primaryParties.length ? primaryParties : ['No data'],
+    'Counter Party': counterParties.length ? counterParties : ['No data'],
+    'Invoice Status': invoiceStatuses.length ? invoiceStatuses : ['No data'],
+    'Approval Status': approvalStatuses.length ? approvalStatuses : ['No data'],
+  };
+
+  // Summary metrics for Invoice List & Approval (match design: Dealers, Total Invoices, Amount, Pending, Approved, Rejected)
+  const dealersCount = new Set(invoiceData.map(r => r.dealerName)).size;
+  const totalInvoices = invoiceData.length;
+  let pending = 0;
+  let approved = 0;
+  let rejected = 0;
+  invoiceData.forEach(r => {
+    const a = (r.approvalStatus || '').toLowerCase();
+    const s = (r.invoiceStatus || '').toLowerCase();
+    if (a.includes('reject') || s.includes('reject')) rejected += 1;
+    else if (a.includes('approval_complete') || a.includes('approved') || a.includes('complete')) approved += 1;
+    else pending += 1;
+  });
+  const summaryStats = {
+    dealers: dealersCount,
+    totalInvoices,
+    totalInvoiceAmount: '₹ 20,000,000.00', // placeholder until API provides amount
+    pendingInvoices: pending,
+    approvedInvoices: approved,
+    rejectedInvoices: rejected,
+  };
+
+  let filteredData = invoiceData;
+  if (selectedDealerName && invoiceData.length > 0) {
+    const dealerNameLower = selectedDealerName.toLowerCase().trim();
+    const filteredByDealer = filteredData.filter(item => {
+      const itemDealerName = item.dealerName?.toLowerCase().trim() || '';
+      const itemDealerCode = item.dealerCode?.toLowerCase().trim() || '';
+      return (
+        itemDealerName.includes(dealerNameLower) ||
+        dealerNameLower.includes(itemDealerName) ||
+        itemDealerCode.includes(dealerNameLower) ||
+        dealerNameLower.includes(itemDealerCode)
       );
+    });
+    if (filteredByDealer.length > 0) {
+      filteredData = filteredByDealer;
     }
-    
-    return data;
-  }, [invoiceData, searchText, selectedDealerName]);
+  }
+  if (searchText.trim()) {
+    const term = searchText.toLowerCase();
+    filteredData = filteredData.filter(
+      item =>
+        (item.dealerName?.toLowerCase() || '').includes(term) ||
+        (item.dealerCode?.toLowerCase() || '').includes(term) ||
+        (item.invoiceNo?.toLowerCase() || '').includes(term),
+    );
+  }
 
   const handleMenuToggle = (invoiceId: string) => {
     if (openMenuId === invoiceId) {
@@ -185,6 +326,14 @@ export function useInvoiceDetails() {
       invoiceId;
 
     switch (action) {
+      case 'viewDetails':
+        (navigation as any).navigate('InvoiceDetailView', {
+          invoiceId,
+          invoiceNo,
+          programId,
+          fromInvoiceDashboard,
+        });
+        break;
       case 'edit':
         (navigation as any).navigate('CreateInvoice', {
           invoiceId,
@@ -194,6 +343,7 @@ export function useInvoiceDetails() {
         break;
       case 'checkerApproval':
         setSelectedInvoiceId(invoiceId);
+        setSelectedInvoiceNo(invoiceNo);
         setShowCheckerApprovalModal(true);
         break;
       case 'recreateInvoice':
@@ -205,6 +355,7 @@ export function useInvoiceDetails() {
         break;
       case 'approvalHistory':
         setSelectedInvoiceId(invoiceId);
+        setSelectedInvoiceNo(invoiceNo);
         setShowCheckerApprovalModal(true);
         break;
       case 'delete':
@@ -224,6 +375,11 @@ export function useInvoiceDetails() {
         );
         break;
       case 'approveReject':
+        setSelectedInvoiceId(invoiceId);
+        setSelectedInvoiceNo(invoiceNo);
+        setShowApproveRejectModal(true);
+        break;
+      case 'invoiceVerification':
         setSelectedInvoiceId(invoiceId);
         setSelectedInvoiceNo(invoiceNo);
         setShowApproveRejectModal(true);
@@ -258,18 +414,36 @@ export function useInvoiceDetails() {
     );
   };
 
-  const selectedRowsForModal = useMemo(
-    () => invoiceData.filter(row => selectedInvoiceIds.includes(row.id)),
-    [invoiceData, selectedInvoiceIds],
+  const selectedRowsForModal = invoiceData.filter(row =>
+    selectedInvoiceIds.includes(row.id),
   );
 
-  const allSelectedOnScreen = useMemo(
-    () =>
-      (isDealerChecker || isAnchorChecker) &&
-      filteredData.length > 0 &&
-      filteredData.every(row => selectedInvoiceIds.includes(row.id)),
-    [filteredData, selectedInvoiceIds, isDealerChecker, isAnchorChecker],
-  );
+  const selectedRow =
+    filteredData.find(r => r.id === selectedInvoiceId) ??
+    invoiceData.find(r => r.id === selectedInvoiceId);
+
+  const selectedInvoiceDetails = selectedRow
+    ? {
+        subTotal: selectedRow.invoiceAmount,
+        withholdingTaxesPercent: '0.00/-',
+        withholdingAmount: '0.00/-',
+        finalPayableAmount: selectedRow.invoiceAmount,
+        finalDueDate: selectedRow.dueDate,
+      }
+    : undefined;
+
+  const allSelectedOnScreen =
+    (isDealerChecker || isAnchorChecker) &&
+    filteredData.length > 0 &&
+    filteredData.every(row => selectedInvoiceIds.includes(row.id));
+
+  const approvalLevel = isAnchorChecker
+    ? 1
+    : isDealerMaker
+    ? 2
+    : isDealerChecker
+    ? 3
+    : 1;
 
   const toggleSelectAllVisible = () => {
     if (!isDealerChecker && !isAnchorChecker) return;
@@ -283,26 +457,87 @@ export function useInvoiceDetails() {
     }
   };
 
-  const onApproveRejectApprove = (invoiceId: string) => {
+  const onApproveRejectApprove = (invoiceId: string, remarks?: string) => {
+    const invNo = selectedInvoiceNo;
+    if (__DEV__) {
+      console.log('[DEBUG 1] onApproveRejectApprove:', {
+        invoiceId,
+        invoiceNo: invNo,
+        programId,
+        apiFilters,
+      });
+    }
+    dispatch(
+      updateInvoiceStatusRequest({
+        invoiceId,
+        action: 'Approve',
+        approvalLevel,
+        remark: remarks,
+        programId,
+        filters: apiFilters,
+      }),
+    );
     setShowApproveRejectModal(false);
     setSelectedInvoiceId(null);
     setSelectedInvoiceNo(null);
-    const invNo = selectedInvoiceNo || invoiceId;
-    (navigation as any).navigate('InvoiceDetailView', {
-      invoiceId,
-      invoiceNo: invNo,
-    });
-    if (programId) {
-      dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
-    }
+    setAnchorCheckerInvoiceDetails(null);
   };
 
-  const onApproveRejectReject = () => {
-    if (programId) {
-      dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
-    }
+  const onApproveRejectReject = (invoiceId: string, remarks?: string) => {
+    dispatch(
+      updateInvoiceStatusRequest({
+        invoiceId,
+        action: 'Reject',
+        approvalLevel,
+        remark: remarks,
+        programId,
+        filters: apiFilters,
+      }),
+    );
+    setShowApproveRejectModal(false);
     setSelectedInvoiceId(null);
     setSelectedInvoiceNo(null);
+    setAnchorCheckerInvoiceDetails(null);
+  };
+
+  const onVerifyApprove = (invoiceId: string, remarks?: string) => {
+    const invNo = selectedInvoiceNo;
+    dispatch(
+      updateInvoiceVerificationRequest({
+        invoiceId,
+        action: 'Verify',
+        remark: remarks,
+        programId,
+        filters: apiFilters,
+        onSuccess: () =>
+          (navigation as any).navigate('InvoiceDetailView', {
+            invoiceId,
+            invoiceNo: invNo || invoiceId,
+            programId,
+            fromInvoiceDashboard,
+          }),
+      }),
+    );
+    setShowApproveRejectModal(false);
+    setSelectedInvoiceId(null);
+    setSelectedInvoiceNo(null);
+    setAnchorCheckerInvoiceDetails(null);
+  };
+
+  const onVerifyReject = (invoiceId: string, remarks?: string) => {
+    dispatch(
+      updateInvoiceVerificationRequest({
+        invoiceId,
+        action: 'Reject',
+        remark: remarks,
+        programId,
+        filters: apiFilters,
+      }),
+    );
+    setShowApproveRejectModal(false);
+    setSelectedInvoiceId(null);
+    setSelectedInvoiceNo(null);
+    setAnchorCheckerInvoiceDetails(null);
   };
 
   const onBulkApply = (action: 'approve' | 'reject' | 'verify' | 'cancel') => {
@@ -348,14 +583,20 @@ export function useInvoiceDetails() {
     (navigation as any).navigate('CreateInvoice');
   }, [navigation]);
 
+  // Create Invoice should be disabled when user is on global "All Program" scope
+  // or when no concrete program is selected.
+  const isCreateInvoiceEnabled =
+    !isAllProgramScope && !!concreteProgramId;
+
   return {
     programId,
-    programName: programSelection?.programName ?? null,
+    programName: routeParams?.programName || programSelection?.programName || '',
     summaryStats,
     apiFilters,
     dispatch,
     navigation,
     invoiceData,
+    invoiceFilterData,
     filteredData,
     invoiceListLoading,
     invoiceListError,
@@ -363,6 +604,7 @@ export function useInvoiceDetails() {
     isAnchorChecker,
     isDealerMaker,
     isDealerChecker,
+    isCashnTechUser,
     dealerListTitle,
     selectedDealerName,
     fromInvoiceDashboard,
@@ -379,12 +621,18 @@ export function useInvoiceDetails() {
     menuButtonRefs,
     showCheckerApprovalModal,
     setShowCheckerApprovalModal,
+    approvalHistoryEntries,
+    approvalHistoryLoading,
+    setApprovalHistoryLoading,
     showApproveRejectModal,
     setShowApproveRejectModal,
     selectedInvoiceId,
     setSelectedInvoiceId,
     selectedInvoiceNo,
     setSelectedInvoiceNo,
+    selectedInvoiceDetails,
+    anchorCheckerInvoiceDetails,
+    anchorCheckerDetailsLoading,
     showAttachmentModal,
     selectedInvoiceIds,
     setSelectedInvoiceIds,
@@ -392,11 +640,10 @@ export function useInvoiceDetails() {
     setShowSendForApprovalModal,
     selectedRowsForModal,
     allSelectedOnScreen,
-    fromInvoiceDashboard,
     breadcrumbBank,
     breadcrumbDealer,
     breadcrumbProgram,
-    showAllProgramBreadcrumb,
+    showAllProgramBreadcrumb: isAllProgramScope,
     handleMenuToggle,
     handleMenuAction,
     handleAttachmentUpload,
@@ -404,11 +651,15 @@ export function useInvoiceDetails() {
     toggleSelectAllVisible,
     onApproveRejectApprove,
     onApproveRejectReject,
+    onVerifyApprove,
+    onVerifyReject,
     onBulkApply,
     getMenuPosition,
     showSelectProgramForCreateModal,
     setShowSelectProgramForCreateModal,
     onCreateInvoicePress,
     onProgramSelectedForCreate,
+    isCreateInvoiceEnabled,
+    hasAnyProgramContext,
   };
 }

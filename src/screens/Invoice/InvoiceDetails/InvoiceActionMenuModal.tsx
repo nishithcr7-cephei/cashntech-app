@@ -24,6 +24,7 @@ type Props = {
   isAnchorChecker: boolean;
   isDealerMaker: boolean;
   isDealerChecker: boolean;
+  isCashnTechUser?: boolean;
 };
 
 export const InvoiceActionMenuModal: React.FC<Props> = ({
@@ -37,6 +38,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   isAnchorChecker,
   isDealerMaker,
   isDealerChecker,
+  isCashnTechUser = false,
 }) => {
   if (!openMenuId) return null;
 
@@ -50,47 +52,112 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
         <Pressable
           style={[styles.menu, getMenuPosition(menuAnchor)]}
           onPress={() => {}}>
-          {(isAnchorMaker || isDealerMaker) && (
+          {/* Maker actions: makers see disabled Edit/Recreate/Delete + active Approval History */}
+          {(isAnchorMaker || isDealerMaker) && !isCashnTechUser && (
             <>
+              {/* Edit – disabled for makers */}
               <TouchableOpacity
-                onPress={() => onMenuAction('edit', openMenuId)}
-                style={styles.menuItem}>
+                disabled={isAnchorMaker || isDealerMaker}
+                onPress={isAnchorMaker || isDealerMaker ? () => {} : () => onMenuAction('edit', openMenuId)}
+                style={[styles.menuItem, (isAnchorMaker || isDealerMaker) && styles.menuItemDisabled]}>
                 <FontAwesome6 name="pencil" iconStyle="solid" color={Colors.darkblack} size={16} />
-                <Text style={styles.menuText}>Edit</Text>
+                <Text style={[styles.menuText, (isAnchorMaker || isDealerMaker) && styles.menuTextDisabled]}>
+                  Edit
+                </Text>
               </TouchableOpacity>
+
+              {/* Recreate Invoice – disabled for makers */}
               <TouchableOpacity
-                onPress={() => onMenuAction('recreateInvoice', openMenuId)}
-                style={styles.menuItem}>
+                disabled={isAnchorMaker || isDealerMaker}
+                onPress={isAnchorMaker || isDealerMaker ? () => {} : () => onMenuAction('recreateInvoice', openMenuId)}
+                style={[styles.menuItem, (isAnchorMaker || isDealerMaker) && styles.menuItemDisabled]}>
                 <FontAwesome6 name="square-plus" iconStyle="solid" color={Colors.darkblack} size={16} />
-                <Text style={styles.menuText}>Recreate Invoice</Text>
+                <Text style={[styles.menuText, (isAnchorMaker || isDealerMaker) && styles.menuTextDisabled]}>
+                  Recreate Invoice
+                </Text>
               </TouchableOpacity>
+
+              {/* Approval History – always active for all makers */}
               <TouchableOpacity
                 onPress={() => onMenuAction('approvalHistory', openMenuId)}
                 style={styles.menuItem}>
                 <FontAwesome6 name="clock-rotate-left" iconStyle="solid" color={Colors.darkblack} size={16} />
                 <Text style={styles.menuText}>Approval History</Text>
               </TouchableOpacity>
+
+              {/* View Invoice Details */}
               <TouchableOpacity
-                onPress={() => onMenuAction('delete', openMenuId)}
+                onPress={() => onMenuAction('viewDetails', openMenuId)}
                 style={styles.menuItem}>
+                <FontAwesome6 name="file-lines" iconStyle="solid" color={Colors.darkblack} size={16} />
+                <Text style={styles.menuText}>View Invoice Details</Text>
+              </TouchableOpacity>
+
+              {/* Dealer Maker can approve/reject at the next workflow step */}
+              {isDealerMaker && (
+                <TouchableOpacity
+                  onPress={() => onMenuAction('approveReject', openMenuId)}
+                  style={styles.menuItem}>
+                  <FontAwesome6 name="check" iconStyle="solid" color={Colors.darkblack} size={16} />
+                  <Text style={styles.menuText}>Invoice Verification</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Delete – disabled for makers */}
+              <TouchableOpacity
+                disabled={isAnchorMaker || isDealerMaker}
+                onPress={isAnchorMaker || isDealerMaker ? () => {} : () => onMenuAction('delete', openMenuId)}
+                style={[styles.menuItem, (isAnchorMaker || isDealerMaker) && styles.menuItemDisabled]}>
                 <FontAwesome6 name="trash" iconStyle="solid" color={Colors.red} size={16} />
-                <Text style={[styles.menuText, styles.deleteMenuText]}>Delete</Text>
+                <Text style={[styles.menuText, styles.deleteMenuText, (isAnchorMaker || isDealerMaker) && styles.menuTextDisabled]}>
+                  Delete
+                </Text>
               </TouchableOpacity>
             </>
           )}
-          {(isAnchorChecker || isDealerChecker) && (
+          {(isAnchorChecker || isDealerChecker) && !isCashnTechUser && (
             <>
+              {/* View Invoice Details */}
+              <TouchableOpacity
+                onPress={() => onMenuAction('viewDetails', openMenuId)}
+                style={styles.menuItem}>
+                <FontAwesome6 name="file-lines" iconStyle="solid" color={Colors.darkblack} size={16} />
+                <Text style={styles.menuText}>View Invoice Details</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => onMenuAction('approveReject', openMenuId)}
                 style={styles.menuItem}>
                 <FontAwesome6 name="check" iconStyle="solid" color={Colors.darkblack} size={16} />
-                <Text style={styles.menuText}>Approve / Reject</Text>
+                <Text style={styles.menuText}>Invoice Verification</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => onMenuAction('checkerApproval', openMenuId)}
                 style={styles.menuItem}>
                 <FontAwesome6 name="calendar-check" iconStyle="solid" color="#3B82F6" size={16} />
                 <Text style={styles.menuText}>Checker Approval</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          {isCashnTechUser && (
+            <>
+              {/* View Invoice Details */}
+              <TouchableOpacity
+                onPress={() => onMenuAction('viewDetails', openMenuId)}
+                style={styles.menuItem}>
+                <FontAwesome6 name="file-lines" iconStyle="solid" color={Colors.darkblack} size={16} />
+                <Text style={styles.menuText}>View Invoice Details</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onMenuAction('invoiceVerification', openMenuId)}
+                style={styles.menuItem}>
+                <FontAwesome6 name="circle-check" iconStyle="solid" color={Colors.darkblack} size={16} />
+                <Text style={styles.menuText}>Invoice Verification</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onMenuAction('approvalHistory', openMenuId)}
+                style={styles.menuItem}>
+                <FontAwesome6 name="clock-rotate-left" iconStyle="solid" color={Colors.darkblack} size={16} />
+                <Text style={styles.menuText}>Approval History</Text>
               </TouchableOpacity>
             </>
           )}
@@ -130,5 +197,11 @@ const styles = StyleSheet.create({
   },
   deleteMenuText: {
     color: Colors.red,
+  },
+  menuItemDisabled: {
+    opacity: 0.35,
+  },
+  menuTextDisabled: {
+    color: '#A0A0A0',
   },
 });

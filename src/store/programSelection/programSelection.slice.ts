@@ -15,6 +15,7 @@ const initialState: ProgramSelectionState = {
   scopeData: null,
   scopeLoading: false,
   scopeError: null,
+  allProgramIds: null,
 };
 
 const programSelectionSlice = createSlice({
@@ -54,6 +55,14 @@ const programSelectionSlice = createSlice({
       state.scopeData = action.payload;
       state.scopeLoading = false;
       state.scopeError = null;
+      // Save all program IDs so "All Program" can pass them to invoice/summary on next page
+      const ids: string[] = [];
+      action.payload?.forEach(bank =>
+        bank.products?.forEach(p =>
+          p.programs?.forEach(prog => ids.push(prog.id)),
+        ),
+      );
+      state.allProgramIds = ids.length ? ids : null;
     },
     fetchUserScopeFailure: (state, action: PayloadAction<string>) => {
       state.scopeLoading = false;
@@ -74,8 +83,9 @@ const programSelectionSlice = createSlice({
     // ============================================================================
     toggleProgramSelection: (state, action: PayloadAction<SelectedProgram>) => {
       const program = action.payload;
-      // Selecting a specific program implies "selected" scope
+      // Selecting a specific program implies "selected" scope; next page gets only this ID
       state.programScope = 'selected';
+      state.allProgramIds = null;
       // Single selection: Clear all previous selections and only keep the new one
       state.selectedPrograms = [program];
       // Update single selection fields

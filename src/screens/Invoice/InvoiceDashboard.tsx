@@ -1,23 +1,21 @@
-import React, {useMemo, useState} from 'react';
+import React, {useMemo, useState, useEffect} from 'react';
 import {
+  ActivityIndicator,
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  Pressable,
-  Modal,
-  Dimensions,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useSelector} from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
 import {
   AppBar,
   Container,
-  FilterModal,
   ProgramBreadcrumb,
   CheckerApprovalModal,
   ApproveRejectModal,
@@ -26,80 +24,112 @@ import {
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
-import {Dots, RightChevron} from '@assets/Icons';
+import {Dots} from '@assets/Icons';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
+import {
+  selectScopeData,
+  selectScopeLoading,
+  selectProgramSelection,
+  selectAllProgramIds,
+} from '@store/programSelection/programSelection.selector';
+import {fetchUserScopeRequest} from '@store/programSelection/programSelection.slice';
+import {
+  fetchInvoiceSummaryRequest,
+  fetchLatestInvoicesRequest,
+  selectInvoiceOverviewSummary,
+  selectInvoiceOverviewSummaryLoading,
+  selectInvoiceOverviewLatest,
+  selectInvoiceOverviewLatestLoading,
+} from '@store/invoiceOverview';
+import type {Bank} from '@constants/programSelection';
+import {formatDateDash} from '@screens/Invoice/InvoiceDetails/types';
 
 type ProductTabType = 'all_product' | 'dealer_finance' | 'vendor_finance' | 'pid';
 
-const getCardMetrics = (productTab: ProductTabType) => {
-  const isAll = productTab === 'all_product' || productTab === 'vendor_finance' || productTab === 'pid';
+const getCardMetrics = (
+  productTab: ProductTabType,
+  summaryRows?: {
+    sanctioned_limit: number | null;
+    drawing_power: number | null;
+  }[],
+) => {
+  const rows = summaryRows ?? [];
+
+  const totalLimit = rows.reduce(
+    (sum, row) => sum + (row.sanctioned_limit || 0),
+    0,
+  );
+  const totalDrawingPower = rows.reduce(
+    (sum, row) => sum + (row.drawing_power || 0),
+    0,
+  );
+  const availableLimit = totalLimit - totalDrawingPower;
+
+  const formatCurrency = (amount: number) =>
+    `₹ ${amount.toLocaleString('en-IN', {
+      maximumFractionDigits: 2,
+    })}`;
+
   return [
-    {label: 'Total Program Limit', value: '₹ 100,000,000.00'},
-    {label: isAll ? 'No. of Accounts' : "No. of Dealer's Accounts", value: '1'},
-    {label: isAll ? 'Limit Uploaded' : 'Dealer Limit Uploaded', value: '₹ 20,000,000.00'},
-    {label: 'Utilized Limit', value: '₹ 1,100.00'},
-    {label: 'Available Limit', value: '₹ 19,998,900.00'},
-    {label: 'Overdue Amount', value: '₹ 0'},
+    {label: 'Total Program Limit', value: formatCurrency(totalLimit)},
+    {label: 'Limit Uploaded', value: formatCurrency(totalLimit)},
+    {label: 'Utilized Limit', value: formatCurrency(totalDrawingPower)},
+    {label: 'Available Limit', value: formatCurrency(availableLimit)},
+    {label: 'Overdue Amount', value: formatCurrency(0)},
   ];
 };
 
-// Summary – columns match web. Include bankName for breadcrumb when navigating to Invoice List & Approval.
-const dealerSummaryRows = Array.from({length: 6}).map((_, index) => ({
-  id: `dealer-${index}`,
-  bankName: index === 0 ? 'UGRO' : 'TCL',
-  programName: index === 0 ? 'UGRO DF Program' : 'TCL DF Program',
-  primaryParty: 'Sun Pharma',
-  counterParty: index === 0 ? '24 hrs medical' : 'All India Medicc',
-  odAccount: index === 0 ? '' : '98765432101234',
-  drawingPower: index === 0 ? '4,50,00,000.00' : '20,00,000.00',
-  utilizedLimit: '-',
-  pipelineRequests: '-',
-  availableLimit: '-',
-  overdueAmount: '-',
-  dpdDays: '-',
-  status: 'Regular',
-}));
-
-const unpaidRows = Array.from({length: 5}).map((_, index) => ({
-  id: `unpaid-${index}`,
-  dealer: 'Hero Finance',
-  invoiceNo: '123101010',
-  invoiceAmount: '₹20,000.00',
-  piAmount: '₹20,00,000.00',
-  invoiceDate: 'dd-mm-yyyy',
-  invoiceStatus: 'Created',
-  approvalStatus: 'Pending',
-  adminStatus: '-',
-  financeStatus: index === 0 ? '-' : '₹19,998,900.00',
-  disbursementDate: 'dd-mm-yyyy',
-  disbAmount: '₹0.00',
-  utrNo: '30',
-}));
-
-// Dummy filter data for Invoice Dashboard
-const dashboardFilterData = {
-  'Dealer Name': ['Hero Finance', 'ABC Finance', 'SK Finance', 'Seven Pharma', 'New Finance'],
-  'Status': ['Regular', 'Overdue', 'Pending'],
-  'OD Account': ['123101010', '12355253', '123101011'],
+const getProgramIdsForTab = (
+  tab: ProductTabType,
+  banks: Bank[] | null,
+): string[] => {
+  if (!banks || banks.length === 0) return [];
+  const ids: string[] = [];
+  banks.forEach(bank => {
+    bank.products.forEach(product => {
+      const isDFProduct = product.name.toLowerCase().includes('dealer finance');
+      product.programs.forEach(program => {
+        const isDFProgram =
+          program.name.toLowerCase().includes('df') ||
+          program.name.toLowerCase().includes('dealer finance');
+        const includeInAll = tab === 'all_product';
+        const includeInDF =
+          tab === 'dealer_finance' && (isDFProduct || isDFProgram);
+        if (includeInAll || includeInDF) {
+          ids.push(program.id);
+        }
+      });
+    });
+  });
+  return Array.from(new Set(ids));
 };
 
+
 export const InvoiceDashboard: React.FC = () => {
+  const dispatch = useDispatch();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const scopeData = useSelector(selectScopeData) as Bank[] | null;
+  const scopeLoading = useSelector(selectScopeLoading);
+  const programSelection = useSelector(selectProgramSelection);
+  const allProgramIds = useSelector(selectAllProgramIds);
+  const summaryData = useSelector(selectInvoiceOverviewSummary);
+  const summaryLoading = useSelector(selectInvoiceOverviewSummaryLoading);
+  const latestData = useSelector(selectInvoiceOverviewLatest);
+  const latestLoading = useSelector(selectInvoiceOverviewLatestLoading);
   
   // Role-based visibility flags
   const isAnchorMaker = userRole === 'anchor_maker';
   const isDealerMaker = userRole === 'dealer_maker';
   const isAnchorChecker = userRole === 'anchor_checker';
   const isDealerChecker = userRole === 'dealer_checker';
+  const isCashnTechUser = userRole === 'cashntech_user';
   const isCheckerRole = isAnchorChecker || isDealerChecker;
   
   const [activeTab, setActiveTab] = useState<'dealers' | 'unpaid'>('dealers');
   const [productTab, setProductTab] = useState<ProductTabType>('all_product');
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showCheckerApprovalModal, setShowCheckerApprovalModal] = useState(false);
   const [showApproveRejectModal, setShowApproveRejectModal] = useState(false);
@@ -112,6 +142,51 @@ export const InvoiceDashboard: React.FC = () => {
     DrawerNavigationProp<HomeNavigatorType>,
     NativeStackNavigationProp<any>
   >>();
+
+  // Derived programIds based on program scope + active product tab
+  // - selected scope  → single programId
+  // - all scope       → all_product tab: all IDs; DF/VF/PID tab: filter by product type from scopeData
+  // - fallback        → filter from scopeData by tab (e.g. when scope loads after landing)
+  const programIds = useMemo(() => {
+    if (
+      programSelection?.programScope === 'selected' &&
+      programSelection?.programId
+    ) {
+      return [programSelection.programId];
+    }
+    if (
+      programSelection?.programScope === 'all' &&
+      allProgramIds &&
+      allProgramIds.length > 0
+    ) {
+      if (productTab === 'all_product') {
+        return allProgramIds;
+      }
+      // DF / VF / PID tab — filter by product type using scopeData mapping
+      return getProgramIdsForTab(productTab, scopeData);
+    }
+    return getProgramIdsForTab(productTab, scopeData);
+  }, [
+    productTab,
+    scopeData,
+    programSelection?.programScope,
+    programSelection?.programId,
+    allProgramIds,
+  ]);
+
+  // Ensure scope is fetched once when missing so summary/latest can load
+  useEffect(() => {
+    if (!scopeData || scopeData.length === 0) {
+      dispatch(fetchUserScopeRequest());
+    }
+  }, [dispatch, scopeData]);
+
+  // Fetch summary/latest whenever we have programIds (including when scope loads after "All Program" land)
+  useEffect(() => {
+    if (!programIds.length) return;
+    dispatch(fetchInvoiceSummaryRequest({programIds}));
+    dispatch(fetchLatestInvoicesRequest({programIds}));
+  }, [dispatch, programIds]);
 
   const handleMenuToggle = (dealerId: string) => {
     if (openMenuId === dealerId) {
@@ -150,7 +225,7 @@ export const InvoiceDashboard: React.FC = () => {
         break;
       case 'print':
         // Print functionality
-        console.log('Print dealer summary:', dealerId);
+        if (__DEV__) { console.log('Print dealer summary:', dealerId); }
         break;
       case 'approveReject':
         // Show approve/reject modal
@@ -164,7 +239,7 @@ export const InvoiceDashboard: React.FC = () => {
   const handleAttachmentUpload = (file?: DocumentPickerResponse) => {
     if (file && selectedDealerId) {
       // TODO: Upload file to API
-      console.log('Upload attachment for dealer:', selectedDealerId, file.name);
+      if (__DEV__) { console.log('Upload attachment for dealer:', selectedDealerId, file.name); }
     }
     setShowAttachmentModal(false);
     setSelectedDealerId(null);
@@ -206,135 +281,179 @@ export const InvoiceDashboard: React.FC = () => {
     }
   }, [userRole]);
 
-  const dealerTable = useMemo(
-    () => (
-      <>
-        {(isAnchorMaker || isDealerMaker) && (
-          <View style={styles.allProgramHeader}>
-            <Text style={styles.allProgramTitle}>All Program</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{dealerSummaryRows.length}</Text>
+  const dealerSummaryRows = useMemo(
+    () =>
+      (summaryData || []).map((row, index) => {
+        const drawingPower =
+          row.drawing_power != null
+            ? row.drawing_power.toLocaleString('en-IN')
+            : '-';
+        const available =
+          row.sanctioned_limit != null && row.drawing_power != null
+            ? (row.sanctioned_limit - row.drawing_power).toLocaleString(
+                'en-IN',
+              )
+            : '-';
+        return {
+          id: row.id || `dealer-${index}`,
+          bankName: '',
+          programName: row.program_name,
+          primaryParty: row.partyName,
+          counterParty: row.counterPartyName || row.partyName,
+          odAccount: row.od_account_no || '',
+          drawingPower,
+          utilizedLimit: drawingPower,
+          pipelineRequests: '-',
+          availableLimit: available,
+          overdueAmount: '-',
+          dpdDays: '-',
+          status: 'Regular',
+        };
+      }),
+    [summaryData],
+  );
+
+  const latestRows = useMemo(
+    () =>
+      (latestData || []).map((row, index) => ({
+        id: row.id || `latest-${index}`,
+        dealer: row.counterPartyName || row.partyName || '',
+        invoiceNo: row.invoice_ref_no,
+        invoiceAmount: `₹${
+          row.final_total != null
+            ? row.final_total.toLocaleString('en-IN')
+            : '0'
+        }`,
+        piAmount: '-',
+        invoiceDate: row.invoice_date ? formatDateDash(row.invoice_date) : '-',
+        invoiceStatus: row.invoice_status || '',
+        approvalStatus: row.approval_status || '',
+        adminStatus: row.admin_status || '',
+        financeStatus: '-',
+        disbursementDate: '-',
+        disbAmount: '-',
+        utrNo: row.utr_no || '-',
+        invoiceDueDate: row.invoice_due_date || '',
+      })),
+    [latestData],
+  );
+
+  const filteredDealerRows = dealerSummaryRows;
+  const filteredLatestRows = latestRows;
+
+  const dealerTable = (
+    <>
+        {(isAnchorMaker || isDealerMaker || isCashnTechUser) && (
+            <View style={styles.allProgramHeader}>
+              <Text style={styles.allProgramTitle}>OD Accounts Summary</Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {filteredDealerRows.length}
+                </Text>
+              </View>
             </View>
-          </View>
         )}
         <View style={styles.listToolbar}>
           <View style={styles.searchBox}>
             <Text style={styles.searchPlaceholder}>Search Entity</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.filterBtn}
-            onPress={() => setShowFilterModal(true)}>
-            <Text style={styles.filterText}>Filters</Text>
-          </TouchableOpacity>
         </View>
         <View style={styles.verticalList}>
-          {dealerSummaryRows.map(row => (
+          {filteredDealerRows.map(row => (
             <View key={row.id} style={styles.cardWrapper}>
               <View style={styles.listCard}>
-                <TouchableOpacity
-                  style={styles.cardHeaderRow}
-                  onPress={() => {
-                    (navigation as any).navigate('InvoiceDetails', {
-                      fromInvoiceDashboard: true,
-                      bankName: row.bankName,
-                      dealerName: row.counterParty,
-                      programName: row.programName,
-                    });
-                  }}>
+                <View style={styles.cardHeaderRow}>
                   <View style={styles.cardHeaderContent}>
                     <View style={styles.cardTitleRow}>
                       <Text style={styles.cardTitle}>{row.programName}</Text>
-                      <RightChevron
-                        width={scaleWidth(14)}
-                        height={scaleHeight(14)}
-                        style={styles.cardTitleChevron}
-                      />
                     </View>
                     <Text style={styles.cardSubtitle}>
                       OD Account: {row.odAccount || '-'}
                     </Text>
                   </View>
-                </TouchableOpacity>
+                </View>
 
                 <View style={styles.infoGrid}>
+                  {/* 1. Program Name */}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Program Name</Text>
                     <Text style={styles.infoValue}>{row.programName}</Text>
                   </View>
-                  {/* anchor-maker: Primary Party first; dealer-maker: Counter Party first */}
-                  {isDealerMaker ? (
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Counter Party</Text>
-                      <Text style={styles.infoValue}>{row.counterParty}</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Primary Party</Text>
-                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
-                    </View>
-                  )}
+
+                  {/* 2. Primary Party */}
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Primary Party</Text>
+                    <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                  </View>
+
+                  {/* 3. Counter Party */}
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Counter Party</Text>
+                    <Text style={styles.infoValue}>{row.counterParty}</Text>
+                  </View>
+
+                  {/* 4. OD Account */}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>OD Account</Text>
                     <Text style={styles.infoValue}>{row.odAccount || '-'}</Text>
                   </View>
+
+                  {/* 5. Drawing Power */}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Drawing Power (₹)</Text>
                     <Text style={styles.infoValue}>{row.drawingPower}</Text>
                   </View>
+
+                  {/* 6. Utilized Limit */}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Utilized Limit (₹)</Text>
                     <Text style={styles.infoValue}>{row.utilizedLimit}</Text>
                   </View>
+
+                  {/* 7. Pipeline Requests */}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Pipeline Requests (₹)</Text>
                     <Text style={styles.infoValue}>{row.pipelineRequests}</Text>
                   </View>
+
+                  {/* 8. Available Limit */}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Available Limit (₹)</Text>
                     <Text style={styles.infoValue}>{row.availableLimit}</Text>
                   </View>
+
+                  {/* 9. Overdue Amount */}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Overdue Amount (₹)</Text>
                     <Text style={styles.infoValue}>{row.overdueAmount}</Text>
                   </View>
+
+                  {/* 10. DPD Days */}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>DPD Days</Text>
                     <Text style={styles.infoValue}>{row.dpdDays}</Text>
                   </View>
+
+                  {/* 11. Status */}
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Status</Text>
                     <Text style={[styles.infoValue, styles.statusGreenText]}>{row.status}</Text>
                   </View>
-                  {/* Secondary party chip at the end */}
-                  {isDealerMaker ? (
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Primary Party</Text>
-                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Counter Party</Text>
-                      <Text style={styles.infoValue}>{row.counterParty}</Text>
-                    </View>
-                  )}
                 </View>
             </View>
             </View>
           ))}
         </View>
-      </>
-    ),
-    [isCheckerRole, isAnchorMaker, isDealerMaker],
+    </>
   );
 
-  const unpaidTable = useMemo(
-    () => (
-      <>
+  const unpaidTable = (
+    <>
         <View style={styles.invoiceHeader}>
           <View style={styles.invoiceBadgeContainer}>
-            <Text style={styles.invoiceLabel}>Invoice List</Text>
+              <Text style={styles.invoiceLabel}>Invoice List</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{unpaidRows.length}</Text>
+              <Text style={styles.badgeText}>{filteredLatestRows.length}</Text>
             </View>
           </View>
         </View>
@@ -343,21 +462,16 @@ export const InvoiceDashboard: React.FC = () => {
           <View style={styles.searchBox}>
             <Text style={styles.searchPlaceholder}>Search by All</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.filterBtn}
-            onPress={() => setShowFilterModal(true)}>
-            <Text style={styles.filterText}>Filters</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.verticalList}>
-          {unpaidRows.map(row => (
+          {filteredLatestRows.map(row => (
             <TouchableOpacity
               key={row.id}
               style={styles.listCard}
               onPress={() => {
                 navigation.navigate('InvoiceDetails', {
-                  invoiceId: row.invoiceNo,
+                  invoiceId: row.id,
                   dealerName: row.dealer,
                 });
               }}>
@@ -371,42 +485,85 @@ export const InvoiceDashboard: React.FC = () => {
               </View>
 
               <View style={styles.infoGrid}>
+                {/* 1. Dealer – in card header */}
+                {/* 2. Invoice / Unique Ref. No – in card header */}
+                {/* 3. Invoice Amount (₹) */}
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
                   <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
                 </View>
+                {/* 4. PI Amount (₹) */}
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>PI Amount (₹)</Text>
                   <Text style={styles.infoValue}>{row.piAmount}</Text>
                 </View>
+                {/* 5. Invoice Date */}
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Invoice Date</Text>
                   <Text style={styles.infoValue}>{row.invoiceDate}</Text>
                 </View>
+                {/* 6. Invoice Status */}
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Invoice Status</Text>
-                  <Text style={styles.infoValue}>{row.invoiceStatus}</Text>
+                  <Text
+                    style={[
+                      styles.infoValue,
+                      (row.invoiceStatus || '').toLowerCase().includes('in progress')
+                        ? styles.statusOrangeText
+                        : (row.invoiceStatus || '').toLowerCase().includes('reject')
+                          ? styles.statusRedText
+                          : (row.invoiceStatus || '').toLowerCase().includes('completed') ||
+                              (row.invoiceStatus || '').toLowerCase().includes('submitted') ||
+                              (row.invoiceStatus || '').toLowerCase().includes('created') ||
+                              (row.invoiceStatus || '').toLowerCase().includes('disbursed')
+                            ? styles.statusGreenText
+                            : undefined,
+                    ]}>
+                    {row.invoiceStatus}
+                  </Text>
                 </View>
+                {/* 7. Approval Status */}
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Approval Status</Text>
-                  <Text style={styles.infoValue}>{row.approvalStatus}</Text>
+                  <Text
+                    style={[
+                      styles.infoValue,
+                      (row.approvalStatus || '').toLowerCase().includes('pending')
+                        ? styles.statusOrangeText
+                        : (row.approvalStatus || '').toLowerCase().includes('reject')
+                          ? styles.statusRedText
+                          : (row.approvalStatus || '').toLowerCase().includes('completed') ||
+                              (row.approvalStatus || '').toLowerCase().includes('approval complete')
+                            ? styles.statusGreenText
+                            : undefined,
+                    ]}>
+                    {row.approvalStatus}
+                  </Text>
                 </View>
+                {/* 8. Admin Status */}
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Admin Status</Text>
-                  <Text style={styles.infoValue}>{row.adminStatus}</Text>
+                  <Text
+                    style={[
+                      styles.infoValue,
+                      (row.adminStatus || '').toLowerCase() === 'verified'
+                        ? styles.statusGreenText
+                        : undefined,
+                    ]}>
+                    {row.adminStatus}
+                  </Text>
                 </View>
+                {/* 9. Disbursed Date */}
                 <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Finance Status</Text>
-                  <Text style={styles.infoValue}>{row.financeStatus}</Text>
-                </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Disbursement Date</Text>
+                  <Text style={styles.infoLabel}>Disbursed Date</Text>
                   <Text style={styles.infoValue}>{row.disbursementDate}</Text>
                 </View>
+                {/* 10. Disb. Amount (₹) */}
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Disb. Amount (₹)</Text>
                   <Text style={styles.infoValue}>{row.disbAmount}</Text>
                 </View>
+                {/* 11. UTR No. */}
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>UTR No.</Text>
                   <Text style={styles.infoValue}>{row.utrNo}</Text>
@@ -415,27 +572,19 @@ export const InvoiceDashboard: React.FC = () => {
             </TouchableOpacity>
           ))}
         </View>
-      </>
-    ),
-    [navigation],
+    </>
   );
 
   return (
     <Container>
-      <AppBar 
-        title={
-          isDealerChecker
-            ? "Invoice"
-            : isAnchorChecker
-              ? "Transactions > Invoice Overview"
-              : "Transactions > Invoice Overview"
-        }
+      <AppBar
+        title="Transactions > Invoice Overview"
         navigation={navigation as any}
       />
       <ProgramBreadcrumb />
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Anchor Maker: Product tabs (All Product / Dealer Finance / Vendor Finance / PID) */}
-        {(isAnchorMaker || isDealerMaker) && (
+        {/* Anchor Maker, Dealer Maker, CashnTech User: Product tabs (All Product / Dealer Finance) */}
+        {(isAnchorMaker || isDealerMaker || isCashnTechUser) && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.productTabsScroll}>
             <View style={styles.productTabsRow}>
               <TouchableOpacity
@@ -468,36 +617,6 @@ export const InvoiceDashboard: React.FC = () => {
                   Dealer Finance (DF)
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.productTabBtn,
-                  productTab === 'vendor_finance' && styles.productTabBtnActive,
-                ]}
-                onPress={() => setProductTab('vendor_finance')}
-                activeOpacity={0.8}>
-                <Text
-                  style={[
-                    styles.productTabText,
-                    productTab === 'vendor_finance' && styles.productTabTextActive,
-                  ]}>
-                  Vendor Finance
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.productTabBtn,
-                  productTab === 'pid' && styles.productTabBtnActive,
-                ]}
-                onPress={() => setProductTab('pid')}
-                activeOpacity={0.8}>
-                <Text
-                  style={[
-                    styles.productTabText,
-                    productTab === 'pid' && styles.productTabTextActive,
-                  ]}>
-                  PID
-                </Text>
-              </TouchableOpacity>
             </View>
           </ScrollView>
         )}
@@ -509,7 +628,7 @@ export const InvoiceDashboard: React.FC = () => {
           <Text style={styles.keyFigureHeading}>Invoice Dashboard: Key Figure</Text>
         )}
         <View style={styles.cardGrid}>
-          {getCardMetrics(productTab).map(card => (
+          {getCardMetrics(productTab, summaryData ?? undefined).map(card => (
             <View key={card.label} style={styles.card}>
               <Text style={styles.cardLabel}>{card.label}</Text>
               <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
@@ -528,7 +647,7 @@ export const InvoiceDashboard: React.FC = () => {
                 styles.tabText,
                 activeTab === 'dealers' && styles.activeTabText,
               ]}>
-              {(isAnchorMaker || isDealerMaker) ? 'Summary of All Program' : 'Summary of Dealers'}
+              {(isAnchorMaker || isDealerMaker || isCashnTechUser) ? 'Summary of All Program' : 'Summary of Dealers'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -545,21 +664,17 @@ export const InvoiceDashboard: React.FC = () => {
         </View>
 
         <View style={styles.tabContent}>
-          {activeTab === 'dealers' ? dealerTable : unpaidTable}
+          {(summaryLoading || latestLoading) ? (
+            <ActivityIndicator
+              size="large"
+              color={Colors.primaryColor}
+              style={styles.loader}
+            />
+          ) : (
+            activeTab === 'dealers' ? dealerTable : unpaidTable
+          )}
         </View>
       </ScrollView>
-
-      {/* Filter Modal */}
-      <FilterModal
-        visible={showFilterModal}
-        onClose={() => setShowFilterModal(false)}
-        onApply={(filters) => {
-          setAppliedFilters(filters);
-          // TODO: Apply filters to data later
-        }}
-        filterData={dashboardFilterData}
-        appliedFilters={appliedFilters}
-      />
 
       {/* Checker Approval Modal */}
       <CheckerApprovalModal
@@ -603,7 +718,7 @@ export const InvoiceDashboard: React.FC = () => {
         }}
         onApprove={(dealerId, remarks) => {
           // TODO: Call approve API
-          console.log('Approve dealer:', dealerId, remarks);
+          if (__DEV__) { console.log('Approve dealer:', dealerId, remarks); }
           // After API success, navigate to invoice detail view
           setShowApproveRejectModal(false);
           const invoiceNo = selectedDealerNo || dealerId;
@@ -616,7 +731,7 @@ export const InvoiceDashboard: React.FC = () => {
         }}
         onReject={(dealerId, remarks) => {
           // TODO: Call reject API
-          console.log('Reject dealer:', dealerId, remarks);
+          if (__DEV__) { console.log('Reject dealer:', dealerId, remarks); }
           setSelectedDealerId(null);
           setSelectedDealerNo(null);
         }}
@@ -634,6 +749,9 @@ export const InvoiceDashboard: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  loader: {
+    marginTop: scaleHeight(40),
+  },
   pageTitleBar: {
     paddingHorizontal: scaleWidth(16),
     paddingVertical: scaleHeight(12),
@@ -867,6 +985,14 @@ const styles = StyleSheet.create({
   },
   statusGreenText: {
     color: Colors.green,
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  statusOrangeText: {
+    color: '#E86C00',
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  statusRedText: {
+    color: Colors.red,
     fontFamily: Fonts.GilroySemiBold,
   },
   statusWarningChip: {

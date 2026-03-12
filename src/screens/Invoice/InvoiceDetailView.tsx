@@ -1,13 +1,15 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
+import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {AppBar, Container, UploadModal} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -16,63 +18,125 @@ import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
+import {invoiceApi} from '@services/api/invoice.api';
+import {formatDateDash} from '@screens/Invoice/InvoiceDetails/types';
+
+type InvoiceDetailData = {
+  dealerName: string;
+  dealerCode: string;
+  creditAccountNumber: string;
+  anchorName: string;
+  remark: string;
+  poRefNo: string;
+  invoiceDate: string;
+  invoiceDueDate: string;
+  items: Array<{id: string; itemName: string; quantity: number; unit: number | string; price: number; total: number}>;
+  discount: {percent: number; amount: number};
+  tax: {percent: number; amount: number};
+  total: number;
+  attachment: {fileName: string; fileSize: string; fileCount: number} | null;
+};
+
+const defaultInvoiceData: InvoiceDetailData = {
+  dealerName: '',
+  dealerCode: '',
+  creditAccountNumber: '',
+  anchorName: '',
+  remark: '',
+  poRefNo: '',
+  invoiceDate: '',
+  invoiceDueDate: '',
+  items: [],
+  discount: {percent: 0, amount: 0},
+  tax: {percent: 0, amount: 0},
+  total: 0,
+  attachment: null,
+};
 
 export const InvoiceDetailView: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
+  const programSelection = useSelector(selectProgramSelection);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isAnchorChecker = userRole === 'anchor_checker';
   const isDealerChecker = userRole === 'dealer_checker';
   const isCheckerRole = isAnchorChecker || isDealerChecker;
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [invoiceData, setInvoiceData] = useState<InvoiceDetailData>(defaultInvoiceData);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Get data from route params
   const invoiceId = (route.params as any)?.invoiceId || '';
-  const invoiceNo = (route.params as any)?.invoiceNo || '1234566';
+  const invoiceNo = (route.params as any)?.invoiceNo || '';
 
-  // Sample invoice data - in real app, fetch from API
-  const invoiceData = {
-    dealerName: '',
-    dealerCode: '',
-    creditAccountNumber: '',
-    anchorName: '',
-    remark: '',
-    poRefNo: '',
-    invoiceDate: '',
-    invoiceDueDate: '',
-    items: [
-      {
-        id: '1',
-        itemName: 'Item Name 1',
-        quantity: 50,
-        unit: 20,
-        price: 3000,
-        total: 150000,
-      },
-      {
-        id: '2',
-        itemName: 'Item Name 2',
-        quantity: 40,
-        unit: 30,
-        price: 5000,
-        total: 200000,
-      },
-    ],
-    discount: {
-      percent: 2,
-      amount: 7000,
-    },
-    tax: {
-      percent: 10,
-      amount: 35000,
-    },
-    total: 378000,
-    attachment: {
-      fileName: 'attachment.jpg',
-      fileSize: '1.2 MB',
-      fileCount: 1,
-    },
-  };
+  useEffect(() => {
+    if (!invoiceId) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    invoiceApi
+      .getInvoiceDetails(invoiceId)
+      .then((data: any) => {
+        if (cancelled) return;
+        const apm = data?.anchorParticipantMapping;
+        const party = data?.party;
+        const dealerName = apm?.party?.entity_name ?? '';
+        const dealerCode = apm?.company_code_given_by_party ?? '';
+        const creditAccountNumber = apm?.od_account_no ?? '';
+        const anchorName = party?.entity_name ?? '';
+        const remark = data?.remark ?? '';
+        const poRefNo = data?.loan_ref_no ?? data?.invoice_ref_no ?? '';
+        const invoiceDate = data?.invoice_date ? formatDateDash(data.invoice_date) : '';
+        const invoiceDueDate = data?.invoice_due_date ? formatDateDash(data.invoice_due_date) : '';
+        const subTotal = Number(data?.sub_total) || 0;
+        const taxTotal = Number(data?.tax_total) || 0;
+        const discountTotal = Number(data?.discount_total) || 0;
+        const finalTotal = Number(data?.final_total) || 0;
+        const items = (data?.invoiceItems || []).map((it: any, idx: number) => ({
+          id: it.id || `item-${idx}`,
+          itemName: it.name ?? '',
+          quantity: Number(it.quantity) || 0,
+          unit: it.unit ?? '-',
+          price: Number(it.price_per_quantity) || 0,
+          total: Number(it.total) || 0,
+        }));
+        const discountPercent = subTotal > 0 ? (discountTotal / subTotal) * 100 : 0;
+        const taxPercent = subTotal > 0 ? (taxTotal / subTotal) * 100 : 0;
+        const attachmentUrl = data?.attachment_url;
+        setInvoiceData({
+          dealerName,
+          dealerCode,
+          creditAccountNumber,
+          anchorName,
+          remark,
+          poRefNo,
+          invoiceDate,
+          invoiceDueDate,
+          items,
+          discount: {percent: discountPercent, amount: discountTotal},
+          tax: {percent: taxPercent, amount: taxTotal},
+          total: finalTotal,
+          attachment: attachmentUrl
+            ? {fileName: 'attachment', fileSize: '-', fileCount: 1}
+            : null,
+        });
+      })
+      .catch((err: any) => {
+        if (!cancelled) {
+          setError(err?.message || 'Failed to load invoice details');
+          setInvoiceData(defaultInvoiceData);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [invoiceId]);
 
   const handleAttachment = () => {
     setShowUploadModal(true);
@@ -91,6 +155,63 @@ export const InvoiceDetailView: React.FC = () => {
     console.log('Export invoice:', invoiceId);
   };
 
+  if (loading) {
+    return (
+      <Container>
+        <AppBar
+          title="Invoice Detail"
+          navigation={navigation as any}
+          hideHamburger={isCheckerRole}
+          renderLeftIcon={
+            isCheckerRole ? (
+              <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />
+            ) : undefined
+          }
+          onPressLeftIcon={
+            isCheckerRole
+              ? () =>
+                  (navigation as any).navigate('InvoiceDetails', {
+                    programId: programSelection?.programId,
+                  })
+              : undefined
+          }
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primaryColor} />
+          <Text style={styles.loadingText}>Loading invoice details...</Text>
+        </View>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <AppBar
+          title="Invoice Detail"
+          navigation={navigation as any}
+          hideHamburger={isCheckerRole}
+          renderLeftIcon={
+            isCheckerRole ? (
+              <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />
+            ) : undefined
+          }
+          onPressLeftIcon={
+            isCheckerRole
+              ? () =>
+                  (navigation as any).navigate('InvoiceDetails', {
+                    programId: programSelection?.programId,
+                  })
+              : undefined
+          }
+        />
+        <View style={styles.loadingContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      </Container>
+    );
+  }
+
   return (
     <Container>
       <AppBar
@@ -104,11 +225,14 @@ export const InvoiceDetailView: React.FC = () => {
         }
         onPressLeftIcon={
           isCheckerRole
-            ? () => (navigation as any).navigate('InvoiceDetails')
+            ? () =>
+                (navigation as any).navigate('InvoiceDetails', {
+                  programId: programSelection?.programId,
+                })
             : undefined
         }
       />
-      
+
       {/* Header with Invoice Number and Action Buttons */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -121,7 +245,7 @@ export const InvoiceDetailView: React.FC = () => {
           )}
           <View style={styles.invoiceTitleContainer}>
             <Text style={styles.invoiceTitle}>
-              Invoice / Unique Ref. No - {invoiceNo}
+              Invoice / Unique Ref. No - {invoiceNo || invoiceId || 'N/A'}
             </Text>
             <View style={styles.titleUnderline} />
           </View>
@@ -129,20 +253,26 @@ export const InvoiceDetailView: React.FC = () => {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={handleAttachment}>
+            onPress={() => {}}
+            disabled>
             <FontAwesome6
               name="paperclip"
               iconStyle="solid"
               color={Colors.darkblack}
               size={scaleWidth(18)}
             />
-            <Text style={styles.actionButtonText}>Attachment</Text>
+            <Text style={[styles.actionButtonText, styles.actionButtonTextDisabled]}>
+              Attachment
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={handleExport}>
+            onPress={() => {}}
+            disabled>
             <Download width={scaleWidth(18)} height={scaleHeight(18)} />
-            <Text style={styles.actionButtonText}>Export</Text>
+            <Text style={[styles.actionButtonText, styles.actionButtonTextDisabled]}>
+              Export
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -181,7 +311,13 @@ export const InvoiceDetailView: React.FC = () => {
             <View style={styles.detailColumn}>
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>PO Ref. No.:</Text>
-                <Text style={styles.detailValue}>{invoiceData.poRefNo || '-'}</Text>
+                <Text
+                  style={[styles.detailValue, styles.detailValueSmall]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}>
+                  {invoiceData.poRefNo || '-'}
+                </Text>
               </View>
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Invoice Date:</Text>
@@ -290,12 +426,31 @@ export const InvoiceDetailView: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: scaleWidth(24),
+  },
+  loadingText: {
+    marginTop: scaleHeight(12),
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
+  errorText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.red,
+    textAlign: 'center',
+  },
   header: {
     flexDirection: 'column',
     paddingHorizontal: scaleWidth(16),
     paddingVertical: scaleHeight(12),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E6E6E6',
+    marginTop: scaleHeight(4),
   },
   headerTop: {
     flexDirection: 'row',
@@ -337,6 +492,9 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
   },
+  actionButtonTextDisabled: {
+    color: Colors.graybase,
+  },
   content: {
     padding: scaleWidth(16),
   },
@@ -352,6 +510,8 @@ const styles = StyleSheet.create({
   },
   detailItem: {
     marginBottom: scaleHeight(16),
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   detailLabel: {
     fontSize: scaleFont(14),
@@ -363,6 +523,9 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyRegular,
     color: Colors.darkblack,
+  },
+  detailValueSmall: {
+    fontSize: scaleFont(11),
   },
   descriptionSection: {
     marginBottom: scaleHeight(24),

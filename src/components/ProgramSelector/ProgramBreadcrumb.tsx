@@ -15,8 +15,7 @@ import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 
 export const ProgramBreadcrumb: React.FC = () => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<AuthNavigatorType>>();
+  const navigation = useNavigation<any>();
   const selection = useSelector(selectProgramSelection);
   const selectedPrograms = useSelector(selectSelectedPrograms);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
@@ -24,8 +23,14 @@ export const ProgramBreadcrumb: React.FC = () => {
   const isDealerMaker = userRole === 'dealer_maker';
   const isAnchorChecker = userRole === 'anchor_checker';
   const isDealerChecker = userRole === 'dealer_checker';
-  // All four roles can use "All Program" scope when Dealer Finance Program is selected
-  const canUseAllProgramScope = isAnchorMaker || isDealerMaker || isAnchorChecker || isDealerChecker;
+  const isCashnTechUser = userRole === 'cashntech_user';
+  // All roles can use "All Program" scope when Dealer Finance Program is selected
+  const canUseAllProgramScope = 
+    isAnchorMaker || 
+    isDealerMaker || 
+    isAnchorChecker || 
+    isDealerChecker || 
+    isCashnTechUser;
   // isExpanded state - Commented for single selection, uncomment for multiple selection
   // const [isExpanded, setIsExpanded] = useState(false);
 
@@ -112,15 +117,19 @@ export const ProgramBreadcrumb: React.FC = () => {
   //   );
   // };
 
-  // Render full breadcrumb format (for single program)
-  const renderFullBreadcrumb = (program: typeof programToDisplay) => {
+  // Render full breadcrumb format (two-row layout)
+  // Row 1: Bank › Product
+  // Row 2: Program name  [Change]
+  const renderFullBreadcrumb = (program: any) => {
+    if (!program) return null;
     return (
       <View style={styles.fullBreadcrumb}>
+        {/* Row 1: Bank › Product */}
         <View style={styles.breadcrumbRow}>
           <View style={styles.itemFixed}>
             <BankBuilding
-              width={scaleWidth(14)}
-              height={scaleWidth(14)}
+              width={scaleWidth(13)}
+              height={scaleWidth(13)}
               color={Colors.primaryColor}
             />
             <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">
@@ -129,32 +138,29 @@ export const ProgramBreadcrumb: React.FC = () => {
           </View>
 
           <RightChevron
-            height={scaleHeight(12)}
-            width={scaleWidth(12)}
+            height={scaleHeight(10)}
+            width={scaleWidth(10)}
             style={styles.chev}
           />
 
           <View style={styles.itemFixed}>
             <Folder
-              width={scaleWidth(14)}
-              height={scaleWidth(14)}
+              width={scaleWidth(13)}
+              height={scaleWidth(13)}
               color={Colors.primaryColor}
             />
             <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">
               {getProductLabel(program.productName)}
             </Text>
           </View>
+        </View>
 
-          <RightChevron
-            height={scaleHeight(12)}
-            width={scaleWidth(12)}
-            style={styles.chev}
-          />
-
+        {/* Row 2: Program name + Change button */}
+        <View style={styles.breadcrumbRow2}>
           <View style={styles.itemGrow}>
             <File
-              width={scaleWidth(14)}
-              height={scaleWidth(14)}
+              width={scaleWidth(13)}
+              height={scaleWidth(13)}
               color={Colors.primaryColor}
             />
             <Text style={styles.breadcrumbTextGrow} numberOfLines={1} ellipsizeMode="tail">
@@ -171,7 +177,6 @@ export const ProgramBreadcrumb: React.FC = () => {
           )}
           */}
 
-          {/* Change button */}
           <TouchableOpacity
             style={styles.changePill}
             onPress={() => navigation.navigate('SelectProgramScreen')}
@@ -190,8 +195,8 @@ export const ProgramBreadcrumb: React.FC = () => {
         <View style={styles.breadcrumbRow}>
           <View style={styles.itemGrow}>
             <File
-              width={scaleWidth(14)}
-              height={scaleWidth(14)}
+              width={scaleWidth(13)}
+              height={scaleWidth(13)}
               color={Colors.primaryColor}
             />
             <Text style={styles.breadcrumbTextGrow} numberOfLines={1} ellipsizeMode="tail">
@@ -268,6 +273,14 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
     gap: scaleWidth(4),
     width: '100%',
+  },
+  breadcrumbRow2: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'nowrap',
+    gap: scaleWidth(4),
+    width: '100%',
+    marginTop: scaleHeight(4),
   },
   itemFixed: {
     flexDirection: 'row',

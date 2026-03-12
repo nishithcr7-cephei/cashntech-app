@@ -7,22 +7,37 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+
+export type ApproveRejectInvoiceDetails = {
+  subTotal?: string;
+  withholdingTaxesPercent?: string;
+  withholdingAmount?: string;
+  finalPayableAmount?: string;
+  finalDueDate?: string;
+  /** Anchor checker layout fields */
+  dealerName?: string;
+  creditAccountNumber?: string;
+  anchorName?: string;
+  invoiceDate?: string;
+  invoiceDueDate?: string;
+  invoiceAmount?: string;
+};
 
 type ApproveRejectModalProps = {
   visible: boolean;
   onClose: () => void;
   invoiceId?: string | null;
   invoiceNo?: string | null;
-  invoiceDetails?: {
-    subTotal?: string;
-    withholdingTaxesPercent?: string;
-    withholdingAmount?: string;
-    finalPayableAmount?: string;
-    finalDueDate?: string;
-  };
+  /** Use 'anchor_checker' for Dealer Name, Credit Account, Anchor Name, Invoice Date/Due Date, Invoice Amount layout; 'cashntech_verification' for CashnTech Verify/Reject */
+  variant?: 'default' | 'anchor_checker' | 'cashntech_verification';
+  invoiceDetails?: ApproveRejectInvoiceDetails;
+  /** Show loading in details table (e.g. when fetching invoice details for anchor_checker) */
+  detailsLoading?: boolean;
   onApprove?: (invoiceId: string, remarks?: string) => void;
   onReject?: (invoiceId: string, remarks?: string) => void;
 };
@@ -32,12 +47,47 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   onClose,
   invoiceId,
   invoiceNo,
+  variant = 'default',
   invoiceDetails,
+  detailsLoading = false,
   onApprove,
   onReject,
 }) => {
+  const insets = useSafeAreaInsets();
   const [remarks, setRemarks] = useState('');
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<'Verified' | 'Hold' | 'Reject' | null>(null);
+
+  const isAnchorChecker = variant === 'anchor_checker';
+  const isCashnTechVerification = variant === 'cashntech_verification';
+  const invoiceLabel = invoiceNo || invoiceId || 'N/A';
+  const modalTitle =
+    isCashnTechVerification || isAnchorChecker
+      ? `Invoice : ${invoiceLabel}`
+      : 'Approval or reject popup';
+  const confirmText = isCashnTechVerification ? (
+    <>
+      Are you sure you want to verify or reject this Invoice{' '}
+      <Text style={styles.invoiceNoBold}>{invoiceLabel}</Text>?
+    </>
+  ) : isAnchorChecker ? (
+    <>
+      Are you sure, you want to approve or reject this
+      {' '}
+      <Text style={styles.invoiceNoBold}>invoice</Text>?
+    </>
+  ) : (
+    <>
+      Are you sure, you want to approve or reject this{' '}
+      <Text style={styles.invoiceNoBold}>
+        Invoice / Unique Ref. No - {invoiceNo || invoiceId || 'N/A'}
+      </Text>
+      ?
+    </>
+  );
+  const primaryButtonLabel = isCashnTechVerification ? 'Verify' : 'Approve';
+  const secondaryButtonLabel = 'Reject';
 
   // Default invoice details if not provided
   const details = invoiceDetails || {
@@ -46,6 +96,12 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
     withholdingAmount: '0.00/-',
     finalPayableAmount: '10,80,025/-',
     finalDueDate: 'dd-mm-yyyy',
+    dealerName: 'Dealer Name',
+    creditAccountNumber: '-',
+    anchorName: 'Anchor Name',
+    invoiceDate: 'DD / MM / YYYY',
+    invoiceDueDate: 'DD / MM / YYYY',
+    invoiceAmount: 'Rs. 0 /-',
   };
 
   const handleApprove = () => {
@@ -75,12 +131,16 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
       animationType="fade"
       onRequestClose={handleClose}>
       <TouchableWithoutFeedback onPress={handleClose}>
-        <View style={styles.overlay}>
+        <View
+          style={[
+            styles.overlay,
+            {paddingTop: insets.top, paddingBottom: insets.bottom},
+          ]}>
           <TouchableWithoutFeedback onPress={() => {}}>
             <View style={styles.modalContainer}>
               {/* Header with Title and Close Button */}
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Approval or reject popup</Text>
+                <Text style={styles.modalTitle}>{modalTitle}</Text>
                 <TouchableOpacity
                   onPress={handleClose}
                   style={styles.closeButton}
@@ -92,37 +152,107 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
               {/* Content */}
               <View style={styles.modalContent}>
                 {/* Confirmation Message */}
-                <Text style={styles.confirmationText}>
-                  Are you sure, you want to approve or reject this{' '}
-                  <Text style={styles.invoiceNoBold}>
-                    Invoice / Unique Ref. No - {invoiceNo || invoiceId || 'N/A'}
-                  </Text>
-                  ?
-                </Text>
+                <Text style={styles.confirmationText}>{confirmText}</Text>
 
                 {/* Invoice Details Table */}
                 <View style={styles.detailsTable}>
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Sub Total:</Text>
-                    <Text style={styles.tableValue}>{details.subTotal}</Text>
-                  </View>
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Withholding Taxes (%):</Text>
-                    <Text style={styles.tableValue}>{details.withholdingTaxesPercent}</Text>
-                  </View>
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Withholding Amount:</Text>
-                    <Text style={styles.tableValue}>{details.withholdingAmount}</Text>
-                  </View>
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Final Payable Amount:</Text>
-                    <Text style={styles.tableValue}>{details.finalPayableAmount}</Text>
-                  </View>
-                  <View style={styles.tableRow}>
-                    <Text style={styles.tableLabel}>Final Due Date:</Text>
-                    <Text style={styles.tableValue}>{details.finalDueDate}</Text>
-                  </View>
+                  {detailsLoading ? (
+                    <View style={styles.loadingRow}>
+                      <ActivityIndicator size="small" color="#666" />
+                      <Text style={styles.loadingText}>Loading invoice details...</Text>
+                    </View>
+                  ) : (isAnchorChecker || isCashnTechVerification) ? (
+                    <>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Invoice Number:</Text>
+                        <Text style={styles.tableValue}>{invoiceLabel}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Anchor Name:</Text>
+                        <Text style={styles.tableValue}>{details.anchorName || '-'}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Credit Account Number:</Text>
+                        <Text style={styles.tableValue}>{details.creditAccountNumber || '-'}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Dealer Name:</Text>
+                        <Text style={styles.tableValue}>{details.dealerName || '-'}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Invoice Amount:</Text>
+                        <Text style={styles.tableValue}>{details.invoiceAmount || 'Rs. 0 /-'}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Invoice Date:</Text>
+                        <Text style={styles.tableValue}>{details.invoiceDate || 'DD / MM / YYYY'}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Invoice Due Date:</Text>
+                        <Text style={styles.tableValue}>{details.invoiceDueDate || 'DD / MM / YYYY'}</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Sub Total:</Text>
+                        <Text style={styles.tableValue}>{details.subTotal}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Withholding Taxes (%):</Text>
+                        <Text style={styles.tableValue}>{details.withholdingTaxesPercent}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Withholding Amount:</Text>
+                        <Text style={styles.tableValue}>{details.withholdingAmount}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Final Payable Amount:</Text>
+                        <Text style={styles.tableValue}>{details.finalPayableAmount}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Final Due Date:</Text>
+                        <Text style={styles.tableValue}>{details.finalDueDate}</Text>
+                      </View>
+                    </>
+                  )}
                 </View>
+
+                {/* Status dropdown (CashnTech admin verification only) */}
+                {isCashnTechVerification && (
+                  <View style={styles.statusContainer}>
+                    <Text style={styles.statusLabel}>Status</Text>
+                    <TouchableOpacity
+                      style={styles.statusDropdown}
+                      activeOpacity={0.8}
+                      onPress={() => setStatusDropdownOpen(prev => !prev)}>
+                      <Text
+                        style={[
+                          styles.statusDropdownText,
+                          !selectedStatus && styles.statusPlaceholderText,
+                        ]}>
+                        {selectedStatus ?? 'Select status'}
+                      </Text>
+                      <Text style={styles.statusDropdownIcon}>▼</Text>
+                    </TouchableOpacity>
+                    {statusDropdownOpen && (
+                      <View style={styles.statusOptions}>
+                        {(['Verified', 'Hold', 'Reject'] as const).map(option => (
+                          <TouchableOpacity
+                            key={option}
+                            style={styles.statusOption}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              setSelectedStatus(option);
+                              setStatusDropdownOpen(false);
+                            }}>
+                            <Text style={styles.statusOptionText}>{option}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )}
 
                 {/* Remarks Input */}
                 <View style={styles.remarksContainer}>
@@ -144,13 +274,13 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                   <TouchableOpacity
                     style={[styles.actionButton, styles.rejectButton]}
                     onPress={handleReject}>
-                    <Text style={styles.rejectButtonText}>Reject</Text>
+                    <Text style={styles.rejectButtonText}>{secondaryButtonLabel}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[styles.actionButton, styles.approveButton]}
                     onPress={handleApprove}>
-                    <Text style={styles.approveButtonText}>Approve</Text>
+                    <Text style={styles.approveButtonText}>{primaryButtonLabel}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -180,14 +310,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: scaleWidth(16),
-    paddingVertical: scaleHeight(16),
+    paddingTop: scaleHeight(24),
+    paddingBottom: scaleHeight(16),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E6E6E6',
   },
   modalTitle: {
-    fontSize: scaleFont(18),
+    fontSize: scaleFont(15),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
+    flex: 1,
   },
   closeButton: {
     width: scaleWidth(24),
@@ -228,6 +360,56 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E6E6E6',
   },
+  statusContainer: {
+    marginTop: scaleHeight(12),
+    marginBottom: scaleHeight(8),
+  },
+  statusLabel: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(4),
+  },
+  statusDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#D0D4DD',
+    borderRadius: scaleWidth(8),
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(8),
+    backgroundColor: '#F7F8FB',
+  },
+  statusDropdownText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+  },
+  statusPlaceholderText: {
+    color: Colors.graybase,
+  },
+  statusDropdownIcon: {
+    fontSize: scaleFont(12),
+    color: Colors.graybase,
+  },
+  statusOptions: {
+    marginTop: scaleHeight(4),
+    borderWidth: 1,
+    borderColor: '#D0D4DD',
+    borderRadius: scaleWidth(8),
+    backgroundColor: Colors.white,
+    overflow: 'hidden',
+  },
+  statusOption: {
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(8),
+  },
+  statusOptionText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+  },
   tableLabel: {
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyMedium,
@@ -241,8 +423,21 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'right',
   },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scaleWidth(8),
+    paddingVertical: scaleHeight(24),
+  },
+  loadingText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
   remarksContainer: {
-    marginBottom: scaleHeight(20),
+    marginTop: scaleHeight(4),
+    marginBottom: scaleHeight(8),
   },
   remarksLabel: {
     fontSize: scaleFont(14),
@@ -255,11 +450,11 @@ const styles = StyleSheet.create({
     borderColor: '#E6E6E6',
     borderRadius: scaleWidth(8),
     paddingHorizontal: scaleWidth(12),
-    paddingVertical: scaleHeight(10),
+    paddingVertical: scaleHeight(6),
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
-    minHeight: scaleHeight(100),
+    minHeight: scaleHeight(48),
     backgroundColor: '#F7F8FB',
   },
   buttonContainer: {

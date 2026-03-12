@@ -4,7 +4,6 @@ import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
-import {unitOptions} from '@constants/invoiceDropdowns';
 import {useSelector} from 'react-redux';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
@@ -124,26 +123,23 @@ export const InvoiceForm: React.FC<Props> = ({
     return dueDate.format('DD-MM-YYYY');
   };
 
-  // Auto-calculate Invoice Due Date when Invoice Date or GRN Date changes
-  useEffect(() => {
-    if (value.invoiceDate) {
-      const calculatedDueDate = calculateInvoiceDueDate(
-        value.invoiceDate,
-        value.grnDate || '',
-        TENURE_DAYS
-      );
-      
-      // Only update if calculated value is different from current value
-      if (calculatedDueDate && calculatedDueDate !== value.invoiceDueDate) {
-        onChange({invoiceDueDate: calculatedDueDate});
-      }
-    } else if (!value.invoiceDate && value.invoiceDueDate) {
-      // Clear due date if invoice date is cleared
-      onChange({invoiceDueDate: ''});
-    }
-  }, [value.invoiceDate, value.grnDate]);
+  // Auto-calculate Invoice Due Date - COMMENTED: user can now select Jan 2026 - Dec 2026 manually
+  // useEffect(() => {
+  //   if (value.invoiceDate) {
+  //     const calculatedDueDate = calculateInvoiceDueDate(
+  //       value.invoiceDate,
+  //       value.grnDate || '',
+  //       TENURE_DAYS
+  //     );
+  //     if (calculatedDueDate && calculatedDueDate !== value.invoiceDueDate) {
+  //       onChange({invoiceDueDate: calculatedDueDate});
+  //     }
+  //   } else if (!value.invoiceDate && value.invoiceDueDate) {
+  //     onChange({invoiceDueDate: ''});
+  //   }
+  // }, [value.invoiceDate, value.grnDate]);
 
-  // Validate Invoice Date (should be current or past date, check for stale invoice)
+  // Validate Invoice Date: up to 1 month back from today, no future dates
   const validateInvoiceDate = (dateStr: string): string | undefined => {
     if (!dateStr) return undefined;
     
@@ -153,25 +149,20 @@ export const InvoiceForm: React.FC<Props> = ({
     }
 
     const today = moment().startOf('day');
-    const daysDiff = today.diff(invoiceDate, 'days');
+    const oneMonthAgo = moment().subtract(1, 'month').startOf('day');
 
-    // Check if date is in future (not allowed)
-    if (daysDiff < 0) {
+    if (invoiceDate.isAfter(today)) {
       return 'Invoice date cannot be in the future';
     }
-
-    // CODE-END DEFAULT: max_invoice_age_days - will be dynamic from backend basic_parameters later
-    const STALE_DAYS_THRESHOLD = 90;
-    if (daysDiff > STALE_DAYS_THRESHOLD) {
-      return `Invoice is stale (older than ${STALE_DAYS_THRESHOLD} days)`;
+    if (invoiceDate.isBefore(oneMonthAgo)) {
+      return 'Invoice date cannot be more than 1 month in the past';
     }
 
     return undefined;
   };
 
-  // Validate Payment Date (should be future date). CODE-END DEFAULT: min_days_from_invoice = 7,
-  // will be dynamic from backend credit terms / basic_parameters when available.
-  const validatePaymentDate = (dateStr: string, invoiceDateStr?: string): string | undefined => {
+  // Validate Payment Date: no back date, today or future only
+  const validatePaymentDate = (dateStr: string, _invoiceDateStr?: string): string | undefined => {
     if (!dateStr) return undefined;
     
     const paymentDate = moment(dateStr, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true);
@@ -180,23 +171,8 @@ export const InvoiceForm: React.FC<Props> = ({
     }
 
     const today = moment().startOf('day');
-    const daysDiff = paymentDate.diff(today, 'days');
-
-    // Payment date should be in future
-    if (daysDiff < 0) {
-      return 'Payment date must be in the future';
-    }
-
-    // If invoice date is available, check if payment date is reasonable (7 or 21 days as per terms)
-    if (invoiceDateStr) {
-      const invoiceDate = moment(invoiceDateStr, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true);
-      if (invoiceDate.isValid()) {
-        const daysFromInvoice = paymentDate.diff(invoiceDate, 'days');
-        const MIN_DAYS_FROM_INVOICE = 7; // CODE-END DEFAULT - will come from backend
-        if (daysFromInvoice < MIN_DAYS_FROM_INVOICE) {
-          return `Payment date should be at least ${MIN_DAYS_FROM_INVOICE} days from invoice date`;
-        }
-      }
+    if (paymentDate.isBefore(today)) {
+      return 'Payment date cannot be in the past';
     }
 
     return undefined;
@@ -239,6 +215,7 @@ export const InvoiceForm: React.FC<Props> = ({
     if (!newItems[index]) {
       newItems[index] = {
         itemName: '', 
+        description: '',
         quantity: '', 
         unit: '', 
         pricePerQuantity: '', 
@@ -249,6 +226,7 @@ export const InvoiceForm: React.FC<Props> = ({
         taxType: '',
         taxPercentage: '',
         taxAmount: '',
+        taxes: [{taxType: '', taxPercentage: '', taxAmount: ''}],
       };
     }
     newItems[index] = {...newItems[index], [field]: text};
@@ -271,18 +249,66 @@ export const InvoiceForm: React.FC<Props> = ({
     }
     newItems[index].discountAmount = discountAmount.toFixed(2);
     
-    // Auto-calculate item-level tax (on amount after discount)
+    // Auto-calculate item-level taxes (on amount after discount)
     const afterDiscount = Math.max(0, lineTotal - discountAmount);
-    const taxPercentage = parseFloat(newItems[index].taxPercentage || '0') || 0;
-    const taxAmount = (afterDiscount * taxPercentage) / 100;
-    newItems[index].taxAmount = taxAmount.toFixed(2);
+    const rawTaxes = newItems[index].taxes?.length ? newItems[index].taxes! : (newItems[index].taxType ? [{taxType: newItems[index].taxType!, taxPercentage: newItems[index].taxPercentage || '', taxAmount: newItems[index].taxAmount || ''}] : []);
+    const taxes = rawTaxes.map(t => ({...t}));
+    taxes.forEach((t, i) => {
+      const pct = parseFloat(t.taxPercentage || '0') || 0;
+      taxes[i] = {...t, taxAmount: ((afterDiscount * pct) / 100).toFixed(2)};
+    });
+    newItems[index].taxes = taxes.length ? taxes : [{taxType: '', taxPercentage: '', taxAmount: ''}];
+    newItems[index].taxAmount = taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0).toFixed(2);
     
+    onChange({items: newItems});
+  };
+
+  const updateItemTax = (itemIndex: number, taxIndex: number, field: 'taxType' | 'taxPercentage' | 'taxAmount', fieldValue: string) => {
+    const newItems = [...(value.items || [])];
+    const item = newItems[itemIndex];
+    if (!item) return;
+    const taxes = [...(item.taxes?.length ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}])];
+    if (!taxes[taxIndex]) taxes[taxIndex] = {taxType: '', taxPercentage: '', taxAmount: ''};
+    taxes[taxIndex] = {...taxes[taxIndex], [field]: fieldValue};
+    const afterDiscount = Math.max(0, (parseFloat(item.total) || 0) - (parseFloat(item.discountAmount || '0') || 0));
+    taxes.forEach((t, i) => {
+      const pct = parseFloat(t.taxPercentage || '0') || 0;
+      taxes[i] = {...t, taxAmount: ((afterDiscount * pct) / 100).toFixed(2)};
+    });
+    newItems[itemIndex] = {...item, taxes};
+    newItems[itemIndex].taxAmount = taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0).toFixed(2);
+    onChange({items: newItems});
+  };
+
+  const addItemTax = (itemIndex: number) => {
+    const newItems = [...(value.items || [])];
+    const item = newItems[itemIndex];
+    if (!item) return;
+    const taxes = [...(item.taxes?.length ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}])];
+    taxes.push({taxType: '', taxPercentage: '', taxAmount: ''});
+    newItems[itemIndex] = {...item, taxes};
+    onChange({items: newItems});
+  };
+
+  const removeItemTax = (itemIndex: number, taxIndex: number) => {
+    const newItems = [...(value.items || [])];
+    const item = newItems[itemIndex];
+    const taxes = item?.taxes?.length ? item.taxes : (item?.taxType ? [{taxType: item.taxType, taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}] : []);
+    if (!item || taxes.length <= 1) return;
+    const taxesFiltered = taxes.filter((_, i) => i !== taxIndex);
+    const afterDiscount = Math.max(0, (parseFloat(item.total) || 0) - (parseFloat(item.discountAmount || '0') || 0));
+    taxesFiltered.forEach((t, i) => {
+      const pct = parseFloat(t.taxPercentage || '0') || 0;
+      taxesFiltered[i] = {...t, taxAmount: ((afterDiscount * pct) / 100).toFixed(2)};
+    });
+    newItems[itemIndex] = {...item, taxes: taxesFiltered, taxAmount: taxesFiltered.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0).toFixed(2)};
     onChange({items: newItems});
   };
 
   const addMoreItems = () => {
     const newItems = [...(value.items || []), {
       itemName: '', 
+      description: '',
       quantity: '', 
       unit: '', 
       pricePerQuantity: '', 
@@ -293,6 +319,7 @@ export const InvoiceForm: React.FC<Props> = ({
       taxType: '',
       taxPercentage: '',
       taxAmount: '',
+      taxes: [{taxType: '', taxPercentage: '', taxAmount: ''}],
     }];
     onChange({items: newItems});
   };
@@ -312,18 +339,6 @@ export const InvoiceForm: React.FC<Props> = ({
         <Text style={styles.sectionTitle}>
           {isDealerFinance ? entityInvoiceLabel : 'Vendor Invoice'}
         </Text>
-        {bankOptions && bankOptions.length > 0 && onBankSelect && (
-          <View style={styles.field}>
-            <CustomDropdown
-              label="Bank *"
-              data={bankOptions}
-              value={selectedBankId}
-              onChange={onBankSelect}
-              placeholder="Select Bank"
-              containerStyle={styles.dropdownContainer}
-            />
-          </View>
-        )}
         <View style={styles.row}>
           <View style={styles.halfWidth}>
             <CustomDropdown
@@ -350,19 +365,7 @@ export const InvoiceForm: React.FC<Props> = ({
           </View>
         </View>
         <View style={styles.field}>
-          <View style={styles.labelRow}>
-            <Text style={styles.label}>
-              {isDealerFinance ? entityODLabel : 'Anchor Loan Account for Vendor'}
-            </Text>
-            <TouchableOpacity
-              onPress={() => setShowCreditAccountTooltip(true)}
-              style={styles.infoButton}
-              hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-              <View style={styles.infoIconContainer}>
-                <Text style={styles.infoIconText}>i</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.label}>OD Account No</Text>
           <CustomDropdown
             label=""
             data={dealerOptions && value.odAccountNumber ? [{label: value.odAccountNumber, value: value.odAccountNumber}] : []}
@@ -401,26 +404,14 @@ export const InvoiceForm: React.FC<Props> = ({
         <View style={styles.row}>
           <View style={styles.halfWidth}>
             <View style={styles.fieldInRow}>
-              <View style={styles.labelRow}>
-                <Text style={styles.label}>Associated PO (Optional)</Text>
-                <TouchableOpacity
-                  onPress={() => setShowPOTooltip(true)}
-                  style={styles.infoButton}
-                  hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-                  <View style={styles.infoIconContainer}>
-                    <Text style={styles.infoIconText}>i</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-              <CustomDropdown
-                label=""
-                data={[]}
-                value={value.associatedPO}
-                onChange={set('associatedPO')}
-                placeholder="Please Select"
-                containerStyle={styles.dropdownContainer}
-                dropdownStyle={styles.dropdownHeight}
-              />
+              <L label="PO.Ref. No(Optional)">
+                <TextInput
+                  style={styles.input}
+                  value={value.associatedPO}
+                  onChangeText={set('associatedPO')}
+                  placeholder="Value"
+                />
+              </L>
             </View>
           </View>
           <View style={styles.halfWidth}>
@@ -443,7 +434,8 @@ export const InvoiceForm: React.FC<Props> = ({
                 datePickerProps={{
                   date: value.invoiceDate ? moment(value.invoiceDate, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true).toDate() : new Date(),
                   mode: 'date',
-                  maximumDate: new Date(), // Only allow current or past dates
+                  minimumDate: moment().subtract(1, 'month').toDate(),
+                  maximumDate: new Date(),
                 }}
                 containerStyle={styles.datePickerContainer}
               />
@@ -458,7 +450,7 @@ export const InvoiceForm: React.FC<Props> = ({
           <View style={styles.halfWidth}>
             <View style={styles.fieldInRow}>
               <DateNTimePicker
-                label="Payment Date (Optional)"
+                label="Payment Date *"
                 value={parseDateValue(value.paymentDate)}
                 onConfirm={(date) => {
                   const dateStr = formatDateForStorage(date);
@@ -474,7 +466,7 @@ export const InvoiceForm: React.FC<Props> = ({
                 datePickerProps={{
                   date: value.paymentDate ? moment(value.paymentDate, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true).toDate() : new Date(),
                   mode: 'date',
-                  minimumDate: new Date(), // Only allow future dates
+                  minimumDate: new Date(),
                 }}
                 containerStyle={styles.datePickerContainer}
               />
@@ -485,19 +477,23 @@ export const InvoiceForm: React.FC<Props> = ({
           </View>
           <View style={styles.halfWidth}>
             <View style={[styles.fieldInRow, styles.invoiceDueDateField]}>
-              <Text style={styles.label}>Invoice Due Date</Text>
-              <TextInput
-                style={[styles.input, styles.autoCalculated]}
-                value={value.invoiceDueDate || ''}
-                editable={false}
-                placeholder="Auto Due Date"
-                placeholderTextColor="#999"
+              <DateNTimePicker
+                label="Invoice Due Date"
+                value={parseDateValue(value.invoiceDueDate)}
+                onConfirm={(date) => {
+                  const dateStr = formatDateForStorage(date);
+                  onChange({invoiceDueDate: dateStr});
+                }}
+                placeholder="DD-MM-YYYY"
+                mode="date"
+                datePickerProps={{
+                  date: value.invoiceDueDate ? moment(value.invoiceDueDate, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true).toDate() : new Date(),
+                  mode: 'date',
+                  minimumDate: new Date(2026, 0, 1),
+                  maximumDate: new Date(2026, 11, 31),
+                }}
+                containerStyle={styles.datePickerContainer}
               />
-              {value.invoiceDueDate && (
-                <Text style={styles.calculatedInfoText}>
-                  Calculated: {value.grnDate ? 'GRN Date' : 'Invoice Date'} + {TENURE_DAYS} days (default - will be dynamic from backend)
-                </Text>
-              )}
             </View>
           </View>
         </View>
@@ -521,24 +517,6 @@ export const InvoiceForm: React.FC<Props> = ({
           <TextInput style={styles.input} value={value.earlyPaymentDiscount} onChangeText={set('earlyPaymentDiscount')} placeholder="Value" keyboardType="decimal-pad" />
         </View>
         <View style={styles.row}>
-          <View style={styles.halfWidth}>
-            <DateNTimePicker
-              label="GRN Date (Optional)"
-              value={parseDateValue(value.grnDate)}
-              onConfirm={(date) => {
-                const dateStr = formatDateForStorage(date);
-                onChange({grnDate: dateStr});
-                // Invoice Due Date will be auto-recalculated via useEffect
-              }}
-              placeholder="DD-MM-YYYY"
-              mode="date"
-              datePickerProps={{
-                date: value.grnDate ? moment(value.grnDate, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true).toDate() : new Date(),
-                mode: 'date',
-                maximumDate: new Date(), // GRN Date should be current or past
-              }}
-            />
-          </View>
           <View style={styles.halfWidth}>
             <View style={styles.creditToField}>
               <CustomDropdown
@@ -592,6 +570,14 @@ export const InvoiceForm: React.FC<Props> = ({
                 placeholder="Value" 
               />
             </L>
+            <L label="Description (Optional)">
+              <TextInput 
+                style={styles.input} 
+                value={item.description || ''} 
+                onChangeText={(text) => updateItem(index, 'description', text)} 
+                placeholder="Value" 
+              />
+            </L>
             <View style={styles.row}>
               <View style={styles.thirdWidth}>
                 <L label="Quantity *">
@@ -605,14 +591,14 @@ export const InvoiceForm: React.FC<Props> = ({
                 </L>
               </View>
               <View style={styles.thirdWidth}>
-                <CustomDropdown
-                  label="Unit *"
-                  data={unitOptions}
-                  value={item.unit}
-                  onChange={(text) => updateItem(index, 'unit', text)}
-                  placeholder="Unit"
-                  containerStyle={styles.dropdownContainer}
-                />
+                <L label="Unit *">
+                  <TextInput
+                    style={[styles.input, errors.items && errors.items.includes(`Item ${index + 1}`) && errors.items.includes('Unit') && styles.inputError]}
+                    value={item.unit}
+                    onChangeText={(text) => updateItem(index, 'unit', text)}
+                    placeholder="e.g. PCS, BOX"
+                  />
+                </L>
               </View>
               <View style={styles.thirdWidth}>
                 <L label="Price *">
@@ -672,47 +658,61 @@ export const InvoiceForm: React.FC<Props> = ({
               </View>
             </View>
             
-            {/* Item-level Tax */}
+            {/* Item-level Tax (multiple) */}
             <View style={styles.itemDiscountTaxContainer}>
-              <Text style={styles.itemDiscountTaxLabelText}>Tax %</Text>
-              <View style={styles.itemDiscountTaxVertical}>
-                <View style={styles.discountTaxDropdownVertical}>
-                  <CustomDropdown
-                    label=""
-                    data={[
-                      {label: 'Select', value: ''},
-                      {label: 'GST', value: 'GST'},
-                      {label: 'CST', value: 'CST'},
-                      {label: 'IGST', value: 'IGST'},
-                    ]}
-                    value={item.taxType || ''}
-                    onChange={(val) => updateItem(index, 'taxType', val)}
-                    placeholder="Select"
-                    containerStyle={styles.itemDropdownContainer}
-                    showSearch={false}
-                  />
-                </View>
-                {item.taxType && (
-                  <View style={styles.itemDiscountTaxInputsVertical}>
-                    <View style={styles.taxPercentInputRow}>
-                      <TextInput
-                        style={styles.itemDiscountTaxInputVertical}
-                        value={item.taxPercentage || ''}
-                        onChangeText={(text) => updateItem(index, 'taxPercentage', text)}
-                        placeholder="e.g. 3 for 3%"
-                        keyboardType="decimal-pad"
+              <Text style={styles.itemDiscountTaxLabelText}>Tax</Text>
+              {((item.taxes && item.taxes.length > 0) ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}]).map((tax, taxIdx) => (
+                <View key={taxIdx} style={styles.taxRowWithActions}>
+                  <View style={[styles.itemDiscountTaxVertical, styles.taxContentWrapper]}>
+                    <View style={styles.discountTaxDropdownVertical}>
+                      <CustomDropdown
+                        label=""
+                        data={[
+                          {label: 'Select', value: ''},
+                          {label: 'GST', value: 'GST'},
+                          {label: 'CGST', value: 'CGST'},
+                          {label: 'OTHER', value: 'OTHER'},
+                        ]}
+                        value={tax.taxType || ''}
+                        onChange={(val) => updateItemTax(index, taxIdx, 'taxType', val)}
+                        placeholder="Select"
+                        containerStyle={styles.itemDropdownContainer}
+                        showSearch={false}
                       />
-                      <Text style={styles.taxPercentSuffix}>%</Text>
                     </View>
-                    <TextInput
-                      style={[styles.itemDiscountTaxInputVertical, styles.autoCalculated]}
-                      value={item.taxAmount || '0.00'}
-                      editable={false}
-                      placeholder="0.00"
-                    />
+                    {tax.taxType && (
+                      <View style={styles.itemDiscountTaxInputsVertical}>
+                        <View style={styles.taxPercentInputRow}>
+                          <TextInput
+                            style={styles.itemDiscountTaxInputVertical}
+                            value={tax.taxPercentage || ''}
+                            onChangeText={(text) => updateItemTax(index, taxIdx, 'taxPercentage', text)}
+                            placeholder="Value"
+                            keyboardType="decimal-pad"
+                          />
+                          <Text style={styles.taxPercentSuffix}>%</Text>
+                        </View>
+                        <TextInput
+                          style={[styles.itemDiscountTaxInputVertical, styles.autoCalculated]}
+                          value={tax.taxAmount || '0.00'}
+                          editable={false}
+                          placeholder="0.00"
+                        />
+                      </View>
+                    )}
                   </View>
-                )}
-              </View>
+                  <View style={styles.taxActionButtons}>
+                    <TouchableOpacity onPress={() => addItemTax(index)} style={[styles.addTaxButton, {marginRight: 8}]}>
+                      <FontAwesome6 name="plus" iconStyle="solid" size={14} color="#333" />
+                    </TouchableOpacity>
+                    {(((item.taxes && item.taxes.length > 0) ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}]).length > 1) && (
+                      <TouchableOpacity onPress={() => removeItemTax(index, taxIdx)} style={styles.removeTaxButton}>
+                        <FontAwesome6 name="trash" iconStyle="solid" size={14} color="#dc3545" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              ))}
             </View>
           </View>
         ))}
@@ -729,8 +729,11 @@ export const InvoiceForm: React.FC<Props> = ({
             return sum + (parseFloat(item.discountAmount || '0') || 0);
           }, 0);
           
-          // Calculate Tax Total (sum of all item-level taxes)
+          // Calculate Tax Total (sum of all item-level taxes - from taxes array or legacy taxAmount)
           const taxTotal = items.reduce((sum, item) => {
+            if (item.taxes?.length) {
+              return sum + item.taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0);
+            }
             return sum + (parseFloat(item.taxAmount || '0') || 0);
           }, 0);
           
@@ -1068,7 +1071,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 12,
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   halfWidth: {
     flex: 1,
@@ -1095,7 +1098,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   invoiceDueDateField: {
-    marginTop: 8,
+    marginTop: 0,
   },
   creditToField: {
     marginTop: 8,
@@ -1300,6 +1303,36 @@ const styles = StyleSheet.create({
   },
   itemDropdownContainer: {
     marginBottom: 0,
+  },
+  taxRowWithActions: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  taxContentWrapper: {
+    flex: 1,
+    minWidth: 0,
+  },
+  taxActionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  addTaxButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F0F0F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeTaxButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFE9E9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   summaryContainer: {
     marginTop: 16,

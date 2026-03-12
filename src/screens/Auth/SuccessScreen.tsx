@@ -29,15 +29,17 @@ export const SuccessScreen = ({
   const isProgramSelected = useSelector(selectIsProgramSelected);
 
   const message = useMemo(() => {
+    const firstName = (params.firstName ?? '').trim();
+    const lastName = (params.lastName ?? '').trim();
+    const fullName = [firstName, lastName].filter(Boolean).join(' ');
+
     switch (params.authMode) {
       case 'signin': {
-        const fullName = params.firstName.trim() + ' ' + params.lastName.trim();
         return fullName
           ? `Welcome back, ${fullName}\nYou are now signed in.`
           : `Welcome back,\nYou are now signed in.`;
       }
       case 'signup': {
-        const fullName = params.firstName.trim() + ' ' + params.lastName.trim();
         return fullName
           ? `Welcome aboard, ${fullName}\nYour account is now created.`
           : `Welcome aboard,\nYour account is now created.`;
@@ -45,7 +47,7 @@ export const SuccessScreen = ({
       case 'password':
         return 'Your password has been updated.';
     }
-  }, [params.authMode]);
+  }, [params.authMode, params.firstName, params.lastName]);
 
   useEffect(() => {
     const backHandler = BackHandler.addEventListener(

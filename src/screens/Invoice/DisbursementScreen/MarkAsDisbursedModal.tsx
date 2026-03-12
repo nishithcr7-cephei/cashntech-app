@@ -8,14 +8,17 @@ import {
   TouchableWithoutFeedback,
   TextInput,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
+import {invoiceApi} from '@services/api/invoice.api';
 
 type MarkAsDisbursedModalProps = {
   visible: boolean;
   onClose: () => void;
+  invoiceId?: string;
   invoiceAmount?: string;
   invoiceNo?: string;
   userId?: string;
@@ -25,14 +28,13 @@ type MarkAsDisbursedModalProps = {
     disbursedAmount: string;
     status: string;
     date: string;
-  }) => void;
+    userId: string;
+    utrRefNo: string;
+  }) => void | Promise<void>;
 };
 
-// Mock data for dropdowns - replace with actual data from API/store
-const accountOptions = [
-  {label: 'Account 1', value: 'acc1'},
-  {label: 'Account 2', value: 'acc2'},
-  {label: 'Account 3', value: 'acc3'},
+const accountOptionsFallback = [
+  {label: 'Select Account No', value: ''},
 ];
 
 const statusOptions = [
@@ -44,39 +46,73 @@ const statusOptions = [
 export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   visible,
   onClose,
+  invoiceId,
   invoiceAmount = '15,556',
   invoiceNo,
-  userId = 'Value',
-  utrRefNo = 'Value',
+  userId: userIdProp,
+  utrRefNo: utrRefNoProp,
   onSubmit,
 }) => {
+  const [accountOptions, setAccountOptions] = useState<{label: string; value: string}[]>(accountOptionsFallback);
+  const [accountsLoading, setAccountsLoading] = useState(false);
   const [debitFrom, setDebitFrom] = useState('');
-  const [disbursedAmount, setDisbursedAmount] = useState('10,000');
+  const [disbursedAmount, setDisbursedAmount] = useState(invoiceAmount || '10,000');
   const [status, setStatus] = useState('');
   const [date, setDate] = useState('');
+  const [userId, setUserId] = useState(userIdProp ?? '');
+  const [utrRefNo, setUtrRefNo] = useState(utrRefNoProp ?? '');
 
   useEffect(() => {
     if (visible) {
-      // Reset form when modal opens
       setDebitFrom('');
-      setDisbursedAmount('10,000');
+      setDisbursedAmount(invoiceAmount || '10,000');
       setStatus('');
       setDate('');
+      setUserId(userIdProp ?? '');
+      setUtrRefNo(utrRefNoProp ?? '');
     }
-  }, [visible]);
+  }, [visible, invoiceAmount, userIdProp, utrRefNoProp]);
 
-  const handleSubmit = () => {
-    if (!debitFrom || !disbursedAmount.trim() || !status || !date) {
-      // TODO: Show validation error
+  useEffect(() => {
+    if (visible && invoiceId) {
+      setAccountsLoading(true);
+      invoiceApi
+        .getBankAccountsForDisbursement(invoiceId)
+        .then((data: any) => {
+          const opts: {label: string; value: string}[] = [];
+          const party = data?.party ?? data?.Party;
+          const bankDetails = party?.party_bank_details ?? party?.partyBankDetails ?? [];
+          if (Array.isArray(bankDetails)) {
+            bankDetails.forEach((b: any) => {
+              const acc = b?.account_number ?? b?.accountNumber ?? '';
+              const name = b?.name_as_per_bank ?? b?.nameAsPerBank ?? '';
+              if (acc) opts.push({label: name ? `${acc} - ${name}` : acc, value: acc});
+            });
+          }
+          const apm = data?.anchorParticipantMapping ?? data?.anchor_participant_mapping;
+          const odAccount = Array.isArray(apm) ? apm[0]?.od_account_no : apm?.od_account_no;
+          if (odAccount) {
+            opts.push({label: `OD Account - ${odAccount}`, value: odAccount});
+          }
+          setAccountOptions(opts.length ? opts : accountOptionsFallback);
+        })
+        .catch(() => setAccountOptions(accountOptionsFallback))
+        .finally(() => setAccountsLoading(false));
+    }
+  }, [visible, invoiceId]);
+
+  const handleSubmit = async () => {
+    if (!debitFrom || !disbursedAmount.trim() || !status || !date || !utrRefNo.trim()) {
       return;
     }
-
     if (onSubmit) {
-      onSubmit({
+      await onSubmit({
         debitFrom,
         disbursedAmount: disbursedAmount.trim(),
         status,
         date,
+        userId: userId.trim(),
+        utrRefNo: utrRefNo.trim(),
       });
     }
     handleClose();
@@ -87,6 +123,8 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     setDisbursedAmount('10,000');
     setStatus('');
     setDate('');
+    setUserId(userIdProp ?? '');
+    setUtrRefNo(utrRefNoProp ?? '');
     onClose();
   };
 
@@ -100,10 +138,11 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback onPress={() => {}}>
             <View style={styles.modalContainer}>
-              {/* Header */}
+              {/* Header - Figma: single line with "Disburse Amount" emphasised */}
               <View style={styles.modalHeader}>
-                <Text style={styles.modalSubTitle}>Are you sure, you want to</Text>
-                <Text style={styles.modalTitle}>Disburs Amount?</Text>
+                <Text style={styles.modalTitleWrap}>
+                  Are you sure, you want to <Text style={styles.modalTitleBold}>Disburse Amount?</Text>
+                </Text>
               </View>
 
               {/* Content */}
@@ -121,7 +160,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                     <Text style={styles.tableHeaderText}>Amount</Text>
                   </View>
 
-                  {/* Invoice Amount */}
+                  {/* Invoice Amount - read-only, greyed */}
                   <View style={styles.tableRow}>
                     <View style={styles.detailColumn}>
                       <Text style={styles.detailLabel}>Invoice Amount</Text>
@@ -129,7 +168,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                     <View style={styles.amountColumn}>
                       <TextInput
                         style={[styles.input, styles.readOnlyInput]}
-                        value={`Rs.: ${invoiceAmount}`}
+                        value={`Rs. ${invoiceAmount}`}
                         editable={false}
                         placeholderTextColor={Colors.graybase}
                       />
@@ -142,19 +181,23 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                       <Text style={styles.detailLabel}>Debit From :</Text>
                     </View>
                     <View style={styles.amountColumn}>
-                      <CustomDropdown
-                        label=""
-                        data={accountOptions}
-                        value={debitFrom}
-                        onChange={setDebitFrom}
-                        placeholder="Select Account No"
-                        containerStyle={styles.dropdownContainer}
-                        showSearch={false}
-                      />
+                      {accountsLoading ? (
+                        <ActivityIndicator size="small" color={Colors.primaryColor} />
+                      ) : (
+                        <CustomDropdown
+                          label=""
+                          data={accountOptions}
+                          value={debitFrom}
+                          onChange={setDebitFrom}
+                          placeholder="Select Account No"
+                          containerStyle={styles.dropdownContainer}
+                          showSearch={false}
+                        />
+                      )}
                     </View>
                   </View>
 
-                  {/* Disbursed Amount */}
+                  {/* Disbursed Amount - editable */}
                   <View style={styles.tableRow}>
                     <View style={styles.detailColumn}>
                       <Text style={styles.detailLabel}>Disbursed Amount</Text>
@@ -162,13 +205,12 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                     <View style={styles.amountColumn}>
                       <TextInput
                         style={styles.input}
-                        value={`Rs.: ${disbursedAmount}`}
+                        value={disbursedAmount ? `Rs. ${disbursedAmount}` : ''}
                         onChangeText={text => {
-                          // Remove "Rs.: " prefix if present
-                          const amount = text.replace(/^Rs\.:\s*/, '');
+                          const amount = text.replace(/^Rs\.\s*/, '').trim();
                           setDisbursedAmount(amount);
                         }}
-                        placeholder="Rs.: 0"
+                        placeholder="Rs. 10,000"
                         placeholderTextColor={Colors.graybase}
                         keyboardType="numeric"
                       />
@@ -216,31 +258,33 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                     </View>
                   </View>
 
-                  {/* User ID */}
+                  {/* User ID - editable, user enters value */}
                   <View style={styles.tableRow}>
                     <View style={styles.detailColumn}>
                       <Text style={styles.detailLabel}>User ID</Text>
                     </View>
                     <View style={styles.amountColumn}>
                       <TextInput
-                        style={[styles.input, styles.readOnlyInput]}
+                        style={styles.input}
                         value={userId}
-                        editable={false}
+                        onChangeText={setUserId}
+                        placeholder="Value"
                         placeholderTextColor={Colors.graybase}
                       />
                     </View>
                   </View>
 
-                  {/* UTR / Ref. No */}
+                  {/* UTR / Ref. No - editable, user enters value */}
                   <View style={styles.tableRow}>
                     <View style={styles.detailColumn}>
                       <Text style={styles.detailLabel}>UTR / Ref. No</Text>
                     </View>
                     <View style={styles.amountColumn}>
                       <TextInput
-                        style={[styles.input, styles.readOnlyInput]}
+                        style={styles.input}
                         value={utrRefNo}
-                        editable={false}
+                        onChangeText={setUtrRefNo}
+                        placeholder="Value"
                         placeholderTextColor={Colors.graybase}
                       />
                     </View>
@@ -293,18 +337,14 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E6E6E6',
     alignItems: 'center',
   },
-  modalSubTitle: {
-    fontSize: scaleFont(13),
+  modalTitleWrap: {
+    fontSize: scaleFont(15),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
     textAlign: 'center',
-    marginBottom: scaleHeight(2),
   },
-  modalTitle: {
-    fontSize: scaleFont(17),
+  modalTitleBold: {
     fontFamily: Fonts.GilroySemiBold,
-    color: Colors.darkblack,
-    textAlign: 'center',
   },
   scrollView: {
     flexShrink: 1,

@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   TouchableWithoutFeedback,
-  ScrollView,
+  FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -16,26 +17,78 @@ export type CheckerApprovalEntry = {
   approvedBy: string;
   approvalDate: string;
   status: 'Approved' | 'Rejected';
+  role?: string;
+  approvalLevel?: string;
+  action?: string;
+  remark?: string;
+  rejectionReason?: string;
 };
 
 type CheckerApprovalModalProps = {
   visible: boolean;
   onClose: () => void;
   approvalEntries?: CheckerApprovalEntry[];
+  loading?: boolean;
+  invoiceNo?: string;
 };
+
+function RowLabelValue({
+  label,
+  value,
+  valueNumberOfLines,
+  multiline = false,
+}: {
+  label: string;
+  value: string;
+  valueNumberOfLines?: number;
+  multiline?: boolean;
+}) {
+  return (
+    <View style={[styles.labelValueRow, multiline && styles.labelValueRowTop]}>
+      <Text style={styles.labelText}>{label}</Text>
+      <Text style={styles.valueText} numberOfLines={valueNumberOfLines}>
+        {value}
+      </Text>
+    </View>
+  );
+}
 
 export const CheckerApprovalModal: React.FC<CheckerApprovalModalProps> = ({
   visible,
   onClose,
-  approvalEntries = [
-    {
-      id: '1',
-      approvedBy: 'Company Name_Checker',
-      approvalDate: 'dd-mm-yyyy',
-      status: 'Approved',
-    },
-  ],
+  approvalEntries = [],
+  loading = false,
+  invoiceNo,
 }) => {
+  const renderCard = ({ item, index }: { item: CheckerApprovalEntry; index: number }) => (
+    <View style={[styles.card, index > 0 && styles.cardSpacer]}>
+      <RowLabelValue
+        label="User Name"
+        value={item.approvedBy}
+        valueNumberOfLines={2}
+        multiline
+      />
+      <RowLabelValue label="Role" value={item.role || '-'} />
+      <RowLabelValue label="Approval Level" value={item.approvalLevel ?? '-'} />
+      <RowLabelValue label="Action" value={item.action || item.status} />
+      <RowLabelValue
+        label="Remark"
+        value={item.remark || '-'}
+        valueNumberOfLines={3}
+        multiline
+      />
+      <RowLabelValue
+        label="Rejection Reason"
+        value={item.rejectionReason || '-'}
+        valueNumberOfLines={3}
+        multiline
+      />
+      <RowLabelValue label="Date" value={item.approvalDate} />
+    </View>
+  );
+
+  const keyExtractor = (item: CheckerApprovalEntry) => item.id;
+
   return (
     <Modal
       transparent
@@ -46,9 +99,10 @@ export const CheckerApprovalModal: React.FC<CheckerApprovalModalProps> = ({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback onPress={() => {}}>
             <View style={styles.modalContainer}>
-              {/* Header with Title and Close Button */}
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Checker Approval Detail</Text>
+                <Text style={styles.modalTitle}>
+                  {invoiceNo ? `Invoice No: ${invoiceNo}` : 'Approval History'}
+                </Text>
                 <TouchableOpacity
                   onPress={onClose}
                   style={styles.closeButton}
@@ -57,60 +111,27 @@ export const CheckerApprovalModal: React.FC<CheckerApprovalModalProps> = ({
                 </TouchableOpacity>
               </View>
 
-              {/* Content */}
               <View style={styles.modalContent}>
-                {/* Gray Header Bar */}
-                <View style={styles.headerBar}>
-                  <Text style={[styles.headerText, styles.headerTextLeft]}>
-                    Approved by
-                  </Text>
-                  <Text style={[styles.headerText, styles.headerTextCenter]}>
-                    Status
-                  </Text>
-                  <Text style={[styles.headerText, styles.headerTextRight]}>
-                    Approval Date
-                  </Text>
-                </View>
-
-                {/* Scrollable List */}
-                <ScrollView
-                  style={styles.listContainer}
-                  showsVerticalScrollIndicator={true}>
-                  {approvalEntries.map((entry, index) => (
-                    <View
-                      key={entry.id}
-                      style={[
-                        styles.detailsRow,
-                        index < approvalEntries.length - 1 && styles.detailsRowBorder,
-                      ]}>
-                      <Text style={[styles.detailText, styles.detailTextLeft]}>
-                        {entry.approvedBy}
-                      </Text>
-                      <View style={styles.statusContainer}>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            entry.status === 'Approved'
-                              ? styles.statusApproved
-                              : styles.statusRejected,
-                          ]}>
-                          <Text
-                            style={[
-                              styles.statusText,
-                              entry.status === 'Approved'
-                                ? styles.statusTextApproved
-                                : styles.statusTextRejected,
-                            ]}>
-                            {entry.status}
-                          </Text>
-                        </View>
+                {loading ? (
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator size="large" color={Colors.primaryColor} />
+                    <Text style={styles.loadingText}>Loading approval history...</Text>
+                  </View>
+                ) : (
+                  <FlatList
+                    data={approvalEntries}
+                    renderItem={renderCard}
+                    keyExtractor={keyExtractor}
+                    style={styles.listContainer}
+                    showsVerticalScrollIndicator={true}
+                    contentContainerStyle={styles.listContent}
+                    ListEmptyComponent={
+                      <View style={styles.emptyRow}>
+                        <Text style={styles.emptyText}>No approval history</Text>
                       </View>
-                      <Text style={[styles.detailText, styles.detailTextRight]}>
-                        {entry.approvalDate}
-                      </Text>
-                    </View>
-                  ))}
-                </ScrollView>
+                    }
+                  />
+                )}
               </View>
             </View>
           </TouchableWithoutFeedback>
@@ -128,7 +149,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    width: '85%',
+    width: '90%',
+    maxHeight: '85%',
+    minHeight: scaleHeight(220),
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(12),
     overflow: 'hidden',
@@ -160,67 +183,57 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     padding: scaleWidth(16),
-    maxHeight: scaleHeight(400),
-  },
-  headerBar: {
-    flexDirection: 'row',
-    backgroundColor: '#808080',
-    paddingHorizontal: scaleWidth(12),
-    paddingVertical: scaleHeight(10),
-    borderRadius: scaleWidth(4),
-    marginBottom: scaleHeight(8),
-  },
-  headerText: {
-    fontSize: scaleFont(14),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.white,
-    flex: 1,
-  },
-  headerTextLeft: {
-    textAlign: 'left',
-  },
-  headerTextCenter: {
-    textAlign: 'center',
-  },
-  headerTextRight: {
-    textAlign: 'right',
+    minHeight: scaleHeight(140),
+    maxHeight: scaleHeight(450),
   },
   listContainer: {
-    maxHeight: scaleHeight(300),
+    maxHeight: scaleHeight(360),
   },
-  detailsRow: {
+  listContent: {
+    paddingBottom: scaleHeight(16),
+    flexGrow: 1,
+  },
+  card: {
+    backgroundColor: '#F7F8FB',
+    borderRadius: scaleWidth(10),
+    padding: scaleWidth(14),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E6E6E6',
+  },
+  cardSpacer: {
+    marginTop: scaleHeight(12),
+  },
+  labelValueRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: scaleWidth(12),
-    paddingVertical: scaleHeight(12),
-  },
-  detailsRowBorder: {
+    paddingVertical: scaleHeight(6),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E6E6E6',
   },
-  detailText: {
-    fontSize: scaleFont(14),
+  labelValueRowTop: {
+    alignItems: 'flex-start',
+  },
+  labelText: {
+    fontSize: scaleFont(13),
     fontFamily: Fonts.GilroyMedium,
-    color: '#808080',
+    color: Colors.graybase,
     flex: 1,
+    marginRight: scaleWidth(8),
   },
-  detailTextLeft: {
-    textAlign: 'left',
-  },
-  detailTextRight: {
+  valueText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    flex: 1,
     textAlign: 'right',
-  },
-  statusContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexShrink: 1,
   },
   statusBadge: {
-    paddingHorizontal: scaleWidth(12),
+    paddingHorizontal: scaleWidth(10),
     paddingVertical: scaleHeight(4),
     borderRadius: scaleWidth(12),
-    minWidth: scaleWidth(80),
-    alignItems: 'center',
+    alignSelf: 'flex-end',
   },
   statusApproved: {
     backgroundColor: '#E8F5E9',
@@ -238,5 +251,25 @@ const styles = StyleSheet.create({
   statusTextRejected: {
     color: Colors.red,
   },
+  emptyRow: {
+    flex: 1,
+    minHeight: scaleHeight(100),
+    padding: scaleHeight(24),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: scaleFont(14),
+    color: Colors.graybase,
+  },
+  loadingRow: {
+    padding: scaleHeight(32),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: scaleHeight(12),
+    fontSize: scaleFont(14),
+    color: Colors.graybase,
+  },
 });
-

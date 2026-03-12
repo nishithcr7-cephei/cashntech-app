@@ -18,6 +18,7 @@ const UNIT_MAP: Record<string, number> = {
   PAIR: 10,
   SET: 11,
   PACK: 12,
+  STRIP: 13,
 };
 
 function toYYYYMMDD(dateStr: string): string {
@@ -49,29 +50,28 @@ export type CreateInvoicePayloadInput = {
 function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<string, unknown> {
   const {fields, createdBy, partnerBank, program, anchorParticipantMapping, party, counterPartyName, counterPartyCode, counterPartyOdAccount} = input;
 
+  // Align with InvoiceForm: use item-level discount and tax (same as form summary)
   const subtotal = fields.items.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0);
-  const discountType = fields.discountType || '';
-  const discountValue = parseFloat(fields.discountValue || '0') || 0;
-  let discountTotal = 0;
-  if (discountType === 'percentage' && discountValue > 0) {
-    discountTotal = (subtotal * discountValue) / 100;
-  } else if ((discountType === 'absolute' || discountType === 'flat') && discountValue > 0) {
-    discountTotal = discountValue;
-  }
-  const finalAmount = Math.max(0, subtotal - discountTotal);
-  const cgst = fields.cgst ? parseFloat(fields.cgst) : finalAmount * 0.025;
-  const sgst = fields.sgst ? parseFloat(fields.sgst) : finalAmount * 0.025;
-  const taxTotal = cgst + sgst;
-  const finalTotalValue = finalAmount + taxTotal;
+  const discountTotal = fields.items.reduce(
+    (sum, item) => sum + (parseFloat(item.discountAmount || '0') || 0),
+    0,
+  );
+  const taxTotal = fields.items.reduce(
+    (sum, item) => sum + (parseFloat(item.taxAmount || '0') || 0),
+    0,
+  );
+  const finalTotalValue = Math.max(0, subtotal - discountTotal + taxTotal);
 
   const items = fields.items.map((item: InvoiceLineItem) => {
+    // Map textual unit (PCS, KG...) to numeric code that DB expects,
+    // but keep it as a string so DTO (@IsString) validation passes.
     const unitNum = UNIT_MAP[item.unit?.toUpperCase()] ?? 1;
     const baseItem: Record<string, unknown> = {
       name: item.itemName?.trim() || '',
-      description: item.itemName?.trim() || '',
+      description: (item.description?.trim() || item.itemName?.trim() || ''),
       created_by: createdBy,
       quantity: parseFloat(item.quantity) || 0,
-      unit: unitNum,
+      unit: String(unitNum),
       price_per_quantity: parseFloat(item.pricePerQuantity) || 0,
       total: parseFloat(item.total) || 0,
     };
@@ -81,7 +81,14 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
       baseItem.discount_value = parseFloat(item.discountValue) || 0;
       baseItem.discount_amount = parseFloat(item.discountAmount || '0') || 0;
     }
-    if (item.taxType && (item.taxPercentage || item.taxAmount)) {
+    const taxesArray = item.taxes?.filter(t => t.taxType) || [];
+    if (taxesArray.length > 0) {
+      baseItem.taxes = taxesArray.map(t => ({
+        tax_type: t.taxType,
+        tax_percentage: parseFloat(t.taxPercentage || '0') || 0,
+        tax_amount: parseFloat(t.taxAmount || '0') || 0,
+      }));
+    } else if (item.taxType && (item.taxPercentage || item.taxAmount)) {
       baseItem.taxes = [{
         tax_type: item.taxType,
         tax_percentage: parseFloat(item.taxPercentage || '0') || 0,
@@ -126,14 +133,85 @@ export type InvoiceListFilters = {
   byApprovalStatus?: string[];
 };
 
+export type InvoiceSummaryRequest = {
+  programIds?: string[];
+};
+
+export type InvoiceLatestRequest = {
+  programIds?: string[];
+};
+
+export type UpdateInvoiceStatusPayload = {
+  invoiceId: string;
+  action: 'Approve' | 'Reject';
+  approvalLevel: number;
+  remark?: string;
+};
+
+export type UpdateInvoiceVerificationPayload = {
+  invoiceId: string;
+  action: 'Verify' | 'Reject';
+  remark?: string;
+};
+
+export type DisbursementListRequest = {
+  programIds?: string[];
+};
+
+export type MarkAsDisbursedPayload = {
+  utr_no: string;
+  transaction_no: string;
+  disbursed_amount: number;
+  disbursement_date: string; // YYYY-MM-DD
+  status: string;
+  remark?: string;
+};
+
+/** API response shape for invoice approval log (GET /invoice/logs/:invoiceId) */
+export type InvoiceApprovalLogApi = {
+  id: string;
+  action: string;
+  action_by_role?: string;
+  remark?: string;
+  action_at: string;
+  user?: { first_name?: string; last_name?: string };
+  rejection_reason?: string;
+  role_approval_level?: number;
+};
+
+export type DailyInterestApiRow = {
+  id: number;
+  accrual_date: string;
+  outstanding_principal_date: number;
+  interest_rate: number;
+  daily_interest: number;
+  base_interest: number;
+  grace_period_interest: number;
+  penal_interest_on_interest: number;
+  penal_interest_on_principal: number;
+  cumulative_interest: number;
+  accrual_type: string;
+};
+
 export const invoiceApi = {
   getInvoiceList: async (
     programId: string,
     filters?: InvoiceListFilters,
   ): Promise<InvoiceListItemApi[]> => {
+    const body: Record<string, unknown> = {
+      ...(filters ?? {}),
+    };
+
+    // Mikro-ORM filter 'programIds' expects args in the shape:
+    // { program_id: string[] }
+    // so we must wrap the programId accordingly.
+    if (programId) {
+      (body as any).programIds = { program_id: [programId] };
+    }
+
     const response = await axiosInstance.post(
-      ApiEndPoints.apiInvoiceList(programId),
-      filters ?? {},
+      ApiEndPoints.apiInvoiceList,
+      body,
       {authRequired: true} as any,
     );
     const data = response?.data;
@@ -156,13 +234,191 @@ export const invoiceApi = {
     return response.data;
   },
 
+  getInvoiceSummary: async (
+    programIds?: string[],
+  ): Promise<any> => {
+    const body: InvoiceSummaryRequest = {
+      programIds: programIds ?? [],
+    };
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiInvoiceSummary,
+      body,
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
+  getLatestInvoices: async (
+    programIds?: string[],
+  ): Promise<any> => {
+    const body: InvoiceLatestRequest = {
+      programIds: programIds ?? [],
+    };
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiInvoiceLatest,
+      body,
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
+  getInvoiceDetails: async (invoiceId: string): Promise<any> => {
+    const response = await axiosInstance.get(
+      ApiEndPoints.apiGetInvoiceDetails(invoiceId),
+      {authRequired: true} as any,
+    );
+    const data = response?.data;
+    return data?.data ?? data;
+  },
+
+  /**
+   * Approval history for an invoice (GET /invoice/logs/:invoiceId)
+   * Returns array of { id, action, action_by_role, remark, action_at, user, rejection_reason }
+   */
+  getInvoiceApprovalHistory: async (invoiceId: string): Promise<InvoiceApprovalLogApi[]> => {
+    const response = await axiosInstance.get(
+      ApiEndPoints.apiGetInvoiceApprovalLogs(invoiceId),
+      {authRequired: true} as any,
+    );
+    const body = response?.data as any;
+    if (Array.isArray(body?.data)) return body.data;
+    if (Array.isArray(body)) return body;
+    if (Array.isArray(body?.logs)) return body.logs;
+    if (Array.isArray(body?.approvalHistory)) return body.approvalHistory;
+    return [];
+  },
+
+  updateInvoiceStatus: async (
+    payload: UpdateInvoiceStatusPayload,
+  ): Promise<any> => {
+    const {invoiceId, action, approvalLevel, remark} = payload;
+    const body = {
+      action,
+      approval_level: approvalLevel,
+      remark: remark ?? '',
+    };
+    const response = await axiosInstance.patch(
+      ApiEndPoints.apiUpdateInvoiceStatus(invoiceId),
+      body,
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
+  /**
+   * CashnTech admin verification: PATCH /invoice/admin/:invoiceId
+   * Body: { action: 'Verify' | 'Reject', remark: string }
+   */
+  updateInvoiceVerification: async (
+    payload: UpdateInvoiceVerificationPayload,
+  ): Promise<any> => {
+    const {invoiceId, action, remark} = payload;
+    const response = await axiosInstance.patch(
+      ApiEndPoints.apiUpdateInvoiceVerification(invoiceId),
+      { action, remark: remark ?? '' },
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
+  /** Verified invoices (admin_status=Verified). Supports filter payload for API-side filtering. */
+  getVerifiedList: async (
+    programIds?: string[],
+    filters?: {
+      bankIds?: string[];
+      programIds?: string[];
+      productIds?: string[];
+      partyIds?: string[];
+      counterPartyIds?: string[];
+      byInvoiceStatus?: string[];
+    },
+  ): Promise<any[]> => {
+    const body: Record<string, unknown> = {};
+    const progIds = filters?.programIds?.length ? filters.programIds : programIds;
+    if (progIds?.length) (body as any).programIds = { program_id: progIds };
+    if (filters?.bankIds?.length) (body as any).bankIds = { bank_id: filters.bankIds };
+    if (filters?.productIds?.length) (body as any).productIds = { product_id: filters.productIds };
+    if (filters?.partyIds?.length) (body as any).partyIds = { party_id: filters.partyIds };
+    if (filters?.counterPartyIds?.length)
+      (body as any).counterPartyIds = { counter_party_id: filters.counterPartyIds };
+    if (filters?.byInvoiceStatus?.length)
+      (body as any).byInvoiceStatus = filters.byInvoiceStatus;
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiVerifiedList,
+      body,
+      {authRequired: true} as any,
+    );
+    const data = response?.data;
+    if (Array.isArray(data)) return data;
+    if (data?.data && Array.isArray(data.data)) return data.data;
+    return [];
+  },
+
+  /** Disbursed invoices (invoice_status=Disbursed) */
+  getDisbursedList: async (programIds?: string[]): Promise<any[]> => {
+    const body: Record<string, unknown> = {};
+    if (programIds?.length) (body as any).programIds = programIds; // Backend uses program: body.programIds
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiDisbursedList,
+      body,
+      {authRequired: true} as any,
+    );
+    const data = response?.data;
+    if (Array.isArray(data)) return data;
+    if (data?.data && Array.isArray(data.data)) return data.data;
+    return [];
+  },
+
+  /** Daily interest rows for a single invoice */
+  getDailyInterest: async (invoiceId: string): Promise<DailyInterestApiRow[]> => {
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiInvoiceDailyInterest(invoiceId),
+      {},
+      {authRequired: true} as any,
+    );
+    const data = response?.data;
+    if (Array.isArray(data)) return data as DailyInterestApiRow[];
+    if (data?.data && Array.isArray(data.data)) return data.data as DailyInterestApiRow[];
+    return [];
+  },
+
+  /** Mail to Bank - updates invoice_status to Submitted (DB only, no email) */
+  mailToBank: async (invoiceId: string): Promise<any> => {
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiMailToBank(invoiceId),
+      {},
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
+  /** Bank accounts for disbursement (Debit From dropdown) */
+  getBankAccountsForDisbursement: async (invoiceId: string): Promise<any> => {
+    const response = await axiosInstance.get(
+      ApiEndPoints.apiTransactionAccount(invoiceId),
+      {authRequired: true} as any,
+    );
+    return response?.data?.data ?? response?.data;
+  },
+
+  /** Mark invoice as disbursed */
+  markAsDisbursed: async (
+    invoiceId: string,
+    payload: MarkAsDisbursedPayload,
+  ): Promise<any> => {
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiDisbursement(invoiceId),
+      payload,
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
   createInvoice: async (input: CreateInvoicePayloadInput): Promise<any> => {
     const payload = buildCreateInvoicePayload(input);
-    // Debug: print exact request body being sent to backend
-    if (typeof __DEV__ !== 'undefined' && __DEV__) {
-      // eslint-disable-next-line no-console
-      console.log('[CreateInvoice] request payload:', JSON.stringify(payload, null, 2));
-    }
+    // Log exact request body sent to backend (sub_total, final_total, items, etc.)
+    // eslint-disable-next-line no-console
+    console.log('[CreateInvoice] API body (sent to backend):', JSON.stringify(payload, null, 2));
 
     if (input.attachment) {
       const formData = new FormData();

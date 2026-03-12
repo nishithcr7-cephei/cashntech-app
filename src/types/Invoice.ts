@@ -1,5 +1,12 @@
+export type InvoiceItemTax = {
+  taxType: string;
+  taxPercentage?: string;
+  taxAmount?: string;
+};
+
 export type InvoiceLineItem = {
   itemName: string;
+  description?: string; // Optional item description
   quantity: string;
   unit: string;
   pricePerQuantity: string;
@@ -8,10 +15,12 @@ export type InvoiceLineItem = {
   discountType?: string; // 'percentage' | 'value' | ''
   discountValue?: string; // Discount percentage or amount
   discountAmount?: string; // Auto calculated discount amount
-  // Item-level tax
-  taxType?: string; // 'GST' | 'CST' | 'IGST' | ''
+  // Item-level tax (legacy single tax - used when taxes array empty)
+  taxType?: string; // 'GST' | 'CGST' | 'OTHER' | ''
   taxPercentage?: string; // Tax percentage
   taxAmount?: string; // Auto calculated tax amount
+  // Multiple taxes per item
+  taxes?: InvoiceItemTax[];
 };
 
 export type InvoiceFields = {

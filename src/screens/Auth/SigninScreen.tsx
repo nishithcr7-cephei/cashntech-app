@@ -34,7 +34,7 @@ const Strings = {
 };
 
 export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
-  const [email, setEmail] = useState('test@gmail.com');
+  const [email, setEmail] = useState('anchormaker.rudraksh@cashntech.com');
   const [passwordValue, setPassword] = useState('123456789');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -117,7 +117,7 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
           <Input
             label={Strings.emailLabel}
             leftIconStyle={styles.leftIcon}
-            maxLength={32}
+            maxLength={80}
             value={email}
             onChangeText={setEmail}
             keyboardType={'email-address'}

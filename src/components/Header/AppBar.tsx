@@ -13,7 +13,10 @@ import {Colors, Fonts, ROLE_HEADER_COLORS} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {MenuIcon} from '@assets/Icons';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
-import {ClientNavigatorType, HomeNavigatorType} from '@type/NavigatorTypes';
+import {
+  AuthNavigatorType,
+  HomeNavigatorType,
+} from '@type/NavigatorTypes';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -36,13 +39,8 @@ export type AppBarProps = {
 
   navigation?:
     | DrawerNavigationProp<HomeNavigatorType>
-    | CompositeNavigationProp<
-        NativeStackNavigationProp<
-          ClientNavigatorType,
-          keyof ClientNavigatorType
-        >,
-        DrawerNavigationProp<HomeNavigatorType>
-      >;
+    | NativeStackNavigationProp<AuthNavigatorType>
+    | any;
 };
 
 export const AppBar = ({
@@ -97,7 +95,7 @@ export const AppBar = ({
       <View style={[
         styles.titleSection, 
         !showProgramSelector && styles.titleSectionFull,
-        (hideHamburger && !renderLeftIcon) && styles.titleSectionNoHamburger
+        hideHamburger && styles.titleSectionNoHamburger
       ]}>
         <Text style={[styles.titleText, titleTextStyle]} numberOfLines={1}>
           {title}
@@ -136,7 +134,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: Colors.primaryColor,
     fontFamily: Fonts.GilroyBold,
-    fontSize: scaleFont(20),
+    fontSize: scaleFont(16),
     textAlign: 'left',
   },
 });

@@ -1,5 +1,6 @@
 import {call, put, takeLatest} from 'redux-saga/effects';
 import {PayloadAction} from '@reduxjs/toolkit';
+import Toast from 'react-native-toast-message';
 import {
   fetchDealerInfoRequest,
   fetchDealerInfoSuccess,
@@ -13,11 +14,31 @@ import {
   fetchInvoiceListRequest,
   fetchInvoiceListSuccess,
   fetchInvoiceListFailure,
+  updateInvoiceStatusRequest,
+  updateInvoiceStatusSuccess,
+  updateInvoiceStatusFailure,
+  updateInvoiceVerificationRequest,
+  updateInvoiceVerificationSuccess,
+  updateInvoiceVerificationFailure,
 } from './inv.slice';
 import {
   invoiceApi,
   CreateInvoicePayloadInput,
 } from '@services/api/invoice.api';
+import type {UpdateInvoiceStatusRequest, UpdateInvoiceVerificationRequest} from './inv.types';
+
+function showActionToast(
+  type: 'success' | 'error',
+  text1: string,
+  text2?: string,
+) {
+  Toast.show({
+    type,
+    text1,
+    ...(text2 ? {text2} : {}),
+    visibilityTime: 3000,
+  });
+}
 
 function* fetchDealerInfoSaga(action: PayloadAction<string>) {
   try {
@@ -104,6 +125,19 @@ function* fetchInvoiceListSaga(
   try {
     const {programId, filters} = action.payload;
     const data = yield call(invoiceApi.getInvoiceList, programId, filters);
+    if (__DEV__) {
+      console.log('[DEBUG 3] fetchInvoiceList API data:', {
+        programId,
+        count: Array.isArray(data) ? data.length : 0,
+        approvalStatuses: Array.isArray(data)
+          ? data.map((i: any) => ({
+              id: i.id,
+              invoice_ref_no: i.invoice_ref_no,
+              approval_status: i.approval_status,
+            }))
+          : [],
+      });
+    }
     yield put(fetchInvoiceListSuccess(data));
   } catch (error: any) {
     const msg =
@@ -114,9 +148,96 @@ function* fetchInvoiceListSaga(
   }
 }
 
+function* updateInvoiceStatusSaga(
+  action: PayloadAction<UpdateInvoiceStatusRequest>,
+) {
+  try {
+    const {
+      invoiceId,
+      action: act,
+      approvalLevel,
+      remark,
+      programId,
+      filters,
+      onSuccess,
+    } =
+      action.payload;
+    const response = yield call(invoiceApi.updateInvoiceStatus, {
+      invoiceId,
+      action: act,
+      approvalLevel,
+      remark,
+    });
+    if (__DEV__) {
+      console.log('[DEBUG 2] updateInvoiceStatus API response:', {
+        invoiceId,
+        response,
+        statusCode: response?.statusCode,
+      });
+    }
+    showActionToast(
+      'success',
+      response?.message ||
+        (act === 'Approve'
+          ? 'Invoice approved successfully'
+          : 'Invoice rejected successfully'),
+    );
+    yield put(updateInvoiceStatusSuccess());
+    if (onSuccess) {
+      yield call(onSuccess);
+    }
+    if (programId !== undefined) {
+      yield put(fetchInvoiceListRequest({programId, filters}));
+    }
+  } catch (error: any) {
+    const msg =
+      error?.response?.data?.message ||
+      error?.message ||
+      'Failed to update invoice status';
+    showActionToast('error', msg);
+    yield put(updateInvoiceStatusFailure(msg));
+  }
+}
+
+function* updateInvoiceVerificationSaga(
+  action: PayloadAction<UpdateInvoiceVerificationRequest>,
+) {
+  try {
+    const {invoiceId, action: act, remark, programId, filters, onSuccess} = action.payload;
+    const response = yield call(invoiceApi.updateInvoiceVerification, {
+      invoiceId,
+      action: act,
+      remark,
+    });
+    showActionToast(
+      'success',
+      response?.message ||
+        (act === 'Verify'
+          ? 'Invoice verified successfully'
+          : 'Invoice rejected successfully'),
+    );
+    yield put(updateInvoiceVerificationSuccess());
+    if (onSuccess) {
+      yield call(onSuccess);
+    }
+    if (programId !== undefined) {
+      yield put(fetchInvoiceListRequest({programId, filters}));
+    }
+  } catch (error: any) {
+    const msg =
+      error?.response?.data?.message ||
+      error?.message ||
+      'Failed to update invoice verification';
+    showActionToast('error', msg);
+    yield put(updateInvoiceVerificationFailure(msg));
+  }
+}
+
 export default function* invoiceSaga() {
   yield takeLatest(fetchDealerInfoRequest.type, fetchDealerInfoSaga);
   yield takeLatest(fetchBankListRequest.type, fetchBankListSaga);
   yield takeLatest(createInvoiceRequest.type, createInvoiceSaga);
   yield takeLatest(fetchInvoiceListRequest.type, fetchInvoiceListSaga);
+  yield takeLatest(updateInvoiceStatusRequest.type, updateInvoiceStatusSaga);
+  yield takeLatest(updateInvoiceVerificationRequest.type, updateInvoiceVerificationSaga);
 }

@@ -1,6 +1,46 @@
 import type {InvoiceListItemApi} from '@store/invoice/inv.types';
+import type {InvoiceApprovalLogApi} from '@services/api/invoice.api';
+import type {CheckerApprovalEntry} from '@components/CheckerApprovalModal/CheckerApprovalModal';
 
 export const NA_AD = 'N/A/AD';
+
+/** Map API approval log to modal entry format */
+export function mapApprovalLogToEntry(
+  log: InvoiceApprovalLogApi | Record<string, any>,
+): CheckerApprovalEntry {
+  const user = log?.user ?? {};
+  const firstName = user.first_name ?? user.firstName ?? '';
+  const lastName = user.last_name ?? user.lastName ?? '';
+  const approvedBy =
+    firstName || lastName
+      ? `${firstName} ${lastName}`.trim()
+      : log.action_by_role ?? log.actionByRole ?? 'Unknown';
+  const status: 'Approved' | 'Rejected' =
+    log.action === 'Approve' || log.action === 'Verify' ? 'Approved' : 'Rejected';
+  const role = log.action_by_role ?? log.actionByRole ?? '';
+  const approvalLevelRaw = log.role_approval_level;
+  const approvalLevel =
+    typeof approvalLevelRaw === 'number'
+      ? String(approvalLevelRaw)
+      : approvalLevelRaw != null
+        ? String(approvalLevelRaw)
+        : undefined;
+  const action = log.action ?? '';
+  const remark = log.remark ?? '';
+  const rejectionReason =
+    log.rejection_reason ?? log.rejectionReason ?? '';
+  return {
+    id: log.id ?? String(Math.random()),
+    approvedBy,
+    approvalDate: formatDateDash(log.action_at ?? log.actionAt ?? ''),
+    status,
+    role,
+    approvalLevel,
+    action,
+    remark,
+    rejectionReason,
+  };
+}
 
 export function formatDate(isoDate: string): string {
   if (!isoDate) return '';
@@ -59,24 +99,38 @@ export type InvoiceRow = {
 };
 
 export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
+  const counterParty =
+    item.counter_party_name ??
+    item.anchorParticipantMapping?.party?.entity_name ??
+    '-';
   return {
     id: item.id,
-    dealerName: item.counter_party_name,
+    dealerName: counterParty,
     dealerCode: item.counter_party_code,
     invoiceNo: item.invoice_ref_no,
-    invoiceAmount: item.invoice_amount ?? '25,000.00/-',
+    invoiceAmount:
+      item.invoice_amount ??
+      (item.final_total != null
+        ? `${Number(item.final_total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/-`
+        : '-'),
     invoiceDate: formatDateDash(item.invoice_date),
-    requestDate: item.request_date ? formatDateDash(item.request_date) : 'dd-mm-yyyy',
+    requestDate: formatDateDash(item.request_date ?? item.created_at ?? ''),
     dueDate: formatDateDash(item.invoice_due_date),
     invoiceStatus: formatStatus(item.invoice_status),
     approvalStatus: formatStatus(item.approval_status),
     adminStatus: item.admin_status ? formatStatus(item.admin_status) : 'Verify',
     loanRefNo: item.loan_ref_no ?? '-',
-    bankName: item.bank_name ?? '-',
-    productName: item.product_name ?? '-',
-    programName: item.program_name ?? '-',
-    primaryParty: item.primary_party_name ?? item.counter_party_name ?? '-',
-    counterParty: item.counter_party_name ?? '-',
+    bankName:
+      item.bank_name ??
+      item.program?.productConfig?.partnerBank?.bank_name ??
+      '-',
+    productName:
+      item.product_name ??
+      item.program?.productConfig?.product?.name ??
+      '-',
+    programName: item.program_name ?? item.program?.program_name ?? '-',
+    primaryParty: item.primary_party_name ?? item.party?.entity_name ?? '-',
+    counterParty,
   };
 }
 

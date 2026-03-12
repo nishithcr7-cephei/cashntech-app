@@ -146,6 +146,15 @@ const apiSignin = async (payload: ISigninPayload) => {
     Api.post(Endpoints.apiSignin, payload),
   );
   if (error) {
+    const isNetworkError =
+      (error as any)?.message === 'Network Error' ||
+      (error as any)?.code === 'ERR_NETWORK';
+    if (isNetworkError) {
+      console.log(
+        '🔴 [auth.api] Signin failed – cannot reach server. Check: (1) Backend is running (2) API_URL port matches backend PORT (e.g. 3000) (3) Device and PC on same WiFi. Full URL:',
+        fullUrl,
+      );
+    }
     console.log('🔴 [auth.api] Signin API error:', error);
     return {
       data: null,

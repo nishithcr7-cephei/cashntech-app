@@ -1,10 +1,9 @@
-import React from 'react';
+import * as React from 'react';
 import {
   View,
   Text,
   ScrollView,
   ActivityIndicator,
-  TouchableOpacity,
 } from 'react-native';
 import {
   AppBar,
@@ -13,13 +12,12 @@ import {
   Container,
   FilterModal,
   UploadModal,
+  ProgramBreadcrumb,
 } from '@components/index';
 import {Colors, Fonts} from '@constants/index';
-import {LeftChevron, RightChevron} from '@assets/Icons';
+import {LeftChevron} from '@assets/Icons';
 import {scaleWidth, scaleHeight} from '@utils/Scale';
-import {BankBuilding, Folder, File, EditIcon} from '@assets/Icons';
 import {useInvoiceDetails} from './useInvoiceDetails';
-import {invoiceFilterData} from './types';
 import {InvoiceDetailsControls} from './InvoiceDetailsControls';
 import {InvoiceDetailsCard} from './InvoiceDetailsCard';
 import {SendForApprovalModal} from './SendForApprovalModal';
@@ -41,6 +39,7 @@ export const InvoiceDetails: React.FC = () => {
     isAnchorMaker,
     isAnchorChecker,
     isDealerChecker,
+    isCashnTechUser,
     dealerListTitle,
     selectedDealerName,
     searchText,
@@ -56,12 +55,18 @@ export const InvoiceDetails: React.FC = () => {
     menuButtonRefs,
     showCheckerApprovalModal,
     setShowCheckerApprovalModal,
+    approvalHistoryEntries,
+    approvalHistoryLoading,
+    setApprovalHistoryLoading,
     showApproveRejectModal,
     setShowApproveRejectModal,
     selectedInvoiceId,
     setSelectedInvoiceId,
     selectedInvoiceNo,
     setSelectedInvoiceNo,
+    selectedInvoiceDetails,
+    anchorCheckerInvoiceDetails,
+    anchorCheckerDetailsLoading,
     showAttachmentModal,
     selectedInvoiceIds,
     showSendForApprovalModal,
@@ -69,10 +74,6 @@ export const InvoiceDetails: React.FC = () => {
     selectedRowsForModal,
     allSelectedOnScreen,
     fromInvoiceDashboard,
-    breadcrumbBank,
-    breadcrumbDealer,
-    breadcrumbProgram,
-    showAllProgramBreadcrumb,
     handleMenuToggle,
     handleMenuAction,
     handleAttachmentUpload,
@@ -80,12 +81,17 @@ export const InvoiceDetails: React.FC = () => {
     toggleSelectAllVisible,
     onApproveRejectApprove,
     onApproveRejectReject,
+    onVerifyApprove,
+    onVerifyReject,
     onBulkApply,
     getMenuPosition,
     showSelectProgramForCreateModal,
     setShowSelectProgramForCreateModal,
     onCreateInvoicePress,
     onProgramSelectedForCreate,
+    isCreateInvoiceEnabled,
+    hasAnyProgramContext,
+    invoiceFilterData,
   } = useInvoiceDetails();
 
   const registerMenuRef = (id: string, ref: View | null) => {
@@ -97,56 +103,16 @@ export const InvoiceDetails: React.FC = () => {
       <AppBar
         title="Transactions > Invoice List & Approval"
         navigation={navigation as any}
-        hideHamburger={(isAnchorMaker || isDealerMaker) && fromInvoiceDashboard}
+        hideHamburger={(isAnchorMaker || isDealerMaker || isCashnTechUser) && fromInvoiceDashboard}
         renderLeftIcon={fromInvoiceDashboard ? <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} /> : undefined}
         onPressLeftIcon={fromInvoiceDashboard ? () => navigation.goBack() : undefined}
       />
-      {fromInvoiceDashboard && breadcrumbBank && breadcrumbDealer && breadcrumbProgram && !showAllProgramBreadcrumb ? (
-        <View style={styles.breadcrumbContainer}>
-          <View style={styles.breadcrumbCard}>
-            <View style={styles.breadcrumbRow}>
-              <View style={styles.breadcrumbItem}>
-                <BankBuilding width={scaleWidth(14)} height={scaleWidth(14)} color={Colors.primaryColor} />
-                <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">{breadcrumbBank}</Text>
-              </View>
-              <RightChevron height={scaleHeight(12)} width={scaleWidth(12)} style={styles.breadcrumbChev} />
-              <View style={styles.breadcrumbItem}>
-                <Folder width={scaleWidth(14)} height={scaleWidth(14)} color={Colors.primaryColor} />
-                <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">{breadcrumbDealer}</Text>
-              </View>
-              <RightChevron height={scaleHeight(12)} width={scaleWidth(12)} style={styles.breadcrumbChev} />
-              <View style={styles.breadcrumbItemGrow}>
-                <File width={scaleWidth(14)} height={scaleWidth(14)} color={Colors.primaryColor} />
-                <Text style={styles.breadcrumbTextGrow} numberOfLines={1} ellipsizeMode="tail">{breadcrumbProgram}</Text>
-              </View>
-              <TouchableOpacity style={styles.breadcrumbChangePill} onPress={() => (navigation as any).navigate('SelectProgramScreen')} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                <EditIcon />
-                <Text style={styles.breadcrumbChangeText}>Change</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+      <ProgramBreadcrumb />
+      {programName ? (
+        <View style={styles.pageTitleBar}>
+          <Text style={styles.pageTitleText}>{programName}</Text>
         </View>
-      ) : (
-        <View style={styles.breadcrumbContainer}>
-          <View style={styles.breadcrumbCard}>
-            <View style={styles.breadcrumbRow}>
-              <View style={styles.breadcrumbItemGrow}>
-                <File width={scaleWidth(14)} height={scaleWidth(14)} color={Colors.primaryColor} />
-                <Text style={styles.breadcrumbTextGrow} numberOfLines={1} ellipsizeMode="tail">All Program</Text>
-              </View>
-              <TouchableOpacity style={styles.breadcrumbChangePill} onPress={() => (navigation as any).navigate('SelectProgramScreen')} hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                <EditIcon />
-                <Text style={styles.breadcrumbChangeText}>Change</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
-      <View style={styles.pageTitleBar}>
-          <Text style={styles.pageTitleText}>
-            Sun Pharma PGM
-          </Text>
-        </View>
+      ) : null}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -155,7 +121,7 @@ export const InvoiceDetails: React.FC = () => {
           setOpenMenuId(null);
           setMenuAnchor(null);
         }}>
-        {!programId ? (
+        {!hasAnyProgramContext ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>
               Select a program first to view invoice list.
@@ -168,40 +134,44 @@ export const InvoiceDetails: React.FC = () => {
         ) : (
           <>
             {/* Summary metrics: Dealers, Total Invoices, Total Amount, Pending, Approved, Rejected */}
-            <View style={styles.summaryCardGrid}>
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryCardLabel}>Dealers</Text>
-                <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.dealers}</Text>
+            {!isAnchorMaker && (
+              <View style={styles.summaryCardGrid}>
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryCardLabel}>Dealers</Text>
+                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.dealers}</Text>
+                </View>
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryCardLabel}>Total Invoices</Text>
+                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.totalInvoices}</Text>
+                </View>
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryCardLabel}>Total Invoice Amount</Text>
+                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.totalInvoiceAmount}</Text>
+                </View>
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryCardLabel}>Pending Invoices</Text>
+                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.pendingInvoices}</Text>
+                </View>
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryCardLabel}>Approved Invoices</Text>
+                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.approvedInvoices}</Text>
+                </View>
+                <View style={styles.summaryCard}>
+                  <Text style={styles.summaryCardLabel}>Rejected Invoices</Text>
+                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.rejectedInvoices}</Text>
+                </View>
               </View>
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryCardLabel}>Total Invoices</Text>
-                <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.totalInvoices}</Text>
-              </View>
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryCardLabel}>Total Invoice Amount</Text>
-                <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.totalInvoiceAmount}</Text>
-              </View>
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryCardLabel}>Pending Invoices</Text>
-                <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.pendingInvoices}</Text>
-              </View>
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryCardLabel}>Approved Invoices</Text>
-                <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.approvedInvoices}</Text>
-              </View>
-              <View style={styles.summaryCard}>
-                <Text style={styles.summaryCardLabel}>Rejected Invoices</Text>
-                <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.rejectedInvoices}</Text>
-              </View>
-            </View>
+            )}
 
             <InvoiceDetailsControls
               dealerListTitle={dealerListTitle}
               invoiceCount={invoiceData.length}
+              summaryStats={summaryStats}
               isDealerMaker={isDealerMaker}
               isAnchorMaker={isAnchorMaker}
               isAnchorChecker={isAnchorChecker}
               isDealerChecker={isDealerChecker}
+              isCashnTechUser={isCashnTechUser}
               filteredDataLength={filteredData.length}
               searchText={searchText}
               setSearchText={setSearchText}
@@ -212,6 +182,7 @@ export const InvoiceDetails: React.FC = () => {
               selectedInvoiceIdsLength={selectedInvoiceIds.length}
               onOpenSendForApprovalModal={() => setShowSendForApprovalModal(true)}
               onCreateInvoicePress={onCreateInvoicePress}
+              isCreateInvoiceEnabled={isCreateInvoiceEnabled}
             />
 
             <View style={styles.listTopSeparator} />
@@ -238,6 +209,7 @@ export const InvoiceDetails: React.FC = () => {
                     isDealerMaker={isDealerMaker}
                     isDealerChecker={isDealerChecker}
                     isAnchorChecker={isAnchorChecker}
+                    isCashnTechUser={isCashnTechUser}
                     isSelected={(isDealerChecker || isAnchorChecker) && selectedInvoiceIds.includes(row.id)}
                     onMenuToggle={handleMenuToggle}
                     onToggleSelection={toggleInvoiceSelection}
@@ -266,44 +238,48 @@ export const InvoiceDetails: React.FC = () => {
         onClose={() => {
           setShowCheckerApprovalModal(false);
           setSelectedInvoiceId(null);
+          setApprovalHistoryLoading(false);
         }}
-        approvalEntries={[
-          {
-            id: '1',
-            approvedBy: 'Company Name_Checker',
-            approvalDate: '01-02-2026',
-            status: 'Approved',
-          },
-          {
-            id: '2',
-            approvedBy: 'Another Checker',
-            approvalDate: '05-02-2026',
-            status: 'Rejected',
-          },
-        ]}
+        approvalEntries={approvalHistoryEntries}
+        loading={approvalHistoryLoading}
+        invoiceNo={selectedInvoiceNo || undefined}
       />
 
       <ApproveRejectModal
         visible={showApproveRejectModal}
         invoiceId={selectedInvoiceId}
         invoiceNo={selectedInvoiceNo || undefined}
-        invoiceDetails={{
-          subTotal: '10,80,025/-',
-          withholdingTaxesPercent: '0.00/-',
-          withholdingAmount: '0.00/-',
-          finalPayableAmount: '10,80,025/-',
-          finalDueDate: 'dd-mm-yyyy',
-        }}
+        variant={
+          isCashnTechUser
+            ? 'cashntech_verification'
+            : isAnchorChecker
+              ? 'anchor_checker'
+              : 'default'
+        }
+        invoiceDetails={
+          isCashnTechUser || isAnchorChecker
+            ? anchorCheckerInvoiceDetails ?? undefined
+            : selectedInvoiceDetails
+        }
+        detailsLoading={(isAnchorChecker || isCashnTechUser) && anchorCheckerDetailsLoading}
         onClose={() => {
           setShowApproveRejectModal(false);
           setSelectedInvoiceId(null);
           setSelectedInvoiceNo(null);
         }}
-        onApprove={(invoiceId, _remarks) => {
-          onApproveRejectApprove(invoiceId);
+        onApprove={(invoiceId, remarks) => {
+          if (isCashnTechUser) {
+            onVerifyApprove(invoiceId, remarks);
+          } else {
+            onApproveRejectApprove(invoiceId, remarks);
+          }
         }}
-        onReject={() => {
-          onApproveRejectReject();
+        onReject={(invoiceId, remarks) => {
+          if (isCashnTechUser) {
+            onVerifyReject(invoiceId, remarks);
+          } else {
+            onApproveRejectReject(invoiceId, remarks);
+          }
         }}
       />
 
@@ -336,6 +312,7 @@ export const InvoiceDetails: React.FC = () => {
         isAnchorChecker={isAnchorChecker}
         isDealerMaker={isDealerMaker}
         isDealerChecker={isDealerChecker}
+        isCashnTechUser={isCashnTechUser}
       />
 
       <SelectProgramModal

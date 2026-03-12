@@ -12,14 +12,21 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
 import {RightChevron} from '@assets/Icons';
-import {useDispatch} from 'react-redux';
-import {userActions} from '@store/user';
+import {useDispatch, useSelector} from 'react-redux';
+import {userActions, userSelector} from '@store/user';
 import {AppRole, ROLE_LABELS, ROLE_BUTTON_COLORS} from '@constants/roles';
+
+const RESTRICTED_ANCHOR_MAKER_ONLY_EMAIL = 'am.rudraksh@cashntech.com';
 
 export const SelectRoleScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<AuthNavigatorType>>();
   const dispatch = useDispatch();
   const [selectedRole, setSelectedRole] = useState<AppRole | null>(null);
+  const user = useSelector(userSelector.getUserInfo);
+  const userEmail = (user?.email ?? '').trim().toLowerCase();
+
+  // For this email, only Anchor Maker is allowed; other roles are disabled
+  const isAnchorMakerOnlyEmail = userEmail === RESTRICTED_ANCHOR_MAKER_ONLY_EMAIL;
 
   const handleRoleSelection = (role: AppRole) => {
     setSelectedRole(role);
@@ -34,7 +41,11 @@ export const SelectRoleScreen: React.FC = () => {
     'anchor_checker',
     'dealer_maker',
     'dealer_checker',
+    'cashntech_user',
   ];
+
+  const isRoleDisabled = (role: AppRole): boolean =>
+    isAnchorMakerOnlyEmail && role !== 'anchor_maker';
 
   return (
     <Container>
@@ -49,6 +60,7 @@ export const SelectRoleScreen: React.FC = () => {
           <View style={styles.optionsContainer}>
             {roleOptions.map((role) => {
               const isSelected = selectedRole === role;
+              const disabled = isRoleDisabled(role);
               const roleColors = ROLE_BUTTON_COLORS[role];
               return (
                 <TouchableOpacity
@@ -58,23 +70,28 @@ export const SelectRoleScreen: React.FC = () => {
                     {
                       backgroundColor: isSelected ? Colors.primaryColor : roleColors.bg,
                       borderColor: isSelected ? Colors.primaryColor : roleColors.border,
+                      opacity: disabled ? 0.5 : 1,
                     },
                   ]}
-                  onPress={() => handleRoleSelection(role)}>
+                  onPress={() => !disabled && handleRoleSelection(role)}
+                  disabled={disabled}
+                  activeOpacity={disabled ? 1 : 0.7}>
                   <Text
                     style={[
                       styles.optionText,
                       {
-                        color: isSelected ? Colors.white : roleColors.text,
+                        color: disabled ? Colors.gray300 : (isSelected ? Colors.white : roleColors.text),
                       },
                     ]}>
                     {ROLE_LABELS[role]}
                   </Text>
-                  <RightChevron 
-                    height={scaleHeight(16)} 
-                    width={scaleWidth(16)} 
-                    style={styles.arrowIcon}
-                  />
+                  {!disabled && (
+                    <RightChevron 
+                      height={scaleHeight(16)} 
+                      width={scaleWidth(16)} 
+                      style={styles.arrowIcon}
+                    />
+                  )}
                 </TouchableOpacity>
               );
             })}

@@ -49,7 +49,8 @@ export const SelectProgramModal: React.FC<SelectProgramModalProps> = ({
     userRole === 'anchor_maker' ||
     userRole === 'dealer_maker' ||
     userRole === 'anchor_checker' ||
-    userRole === 'dealer_checker';
+    userRole === 'dealer_checker' ||
+    userRole === 'cashntech_user';
   const scopeData = useSelector(selectScopeData);
   const scopeLoading = useSelector(selectScopeLoading);
   const scopeError = useSelector(selectScopeError);

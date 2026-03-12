@@ -2,10 +2,11 @@ import {DrawerContent} from '@components/index';
 import {createDrawerNavigator} from '@react-navigation/drawer';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
 import {scaleWidth} from '@utils/Scale';
-import React from 'react';
+import React, {useEffect} from 'react';
 import {Dimensions} from 'react-native';
-import {useSelector} from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
 import {userSelector} from '@store/user';
+import {fetchUserScopeRequest} from '@store/programSelection/programSelection.slice';
 import {AppRole} from '@constants/roles';
 import {
   OcrInvoiceScreen,
@@ -32,13 +33,24 @@ import {
   InvoiceDetailView,
   DealerInvoiceDetailsScreen,
   DisbursementScreen,
+  InterestAccrualsScreen,
+  InvoiceDailyInterestScreen,
+  RepaymentSettlementScreen,
+  DPDPenalInterestNPAScreen,
+  ProfileScreen,
 } from '@screens/index';
 
 const Drawer = createDrawerNavigator<HomeNavigatorType>();
 
 export const HomeNavigator = () => {
+  const dispatch = useDispatch();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const initialRoute = 'InvoiceDashboard';
+
+  // Pre-load user scope when entering home so Invoice Overview (and other screens) have scopeData on first land
+  useEffect(() => {
+    dispatch(fetchUserScopeRequest());
+  }, [dispatch]);
 
   return (
     <Drawer.Navigator
@@ -76,7 +88,15 @@ export const HomeNavigator = () => {
       <Drawer.Screen name="InvoiceDetailView" component={InvoiceDetailView} />
       <Drawer.Screen name="DealerInvoiceDetailsScreen" component={DealerInvoiceDetailsScreen} />
       <Drawer.Screen name="DisbursementScreen" component={DisbursementScreen} />
+      <Drawer.Screen name="InterestAccrualsScreen" component={InterestAccrualsScreen} />
+      <Drawer.Screen
+        name="InvoiceDailyInterestScreen"
+        component={InvoiceDailyInterestScreen}
+      />
+      <Drawer.Screen name="RepaymentSettlementScreen" component={RepaymentSettlementScreen} />
+      <Drawer.Screen name="DPDPenalInterestNPAScreen" component={DPDPenalInterestNPAScreen} />
       <Drawer.Screen name="OcrInvoice" component={OcrInvoiceScreen} />
+      <Drawer.Screen name="Profile" component={ProfileScreen} />
     </Drawer.Navigator>
   );
 };

@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,14 +9,19 @@ import {
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Search, Filter, Plus} from '@assets/Icons';
+import Toast from 'react-native-toast-message';
 
 type Props = {
   dealerListTitle: string;
   invoiceCount: number;
+  summaryStats: {
+    pendingInvoices: number;
+  };
   isDealerMaker: boolean;
   isAnchorMaker: boolean;
   isAnchorChecker: boolean;
   isDealerChecker: boolean;
+  isCashnTechUser?: boolean;
   filteredDataLength: number;
   searchText: string;
   setSearchText: (v: string) => void;
@@ -27,15 +32,19 @@ type Props = {
   selectedInvoiceIdsLength: number;
   onOpenSendForApprovalModal: () => void;
   onCreateInvoicePress?: () => void;
+  /** When false (e.g. "All Program" in breadcrumb), list is visible but Create Invoice is disabled */
+  isCreateInvoiceEnabled?: boolean;
 };
 
 export const InvoiceDetailsControls: React.FC<Props> = ({
   dealerListTitle,
   invoiceCount,
+  summaryStats,
   isDealerMaker,
   isAnchorMaker,
   isAnchorChecker,
-   isDealerChecker,
+  isDealerChecker,
+  isCashnTechUser = false,
   filteredDataLength,
   searchText,
   setSearchText,
@@ -46,6 +55,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   selectedInvoiceIdsLength,
   onOpenSendForApprovalModal,
   onCreateInvoicePress,
+  isCreateInvoiceEnabled = true,
 }) => {
   return (
     <View style={styles.controlsSection}>
@@ -57,6 +67,13 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
           </View>
         </View>
       </View>
+
+      {isAnchorMaker && summaryStats.pendingInvoices > 0 && (
+        <View style={styles.pendingLegendContainer}>
+          <View style={styles.pendingDot} />
+          <Text style={styles.pendingLegendText}>Pending Invoice Approval</Text>
+        </View>
+      )}
 
       {(isDealerChecker || isAnchorChecker) && filteredDataLength > 0 && (
         <TouchableOpacity
@@ -98,27 +115,34 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
       </View>
 
       <View style={styles.primaryActionsRow}>
-        {isAnchorMaker && (
-          <>
-            <TouchableOpacity
-              style={[styles.primaryButton, styles.primaryButtonHalf]}
-              onPress={() => navigation.navigate('UploadInvoiceList' as never)}>
-              <View style={styles.buttonIconContainer}>
-                <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
-              </View>
-              <Text style={styles.primaryButtonText}>Upload Invoice List</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.primaryButton, styles.primaryButtonHalf]}
-              onPress={onCreateInvoicePress ?? (() => navigation.navigate('CreateInvoice' as never))}>
-              <View style={styles.buttonIconContainer}>
-                <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
-              </View>
-              <Text style={styles.primaryButtonText}>Create Invoice</Text>
-            </TouchableOpacity>
-          </>
+        {isAnchorMaker && !isCashnTechUser && (
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              styles.primaryButtonSingle,
+              !isCreateInvoiceEnabled && styles.primaryButtonDisabled,
+            ]}
+            onPress={() => {
+              if (!isCreateInvoiceEnabled) {
+                Toast.show({
+                  type: 'info',
+                  text1: 'Select a program to create an invoice',
+                  text2: 'Use the filter above to choose a specific program.',
+                });
+                return;
+              }
+              const handler =
+                onCreateInvoicePress ??
+                (() => navigation.navigate('CreateInvoice' as never));
+              handler();
+            }}>
+            <View style={styles.buttonIconContainer}>
+              <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
+            </View>
+            <Text style={styles.primaryButtonText}>Create Invoice</Text>
+          </TouchableOpacity>
         )}
-        {isDealerMaker && (
+        {isDealerMaker && !isCashnTechUser && (
           <>
             <TouchableOpacity
               style={[styles.primaryButton, styles.primaryButtonHalf]}
@@ -129,8 +153,25 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
               <Text style={styles.primaryButtonText}>Upload Invoice List</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.primaryButton, styles.primaryButtonHalf]}
-              onPress={onCreateInvoicePress ?? (() => navigation.navigate('CreateInvoice' as never))}>
+              style={[
+                styles.primaryButton,
+                styles.primaryButtonHalf,
+                !isCreateInvoiceEnabled && styles.primaryButtonDisabled,
+              ]}
+              onPress={() => {
+                if (!isCreateInvoiceEnabled) {
+                  Toast.show({
+                    type: 'info',
+                    text1: 'Select a program to create an invoice',
+                    text2: 'Use the filter above to choose a specific program.',
+                  });
+                  return;
+                }
+                const handler =
+                  onCreateInvoicePress ??
+                  (() => navigation.navigate('CreateInvoice' as never));
+                handler();
+              }}>
               <View style={styles.buttonIconContainer}>
                 <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
               </View>
@@ -139,6 +180,16 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
           </>
         )}
       </View>
+
+      {(isAnchorMaker || isDealerMaker) &&
+        !isCashnTechUser &&
+        !isCreateInvoiceEnabled && (
+          <View style={styles.disabledHintContainer}>
+            <Text style={styles.disabledHintText}>
+              Select a program to create an invoice
+            </Text>
+          </View>
+        )}
 
       {(isDealerChecker || isAnchorChecker) && selectedInvoiceIdsLength > 0 && (
         <TouchableOpacity
@@ -186,6 +237,23 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
+  },
+  pendingLegendContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(6),
+    marginTop: -scaleHeight(8), // Pull it closer to the line above
+  },
+  pendingDot: {
+    width: scaleWidth(8),
+    height: scaleWidth(8),
+    borderRadius: scaleWidth(4),
+    backgroundColor: Colors.tertiaryBlue,
+  },
+  pendingLegendText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
   },
   dmSelectAllRow: {
     flexDirection: 'row',
@@ -276,6 +344,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: scaleWidth(10),
+  },
+  primaryButtonSingle: {
+    marginLeft: 'auto',
+    paddingHorizontal: scaleWidth(18),
+  },
+  primaryButtonDisabled: {
+    opacity: 0.5,
+  },
+  disabledHintContainer: {
+    marginTop: scaleHeight(4),
+  },
+  disabledHintText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
   },
   buttonIconContainer: {
     width: scaleWidth(18),

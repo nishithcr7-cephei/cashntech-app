@@ -27,4 +27,6 @@ export type ProgramSelectionState = {
   scopeData: Bank[] | null;
   scopeLoading: boolean;
   scopeError: string | null;
+  /** All program IDs when scope loaded (for "All Program" → invoice/summary on next page) */
+  allProgramIds: string[] | null;
 };

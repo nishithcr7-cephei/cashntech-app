@@ -5,6 +5,8 @@ import {
   DealerInfoResponse,
   PartnerBank,
   InvoiceListItemApi,
+  UpdateInvoiceStatusRequest,
+  UpdateInvoiceVerificationRequest,
 } from './inv.types';
 
 const invoiceSlice = createSlice({
@@ -74,6 +76,29 @@ const invoiceSlice = createSlice({
       state.invoiceListLoading = false;
       state.invoiceListError = action.payload;
     },
+    updateInvoiceStatusRequest: (
+      _state,
+      _action: PayloadAction<UpdateInvoiceStatusRequest>,
+    ) => {},
+    updateInvoiceStatusSuccess: state => {
+      // no-op reducer; side-effects handled in saga, list refreshed separately
+      state.invoiceListError = null;
+    },
+    updateInvoiceStatusFailure: (state, _action: PayloadAction<string>) => {
+      // Action-level failures are surfaced via toast; keep list screen intact.
+      state.invoiceListError = null;
+    },
+    updateInvoiceVerificationRequest: (
+      _state,
+      _action: PayloadAction<UpdateInvoiceVerificationRequest>,
+    ) => {},
+    updateInvoiceVerificationSuccess: state => {
+      state.invoiceListError = null;
+    },
+    updateInvoiceVerificationFailure: (state, _action: PayloadAction<string>) => {
+      // Action-level failures are surfaced via toast; keep list screen intact.
+      state.invoiceListError = null;
+    },
   },
 });
 
@@ -91,6 +116,12 @@ export const {
   fetchInvoiceListRequest,
   fetchInvoiceListSuccess,
   fetchInvoiceListFailure,
+  updateInvoiceStatusRequest,
+  updateInvoiceStatusSuccess,
+  updateInvoiceStatusFailure,
+  updateInvoiceVerificationRequest,
+  updateInvoiceVerificationSuccess,
+  updateInvoiceVerificationFailure,
 } = invoiceSlice.actions;
 
 export default invoiceSlice.reducer;

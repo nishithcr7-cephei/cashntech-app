@@ -1,14 +1,34 @@
-import React from 'react';
+import * as React from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Dots} from '@assets/Icons';
 import type {InvoiceRow} from './types';
 
-/** Admin Status colors: Verify & Submitted = green, Hold = gray/brown, Reject = red */
+const STATUS_ORANGE = '#E86C00';
+
+/** Invoice Status: In Progress = orange, Rejected = red, Completed/Submitted/Created/Disbursed = green */
+function getInvoiceStatusStyle(invoiceStatus: string) {
+  const s = (invoiceStatus || '').toLowerCase();
+  if (s.includes('in progress') || s === 'in progress') return styles.statusOrange;
+  if (s.includes('reject')) return styles.statusRed;
+  if (s.includes('completed') || s.includes('submitted') || s.includes('created') || s.includes('disbursed')) return styles.statusGreen;
+  return styles.infoValue;
+}
+
+/** Approval Status: Pending = orange, Rejected = red, Completed = green */
+function getApprovalStatusStyle(approvalStatus: string) {
+  const s = (approvalStatus || '').toLowerCase();
+  if (s.includes('pending')) return styles.statusOrange;
+  if (s.includes('reject')) return styles.statusRed;
+  if (s.includes('completed') || s.includes('approval complete')) return styles.statusGreen;
+  return styles.infoValue;
+}
+
+/** Admin Status colors: Verify, Verified & Submitted = green, Hold = gray/brown, Reject = red */
 function getAdminStatusStyle(adminStatus: string) {
   const s = (adminStatus || '').toLowerCase();
-  if (s === 'verify' || s === 'submitted') return styles.adminStatusGreen;
+  if (s === 'verify' || s === 'verified' || s === 'submitted') return styles.adminStatusGreen;
   if (s === 'hold') return styles.adminStatusGrayBrown;
   if (s === 'reject' || s === 'rejected') return styles.adminStatusRed;
   return styles.infoValue;
@@ -20,6 +40,7 @@ type Props = {
   isDealerMaker: boolean;
   isDealerChecker: boolean;
   isAnchorChecker: boolean;
+  isCashnTechUser?: boolean;
   isSelected: boolean;
   onMenuToggle: (id: string) => void;
   onToggleSelection: (id: string) => void;
@@ -32,16 +53,30 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   isDealerMaker,
   isDealerChecker,
   isAnchorChecker,
+  isCashnTechUser = false,
   isSelected,
   onMenuToggle,
   onToggleSelection,
   registerMenuRef,
 }) => {
+  const approval = (row.approvalStatus || '').toLowerCase();
+  const status = (row.invoiceStatus || '').toLowerCase();
+  const isPendingInvoice =
+    approval.includes('pending') ||
+    (!approval.includes('reject') &&
+      !approval.includes('approval_complete') &&
+      (status.includes('pending') ||
+        status.includes('in_progress') ||
+        status.includes('submitted')));
+  const partyTitle = isDealerMaker || isDealerChecker
+    ? row.counterParty || row.dealerName
+    : row.dealerName;
+
   return (
     <View style={styles.cardWrapper}>
       <View style={styles.listCard}>
-        {/* 3-dot action menu - for Maker and Checker roles */}
-        {(isAnchorMaker || isDealerMaker || isDealerChecker || isAnchorChecker) && (
+        {/* 3-dot action menu - for Maker, Checker, and CashnTech User roles */}
+        {(isAnchorMaker || isDealerMaker || isDealerChecker || isAnchorChecker || isCashnTechUser) && (
           <View
             ref={(r: View | null) => registerMenuRef(row.id, r)}
             collapsable={false}
@@ -74,161 +109,82 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
                 {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
               </View>
               <View style={styles.dmCardHeaderTextWrap}>
-                <Text style={styles.primaryPartyLabel}>
-                  {isDealerChecker ? 'Counter Party (Dealers)' : 'Primary Party (Anchors)'}
-                </Text>
-                <Text style={styles.cardTitle}>
-                  {isDealerChecker ? (row.counterParty || row.dealerName) : row.dealerName}
-                </Text>
-                <Text style={styles.cardSubtitle}>
-                  Invoice No: {row.invoiceNo}
-                </Text>
+                {isPendingInvoice && <View style={styles.pendingDotInline} />}
+                {!!partyTitle && (
+                  <Text style={styles.cardTitle}>{partyTitle}</Text>
+                )}
               </View>
             </TouchableOpacity>
           ) : (
             <>
-              <Text style={styles.primaryPartyLabel}>
-                {isDealerMaker ? 'Counter Party (Dealers)' : 'Primary Party (Anchors)'}
-              </Text>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardTitle}>
-                  {isDealerMaker ? (row.counterParty || row.dealerName) : row.dealerName}
+              {isPendingInvoice && <View style={styles.pendingDotStandalone} />}
+              {!!partyTitle && (
+                <Text style={[styles.cardTitle, styles.cardTitleSpacing]}>
+                  {partyTitle}
                 </Text>
-              </View>
-              <Text style={styles.cardSubtitle}>
-                Invoice No: {row.invoiceNo}
-              </Text>
+              )}
             </>
           )}
         </View>
 
         <View style={styles.infoGrid}>
-          {isDealerMaker ? (
-            <>
-              {/* dealer-maker: order as per web design */}
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Dealer Code</Text>
-                <Text style={styles.infoValue}>{row.dealerCode || '-'}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice No</Text>
-                <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice Date</Text>
-                <Text style={styles.infoValue}>{row.invoiceDate}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Request Date</Text>
-                <Text style={styles.infoValue}>{row.requestDate}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Due Date</Text>
-                <Text style={styles.infoValue}>{row.dueDate}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice Status</Text>
-                <Text style={[styles.infoValue, styles.statusGreen]}>{row.invoiceStatus}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Approval Status</Text>
-                <Text style={[styles.infoValue, styles.statusGreen]}>{row.approvalStatus}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Admin Status</Text>
-                <Text style={[styles.infoValue, getAdminStatusStyle(row.adminStatus)]}>{row.adminStatus}</Text>
-              </View>
-              {/* Extra attributes */}
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Loan Ref No.</Text>
-                <Text style={styles.infoValue}>{row.loanRefNo}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Bank Name</Text>
-                <Text style={styles.infoValue}>{row.bankName}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Product Name</Text>
-                <Text style={styles.infoValue}>{row.productName}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Program Name</Text>
-                <Text style={styles.infoValue}>{row.programName}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Primary Party</Text>
-                <Text style={styles.infoValue}>{row.primaryParty}</Text>
-              </View>
-            </>
-          ) : (
-            <>
-              {/* anchor-maker / checker roles: existing order */}
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Loan Ref No.</Text>
-                <Text style={styles.infoValue}>{row.loanRefNo}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice No</Text>
-                <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Dealer Code</Text>
-                <Text style={styles.infoValue}>{row.dealerCode || '-'}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Bank Name</Text>
-                <Text style={styles.infoValue}>{row.bankName}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Product Name</Text>
-                <Text style={styles.infoValue}>{row.productName}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Program Name</Text>
-                <Text style={styles.infoValue}>{row.programName}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Primary Party</Text>
-                <Text style={styles.infoValue}>{row.primaryParty}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Counter Party</Text>
-                <Text style={styles.infoValue}>{row.counterParty}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice Date</Text>
-                <Text style={styles.infoValue}>{row.invoiceDate}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Request Date</Text>
-                <Text style={styles.infoValue}>{row.requestDate}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Due Date</Text>
-                <Text style={styles.infoValue}>{row.dueDate}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice Status</Text>
-                <Text style={[styles.infoValue, styles.statusGreen]}>{row.invoiceStatus}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Approval Status</Text>
-                <Text style={[styles.infoValue, styles.statusGreen]}>{row.approvalStatus}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Admin Status</Text>
-                <Text style={[styles.infoValue, getAdminStatusStyle(row.adminStatus)]}>{row.adminStatus}</Text>
-              </View>
-            </>
-          )}
+          {/* Same chip order for all roles: Loan Ref No. → … → Admin Status */}
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Loan Ref No.</Text>
+            <Text style={styles.infoValue}>{row.loanRefNo}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice No</Text>
+            <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Bank Name</Text>
+            <Text style={styles.infoValue}>{row.bankName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Product Name</Text>
+            <Text style={styles.infoValue}>{row.productName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Program Name</Text>
+            <Text style={styles.infoValue}>{row.programName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Primary Party</Text>
+            <Text style={styles.infoValue}>{row.primaryParty}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Counter Party</Text>
+            <Text style={styles.infoValue}>{row.counterParty}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+            <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Date</Text>
+            <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Request Date</Text>
+            <Text style={styles.infoValue}>{row.requestDate}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Due Date</Text>
+            <Text style={styles.infoValue}>{row.dueDate}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Status</Text>
+            <Text style={[styles.infoValue, getInvoiceStatusStyle(row.invoiceStatus)]}>{row.invoiceStatus}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Approval Status</Text>
+            <Text style={[styles.infoValue, getApprovalStatusStyle(row.approvalStatus)]}>{row.approvalStatus}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Admin Status</Text>
+            <Text style={[styles.infoValue, getAdminStatusStyle(row.adminStatus)]}>{row.adminStatus}</Text>
+          </View>
         </View>
       </View>
     </View>
@@ -253,7 +209,30 @@ const styles = StyleSheet.create({
   },
   cardHeaderContainer: {
     marginBottom: scaleHeight(12),
-    paddingRight: scaleWidth(50), // Space for 3-dot button when visible (Checker roles)
+    paddingRight: scaleWidth(50),
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(6),
+    marginBottom: scaleHeight(2),
+  },
+  pendingDotInline: {
+    width: scaleWidth(8),
+    height: scaleWidth(8),
+    borderRadius: scaleWidth(4),
+    backgroundColor: Colors.tertiaryBlue,
+    marginBottom: scaleHeight(6),
+  },
+  pendingDotStandalone: {
+    width: scaleWidth(8),
+    height: scaleWidth(8),
+    borderRadius: scaleWidth(4),
+    backgroundColor: Colors.tertiaryBlue,
+    marginBottom: scaleHeight(6),
+  },
+  cardTitleSpacing: {
+    marginBottom: scaleHeight(4),
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -287,23 +266,21 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(12),
     lineHeight: scaleFont(12),
   },
-  primaryPartyLabel: {
-    fontSize: scaleFont(12),
-    color: Colors.graybase,
-    marginBottom: scaleHeight(2),
-  },
   cardTitle: {
     fontSize: scaleFont(16),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
   },
-  cardSubtitle: {
-    fontSize: scaleFont(13),
-    color: Colors.graybase,
-    marginTop: scaleHeight(4),
-  },
   statusGreen: {
     color: Colors.green,
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  statusOrange: {
+    color: STATUS_ORANGE,
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  statusRed: {
+    color: Colors.red,
     fontFamily: Fonts.GilroySemiBold,
   },
   adminStatusGreen: {

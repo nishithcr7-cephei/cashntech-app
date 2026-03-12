@@ -27,14 +27,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import {
   fetchDealerInfoRequest,
-  fetchBankListRequest,
   createInvoiceRequest,
   resetCreateInvoiceState,
 } from '@store/invoice/inv.slice';
 import {
   selectDealerInfo,
   selectDealerInfoError,
-  selectBankList,
   selectCreateInvoiceLoading,
   selectCreateInvoiceSuccess,
   selectCreateInvoiceError,
@@ -105,7 +103,6 @@ export const CreateInvoice: React.FC = () => {
   const programSelection = useSelector(selectProgramSelection);
   const dealerInfo = useSelector(selectDealerInfo);
   const dealerInfoError = useSelector(selectDealerInfoError);
-  const bankList = useSelector(selectBankList);
   const createInvoiceLoading = useSelector(selectCreateInvoiceLoading);
   const createInvoiceSuccess = useSelector(selectCreateInvoiceSuccess);
   const createInvoiceError = useSelector(selectCreateInvoiceError);
@@ -120,7 +117,6 @@ export const CreateInvoice: React.FC = () => {
   const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [selectedParticipant, setSelectedParticipant] = useState<DealerInfoParticipant | null>(null);
-  const [selectedPartnerBankId, setSelectedPartnerBankId] = useState<string>('');
   const [selectedAttachment, setSelectedAttachment] = useState<DocumentPickerResponse | null>(null);
   const disabled = useMemo(() => loading || createInvoiceLoading, [loading, createInvoiceLoading]);
   const [productType, setProductType] = useState<'dealer_finance' | 'vendor_finance'>('dealer_finance');
@@ -136,6 +132,22 @@ export const CreateInvoice: React.FC = () => {
   const headerRefTitle = invoiceNo
     ? `Invoice / Unique Ref. No: ${invoiceNo}`
     : undefined;
+  const programContext = useMemo(() => {
+    const bank = programSelection?.bankName;
+    const product = programSelection?.productName;
+    const program = programSelection?.programName;
+
+    if (!bank && !product && !program) {
+      return null;
+    }
+
+    const parts: string[] = [];
+    if (bank) parts.push(bank);
+    if (product) parts.push(product);
+    if (program) parts.push(program);
+
+    return parts.join(' - ');
+  }, [programSelection]);
   
   // Role-based access control: Prevent anchor_checker from accessing Create Invoice screen
   useEffect(() => {
@@ -161,7 +173,6 @@ export const CreateInvoice: React.FC = () => {
     if (programId) {
       dispatch(fetchDealerInfoRequest(programId));
     }
-    dispatch(fetchBankListRequest());
   }, [programSelection?.programId, dispatch]);
 
   // Toast: programId debug - verify if program selection reached Create Invoice
@@ -212,7 +223,6 @@ export const CreateInvoice: React.FC = () => {
       dispatch(resetCreateInvoiceState());
       setFields(emptyFields);
       setSelectedParticipant(null);
-      setSelectedPartnerBankId('');
       setSelectedAttachment(null);
       Alert.alert('Success', 'Invoice created successfully.', [
         {text: 'OK', onPress: () => (navigation as any).navigate('InvoiceDetails')},
@@ -256,6 +266,11 @@ export const CreateInvoice: React.FC = () => {
       case 'invoiceDate':
         if (!value?.trim()) {
           return 'Invoice Date is required';
+        }
+        return undefined;
+      case 'paymentDate':
+        if (!value?.trim()) {
+          return 'Payment Date is required';
         }
         return undefined;
       case 'creditTo':
@@ -305,6 +320,9 @@ export const CreateInvoice: React.FC = () => {
     const invoiceDateError = validateField('invoiceDate', fields.invoiceDate);
     if (invoiceDateError) newErrors.invoiceDate = invoiceDateError;
     
+    const paymentDateError = validateField('paymentDate', fields.paymentDate);
+    if (paymentDateError) newErrors.paymentDate = paymentDateError;
+    
     const creditToError = validateField('creditTo', fields.creditTo);
     if (creditToError) newErrors.creditTo = creditToError;
     
@@ -322,6 +340,7 @@ export const CreateInvoice: React.FC = () => {
       fields.dealer?.trim() &&
       fields.dealerCode?.trim() &&
       fields.invoiceDate?.trim() &&
+      fields.paymentDate?.trim() &&
       fields.creditTo?.trim() &&
       fields.items &&
       fields.items.length > 0 &&
@@ -448,10 +467,11 @@ export const CreateInvoice: React.FC = () => {
 
     const createdBy = userId != null ? String(userId) : '';
 
-    if (dealerInfo && (!selectedParticipant || !selectedPartnerBankId)) {
+    const partnerBankId = programSelection?.bankId;
+    if (dealerInfo && (!selectedParticipant || !partnerBankId)) {
       Alert.alert(
         'Validation Error',
-        'Please select Dealer and Bank from the dropdowns.',
+        'Please select a Program (with Bank) and Dealer first.',
       );
       return;
     }
@@ -460,15 +480,31 @@ export const CreateInvoice: React.FC = () => {
       return;
     }
 
-    if (dealerInfo && selectedParticipant && programSelection?.programId) {
+    if (dealerInfo && selectedParticipant && programSelection?.programId && partnerBankId) {
+      const requestPayload = {
+        fields,
+        createdBy,
+        partnerBank: partnerBankId,
+        program: programSelection.programId,
+        anchorParticipantMapping: selectedParticipant.id,
+        party: dealerInfo.party.id,
+        counterPartyName: selectedParticipant.party.entity_name,
+        counterPartyCode: selectedParticipant.company_code,
+        counterPartyOdAccount: selectedParticipant.od_account_no,
+        hasAttachment: !!selectedAttachment,
+      };
+      // eslint-disable-next-line no-console
+      console.log('[CreateInvoice] Request payload (full body sent from page):', JSON.stringify(requestPayload, null, 2));
       dispatch(
         createInvoiceRequest({
           fields,
           createdBy,
-          partnerBank: selectedPartnerBankId,
+          partnerBank: partnerBankId,
           program: programSelection.programId,
           anchorParticipantMapping: selectedParticipant.id,
-          party: selectedParticipant.party.id,
+          // For Anchor-maker: backend expects invoice.party to be the Anchor party,
+          // while counter party details come from the selected participant (dealer).
+          party: dealerInfo.party.id,
           counterPartyName: selectedParticipant.party.entity_name,
           counterPartyCode: selectedParticipant.company_code,
           counterPartyOdAccount: selectedParticipant.od_account_no,
@@ -520,15 +556,6 @@ export const CreateInvoice: React.FC = () => {
       })) ?? [],
     [dealerInfo],
   );
-  const bankOptions = useMemo(
-    () =>
-      bankList?.map(b => ({
-        label: b.bank_name,
-        value: b.id,
-      })) ?? [],
-    [bankList],
-  );
-
   return (
     <Container>
       <AppBar 
@@ -545,6 +572,11 @@ export const CreateInvoice: React.FC = () => {
           <Text style={styles.pageTitleText} numberOfLines={1}>
             {headerModeTitle}
           </Text>
+          {programContext && (
+            <Text style={styles.pageSubtitleText} numberOfLines={1}>
+              {programContext}
+            </Text>
+          )}
           {!!headerRefTitle && (
             <Text style={styles.pageSubtitleText} numberOfLines={1}>
               {headerRefTitle}
@@ -615,9 +647,6 @@ export const CreateInvoice: React.FC = () => {
             productType={productType}
             dealerOptions={dealerOptions.length > 0 ? dealerOptions : undefined}
             creditToOptions={creditToOptions.length > 0 ? creditToOptions : undefined}
-            bankOptions={bankOptions.length > 0 ? bankOptions : undefined}
-            selectedBankId={selectedPartnerBankId}
-            onBankSelect={setSelectedPartnerBankId}
           />
         </ScrollView>
 

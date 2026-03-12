@@ -33,8 +33,11 @@ export type InvoiceListItemApi = {
   counter_party_name: string;
   counter_party_code: string;
   invoice_amount?: string;
+  /** Backend returns final_total from invoice_master */
+  final_total?: number | string;
   invoice_date: string;
   request_date?: string;
+  created_at?: string;
   invoice_due_date: string;
   invoice_status: string;
   approval_status: string;
@@ -45,6 +48,16 @@ export type InvoiceListItemApi = {
   product_name?: string;
   program_name?: string;
   primary_party_name?: string;
+  /** Nested from API when flat fields not present */
+  program?: {
+    program_name?: string;
+    productConfig?: {
+      partnerBank?: { bank_name?: string };
+      product?: { name?: string };
+    };
+  };
+  party?: { entity_name?: string };
+  anchorParticipantMapping?: { party?: { entity_name?: string } };
 };
 
 export type InvoiceState = {
@@ -77,4 +90,24 @@ export const initialInvoiceState: InvoiceState = {
   invoiceList: [],
   invoiceListLoading: false,
   invoiceListError: null,
+};
+
+export type UpdateInvoiceStatusRequest = {
+  invoiceId: string;
+  action: 'Approve' | 'Reject';
+  approvalLevel: number;
+  remark?: string;
+  programId?: string;
+  filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]};
+  onSuccess?: () => void;
+};
+
+/** CashnTech admin verification (PATCH /invoice/admin/:invoiceId) */
+export type UpdateInvoiceVerificationRequest = {
+  invoiceId: string;
+  action: 'Verify' | 'Reject';
+  remark?: string;
+  programId?: string;
+  filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]};
+  onSuccess?: () => void;
 };

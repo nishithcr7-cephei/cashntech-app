@@ -48,8 +48,14 @@ export const SelectProgramScreen: React.FC = () => {
   const isDealerMaker = userRole === 'dealer_maker';
   const isAnchorChecker = userRole === 'anchor_checker';
   const isDealerChecker = userRole === 'dealer_checker';
-  // All four roles can use "All Program" scope when Dealer Finance Program is selected
-  const canUseAllProgramScope = isAnchorMaker || isDealerMaker || isAnchorChecker || isDealerChecker;
+  const isCashnTechUser = userRole === 'cashntech_user';
+  // All roles can use "All Program" scope when Dealer Finance Program is selected
+  const canUseAllProgramScope = 
+    isAnchorMaker || 
+    isDealerMaker || 
+    isAnchorChecker || 
+    isDealerChecker || 
+    isCashnTechUser;
   const scopeData = useSelector(selectScopeData);
   const scopeLoading = useSelector(selectScopeLoading);
   const scopeError = useSelector(selectScopeError);
@@ -93,10 +99,21 @@ export const SelectProgramScreen: React.FC = () => {
     return isDFProduct || isDFProgramName;
   };
 
-  // Fetch user scope on mount
+  // Fetch user scope on mount only when not already loaded,
+  // so that Change button navigation doesn't keep refetching
+  // and re-triggering invoice overview APIs unnecessarily.
   useEffect(() => {
-    dispatch(fetchUserScopeRequest());
-  }, [dispatch]);
+    if (!scopeData || scopeData.length === 0) {
+      dispatch(fetchUserScopeRequest());
+    }
+  }, [dispatch, scopeData]);
+
+  // Minimum delay + loader so user sees "Loading programs..." before list appears
+  const [delayPassed, setDelayPassed] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setDelayPassed(true), 1000);
+    return () => clearTimeout(t);
+  }, []);
 
   // Track which banks/products are expanded
   const [expandedBanks, setExpandedBanks] = useState<Set<string>>(new Set());
@@ -168,6 +185,7 @@ export const SelectProgramScreen: React.FC = () => {
   };
 
   const handleAllProgram = () => {
+    // allProgramIds already saved in Redux when scope loaded (fetchUserScopeSuccess)
     dispatch(setProgramScope('all'));
     navigation.replace('HomeNavigator');
   };
@@ -330,10 +348,10 @@ export const SelectProgramScreen: React.FC = () => {
     );
   };
 
-  if (scopeLoading) {
+  if (scopeLoading || !delayPassed) {
     return (
       <Container>
-        <AppBar title="Select Program" navigation={navigation} hideHamburger={true} />
+        <AppBar title="Select DF Programs" navigation={navigation as any} hideHamburger={true} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primaryColor} />
           <Text style={styles.loadingText}>Loading programs...</Text>
@@ -345,7 +363,7 @@ export const SelectProgramScreen: React.FC = () => {
   if (scopeError) {
     return (
       <Container>
-        <AppBar title="Select Program" navigation={navigation} hideHamburger={true} />
+        <AppBar title="Select Program" navigation={navigation as any} hideHamburger={true} />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{scopeError}</Text>
         </View>
@@ -356,7 +374,7 @@ export const SelectProgramScreen: React.FC = () => {
   if (banksData.length === 0) {
     return (
       <Container>
-        <AppBar title="Select Program" navigation={navigation} hideHamburger={true} />
+        <AppBar title="Select Program" navigation={navigation as any} hideHamburger={true} />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>No programs available</Text>
         </View>
@@ -366,7 +384,7 @@ export const SelectProgramScreen: React.FC = () => {
 
   return (
     <Container>
-      <AppBar title="Select DF Programs" navigation={navigation} hideHamburger={true} />
+      <AppBar title="Select DF Programs" navigation={navigation as any} hideHamburger={true} />
       <View style={styles.contentContainer}>
         <View style={styles.contentWrapper}>
           {/* Anchor/Dealer Maker: allow "All Program" scope at UI level */}

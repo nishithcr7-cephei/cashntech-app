@@ -62,6 +62,7 @@ export type HomeNavigatorType = {
   InvoiceDetails: {
     invoiceId?: string;
     dealerName?: string;
+    programId?: string;
   };
   CreateInvoice: undefined;
   UploadInvoiceList: undefined;
@@ -101,5 +102,13 @@ export type HomeNavigatorType = {
     dealerName?: string;
   };
   DisbursementScreen: undefined;
+  InterestAccrualsScreen: undefined;
+  InvoiceDailyInterestScreen: {
+    invoiceId: string;
+    invoiceNo: string;
+  };
+  RepaymentSettlementScreen: undefined;
+  DPDPenalInterestNPAScreen: undefined;
   OcrInvoice: undefined;
+  Profile: undefined;
 };
