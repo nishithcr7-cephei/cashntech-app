@@ -33,9 +33,10 @@ const Strings = {
   otpSent: 'OTP sent to your email.',
 };
 
+
 export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
-  const [email, setEmail] = useState('anchormaker.rudraksh@cashntech.com');
-  const [passwordValue, setPassword] = useState('123456789');
+  const [email, setEmail] = useState('sm_maker@yopmail.com');
+  const [passwordValue, setPassword] = useState('Welcome@123');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
@@ -52,13 +53,6 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
       email: email.trim().toLowerCase(),
       password: passwordValue.trim(),
     };
-    
-    Toast.show({
-      type: 'info',
-      text1: 'API Call',
-      text2: 'POST http://192.168.31.225:3000/auth/login',
-      visibilityTime: 3000,
-    });
 
     console.log('🔵 [SigninScreen] Login button pressed');
     console.log('🔵 [SigninScreen] Payload:', JSON.stringify(payload, null, 2));

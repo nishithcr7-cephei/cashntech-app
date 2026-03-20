@@ -3,6 +3,7 @@ import {
   View,
   Text,
   ScrollView,
+  FlatList,
   ActivityIndicator,
 } from 'react-native';
 import {
@@ -11,10 +12,10 @@ import {
   ApproveRejectModal,
   Container,
   FilterModal,
-  UploadModal,
+  InvoiceAttachmentsModal,
   ProgramBreadcrumb,
 } from '@components/index';
-import {Colors, Fonts} from '@constants/index';
+import {Colors} from '@constants/index';
 import {LeftChevron} from '@assets/Icons';
 import {scaleWidth, scaleHeight} from '@utils/Scale';
 import {useInvoiceDetails} from './useInvoiceDetails';
@@ -22,17 +23,18 @@ import {InvoiceDetailsControls} from './InvoiceDetailsControls';
 import {InvoiceDetailsCard} from './InvoiceDetailsCard';
 import {SendForApprovalModal} from './SendForApprovalModal';
 import {InvoiceActionMenuModal} from './InvoiceActionMenuModal';
-import {SelectProgramModal} from './SelectProgramModal';
 import {styles} from './InvoiceDetails.styles';
 
 export const InvoiceDetails: React.FC = () => {
   const {
     programId,
     programName,
-    summaryStats,
     navigation,
     invoiceData,
     filteredData,
+    paginatedData,
+    hasMore,
+    loadMore,
     invoiceListLoading,
     invoiceListError,
     isDealerMaker,
@@ -68,6 +70,7 @@ export const InvoiceDetails: React.FC = () => {
     anchorCheckerInvoiceDetails,
     anchorCheckerDetailsLoading,
     showAttachmentModal,
+    setShowAttachmentModal,
     selectedInvoiceIds,
     showSendForApprovalModal,
     setShowSendForApprovalModal,
@@ -76,7 +79,8 @@ export const InvoiceDetails: React.FC = () => {
     fromInvoiceDashboard,
     handleMenuToggle,
     handleMenuAction,
-    handleAttachmentUpload,
+    handleInvoiceNoPress,
+    refreshInvoiceList,
     toggleInvoiceSelection,
     toggleSelectAllVisible,
     onApproveRejectApprove,
@@ -85,13 +89,11 @@ export const InvoiceDetails: React.FC = () => {
     onVerifyReject,
     onBulkApply,
     getMenuPosition,
-    showSelectProgramForCreateModal,
-    setShowSelectProgramForCreateModal,
     onCreateInvoicePress,
-    onProgramSelectedForCreate,
     isCreateInvoiceEnabled,
     hasAnyProgramContext,
     invoiceFilterData,
+    showAllProgramBreadcrumb,
   } = useInvoiceDetails();
 
   const registerMenuRef = (id: string, ref: View | null) => {
@@ -108,90 +110,86 @@ export const InvoiceDetails: React.FC = () => {
         onPressLeftIcon={fromInvoiceDashboard ? () => navigation.goBack() : undefined}
       />
       <ProgramBreadcrumb />
-      {programName ? (
-        <View style={styles.pageTitleBar}>
-          <Text style={styles.pageTitleText}>{programName}</Text>
+      {hasAnyProgramContext && (
+        <View style={styles.selectedProgramRow}>
+          <Text style={styles.selectedProgramText}>
+            {programName
+              ? programName
+              : showAllProgramBreadcrumb
+                ? 'All Program'
+                : '-'}
+          </Text>
         </View>
-      ) : null}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        onScrollBeginDrag={() => {
-          setOpenMenuId(null);
-          setMenuAnchor(null);
-        }}>
-        {!hasAnyProgramContext ? (
+      )}
+      {!hasAnyProgramContext ? (
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>
               Select a program first to view invoice list.
             </Text>
           </View>
-        ) : invoiceListError ? (
+        </ScrollView>
+      ) : invoiceListError ? (
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <View style={styles.emptyState}>
             <Text style={styles.errorStateText}>{invoiceListError}</Text>
           </View>
-        ) : (
-          <>
-            {/* Summary metrics: Dealers, Total Invoices, Total Amount, Pending, Approved, Rejected */}
-            {!isAnchorMaker && (
-              <View style={styles.summaryCardGrid}>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryCardLabel}>Dealers</Text>
-                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.dealers}</Text>
+        </ScrollView>
+      ) : (
+        <FlatList
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          data={invoiceListLoading ? [] : paginatedData}
+          keyExtractor={row => row.id}
+          ListHeaderComponent={
+            <>
+              <InvoiceDetailsControls
+                dealerListTitle={dealerListTitle}
+                invoiceCount={invoiceData.length}
+                isDealerMaker={isDealerMaker}
+                isAnchorMaker={isAnchorMaker}
+                isAnchorChecker={isAnchorChecker}
+                isDealerChecker={isDealerChecker}
+                isCashnTechUser={isCashnTechUser}
+                filteredDataLength={filteredData.length}
+                searchText={searchText}
+                setSearchText={setSearchText}
+                onOpenFilterModal={() => setShowFilterModal(true)}
+                navigation={navigation}
+                allSelectedOnScreen={allSelectedOnScreen}
+                onToggleSelectAllVisible={toggleSelectAllVisible}
+                selectedInvoiceIdsLength={selectedInvoiceIds.length}
+                onOpenSendForApprovalModal={() => setShowSendForApprovalModal(true)}
+                onCreateInvoicePress={onCreateInvoicePress}
+                isCreateInvoiceEnabled={isCreateInvoiceEnabled}
+              />
+              <View style={styles.listTopSeparator} />
+              {invoiceListLoading && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={Colors.primaryColor} />
+                  <Text style={styles.loadingText}>Loading invoices...</Text>
                 </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryCardLabel}>Total Invoices</Text>
-                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.totalInvoices}</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryCardLabel}>Total Invoice Amount</Text>
-                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.totalInvoiceAmount}</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryCardLabel}>Pending Invoices</Text>
-                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.pendingInvoices}</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryCardLabel}>Approved Invoices</Text>
-                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.approvedInvoices}</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryCardLabel}>Rejected Invoices</Text>
-                  <Text style={styles.summaryCardValue} numberOfLines={1}>{summaryStats.rejectedInvoices}</Text>
-                </View>
-              </View>
-            )}
-
-            <InvoiceDetailsControls
-              dealerListTitle={dealerListTitle}
-              invoiceCount={invoiceData.length}
-              summaryStats={summaryStats}
-              isDealerMaker={isDealerMaker}
+              )}
+            </>
+          }
+          ItemSeparatorComponent={() => <View style={{height: scaleHeight(12)}} />}
+          renderItem={({item: row}) => (
+            <InvoiceDetailsCard
+              row={row}
               isAnchorMaker={isAnchorMaker}
-              isAnchorChecker={isAnchorChecker}
+              isDealerMaker={isDealerMaker}
               isDealerChecker={isDealerChecker}
+              isAnchorChecker={isAnchorChecker}
               isCashnTechUser={isCashnTechUser}
-              filteredDataLength={filteredData.length}
-              searchText={searchText}
-              setSearchText={setSearchText}
-              onOpenFilterModal={() => setShowFilterModal(true)}
-              navigation={navigation}
-              allSelectedOnScreen={allSelectedOnScreen}
-              onToggleSelectAllVisible={toggleSelectAllVisible}
-              selectedInvoiceIdsLength={selectedInvoiceIds.length}
-              onOpenSendForApprovalModal={() => setShowSendForApprovalModal(true)}
-              onCreateInvoicePress={onCreateInvoicePress}
-              isCreateInvoiceEnabled={isCreateInvoiceEnabled}
+              isSelected={(isDealerChecker || isAnchorChecker) && selectedInvoiceIds.includes(row.id)}
+              onMenuToggle={handleMenuToggle}
+              onToggleSelection={toggleInvoiceSelection}
+              onInvoiceNoPress={handleInvoiceNoPress}
+              registerMenuRef={registerMenuRef}
             />
-
-            <View style={styles.listTopSeparator} />
-            {invoiceListLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.primaryColor} />
-                <Text style={styles.loadingText}>Loading invoices...</Text>
-              </View>
-            ) : filteredData.length === 0 ? (
+          )}
+          ListEmptyComponent={
+            !invoiceListLoading && filteredData.length === 0 ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>
                   {selectedDealerName
@@ -199,28 +197,24 @@ export const InvoiceDetails: React.FC = () => {
                     : 'No invoices found'}
                 </Text>
               </View>
-            ) : (
-              <View style={styles.verticalList}>
-                {filteredData.map(row => (
-                  <InvoiceDetailsCard
-                    key={row.id}
-                    row={row}
-                    isAnchorMaker={isAnchorMaker}
-                    isDealerMaker={isDealerMaker}
-                    isDealerChecker={isDealerChecker}
-                    isAnchorChecker={isAnchorChecker}
-                    isCashnTechUser={isCashnTechUser}
-                    isSelected={(isDealerChecker || isAnchorChecker) && selectedInvoiceIds.includes(row.id)}
-                    onMenuToggle={handleMenuToggle}
-                    onToggleSelection={toggleInvoiceSelection}
-                    registerMenuRef={registerMenuRef}
-                  />
-                ))}
+            ) : null
+          }
+          onEndReached={hasMore ? loadMore : undefined}
+          onEndReachedThreshold={0.3}
+          onScrollBeginDrag={() => {
+            setOpenMenuId(null);
+            setMenuAnchor(null);
+          }}
+          ListFooterComponent={
+            hasMore ? (
+              <View style={styles.loadMoreFooter}>
+                <ActivityIndicator size="small" color={Colors.primaryColor} />
+                <Text style={styles.loadMoreText}>Loading more...</Text>
               </View>
-            )}
-          </>
-        )}
-      </ScrollView>
+            ) : null
+          }
+        />
+      )}
 
       <FilterModal
         visible={showFilterModal}
@@ -283,10 +277,14 @@ export const InvoiceDetails: React.FC = () => {
         }}
       />
 
-      <UploadModal
+      <InvoiceAttachmentsModal
         visible={showAttachmentModal}
-        allowedFileTypes={['jpg', 'jpeg', 'png', 'pdf']}
-        onClose={handleAttachmentUpload}
+        invoiceId={selectedInvoiceId}
+        onClose={() => {
+          setShowAttachmentModal(false);
+          setSelectedInvoiceId(null);
+        }}
+        onListChanged={refreshInvoiceList}
       />
 
       <SendForApprovalModal
@@ -315,11 +313,6 @@ export const InvoiceDetails: React.FC = () => {
         isCashnTechUser={isCashnTechUser}
       />
 
-      <SelectProgramModal
-        visible={showSelectProgramForCreateModal}
-        onClose={() => setShowSelectProgramForCreateModal(false)}
-        onProgramSelected={onProgramSelectedForCreate}
-      />
     </Container>
   );
 };

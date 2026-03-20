@@ -21,3 +21,6 @@ export const selectInvoiceOverviewLatestLoading = (state: RootState) =>
 export const selectInvoiceOverviewLatestError = (state: RootState) =>
   state.invoiceOverview.latestError;
 
+export const selectInvoiceOverviewKpis = (state: RootState) =>
+  state.invoiceOverview.kpis;
+

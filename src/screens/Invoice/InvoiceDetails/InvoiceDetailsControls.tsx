@@ -14,9 +14,6 @@ import Toast from 'react-native-toast-message';
 type Props = {
   dealerListTitle: string;
   invoiceCount: number;
-  summaryStats: {
-    pendingInvoices: number;
-  };
   isDealerMaker: boolean;
   isAnchorMaker: boolean;
   isAnchorChecker: boolean;
@@ -32,14 +29,12 @@ type Props = {
   selectedInvoiceIdsLength: number;
   onOpenSendForApprovalModal: () => void;
   onCreateInvoicePress?: () => void;
-  /** When false (e.g. "All Program" in breadcrumb), list is visible but Create Invoice is disabled */
   isCreateInvoiceEnabled?: boolean;
 };
 
 export const InvoiceDetailsControls: React.FC<Props> = ({
   dealerListTitle,
   invoiceCount,
-  summaryStats,
   isDealerMaker,
   isAnchorMaker,
   isAnchorChecker,
@@ -57,6 +52,21 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   onCreateInvoicePress,
   isCreateInvoiceEnabled = true,
 }) => {
+  const onPressCreateInvoice = () => {
+    if (!isCreateInvoiceEnabled) {
+      Toast.show({
+        type: 'info',
+        text1: 'Select a program to create an invoice',
+        text2: 'Use the filter above to choose a specific program.',
+      });
+      return;
+    }
+    const handler =
+      onCreateInvoicePress ??
+      (() => navigation.navigate('CreateInvoice' as never));
+    handler();
+  };
+
   return (
     <View style={styles.controlsSection}>
       <View style={styles.topRow}>
@@ -67,13 +77,6 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
           </View>
         </View>
       </View>
-
-      {isAnchorMaker && summaryStats.pendingInvoices > 0 && (
-        <View style={styles.pendingLegendContainer}>
-          <View style={styles.pendingDot} />
-          <Text style={styles.pendingLegendText}>Pending Invoice Approval</Text>
-        </View>
-      )}
 
       {(isDealerChecker || isAnchorChecker) && filteredDataLength > 0 && (
         <TouchableOpacity
@@ -114,6 +117,17 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
         </TouchableOpacity>
       </View>
 
+      {(isAnchorMaker || isAnchorChecker) && (
+        <View style={styles.blueDotLegendRow}>
+          <View style={styles.blueDotLegendContent}>
+            <View style={styles.pendingDot} />
+            <Text style={styles.blueDotLegendText}>
+               Pending Invoice Approval
+            </Text>
+          </View>
+        </View>
+      )}
+
       <View style={styles.primaryActionsRow}>
         {isAnchorMaker && !isCashnTechUser && (
           <TouchableOpacity
@@ -122,20 +136,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
               styles.primaryButtonSingle,
               !isCreateInvoiceEnabled && styles.primaryButtonDisabled,
             ]}
-            onPress={() => {
-              if (!isCreateInvoiceEnabled) {
-                Toast.show({
-                  type: 'info',
-                  text1: 'Select a program to create an invoice',
-                  text2: 'Use the filter above to choose a specific program.',
-                });
-                return;
-              }
-              const handler =
-                onCreateInvoicePress ??
-                (() => navigation.navigate('CreateInvoice' as never));
-              handler();
-            }}>
+            onPress={onPressCreateInvoice}>
             <View style={styles.buttonIconContainer}>
               <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
             </View>
@@ -158,20 +159,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
                 styles.primaryButtonHalf,
                 !isCreateInvoiceEnabled && styles.primaryButtonDisabled,
               ]}
-              onPress={() => {
-                if (!isCreateInvoiceEnabled) {
-                  Toast.show({
-                    type: 'info',
-                    text1: 'Select a program to create an invoice',
-                    text2: 'Use the filter above to choose a specific program.',
-                  });
-                  return;
-                }
-                const handler =
-                  onCreateInvoicePress ??
-                  (() => navigation.navigate('CreateInvoice' as never));
-                handler();
-              }}>
+              onPress={onPressCreateInvoice}>
               <View style={styles.buttonIconContainer}>
                 <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
               </View>
@@ -238,22 +226,32 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
   },
-  pendingLegendContainer: {
+  blueDotLegendRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: scaleHeight(8),
+    paddingRight: scaleWidth(2),
+  },
+  blueDotLegendContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: scaleWidth(6),
-    marginTop: -scaleHeight(8), // Pull it closer to the line above
+    maxWidth: '92%',
+  },
+  blueDotLegendText: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+    flexShrink: 1,
+    textAlign: 'right',
   },
   pendingDot: {
     width: scaleWidth(8),
     height: scaleWidth(8),
     borderRadius: scaleWidth(4),
     backgroundColor: Colors.tertiaryBlue,
-  },
-  pendingLegendText: {
-    fontSize: scaleFont(12),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.graybase,
   },
   dmSelectAllRow: {
     flexDirection: 'row',

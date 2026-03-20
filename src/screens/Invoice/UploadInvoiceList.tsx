@@ -128,22 +128,14 @@ export const UploadInvoiceList: React.FC = () => {
           {/* Role-based links */}
           <View style={styles.linksContainer}>
             <TouchableOpacity
-              onPress={() => {
-                // TODO: Download sample Excel file
-                console.log('Download Sample Excel File');
-                // Linking.openURL('https://example.com/sample.xlsx');
-              }}
+              onPress={() => {}}
               style={styles.linkButton}>
               <Text style={styles.linkText}>Download Sample Excel File</Text>
             </TouchableOpacity>
             
             {/* Same as Anchor Maker: List of Dealers */}
             <TouchableOpacity
-              onPress={() => {
-                // TODO: Navigate to DealerInvoiceList (or existing dealer list screen)
-                console.log('Navigate to List of Dealers');
-                // (navigation as any).navigate('DealerInvoiceList');
-              }}
+              onPress={() => {}}
               style={styles.linkButton}>
               <Text style={styles.linkText}>List of Dealers</Text>
             </TouchableOpacity>

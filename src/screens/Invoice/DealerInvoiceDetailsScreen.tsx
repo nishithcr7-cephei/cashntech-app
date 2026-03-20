@@ -239,8 +239,7 @@ export const DealerInvoiceDetailsScreen: React.FC = () => {
     visibleInvoiceIds.every(id => selectedInvoiceIds.includes(id));
 
   const handleExport = () => {
-    // TODO: Export functionality
-    console.log('Export invoices for dealer:', dealerName);
+    void dealerName;
   };
 
   const toggleSelectAllVisible = () => {
@@ -302,10 +301,10 @@ export const DealerInvoiceDetailsScreen: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        {/* Dealers Badge Header */}
+        {/* Dealer Wise Invoice Details Badge Header */}
         <View style={styles.dealersHeader}>
           <View style={styles.dealersBadgeContainer}>
-            <Text style={styles.dealersLabel}>Dealers</Text>
+            <Text style={styles.dealersLabel}>Dealer Wise Invoice Details</Text>
             <View style={styles.dealersBadge}>
               <Text style={styles.dealersBadgeText}>100</Text>
             </View>
@@ -537,7 +536,7 @@ export const DealerInvoiceDetailsScreen: React.FC = () => {
           setSelectedInvoiceNo(null);
         }}
         onApprove={(invoiceId, remarks) => {
-          console.log('Approve invoice:', invoiceId, remarks);
+          void remarks;
           setShowApproveRejectModal(false);
           const invoiceNo = selectedInvoiceNo || invoiceId;
           (navigation as any).navigate('InvoiceDetailView', {
@@ -548,7 +547,8 @@ export const DealerInvoiceDetailsScreen: React.FC = () => {
           setSelectedInvoiceNo(null);
         }}
         onReject={(invoiceId, remarks) => {
-          console.log('Reject invoice:', invoiceId, remarks);
+          void invoiceId;
+          void remarks;
           setSelectedInvoiceId(null);
           setSelectedInvoiceNo(null);
         }}
@@ -861,10 +861,6 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
-  },
-  cardHeaderLeft: {
-    flex: 1,
-    marginRight: scaleWidth(8),
   },
   cardTitle: {
     fontSize: scaleFont(16),

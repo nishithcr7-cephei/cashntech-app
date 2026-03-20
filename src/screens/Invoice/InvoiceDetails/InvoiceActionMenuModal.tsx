@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  View,
   ViewStyle,
 } from 'react-native';
 import {Colors, Fonts} from '@constants/index';
@@ -115,9 +116,38 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
               </TouchableOpacity>
             </>
           )}
-          {(isAnchorChecker || isDealerChecker) && !isCashnTechUser && (
+          {/* Anchor checker: 3-step menu — Verification (Approve/Reject), Checker Approval (History), Attachments */}
+          {isAnchorChecker && !isCashnTechUser && (
             <>
-              {/* View Invoice Details */}
+              <TouchableOpacity
+                onPress={() => onMenuAction('approveReject', openMenuId)}
+                style={styles.menuItem}>
+                <FontAwesome6 name="circle-check" iconStyle="solid" color={Colors.darkblack} size={16} />
+                <View style={styles.menuItemTextBlock}>
+                  <Text style={styles.menuText}>Invoice Verification</Text>
+                  <Text style={styles.menuSubText}>Approval / Reject</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onMenuAction('checkerApproval', openMenuId)}
+                style={styles.menuItem}>
+                <FontAwesome6 name="clock-rotate-left" iconStyle="solid" color="#3B82F6" size={16} />
+                <View style={styles.menuItemTextBlock}>
+                  <Text style={styles.menuText}>Checker Approval</Text>
+                  <Text style={styles.menuSubText}>Approval History</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => onMenuAction('attachment', openMenuId)}
+                style={styles.menuItem}>
+                <FontAwesome6 name="paperclip" iconStyle="solid" color={Colors.darkblack} size={16} />
+                <Text style={styles.menuText}>Attachments</Text>
+              </TouchableOpacity>
+            </>
+          )}
+          {/* Dealer checker: keep full row actions incl. View details */}
+          {isDealerChecker && !isAnchorChecker && !isCashnTechUser && (
+            <>
               <TouchableOpacity
                 onPress={() => onMenuAction('viewDetails', openMenuId)}
                 style={styles.menuItem}>
@@ -182,7 +212,17 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    minWidth: scaleWidth(180),
+    minWidth: scaleWidth(200),
+  },
+  menuItemTextBlock: {
+    flex: 1,
+    flexShrink: 1,
+  },
+  menuSubText: {
+    fontSize: scaleFont(12),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyRegular,
+    marginTop: scaleHeight(2),
   },
   menuItem: {
     flexDirection: 'row',

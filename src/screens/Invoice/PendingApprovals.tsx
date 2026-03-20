@@ -144,17 +144,25 @@ export const PendingApprovals: React.FC = () => {
                 />
               </TouchableOpacity>
 
-              <View style={styles.cardHeaderRow}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() =>
+                  (navigation as any).navigate('InvoiceDetailView', {
+                    invoiceId: row.id,
+                    invoiceNo: row.invoiceRefNo,
+                  })
+                }
+                style={styles.cardHeaderRow}>
                 <View>
                   <Text style={styles.cardTitle}>{row.dealerName}</Text>
-                  <Text style={styles.cardSubtitle}>
+                  <Text style={[styles.cardSubtitle, styles.invoiceRefLink]}>
                     Invoice / Unique Ref. No: {row.invoiceRefNo}
                   </Text>
                 </View>
                 <View style={styles.statusBadge}>
                   <Text style={styles.statusText}>{row.invoiceStatus}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               <View style={styles.infoGrid}>
                 <View style={styles.infoColumn}>
@@ -330,6 +338,10 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(13),
     color: Colors.graybase,
     marginTop: scaleHeight(4),
+  },
+  invoiceRefLink: {
+    color: Colors.tertiaryColor,
+    textDecorationLine: 'underline',
   },
   statusBadge: {
     backgroundColor: '#E8F5E9',

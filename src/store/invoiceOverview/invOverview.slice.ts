@@ -49,6 +49,38 @@ const invoiceOverviewSlice = createSlice({
       state.latestLoading = false;
       state.latestError = action.payload;
     },
+
+    fetchInvoiceKpisRequest: (
+      state,
+      _action: PayloadAction<{programIds: string[]}>,
+    ) => {
+      // keep existing summary/latest loading state; KPIs are lightweight
+    },
+    fetchInvoiceKpisSuccess: (
+      state,
+      action: PayloadAction<{
+        total_program_limit: string;
+        utilized_amount: string;
+        utilized_rate: string;
+        active_dealer_ratio: string;
+        available_limit: string;
+        overdue_amount: string;
+        dpd_days: string;
+      }>,
+    ) => {
+      state.kpis = action.payload;
+    },
+    fetchInvoiceKpisFailure: (state, _action: PayloadAction<string>) => {
+      state.kpis = {
+        total_program_limit: '0',
+        utilized_amount: '0',
+        utilized_rate: '0',
+        active_dealer_ratio: '0',
+        available_limit: '0',
+        overdue_amount: '0',
+        dpd_days: '0',
+      };
+    },
   },
 });
 
@@ -59,6 +91,9 @@ export const {
   fetchLatestInvoicesRequest,
   fetchLatestInvoicesSuccess,
   fetchLatestInvoicesFailure,
+  fetchInvoiceKpisRequest,
+  fetchInvoiceKpisSuccess,
+  fetchInvoiceKpisFailure,
 } = invoiceOverviewSlice.actions;
 
 export default invoiceOverviewSlice.reducer;

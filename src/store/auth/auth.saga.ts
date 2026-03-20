@@ -35,6 +35,7 @@ import {
 import {setStorage} from '@services/localStorage';
 import StorageKeys from '@constants/StorageKeys';
 import {userActions} from '@store/user';
+import {deriveAppRoleFromUser} from '@utils/deriveAppRole';
 
 function* handleSignup(
   action: PayloadAction<SignupPayloadWithCallback>,
@@ -86,10 +87,12 @@ function* handleSignInOtpVerify(
   > = yield call(AuthApis.apiSigninOtpVerify, action.payload.payload);
   yield put(setGlobalLoader(false));
   if (!error) {
-    setStorage(StorageKeys.TOKEN, data.data.token);
-    setStorage(StorageKeys.USER_INFO, JSON.stringify(data.data.user));
-    yield put(userActions.setUserInfo(data.data.user));
-    action.payload.callbackSuccess?.(data.data.user);
+    const {token: tokenVal, user: userData} = data.data || {};
+    setStorage(StorageKeys.TOKEN, tokenVal);
+    setStorage(StorageKeys.USER_INFO, JSON.stringify(userData));
+    const appRole = userData ? deriveAppRoleFromUser(userData) : null;
+    yield put(userActions.setUserInfo({...userData, appRole}));
+    action.payload.callbackSuccess?.(userData);
   } else {
     const errorMessage = error.response?.data?.message ?? 'Something went wrong';
     action.payload.callbackError?.(errorMessage);

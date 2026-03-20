@@ -7,6 +7,7 @@ import {Dimensions} from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
 import {userSelector} from '@store/user';
 import {fetchUserScopeRequest} from '@store/programSelection/programSelection.slice';
+import {fetchPermissionsRequest} from '@store/permissions';
 import {AppRole} from '@constants/roles';
 import {
   OcrInvoiceScreen,
@@ -31,6 +32,7 @@ import {
   ODRepaymentsScreen,
   AnchorsListScreen,
   InvoiceDetailView,
+  InvoiceUploadPreview,
   DealerInvoiceDetailsScreen,
   DisbursementScreen,
   InterestAccrualsScreen,
@@ -47,9 +49,10 @@ export const HomeNavigator = () => {
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const initialRoute = 'InvoiceDashboard';
 
-  // Pre-load user scope when entering home so Invoice Overview (and other screens) have scopeData on first land
+  // Pre-load user scope and permissions when entering home
   useEffect(() => {
     dispatch(fetchUserScopeRequest());
+    dispatch(fetchPermissionsRequest());
   }, [dispatch]);
 
   return (
@@ -86,6 +89,7 @@ export const HomeNavigator = () => {
       <Drawer.Screen name="ODRepaymentsScreen" component={ODRepaymentsScreen} />
       <Drawer.Screen name="AnchorsListScreen" component={AnchorsListScreen} />
       <Drawer.Screen name="InvoiceDetailView" component={InvoiceDetailView} />
+      <Drawer.Screen name="InvoiceUploadPreview" component={InvoiceUploadPreview} />
       <Drawer.Screen name="DealerInvoiceDetailsScreen" component={DealerInvoiceDetailsScreen} />
       <Drawer.Screen name="DisbursementScreen" component={DisbursementScreen} />
       <Drawer.Screen name="InterestAccrualsScreen" component={InterestAccrualsScreen} />

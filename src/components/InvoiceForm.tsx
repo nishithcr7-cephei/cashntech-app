@@ -56,6 +56,12 @@ type Props = {
   bankOptions?: DropdownOption[];
   selectedBankId?: string;
   onBankSelect?: (bankId: string) => void;
+  /** From dealer-info API basic_parameters: days user can go back for invoice date (default 30) */
+  staleInvoicePeriodDays?: number;
+  /** From dealer-info API basic_parameters: max days from today for invoice due date (default 60) */
+  defaultPaymentTermsDays?: number;
+  /** When true, submit button appears disabled but remains pressable (for toast feedback) */
+  submitButtonAppearsDisabled?: boolean;
 };
 
 export const InvoiceForm: React.FC<Props> = ({
@@ -73,6 +79,9 @@ export const InvoiceForm: React.FC<Props> = ({
   bankOptions,
   selectedBankId = '',
   onBankSelect,
+  staleInvoicePeriodDays = 30,
+  defaultPaymentTermsDays = 60,
+  submitButtonAppearsDisabled = false,
 }) => {
   const dealerData = dealerOptions ?? [];
   const creditToData = creditToOptions ?? [];
@@ -97,10 +106,7 @@ export const InvoiceForm: React.FC<Props> = ({
   const entityODLabel = effectiveEntityType === 'anchor' ? 'Anchor OD Account' : 'Dealer OD Account';
   const entityInvoiceLabel = effectiveEntityType === 'anchor' ? 'Anchor Invoice' : 'Dealer Invoice';
 
-  // CODE-END DEFAULT: Backend has no tenure/credit terms yet. basic_parameters/interest_parameters
-  // are flexible JSON but invoice create flow doesn't use them. When backend adds credit_days,
-  // max_invoice_age_days etc. in basic_parameters, fetch from program API and make this dynamic.
-  const TENURE_DAYS = 60;
+  const TENURE_DAYS = defaultPaymentTermsDays;
 
   // Calculate Invoice Due Date based on Invoice Date, GRN Date, and Tenure
   const calculateInvoiceDueDate = (
@@ -123,23 +129,24 @@ export const InvoiceForm: React.FC<Props> = ({
     return dueDate.format('DD-MM-YYYY');
   };
 
-  // Auto-calculate Invoice Due Date - COMMENTED: user can now select Jan 2026 - Dec 2026 manually
-  // useEffect(() => {
-  //   if (value.invoiceDate) {
-  //     const calculatedDueDate = calculateInvoiceDueDate(
-  //       value.invoiceDate,
-  //       value.grnDate || '',
-  //       TENURE_DAYS
-  //     );
-  //     if (calculatedDueDate && calculatedDueDate !== value.invoiceDueDate) {
-  //       onChange({invoiceDueDate: calculatedDueDate});
-  //     }
-  //   } else if (!value.invoiceDate && value.invoiceDueDate) {
-  //     onChange({invoiceDueDate: ''});
-  //   }
-  // }, [value.invoiceDate, value.grnDate]);
+  // Auto-calculate Invoice Due Date only when Invoice Date or GRN Date changes.
+  // Do NOT include invoiceDueDate in deps – otherwise manual due date changes get overwritten.
+  useEffect(() => {
+    if (value.invoiceDate) {
+      const calculatedDueDate = calculateInvoiceDueDate(
+        value.invoiceDate,
+        value.grnDate || '',
+        TENURE_DAYS,
+      );
+      if (calculatedDueDate) {
+        onChange({invoiceDueDate: calculatedDueDate});
+      }
+    } else if (!value.invoiceDate && value.invoiceDueDate) {
+      onChange({invoiceDueDate: ''});
+    }
+  }, [value.invoiceDate, value.grnDate, TENURE_DAYS]);
 
-  // Validate Invoice Date: up to 1 month back from today, no future dates
+  // Validate Invoice Date: up to staleInvoicePeriodDays back from today, no future dates
   const validateInvoiceDate = (dateStr: string): string | undefined => {
     if (!dateStr) return undefined;
     
@@ -149,13 +156,35 @@ export const InvoiceForm: React.FC<Props> = ({
     }
 
     const today = moment().startOf('day');
-    const oneMonthAgo = moment().subtract(1, 'month').startOf('day');
+    const minDate = moment().subtract(staleInvoicePeriodDays, 'days').startOf('day');
 
     if (invoiceDate.isAfter(today)) {
       return 'Invoice date cannot be in the future';
     }
-    if (invoiceDate.isBefore(oneMonthAgo)) {
-      return 'Invoice date cannot be more than 1 month in the past';
+    if (invoiceDate.isBefore(minDate)) {
+      return `Invoice date cannot be more than ${staleInvoicePeriodDays} days in the past`;
+    }
+
+    return undefined;
+  };
+
+  // Validate Invoice Due Date: from today up to defaultPaymentTermsDays
+  const validateInvoiceDueDate = (dateStr: string): string | undefined => {
+    if (!dateStr) return undefined;
+    
+    const dueDate = moment(dateStr, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true);
+    if (!dueDate.isValid()) {
+      return 'Invalid date format';
+    }
+
+    const today = moment().startOf('day');
+    const maxDate = moment().add(defaultPaymentTermsDays, 'days').startOf('day');
+
+    if (dueDate.isBefore(today)) {
+      return 'Invoice due date cannot be in the past';
+    }
+    if (dueDate.isAfter(maxDate)) {
+      return `Invoice due date cannot be more than ${defaultPaymentTermsDays} days from today`;
     }
 
     return undefined;
@@ -340,7 +369,7 @@ export const InvoiceForm: React.FC<Props> = ({
           {isDealerFinance ? entityInvoiceLabel : 'Vendor Invoice'}
         </Text>
         <View style={styles.row}>
-          <View style={styles.halfWidth}>
+          <View style={styles.dealerNameWidth}>
             <CustomDropdown
               label={`${entityNameLabel} *`}
               data={dealerData}
@@ -351,13 +380,13 @@ export const InvoiceForm: React.FC<Props> = ({
             />
             {errors.dealer && <Text style={styles.errorText}>{errors.dealer}</Text>}
           </View>
-          <View style={styles.halfWidth}>
+          <View style={styles.dealerCodeWidth}>
             <CustomDropdown
               label={`${entityCodeLabel} *`}
               data={dealerOptions && value.dealerCode ? [{label: value.dealerCode, value: value.dealerCode}] : []}
               value={value.dealerCode}
               onChange={set('dealerCode')}
-              placeholder={`Select ${entityLabel} Code`}
+              placeholder={entityCodeLabel}
               containerStyle={styles.dropdownContainer}
               editable={!dealerOptions || !dealerOptions.length}
             />
@@ -434,7 +463,7 @@ export const InvoiceForm: React.FC<Props> = ({
                 datePickerProps={{
                   date: value.invoiceDate ? moment(value.invoiceDate, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true).toDate() : new Date(),
                   mode: 'date',
-                  minimumDate: moment().subtract(1, 'month').toDate(),
+                  minimumDate: moment().subtract(staleInvoicePeriodDays, 'days').toDate(),
                   maximumDate: new Date(),
                 }}
                 containerStyle={styles.datePickerContainer}
@@ -450,7 +479,7 @@ export const InvoiceForm: React.FC<Props> = ({
           <View style={styles.halfWidth}>
             <View style={styles.fieldInRow}>
               <DateNTimePicker
-                label="Payment Date *"
+                label="Payment Date (Optional)"
                 value={parseDateValue(value.paymentDate)}
                 onConfirm={(date) => {
                   const dateStr = formatDateForStorage(date);
@@ -489,11 +518,14 @@ export const InvoiceForm: React.FC<Props> = ({
                 datePickerProps={{
                   date: value.invoiceDueDate ? moment(value.invoiceDueDate, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true).toDate() : new Date(),
                   mode: 'date',
-                  minimumDate: new Date(2026, 0, 1),
-                  maximumDate: new Date(2026, 11, 31),
+                  minimumDate: new Date(),
+                  maximumDate: moment().add(defaultPaymentTermsDays, 'days').toDate(),
                 }}
                 containerStyle={styles.datePickerContainer}
               />
+              {value.invoiceDueDate && validateInvoiceDueDate(value.invoiceDueDate) && (
+                <Text style={styles.warningText}>{validateInvoiceDueDate(value.invoiceDueDate)}</Text>
+              )}
             </View>
           </View>
         </View>
@@ -1024,9 +1056,9 @@ export const InvoiceForm: React.FC<Props> = ({
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.button, styles.submitButton, (loading || !isFormValid) && styles.submitButtonDisabled]}
+          style={[styles.button, styles.submitButton, (loading || !isFormValid || submitButtonAppearsDisabled) && styles.submitButtonDisabled]}
           onPress={onSubmit}
-          disabled={loading || !isFormValid}>
+          disabled={loading || submitButtonAppearsDisabled}>
           {loading ? (
             <Text style={styles.submitButtonText}>Submitting...</Text>
           ) : (
@@ -1074,6 +1106,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   halfWidth: {
+    flex: 1,
+    minWidth: 0,
+  },
+  dealerNameWidth: {
+    flex: 2,
+    minWidth: 0,
+  },
+  dealerCodeWidth: {
     flex: 1,
     minWidth: 0,
   },

@@ -47,8 +47,10 @@ export function mapUserScopeToBanks(data: UserScopeApiItem[]): Bank[] {
 }
 
 export const userScopeApi = {
-  getUserScope: async (): Promise<UserScopeApiResponse> => {
-    const response = await axiosInstance.get(ApiEndPoints.apiUserScope, {
+  getUserScope: async (isClient: boolean = true): Promise<UserScopeApiResponse> => {
+    const params = new URLSearchParams({isClient: String(isClient)});
+    const url = `${ApiEndPoints.apiUserScope}?${params.toString()}`;
+    const response = await axiosInstance.get(url, {
       authRequired: true,
     } as any);
     return response.data;

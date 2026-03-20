@@ -6,6 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Linking,
+  Alert,
+        Platform,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
@@ -15,47 +18,56 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Download, LeftChevron} from '@assets/Icons';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
-import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {invoiceApi} from '@services/api/invoice.api';
 import {formatDateDash} from '@screens/Invoice/InvoiceDetails/types';
+import {decryptValue} from '@utils/decrypt';
+import {FILE_DOWNLOAD_URL} from '@config/config';
+
+const fmtAmount = (n: number) =>
+  n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const fmtPercent = (n: number) => Number(n).toFixed(2);
+
+type AttachmentItem = {id: number; attachment_url: string; fullUrl: string};
 
 type InvoiceDetailData = {
   dealerName: string;
   dealerCode: string;
-  creditAccountNumber: string;
+  odAccountNumber: string;
   anchorName: string;
   remark: string;
   poRefNo: string;
   invoiceDate: string;
   invoiceDueDate: string;
+  earlyPaymentDiscount: number;
   items: Array<{id: string; itemName: string; quantity: number; unit: number | string; price: number; total: number}>;
   discount: {percent: number; amount: number};
   tax: {percent: number; amount: number};
   total: number;
-  attachment: {fileName: string; fileSize: string; fileCount: number} | null;
+  attachments: AttachmentItem[];
 };
 
 const defaultInvoiceData: InvoiceDetailData = {
   dealerName: '',
   dealerCode: '',
-  creditAccountNumber: '',
+  odAccountNumber: '',
   anchorName: '',
   remark: '',
   poRefNo: '',
   invoiceDate: '',
   invoiceDueDate: '',
+  earlyPaymentDiscount: 0,
   items: [],
   discount: {percent: 0, amount: 0},
   tax: {percent: 0, amount: 0},
   total: 0,
-  attachment: null,
+  attachments: [],
 };
 
 export const InvoiceDetailView: React.FC = () => {
   const navigation = useNavigation();
-  const route = useRoute();
+  const route = useRoute<any>();
   const programSelection = useSelector(selectProgramSelection);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isAnchorChecker = userRole === 'anchor_checker';
@@ -66,8 +78,8 @@ export const InvoiceDetailView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const invoiceId = (route.params as any)?.invoiceId || '';
-  const invoiceNo = (route.params as any)?.invoiceNo || '';
+  const invoiceId = route?.params?.invoiceId || '';
+  const invoiceNo = route?.params?.invoiceNo || '';
 
   useEffect(() => {
     if (!invoiceId) {
@@ -83,14 +95,17 @@ export const InvoiceDetailView: React.FC = () => {
         if (cancelled) return;
         const apm = data?.anchorParticipantMapping;
         const party = data?.party;
-        const dealerName = apm?.party?.entity_name ?? '';
+        const dealerName =
+          decryptValue(apm?.party?.entity_name ?? '') || '';
         const dealerCode = apm?.company_code_given_by_party ?? '';
-        const creditAccountNumber = apm?.od_account_no ?? '';
-        const anchorName = party?.entity_name ?? '';
+        const odAccountNumber =
+          decryptValue(apm?.od_account_no ?? '') || '';
+        const anchorName = decryptValue(party?.entity_name ?? '') || '';
         const remark = data?.remark ?? '';
         const poRefNo = data?.loan_ref_no ?? data?.invoice_ref_no ?? '';
         const invoiceDate = data?.invoice_date ? formatDateDash(data.invoice_date) : '';
         const invoiceDueDate = data?.invoice_due_date ? formatDateDash(data.invoice_due_date) : '';
+        const earlyPaymentDiscount = Number(data?.early_payment_discount) || 0;
         const subTotal = Number(data?.sub_total) || 0;
         const taxTotal = Number(data?.tax_total) || 0;
         const discountTotal = Number(data?.discount_total) || 0;
@@ -105,23 +120,32 @@ export const InvoiceDetailView: React.FC = () => {
         }));
         const discountPercent = subTotal > 0 ? (discountTotal / subTotal) * 100 : 0;
         const taxPercent = subTotal > 0 ? (taxTotal / subTotal) * 100 : 0;
-        const attachmentUrl = data?.attachment_url;
+        const baseUrl =
+          (FILE_DOWNLOAD_URL || '').trim() ||
+          'https://d2wayd1he5a7q1.cloudfront.net';
+        const rawAttachments = data?.attachment ?? (data?.attachment_url ? [{attachment_url: data.attachment_url}] : []);
+        const attachments: AttachmentItem[] = (Array.isArray(rawAttachments) ? rawAttachments : []).map(
+          (a: any, idx: number) => {
+            const url = (a?.attachment_url || '').trim();
+            const fullUrl = url ? (url.startsWith('http') ? url : `${baseUrl.replace(/\/$/, '')}/${url.replace(/^\//, '')}`) : '';
+            return {id: a?.id ?? idx, attachment_url: url, fullUrl};
+          },
+        ).filter(a => a.fullUrl);
         setInvoiceData({
           dealerName,
           dealerCode,
-          creditAccountNumber,
+          odAccountNumber,
           anchorName,
           remark,
           poRefNo,
           invoiceDate,
           invoiceDueDate,
+          earlyPaymentDiscount,
           items,
           discount: {percent: discountPercent, amount: discountTotal},
           tax: {percent: taxPercent, amount: taxTotal},
           total: finalTotal,
-          attachment: attachmentUrl
-            ? {fileName: 'attachment', fileSize: '-', fileCount: 1}
-            : null,
+          attachments,
         });
       })
       .catch((err: any) => {
@@ -142,17 +166,18 @@ export const InvoiceDetailView: React.FC = () => {
     setShowUploadModal(true);
   };
 
-  const handleAttachmentUpload = (file?: DocumentPickerResponse) => {
-    if (file) {
-      // TODO: Upload file to API
-      console.log('Upload attachment for invoice:', invoiceId, file.name);
-    }
+  const handleAttachmentUpload = (_file?: DocumentPickerResponse) => {
     setShowUploadModal(false);
   };
 
-  const handleExport = () => {
-    // TODO: Export invoice functionality
-    console.log('Export invoice:', invoiceId);
+  const handleExport = () => {};
+
+  const openAttachment = async (fullUrl: string, label: string) => {
+    try {
+      await Linking.openURL(fullUrl);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to open attachment');
+    }
   };
 
   if (loading) {
@@ -197,12 +222,7 @@ export const InvoiceDetailView: React.FC = () => {
             ) : undefined
           }
           onPressLeftIcon={
-            isCheckerRole
-              ? () =>
-                  (navigation as any).navigate('InvoiceDetails', {
-                    programId: programSelection?.programId,
-                  })
-              : undefined
+            isCheckerRole ? () => (navigation as any).goBack() : undefined
           }
         />
         <View style={styles.loadingContainer}>
@@ -233,13 +253,16 @@ export const InvoiceDetailView: React.FC = () => {
         }
       />
 
-      {/* Header with Invoice Number and Action Buttons */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           {!isCheckerRole && (
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => navigation.goBack()}>
+              onPress={() =>
+                (navigation as any).navigate('InvoiceDetails', {
+                  programId: programSelection?.programId,
+                })
+              }>
               <LeftChevron height={scaleWidth(16)} width={scaleHeight(16)} />
             </TouchableOpacity>
           )}
@@ -293,9 +316,9 @@ export const InvoiceDetailView: React.FC = () => {
                 <Text style={styles.detailValue}>{invoiceData.dealerCode || '-'}</Text>
               </View>
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Credit Account Number:</Text>
+                <Text style={styles.detailLabel}>OD Account Number:</Text>
                 <Text style={styles.detailValue}>
-                  {invoiceData.creditAccountNumber || '-'}
+                  {invoiceData.odAccountNumber || '-'}
                 </Text>
               </View>
               <View style={styles.detailItem}>
@@ -329,6 +352,12 @@ export const InvoiceDetailView: React.FC = () => {
                   {invoiceData.invoiceDueDate || '-'}
                 </Text>
               </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Early Payment Discount (%):</Text>
+                <Text style={styles.detailValue}>
+                  {fmtPercent(invoiceData.earlyPaymentDiscount)}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
@@ -357,13 +386,13 @@ export const InvoiceDetailView: React.FC = () => {
                 <View style={styles.itemDetailRow}>
                   <Text style={styles.itemDetailLabel}>Price:</Text>
                   <Text style={styles.itemDetailValue}>
-                    {item.price.toLocaleString('en-IN')}
+                    {fmtAmount(item.price)}
                   </Text>
                 </View>
                 <View style={styles.itemDetailRow}>
                   <Text style={styles.itemDetailLabel}>Total:</Text>
                   <Text style={[styles.itemDetailValue, styles.itemTotalValue]}>
-                    {item.total.toLocaleString('en-IN')}/-
+                    {fmtAmount(item.total)}/-
                   </Text>
                 </View>
               </View>
@@ -376,13 +405,13 @@ export const InvoiceDetailView: React.FC = () => {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Discount:</Text>
             <Text style={styles.summaryValue}>
-              {invoiceData.discount.percent}% ({invoiceData.discount.amount.toLocaleString('en-IN')}/-)
+              {fmtPercent(invoiceData.discount.percent)}% ({fmtAmount(invoiceData.discount.amount)}/-)
             </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Tax Value:</Text>
             <Text style={styles.summaryValue}>
-              {invoiceData.tax.percent}% ({invoiceData.tax.amount.toLocaleString('en-IN')}/-)
+              {fmtPercent(invoiceData.tax.percent)}% ({fmtAmount(invoiceData.tax.amount)}/-)
             </Text>
           </View>
         </View>
@@ -392,35 +421,46 @@ export const InvoiceDetailView: React.FC = () => {
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>
-              {invoiceData.total.toLocaleString('en-IN')}/-
+              {fmtAmount(invoiceData.total)}/-
             </Text>
           </View>
         </View>
 
-        {/* Attachment Preview */}
-        {invoiceData.attachment && (
+        {/* Attachments */}
+        {invoiceData.attachments.length > 0 && (
           <View style={styles.attachmentSection}>
-            <View style={styles.attachmentPreview}>
-              <View style={styles.attachmentIcon}>
-                <Text style={styles.attachmentIconText}>JPG</Text>
-              </View>
-              <View style={styles.attachmentInfo}>
-                <Text style={styles.attachmentLabel}>Attachment</Text>
-                <Text style={styles.attachmentMeta}>
-                  {invoiceData.attachment.fileCount} file, {invoiceData.attachment.fileSize}
-                </Text>
-              </View>
-            </View>
+            <Text style={styles.attachmentSectionTitle}>Attachments</Text>
+            {invoiceData.attachments.map((att, idx) => {
+              const fileName = att.attachment_url?.split('/').pop() || `Attachment ${idx + 1}`;
+              const isPdf = fileName.toLowerCase().endsWith('.pdf');
+              return (
+                <TouchableOpacity
+                  key={att.id}
+                  style={styles.attachmentPreview}
+                  onPress={() => openAttachment(att.fullUrl, fileName)}
+                  activeOpacity={0.7}>
+                  <View style={[styles.attachmentIcon, isPdf && styles.attachmentIconPdf]}>
+                    <Text style={styles.attachmentIconText}>{isPdf ? 'PDF' : 'FILE'}</Text>
+                  </View>
+                  <View style={styles.attachmentInfo}>
+                    <Text style={styles.attachmentLabel} numberOfLines={1}
+                      ellipsizeMode="middle">{fileName}</Text>
+                    <Text style={styles.attachmentMeta}>
+                      Tap to {Platform.OS === 'ios' ? 'open in browser' : 'view'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
       </ScrollView>
 
-      {/* Upload Attachment Modal */}
       <UploadModal
-        visible={showUploadModal}
-        allowedFileTypes={['jpg', 'jpeg', 'png', 'pdf']}
-        onClose={handleAttachmentUpload}
-      />
+          visible={showUploadModal}
+          allowedFileTypes={['jpg', 'jpeg', 'png', 'pdf']}
+            onClose={handleAttachmentUpload}
+        />
     </Container>
   );
 };
@@ -624,12 +664,19 @@ const styles = StyleSheet.create({
   attachmentSection: {
     marginTop: scaleHeight(16),
   },
+  attachmentSectionTitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(12),
+  },
   attachmentPreview: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: scaleWidth(12),
     backgroundColor: '#F7F8FB',
     borderRadius: scaleWidth(8),
+    marginBottom: scaleHeight(10),
   },
   attachmentIcon: {
     width: scaleWidth(48),
@@ -644,6 +691,9 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(12),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
+  },
+  attachmentIconPdf: {
+    backgroundColor: '#E8F4FD',
   },
   attachmentInfo: {
     flex: 1,

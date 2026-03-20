@@ -1,22 +1,26 @@
-import {call, put, takeLatest} from 'redux-saga/effects';
+import {call, put, select, takeLatest} from 'redux-saga/effects';
 import {
   fetchUserScopeRequest,
   fetchUserScopeSuccess,
   fetchUserScopeFailure,
 } from './programSelection.slice';
+import {fetchPermissionsRequest} from '@store/permissions';
 import {
   userScopeApi,
   mapUserScopeToBanks,
 } from '@services/api/userScope.api';
+import {userSelector} from '@store/user';
 
 function* fetchUserScopeSaga() {
   try {
-    const response = yield call(userScopeApi.getUserScope);
+    const isClient = (yield select(userSelector.getIsClient)) ?? true;
+    const response = yield call(userScopeApi.getUserScope, isClient);
     const data = response?.data;
 
     if (Array.isArray(data) && data.length > 0) {
       const banks = mapUserScopeToBanks(data);
       yield put(fetchUserScopeSuccess(banks));
+      yield put(fetchPermissionsRequest());
     } else {
       yield put(
         fetchUserScopeFailure(response?.message || 'No programs available'),

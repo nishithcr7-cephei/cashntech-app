@@ -1,5 +1,5 @@
 import {Config} from '@config/index';
-import CryptoJS from 'react-native-crypto-js';
+import CryptoJS from 'crypto-js';
 
 export class DecryptionError extends Error {
   constructor(message: string, public readonly originalError?: Error) {
@@ -26,7 +26,10 @@ export function decryptUtility(
   try {
     const key = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_KEY);
     const iv = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_IV);
-    const decrypted = CryptoJS.AES.decrypt(encryptedString, key, {
+    const cipherParams = CryptoJS.lib.CipherParams.create({
+      ciphertext: CryptoJS.enc.Base64.parse(encryptedString),
+    });
+    const decrypted = CryptoJS.AES.decrypt(cipherParams, key, {
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7,
       iv: iv,
@@ -76,7 +79,10 @@ export function decryptLocation(encrypted: string): string {
   try {
     const key = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_KEY);
     const iv = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_IV);
-    const decrypted = CryptoJS.AES.decrypt(encrypted, key, {
+    const cipherParams = CryptoJS.lib.CipherParams.create({
+      ciphertext: CryptoJS.enc.Base64.parse(encrypted),
+    });
+    const decrypted = CryptoJS.AES.decrypt(cipherParams, key, {
       iv: iv,
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7,
@@ -105,18 +111,26 @@ export function decryptConditionally(value: string): string {
     return value;
   }
 
-  // Try to decrypt it
+  // Try to decrypt it (backend sends raw ciphertext in Base64, not OpenSSL format)
   try {
-    const key = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_KEY);
-    const iv = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_IV);
-    const decrypted = CryptoJS.AES.decrypt(value, key, {
-      iv: iv,
+    const keyStr = Config.RK_ENCRYPTION_KEY || '';
+    const ivStr = Config.RK_ENCRYPTION_IV || '';
+    if (!keyStr || !ivStr) return value;
+
+    const key = CryptoJS.enc.Base64.parse(keyStr);
+    const iv = CryptoJS.enc.Base64.parse(ivStr);
+    const ciphertext = CryptoJS.enc.Base64.parse(value);
+    const cipherParams =
+      typeof CryptoJS.lib?.CipherParams?.create === 'function'
+        ? CryptoJS.lib.CipherParams.create({ciphertext})
+        : {ciphertext};
+    const decrypted = CryptoJS.AES.decrypt(cipherParams, key, {
+      iv,
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7,
     });
     const decryptedText = decrypted.toString(CryptoJS.enc.Utf8);
 
-    // If decryption produces a meaningful result, return it
     if (decryptedText && decryptedText.length > 0) {
       return decryptedText;
     }

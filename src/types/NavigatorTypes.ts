@@ -64,7 +64,11 @@ export type HomeNavigatorType = {
     dealerName?: string;
     programId?: string;
   };
-  CreateInvoice: undefined;
+  CreateInvoice: {
+    previewFields?: import('./Invoice').InvoiceFields;
+    previewAttachment?: import('@react-native-documents/picker').DocumentPickerResponse;
+    previewReturnToken?: number;
+  } | undefined;
   UploadInvoiceList: undefined;
   DealerInvoiceList: undefined;
   DiscountingPayments: undefined;
@@ -97,6 +101,11 @@ export type HomeNavigatorType = {
   InvoiceDetailView: {
     invoiceId?: string;
     invoiceNo?: string;
+  };
+  InvoiceUploadPreview: {
+    previewFields?: import('./Invoice').InvoiceFields;
+    previewAttachment?: import('@react-native-documents/picker').DocumentPickerResponse;
+    previewAnchorName?: string;
   };
   DealerInvoiceDetailsScreen: {
     dealerName?: string;

@@ -11,9 +11,16 @@ export type PartyBankDetail = {
   account_number: string;
 };
 
+export type DealerInfoBasicParameters = {
+  default_payment_terms_days?: number;
+  stale_invoice_period_days?: number;
+  [key: string]: unknown;
+};
+
 export type DealerInfoResponse = {
   id: string;
   program_name: string;
+  basic_parameters?: DealerInfoBasicParameters;
   party: {
     id: string;
     party_bank_details: PartyBankDetail[];

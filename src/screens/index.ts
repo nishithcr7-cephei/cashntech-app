@@ -45,6 +45,7 @@ export * from './Invoice/ODDetailsScreen';
 export * from './Invoice/ODRepaymentsScreen';
 export * from './Invoice/AnchorsListScreen';
 export * from './Invoice/InvoiceDetailView';
+export * from './Invoice/InvoiceUploadPreview';
 export * from './Invoice/DealerInvoiceDetailsScreen';
 export * from './Invoice/DisbursementScreen';
 export * from './Invoice/InterestAccrualsScreen';

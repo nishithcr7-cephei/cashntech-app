@@ -7,16 +7,14 @@ import type {InvoiceRow} from './types';
 
 const STATUS_ORANGE = '#E86C00';
 
-/** Invoice Status: In Progress = orange, Rejected = red, Completed/Submitted/Created/Disbursed = green */
 function getInvoiceStatusStyle(invoiceStatus: string) {
   const s = (invoiceStatus || '').toLowerCase();
-  if (s.includes('in progress') || s === 'in progress') return styles.statusOrange;
+  if (s.includes('in progress')) return styles.statusOrange;
   if (s.includes('reject')) return styles.statusRed;
   if (s.includes('completed') || s.includes('submitted') || s.includes('created') || s.includes('disbursed')) return styles.statusGreen;
   return styles.infoValue;
 }
 
-/** Approval Status: Pending = orange, Rejected = red, Completed = green */
 function getApprovalStatusStyle(approvalStatus: string) {
   const s = (approvalStatus || '').toLowerCase();
   if (s.includes('pending')) return styles.statusOrange;
@@ -25,7 +23,6 @@ function getApprovalStatusStyle(approvalStatus: string) {
   return styles.infoValue;
 }
 
-/** Admin Status colors: Verify, Verified & Submitted = green, Hold = gray/brown, Reject = red */
 function getAdminStatusStyle(adminStatus: string) {
   const s = (adminStatus || '').toLowerCase();
   if (s === 'verify' || s === 'verified' || s === 'submitted') return styles.adminStatusGreen;
@@ -44,6 +41,7 @@ type Props = {
   isSelected: boolean;
   onMenuToggle: (id: string) => void;
   onToggleSelection: (id: string) => void;
+  onInvoiceNoPress?: (invoiceId: string, invoiceNo: string) => void;
   registerMenuRef: (id: string, ref: View | null) => void;
 };
 
@@ -57,17 +55,14 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   isSelected,
   onMenuToggle,
   onToggleSelection,
+  onInvoiceNoPress,
   registerMenuRef,
 }) => {
-  const approval = (row.approvalStatus || '').toLowerCase();
-  const status = (row.invoiceStatus || '').toLowerCase();
-  const isPendingInvoice =
-    approval.includes('pending') ||
-    (!approval.includes('reject') &&
-      !approval.includes('approval_complete') &&
-      (status.includes('pending') ||
-        status.includes('in_progress') ||
-        status.includes('submitted')));
+  const invoiceStatusLower = (row.invoiceStatus || '').toLowerCase();
+  const approvalStatusLower = (row.approvalStatus || '').toLowerCase();
+  const showPendingBlueDot = isAnchorChecker
+    ? approvalStatusLower.includes('pending')
+    : invoiceStatusLower.includes('in progress');
   const partyTitle = isDealerMaker || isDealerChecker
     ? row.counterParty || row.dealerName
     : row.dealerName;
@@ -75,7 +70,6 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   return (
     <View style={styles.cardWrapper}>
       <View style={styles.listCard}>
-        {/* 3-dot action menu - for Maker, Checker, and CashnTech User roles */}
         {(isAnchorMaker || isDealerMaker || isDealerChecker || isAnchorChecker || isCashnTechUser) && (
           <View
             ref={(r: View | null) => registerMenuRef(row.id, r)}
@@ -109,7 +103,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
                 {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
               </View>
               <View style={styles.dmCardHeaderTextWrap}>
-                {isPendingInvoice && <View style={styles.pendingDotInline} />}
+                {showPendingBlueDot && <View style={styles.pendingDotInline} />}
                 {!!partyTitle && (
                   <Text style={styles.cardTitle}>{partyTitle}</Text>
                 )}
@@ -117,7 +111,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
             </TouchableOpacity>
           ) : (
             <>
-              {isPendingInvoice && <View style={styles.pendingDotStandalone} />}
+              {showPendingBlueDot && <View style={styles.pendingDotStandalone} />}
               {!!partyTitle && (
                 <Text style={[styles.cardTitle, styles.cardTitleSpacing]}>
                   {partyTitle}
@@ -128,14 +122,18 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
         </View>
 
         <View style={styles.infoGrid}>
-          {/* Same chip order for all roles: Loan Ref No. → … → Admin Status */}
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Loan Ref No.</Text>
-            <Text style={styles.infoValue}>{row.loanRefNo}</Text>
-          </View>
+          {/* Chip order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Amount → Invoice Date → Upload Date → Due Date → Invoice Status → Approval Status → Admin Status */}
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Invoice No</Text>
-            <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+            {onInvoiceNoPress ? (
+              <TouchableOpacity
+                onPress={() => onInvoiceNoPress(row.id, row.invoiceNo || row.id)}
+                activeOpacity={0.7}>
+                <Text style={[styles.infoValue, styles.invoiceNoLink]}>{row.invoiceNo}</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+            )}
           </View>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Bank Name</Text>
@@ -150,15 +148,11 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
             <Text style={styles.infoValue}>{row.programName}</Text>
           </View>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Primary Party</Text>
-            <Text style={styles.infoValue}>{row.primaryParty}</Text>
-          </View>
-          <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Counter Party</Text>
             <Text style={styles.infoValue}>{row.counterParty}</Text>
           </View>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+            <Text style={styles.infoLabel}>Invoice Amount</Text>
             <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
           </View>
           <View style={styles.infoColumn}>
@@ -166,7 +160,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
             <Text style={styles.infoValue}>{row.invoiceDate}</Text>
           </View>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Request Date</Text>
+            <Text style={styles.infoLabel}>Upload Date</Text>
             <Text style={styles.infoValue}>{row.requestDate}</Text>
           </View>
           <View style={styles.infoColumn}>
@@ -211,12 +205,6 @@ const styles = StyleSheet.create({
     marginBottom: scaleHeight(12),
     paddingRight: scaleWidth(50),
   },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scaleWidth(6),
-    marginBottom: scaleHeight(2),
-  },
   pendingDotInline: {
     width: scaleWidth(8),
     height: scaleWidth(8),
@@ -233,12 +221,6 @@ const styles = StyleSheet.create({
   },
   cardTitleSpacing: {
     marginBottom: scaleHeight(4),
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: scaleHeight(8),
   },
   dmCardHeaderRow: {
     flexDirection: 'row',
@@ -315,6 +297,10 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     color: Colors.darkblack,
     fontFamily: Fonts.GilroyMedium,
+  },
+  invoiceNoLink: {
+    color: Colors.tertiaryColor,
+    textDecorationLine: 'underline',
   },
   threeDotsButton: {
     position: 'absolute',

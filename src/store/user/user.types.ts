@@ -14,4 +14,6 @@ export interface UserState {
   appRole?: AppRole | null;
   scope?: { program_ids?: string[] };
   final_user_permission?: unknown;
+  /** From OTP verify - used for /user/permissions groupId */
+  permission_group?: Array<{ id?: number; department?: string; business_role?: string; functional_role?: string }>;
 }

@@ -97,6 +97,18 @@ export const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
   },
+  selectedProgramRow: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(8),
+    backgroundColor: Colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E6E6E6',
+  },
+  selectedProgramText: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
   content: {
     paddingHorizontal: scaleWidth(16),
     paddingBottom: scaleHeight(24),
@@ -145,6 +157,18 @@ export const styles = StyleSheet.create({
   loadingText: {
     marginTop: scaleHeight(12),
     fontSize: scaleFont(14),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  loadMoreFooter: {
+    paddingVertical: scaleHeight(16),
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: scaleWidth(8),
+  },
+  loadMoreText: {
+    fontSize: scaleFont(13),
     color: Colors.graybase,
     fontFamily: Fonts.GilroyMedium,
   },

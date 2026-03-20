@@ -1,10 +1,10 @@
 import type {InvoiceListItemApi} from '@store/invoice/inv.types';
 import type {InvoiceApprovalLogApi} from '@services/api/invoice.api';
 import type {CheckerApprovalEntry} from '@components/CheckerApprovalModal/CheckerApprovalModal';
+import {decryptValue} from '@utils/decrypt';
 
 export const NA_AD = 'N/A/AD';
 
-/** Map API approval log to modal entry format */
 export function mapApprovalLogToEntry(
   log: InvoiceApprovalLogApi | Record<string, any>,
 ): CheckerApprovalEntry {
@@ -55,7 +55,6 @@ export function formatDate(isoDate: string): string {
   }
 }
 
-/** dd-mm-yyyy for table/card display to match design */
 export function formatDateDash(isoDate: string): string {
   if (!isoDate) return 'dd-mm-yyyy';
   try {
@@ -79,17 +78,16 @@ export function formatStatus(str: string): string {
 
 export type InvoiceRow = {
   id: string;
-  dealerName: string;       // Primary Party (Anchors) / counter party display
+  dealerName: string;
   dealerCode: string;
   invoiceNo: string;
-  invoiceAmount: string;   // e.g. "25,000.00/-"
+  invoiceAmount: string;
   invoiceDate: string;
   requestDate: string;
   dueDate: string;
   invoiceStatus: string;
   approvalStatus: string;
   adminStatus: string;
-  /** Web-aligned columns */
   loanRefNo: string;
   bankName: string;
   productName: string;
@@ -100,9 +98,11 @@ export type InvoiceRow = {
 
 export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
   const counterParty =
-    item.counter_party_name ??
-    item.anchorParticipantMapping?.party?.entity_name ??
-    '-';
+    decryptValue(
+      item.counter_party_name ??
+        item.anchorParticipantMapping?.party?.entity_name ??
+        '',
+    ) || '-';
   return {
     id: item.id,
     dealerName: counterParty,
@@ -116,9 +116,9 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
     invoiceDate: formatDateDash(item.invoice_date),
     requestDate: formatDateDash(item.request_date ?? item.created_at ?? ''),
     dueDate: formatDateDash(item.invoice_due_date),
-    invoiceStatus: formatStatus(item.invoice_status),
-    approvalStatus: formatStatus(item.approval_status),
-    adminStatus: item.admin_status ? formatStatus(item.admin_status) : 'Verify',
+    invoiceStatus: item.invoice_status ? formatStatus(item.invoice_status) : '',
+    approvalStatus: item.approval_status ? formatStatus(item.approval_status) : '',
+    adminStatus: item.admin_status ? formatStatus(item.admin_status) : '',
     loanRefNo: item.loan_ref_no ?? '-',
     bankName:
       item.bank_name ??
@@ -129,12 +129,14 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
       item.program?.productConfig?.product?.name ??
       '-',
     programName: item.program_name ?? item.program?.program_name ?? '-',
-    primaryParty: item.primary_party_name ?? item.party?.entity_name ?? '-',
+    primaryParty:
+      decryptValue(
+        item.primary_party_name ?? item.party?.entity_name ?? '',
+      ) || '-',
     counterParty,
   };
 }
 
-/** Filter view for Invoice List & Approvals – matches web: Bank, Product, Program, Primary Party, Counter Party */
 export const invoiceFilterData = {
   'Bank': ['UGRO', 'HDFC Bank', 'ICICI Bank', 'Axis Bank', 'SBI'],
   'Product': ['Dealer Finance', 'Vendor Finance', 'PID', 'SID', 'OD'],

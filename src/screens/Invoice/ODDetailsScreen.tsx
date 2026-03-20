@@ -143,33 +143,27 @@ export const ODDetailsScreen: React.FC = () => {
 
     switch (action) {
       case 'checkerApproval':
-        // Show checker approval modal
         setSelectedOdId(odId);
         setShowCheckerApprovalModal(true);
         break;
       case 'attachment':
-        // Show attachment upload modal
         setSelectedOdId(odId);
         setShowAttachmentModal(true);
         break;
       case 'print':
-        // Print functionality
-        console.log('Print OD details:', odId);
+        void odId;
         break;
       case 'approveReject':
-        // Show approve/reject modal
         setSelectedOdId(odId);
-        setSelectedOdNo(odId); // Using odId as invoiceNo for now
+        setSelectedOdNo(odId);
         setShowApproveRejectModal(true);
         break;
     }
   };
 
   const handleAttachmentUpload = (file?: DocumentPickerResponse) => {
-    if (file && selectedOdId) {
-      // TODO: Upload file to API
-      console.log('Upload attachment for OD:', selectedOdId, file.name);
-    }
+    void file;
+    void selectedOdId;
     setShowAttachmentModal(false);
     setSelectedOdId(null);
   };
@@ -462,9 +456,7 @@ export const ODDetailsScreen: React.FC = () => {
           setSelectedOdNo(null);
         }}
         onApprove={(odId, remarks) => {
-          // TODO: Call approve API
-          console.log('Approve OD:', odId, remarks);
-          // After API success, navigate to invoice detail view
+          void remarks;
           setShowApproveRejectModal(false);
           const invoiceNo = selectedOdNo || odId;
           (navigation as any).navigate('InvoiceDetailView', {
@@ -475,8 +467,7 @@ export const ODDetailsScreen: React.FC = () => {
           setSelectedOdNo(null);
         }}
         onReject={(odId, remarks) => {
-          // TODO: Call reject API
-          console.log('Reject OD:', odId, remarks);
+          void remarks;
           setSelectedOdId(null);
           setSelectedOdNo(null);
         }}

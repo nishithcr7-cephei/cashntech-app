@@ -142,11 +142,16 @@ const Endpoints = {
   apiBankProductList: '/master-data-management/bank-product/list',
   apiCreateInvoice: '/invoice',
   apiInvoiceList: '/invoice/list',
+  apiInvoiceKpis: '/invoice/kpis',
   apiInvoiceSummary: '/invoice/summary',
   apiInvoiceLatest: '/invoice/latest',
   apiUpdateInvoiceStatus: (invoiceId: string) => `/invoice/${invoiceId}`,
   apiUpdateInvoiceVerification: (invoiceId: string) => `/invoice/admin/${invoiceId}`,
   apiGetInvoiceDetails: (invoiceId: string) => `/invoice/details/${invoiceId}`,
+  /** POST multipart: add attachment to invoice (body: file field, same as create invoice) */
+  apiUploadInvoiceAttachment: (invoiceId: string) => `/invoice/attachment/${invoiceId}`,
+  /** DELETE attachment row by attachment id (numeric id from details `attachment[].id`) */
+  apiDeleteInvoiceAttachment: (attachmentId: number | string) => `/invoice/${attachmentId}`,
   apiGetInvoiceApprovalLogs: (invoiceId: string) => `/invoice/logs/${invoiceId}`,
   apiVerifiedList: '/invoice/verified/list',
   apiDisbursedList: '/invoice/disbursed/list',
@@ -157,6 +162,8 @@ const Endpoints = {
 
   // User Scope (Program Selection)
   apiUserScope: '/user/scope',
+  // User Permissions (feature/action access)
+  apiUserPermissions: '/user/permissions',
 } as const;
 
 export default Endpoints;

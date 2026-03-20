@@ -20,6 +20,7 @@ export * from './CheckerApprovalModal/CheckerApprovalModal';
 export * from './ApproveRejectModal/ApproveRejectModal';
 export * from './AddFundModal/AddFundModal';
 export * from './FilterModal/FilterModal';
+export * from './InvoiceAttachmentsModal/InvoiceAttachmentsModal';
 
 // Filter components
 export * from './ThreeDotsDropdown/ThreeDotsDropdown';

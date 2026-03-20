@@ -3,6 +3,9 @@ import StorageKeys from '@constants/StorageKeys';
 import {storage} from '@services/localStorage';
 import {store} from '@store/app/store';
 import {authActions} from '@store/auth';
+import {userActions} from '@store/user';
+import {clearProgramSelection} from '@store/programSelection/programSelection.slice';
+import {clearPermissions} from '@store/permissions';
 import {decodeJWT, isTokenExpired} from '@utils/Utils';
 import axios, {
   AxiosError,
@@ -16,8 +19,7 @@ const GENERAL_TIMEOUT = 10000;
 console.log('🌐 [api.ts] Creating axios instance...');
 console.log('🌐 [api.ts] Config.API_URL:', Config.API_URL);
 
-// Temporary hardcode for testing - replace with .env later
-const BASE_URL = Config.API_URL || 'http://192.168.31.225:3000';
+const BASE_URL = Config.API_URL || 'https://losapidev.cashntech.com';
 console.log('🌐 [api.ts] Using BASE_URL:', BASE_URL);
 
 const axiosInstance = axios.create({
@@ -194,6 +196,9 @@ export const logoutUser = () => {
   cancelAllRequests();
   storage.clearAll();
   store.dispatch(authActions.resetAuthState());
+  store.dispatch(userActions.clearUserInfo());
+  store.dispatch(clearProgramSelection());
+  store.dispatch(clearPermissions());
 };
 
 export default axiosInstance;

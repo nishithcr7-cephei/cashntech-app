@@ -31,6 +31,15 @@ export type InvoiceOverviewState = {
   latest: InvoiceOverviewLatestItem[];
   latestLoading: boolean;
   latestError: string | null;
+  kpis?: {
+    total_program_limit: string;
+    utilized_amount: string;
+    utilized_rate: string;
+    active_dealer_ratio: string;
+    available_limit: string;
+    overdue_amount: string;
+    dpd_days: string;
+  } | null;
 };
 
 export const initialInvoiceOverviewState: InvoiceOverviewState = {
@@ -40,5 +49,6 @@ export const initialInvoiceOverviewState: InvoiceOverviewState = {
   latest: [],
   latestLoading: false,
   latestError: null,
+  kpis: null,
 };
 

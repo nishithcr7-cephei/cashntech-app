@@ -153,8 +153,8 @@ export const FinancingRequestScreen: React.FC = () => {
   const handleMenuAction = (action: string, requestId: string) => {
     setOpenMenuId(null);
     setMenuAnchor(null);
-    console.log('Action:', action, 'Request ID:', requestId);
-    // TODO: Implement actions
+    void action;
+    void requestId;
   };
 
   const getMenuPosition = (anchor: {x: number; y: number; width: number; height: number} | null) => {

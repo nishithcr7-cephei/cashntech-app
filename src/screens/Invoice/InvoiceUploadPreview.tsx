@@ -1,0 +1,542 @@
+import React, {useMemo} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+} from 'react-native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {useSelector} from 'react-redux';
+import {selectDealerInfo} from '@store/invoice/inv.selector';
+import {AppBar, Container} from '@components/index';
+import {Colors, Fonts} from '@constants/index';
+import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
+import {DocumentPickerResponse} from '@react-native-documents/picker';
+import {decryptValue} from '@utils/decrypt';
+import type {InvoiceFields} from '../../types/Invoice';
+
+const fmtAmount = (n: number) =>
+  n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const fmtPercent = (n: number) => Number(n).toFixed(2);
+
+type AttachmentItem = {id: number; attachment_url: string; fullUrl: string};
+
+type InvoiceDetailData = {
+  dealerName: string;
+  dealerCode: string;
+  odAccountNumber: string;
+  anchorName: string;
+  remark: string;
+  poRefNo: string;
+  invoiceDate: string;
+  invoiceDueDate: string;
+  items: Array<{id: string; itemName: string; quantity: number; unit: number | string; price: number; total: number}>;
+  discount: {percent: number; amount: number};
+  tax: {percent: number; amount: number};
+  total: number;
+  attachments: AttachmentItem[];
+};
+
+const mapPreviewFieldsToInvoiceData = (
+  fields: InvoiceFields,
+  attachment?: DocumentPickerResponse,
+  anchorName?: string,
+): InvoiceDetailData => {
+  const normalizedItems = (fields.items || []).map((it: any, index) => {
+    const lineTotal = Number(it.total) || 0;
+    const discountType = it.discountType || '';
+    const discountValue = Number(it.discountValue) || 0;
+    let discountAmount = Number(it.discountAmount) || 0;
+    if (!discountAmount && discountType === 'percentage') {
+      discountAmount = (lineTotal * discountValue) / 100;
+    } else if (!discountAmount && discountType === 'value') {
+      discountAmount = discountValue;
+    }
+    const taxes = Array.isArray(it.taxes) ? it.taxes : [];
+    const taxFromTaxes = taxes.reduce(
+      (sum: number, t: any) => sum + (Number(t?.taxAmount) || 0),
+      0,
+    );
+    const taxAmount = taxFromTaxes || Number(it.taxAmount) || 0;
+    const netTotal = Math.max(0, lineTotal - discountAmount + taxAmount);
+    return {
+      id: `preview-item-${index}`,
+      itemName: it.itemName || '-',
+      quantity: Number(it.quantity) || 0,
+      unit: it.unit || '-',
+      price: Number(it.pricePerQuantity) || 0,
+      total: netTotal,
+      lineTotal,
+      discountAmount,
+      taxAmount,
+    };
+  });
+
+  const subTotalBeforeDiscountTax = normalizedItems.reduce(
+    (sum, it: any) => sum + (Number(it.lineTotal) || 0),
+    0,
+  );
+  const itemDiscountTotal = normalizedItems.reduce(
+    (sum, it: any) => sum + (Number(it.discountAmount) || 0),
+    0,
+  );
+  const itemTaxTotal = normalizedItems.reduce(
+    (sum, it: any) => sum + (Number(it.taxAmount) || 0),
+    0,
+  );
+
+  const formDiscountValue = Number(fields.discountValue) || 0;
+  const discountAmount =
+    itemDiscountTotal ||
+    (fields.discountType === 'percentage'
+      ? (subTotalBeforeDiscountTax * formDiscountValue) / 100
+      : formDiscountValue);
+
+  const formTaxTotal = (Number(fields.cgst) || 0) + (Number(fields.sgst) || 0);
+  const taxAmount = itemTaxTotal || formTaxTotal;
+
+  const sumOfItemTotals = normalizedItems.reduce(
+    (sum, it) => sum + (Number(it.total) || 0),
+    0,
+  );
+  const total = Number(fields.grandTotal) || sumOfItemTotals;
+
+  const discountPercent =
+    subTotalBeforeDiscountTax > 0
+      ? (discountAmount / subTotalBeforeDiscountTax) * 100
+      : 0;
+  const taxPercent =
+    subTotalBeforeDiscountTax > 0
+      ? (taxAmount / subTotalBeforeDiscountTax) * 100
+      : 0;
+
+  return {
+    dealerName: decryptValue(fields.dealer ?? '') || fields.dealer || '',
+    dealerCode: fields.dealerCode || '',
+    odAccountNumber:
+      decryptValue(fields.odAccountNumber ?? '') || fields.odAccountNumber || '',
+    anchorName: anchorName || '',
+    remark: fields.remark || '',
+    poRefNo: fields.associatedPO || '',
+    invoiceDate: fields.invoiceDate || '',
+    invoiceDueDate: fields.invoiceDueDate || '',
+    items: normalizedItems,
+    discount: {percent: discountPercent, amount: discountAmount},
+    tax: {percent: taxPercent, amount: taxAmount},
+    total,
+    attachments: attachment?.uri
+      ? [
+          {
+            id: 0,
+            attachment_url: attachment.name || 'Uploaded invoice',
+            fullUrl: attachment.uri,
+          },
+        ]
+      : [],
+  };
+};
+
+export const InvoiceUploadPreview: React.FC = () => {
+  const navigation = useNavigation();
+  const route = useRoute<any>();
+  const dealerInfo = useSelector(selectDealerInfo);
+
+  const previewFields = route?.params?.previewFields as InvoiceFields | undefined;
+  const previewAttachment = route?.params?.previewAttachment as
+    | DocumentPickerResponse
+    | undefined;
+  const previewAnchorName = route?.params?.previewAnchorName as string | undefined;
+
+  const invoiceData = useMemo(
+    () =>
+      mapPreviewFieldsToInvoiceData(
+        previewFields || ({} as InvoiceFields),
+        previewAttachment,
+        previewAnchorName ||
+          (dealerInfo?.party?.entity_name
+            ? decryptValue(dealerInfo.party.entity_name) || dealerInfo.party.entity_name
+            : ''),
+      ),
+    [previewFields, previewAttachment, previewAnchorName, dealerInfo],
+  );
+
+  const closePreview = () => {
+    (navigation as any).navigate('CreateInvoice', {
+      previewFields,
+      previewAttachment,
+      previewReturnToken: Date.now(),
+    });
+  };
+
+  return (
+    <Container>
+      <AppBar
+        title="Invoice Preview"
+        navigation={navigation as any}
+        hideHamburger
+      />
+
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <View style={styles.invoiceTitleContainer}>
+            <Text style={styles.invoiceTitle}>
+              Invoice / Unique Ref. No - {previewFields?.invoiceNumber || 'N/A'}
+            </Text>
+            <View style={styles.titleUnderline} />
+          </View>
+          <TouchableOpacity style={styles.actionButton} onPress={closePreview}>
+            <FontAwesome6
+              name="xmark"
+              iconStyle="solid"
+              color={Colors.darkblack}
+              size={scaleWidth(18)}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}>
+        <View style={styles.detailsSection}>
+          <View style={styles.detailsGrid}>
+            <View style={styles.detailColumn}>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Dealer Name:</Text>
+                <Text style={styles.detailValue}>{invoiceData.dealerName || '-'}</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Dealer Code:</Text>
+                <Text style={styles.detailValue}>{invoiceData.dealerCode || '-'}</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>OD Account Number:</Text>
+                <Text style={styles.detailValue}>
+                  {invoiceData.odAccountNumber || '-'}
+                </Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Anchor Name:</Text>
+                <Text style={styles.detailValue}>{invoiceData.anchorName || '-'}</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Remark:</Text>
+                <Text style={styles.detailValue}>{invoiceData.remark || '-'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.detailColumn}>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>PO Ref. No.:</Text>
+                <Text
+                  style={[styles.detailValue, styles.detailValueSmall]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.65}>
+                  {invoiceData.poRefNo || '-'}
+                </Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Invoice Date:</Text>
+                <Text style={styles.detailValue}>{invoiceData.invoiceDate || '-'}</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Invoice Due Date:</Text>
+                <Text style={styles.detailValue}>
+                  {invoiceData.invoiceDueDate || '-'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.descriptionSection}>
+          <Text style={styles.sectionTitle}>Description</Text>
+          {invoiceData.items.map((item, index) => (
+            <View key={item.id} style={styles.itemCard}>
+              <View style={styles.itemHeader}>
+                <Text style={styles.itemHeaderText}>Item {index + 1}</Text>
+              </View>
+              <View style={styles.itemDetails}>
+                <View style={styles.itemDetailRow}>
+                  <Text style={styles.itemDetailLabel}>Item Name:</Text>
+                  <Text style={styles.itemDetailValue}>{item.itemName}</Text>
+                </View>
+                <View style={styles.itemDetailRow}>
+                  <Text style={styles.itemDetailLabel}>Quantity:</Text>
+                  <Text style={styles.itemDetailValue}>{item.quantity}</Text>
+                </View>
+                <View style={styles.itemDetailRow}>
+                  <Text style={styles.itemDetailLabel}>Unit:</Text>
+                  <Text style={styles.itemDetailValue}>{item.unit}</Text>
+                </View>
+                <View style={styles.itemDetailRow}>
+                  <Text style={styles.itemDetailLabel}>Price:</Text>
+                  <Text style={styles.itemDetailValue}>{fmtAmount(item.price)}</Text>
+                </View>
+                <View style={styles.itemDetailRow}>
+                  <Text style={styles.itemDetailLabel}>Total:</Text>
+                  <Text style={[styles.itemDetailValue, styles.itemTotalValue]}>
+                    {fmtAmount(item.total)}/-
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.summarySection}>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Discount:</Text>
+            <Text style={styles.summaryValue}>
+              {fmtPercent(invoiceData.discount.percent)}% ({fmtAmount(invoiceData.discount.amount)}/-)
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Tax Value:</Text>
+            <Text style={styles.summaryValue}>
+              {fmtPercent(invoiceData.tax.percent)}% ({fmtAmount(invoiceData.tax.amount)}/-)
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.totalSection}>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalValue}>
+              {fmtAmount(invoiceData.total)}/-
+            </Text>
+          </View>
+        </View>
+
+        {invoiceData.attachments.length > 0 && (
+          <View style={styles.attachmentSection}>
+            <Text style={styles.attachmentSectionTitle}>Attachments</Text>
+            {invoiceData.attachments.map((att) => {
+              const fileName = att.attachment_url?.split('/').pop() || 'Attachment';
+              const isPdf = fileName.toLowerCase().endsWith('.pdf');
+              const isImage = /\.(png|jpe?g|webp|gif)$/i.test(fileName);
+
+              return (
+                <View key={att.id} style={styles.attachmentPreviewStatic}>
+                  {isImage ? (
+                    <Image
+                      source={{uri: att.fullUrl}}
+                      style={styles.previewAttachmentImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={[styles.attachmentIcon, isPdf && styles.attachmentIconPdf]}>
+                      <Text style={styles.attachmentIconText}>{isPdf ? 'PDF' : 'FILE'}</Text>
+                    </View>
+                  )}
+                  <View style={styles.attachmentInfo}>
+                    <Text style={styles.attachmentLabel} numberOfLines={1} ellipsizeMode="middle">
+                      {fileName}
+                    </Text>
+                    <Text style={styles.attachmentMeta}>Preview attachment</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
+    </Container>
+  );
+};
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'column',
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E6E6E6',
+    marginTop: scaleHeight(4),
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: scaleHeight(12),
+  },
+  actionButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: scaleWidth(28),
+    height: scaleWidth(28),
+    marginLeft: scaleWidth(10),
+  },
+  invoiceTitleContainer: {flex: 1},
+  invoiceTitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(4),
+  },
+  titleUnderline: {
+    height: 1,
+    backgroundColor: '#E6E6E6',
+    width: '100%',
+  },
+  content: {padding: scaleWidth(16)},
+  detailsSection: {marginBottom: scaleHeight(24)},
+  detailsGrid: {flexDirection: 'row', gap: scaleWidth(16)},
+  detailColumn: {flex: 1},
+  detailItem: {
+    marginBottom: scaleHeight(16),
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  detailLabel: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(4),
+  },
+  detailValue: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyRegular,
+    color: Colors.darkblack,
+  },
+  detailValueSmall: {fontSize: scaleFont(11)},
+  descriptionSection: {marginBottom: scaleHeight(24)},
+  sectionTitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(12),
+  },
+  itemCard: {
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    borderRadius: scaleWidth(8),
+    marginBottom: scaleHeight(12),
+    overflow: 'hidden',
+    backgroundColor: Colors.white,
+  },
+  itemHeader: {
+    backgroundColor: '#4A4A4A',
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: scaleWidth(12),
+  },
+  itemHeaderText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.white,
+  },
+  itemDetails: {padding: scaleWidth(12)},
+  itemDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: scaleHeight(8),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#F0F0F0',
+  },
+  itemDetailLabel: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+    flex: 1,
+  },
+  itemDetailValue: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyRegular,
+    color: Colors.darkblack,
+    flex: 1,
+    textAlign: 'right',
+  },
+  itemTotalValue: {
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  summarySection: {marginBottom: scaleHeight(16)},
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: scaleHeight(8),
+  },
+  summaryLabel: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+  },
+  summaryValue: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+  },
+  totalSection: {marginBottom: scaleHeight(24)},
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#4A4A4A',
+    paddingVertical: scaleHeight(12),
+    paddingHorizontal: scaleWidth(12),
+    borderRadius: scaleWidth(8),
+  },
+  totalLabel: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.white,
+  },
+  totalValue: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.white,
+  },
+  attachmentSection: {marginTop: scaleHeight(16)},
+  attachmentSectionTitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(12),
+  },
+  attachmentPreviewStatic: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: scaleWidth(12),
+    backgroundColor: '#F7F8FB',
+    borderRadius: scaleWidth(8),
+    marginBottom: scaleHeight(10),
+    minHeight: scaleHeight(84),
+  },
+  previewAttachmentImage: {
+    width: scaleWidth(62),
+    height: scaleWidth(62),
+    borderRadius: scaleWidth(8),
+    marginRight: scaleWidth(12),
+    backgroundColor: Colors.white,
+  },
+  attachmentIcon: {
+    width: scaleWidth(48),
+    height: scaleWidth(48),
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: scaleWidth(12),
+  },
+  attachmentIconText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  attachmentIconPdf: {backgroundColor: '#E8F4FD'},
+  attachmentInfo: {flex: 1},
+  attachmentLabel: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(4),
+  },
+  attachmentMeta: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyRegular,
+    color: Colors.graybase,
+  },
+});

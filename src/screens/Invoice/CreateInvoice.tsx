@@ -1,4 +1,4 @@
-import React, {useMemo, useState, useEffect} from 'react';
+import React, {useMemo, useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Modal,
+  InteractionManager,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
@@ -41,8 +42,9 @@ import {selectProgramSelection} from '@store/programSelection/programSelection.s
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import type {DealerInfoParticipant} from '@store/invoice/inv.types';
+import {decryptValue} from '@utils/decrypt';
 
-const emptyFields: InvoiceFields = {
+const getInitialFields = (): InvoiceFields => ({
   dealer: '',
   dealerCode: '',
   odAccountNumber: '',
@@ -62,11 +64,12 @@ const emptyFields: InvoiceFields = {
   cgst: '',
   sgst: '',
   grandTotal: '',
-};
+});
 
-// Convert GSTInvoiceJSON line items to InvoiceLineItem format
-const convertGSTItemsToInvoiceItems = (gstItems: GSTInvoiceJSON['line_items']): InvoiceLineItem[] => {
-  return gstItems.map(item => ({
+const convertGSTItemsToInvoiceItems = (
+  gstItems: GSTInvoiceJSON['line_items'],
+): InvoiceLineItem[] =>
+  gstItems.map(item => ({
     itemName: item.description || '',
     quantity: item.quantity.toString(),
     unit: item.unit || 'PCS',
@@ -74,18 +77,31 @@ const convertGSTItemsToInvoiceItems = (gstItems: GSTInvoiceJSON['line_items']): 
     total: item.taxable_amount.toString(),
     discountType:
       item.discount_type && item.discount_value != null && item.discount_value > 0
-        ? (item.discount_type === 'value' ? 'value' : 'percentage')
+        ? item.discount_type === 'value'
+          ? 'value'
+          : 'percentage'
         : '',
-    discountValue: item.discount_value != null && item.discount_value > 0 ? String(item.discount_value) : '',
-    discountAmount: item.discount_amount != null && item.discount_amount > 0 ? String(item.discount_amount) : '',
+    discountValue:
+      item.discount_value != null && item.discount_value > 0
+        ? String(item.discount_value)
+        : '',
+    discountAmount:
+      item.discount_amount != null && item.discount_amount > 0
+        ? String(item.discount_amount)
+        : '',
     taxType:
-      item.tax_type && ((item.tax_percentage != null && item.tax_percentage > 0) || (item.tax_amount != null && item.tax_amount > 0))
-        ? (item.tax_type || 'GST')
+      item.tax_type &&
+      ((item.tax_percentage != null && item.tax_percentage > 0) ||
+        (item.tax_amount != null && item.tax_amount > 0))
+        ? item.tax_type || 'GST'
         : '',
-    taxPercentage: item.tax_percentage != null && item.tax_percentage > 0 ? String(item.tax_percentage) : '',
-    taxAmount: item.tax_amount != null && item.tax_amount > 0 ? String(item.tax_amount) : '',
+    taxPercentage:
+      item.tax_percentage != null && item.tax_percentage > 0
+        ? String(item.tax_percentage)
+        : '',
+    taxAmount:
+      item.tax_amount != null && item.tax_amount > 0 ? String(item.tax_amount) : '',
   }));
-};
 
 interface ValidationErrors {
   invoiceNumber?: string;
@@ -111,24 +127,26 @@ export const CreateInvoice: React.FC = () => {
   const isAnchorMaker = userRole === 'anchor_maker';
   const isDealerMaker = userRole === 'dealer_maker';
 
-  const [fields, setFields] = useState<InvoiceFields>(emptyFields);
-  const [loading, setLoading] = useState(false);
+  const [fields, setFields] = useState<InvoiceFields>(() => getInitialFields());
+  const [ocrLoading, setOcrLoading] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
-  const [isUploadModalVisible, setIsUploadModalVisible] = useState(false);
+  const [isOcrUploadModalVisible, setIsOcrUploadModalVisible] = useState(false);
+  const [isProofUploadModalVisible, setIsProofUploadModalVisible] = useState(false);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [selectedParticipant, setSelectedParticipant] = useState<DealerInfoParticipant | null>(null);
   const [selectedAttachment, setSelectedAttachment] = useState<DocumentPickerResponse | null>(null);
-  const disabled = useMemo(() => loading || createInvoiceLoading, [loading, createInvoiceLoading]);
+  const disabled = useMemo(
+    () => createInvoiceLoading || ocrLoading,
+    [createInvoiceLoading, ocrLoading],
+  );
   const [productType, setProductType] = useState<'dealer_finance' | 'vendor_finance'>('dealer_finance');
   const invoiceNo: string | undefined = route?.params?.invoiceNo;
   const mode: 'edit' | 'recreate' | undefined = route?.params?.mode;
-  const baseTitle = productType === 'vendor_finance' ? 'Vendor Invoice' : 'Dealer Invoice';
-  const headerModeTitle =
-    mode === 'edit'
-      ? `Edit ${baseTitle}`
-      : mode === 'recreate'
-        ? `Recreate ${baseTitle}`
-        : `${baseTitle} [Create Invoice]`;
+  const previewFieldsFromRoute: InvoiceFields | undefined = route?.params?.previewFields;
+  const previewAttachmentFromRoute: DocumentPickerResponse | undefined = route?.params?.previewAttachment;
+  const previewReturnToken: number | undefined = route?.params?.previewReturnToken;
+  const headerModeTitle ="Invoice Details";
+   
   const headerRefTitle = invoiceNo
     ? `Invoice / Unique Ref. No: ${invoiceNo}`
     : undefined;
@@ -217,15 +235,33 @@ export const CreateInvoice: React.FC = () => {
       .catch(() => {});
   }, []);
 
+  // Restore form when returning from preview (Close X on preview page)
+  useEffect(() => {
+    if (!previewReturnToken) return;
+    if (previewFieldsFromRoute) setFields(previewFieldsFromRoute);
+    if (previewAttachmentFromRoute) setSelectedAttachment(previewAttachmentFromRoute);
+    if (previewFieldsFromRoute?.dealer && dealerInfo?.participants?.length) {
+      const participant = dealerInfo.participants.find(
+        p => p.party.entity_name === previewFieldsFromRoute.dealer,
+      );
+      if (participant) setSelectedParticipant(participant);
+    }
+  }, [
+    previewReturnToken,
+    previewFieldsFromRoute,
+    previewAttachmentFromRoute,
+    dealerInfo?.participants,
+  ]);
+
   // Handle create invoice success / error
   useEffect(() => {
     if (createInvoiceSuccess) {
       dispatch(resetCreateInvoiceState());
-      setFields(emptyFields);
+      setFields(getInitialFields());
       setSelectedParticipant(null);
       setSelectedAttachment(null);
       Alert.alert('Success', 'Invoice created successfully.', [
-        {text: 'OK', onPress: () => (navigation as any).navigate('InvoiceDetails')},
+        {text: 'OK', onPress: () => (navigation as any).navigate('InvoiceDetails', {refreshList: true})},
       ]);
     }
   }, [createInvoiceSuccess, dispatch, navigation]);
@@ -269,9 +305,6 @@ export const CreateInvoice: React.FC = () => {
         }
         return undefined;
       case 'paymentDate':
-        if (!value?.trim()) {
-          return 'Payment Date is required';
-        }
         return undefined;
       case 'creditTo':
         if (!value?.trim()) {
@@ -297,6 +330,27 @@ export const CreateInvoice: React.FC = () => {
           if (!item.pricePerQuantity?.trim() || parseFloat(item.pricePerQuantity) <= 0) {
             return `Item ${i + 1}: Valid Price is required`;
           }
+          if (!item.discountType?.trim()) {
+            return `Item ${i + 1}: Discount Type is required`;
+          }
+          if (!item.discountValue?.trim()) {
+            return `Item ${i + 1}: Discount Value is required`;
+          }
+          const hasValidTaxInArray = Array.isArray(item.taxes)
+            ? item.taxes.some(
+                (t: any) =>
+                  t?.taxType?.trim() &&
+                  t?.taxPercentage?.toString().trim() &&
+                  Number(t.taxPercentage) >= 0,
+              )
+            : false;
+          const hasLegacyTax =
+            item.taxType?.trim() &&
+            item.taxPercentage?.toString().trim() &&
+            Number(item.taxPercentage) >= 0;
+          if (!hasValidTaxInArray && !hasLegacyTax) {
+            return `Item ${i + 1}: Tax details are required`;
+          }
         }
         return undefined;
       default:
@@ -320,12 +374,10 @@ export const CreateInvoice: React.FC = () => {
     const invoiceDateError = validateField('invoiceDate', fields.invoiceDate);
     if (invoiceDateError) newErrors.invoiceDate = invoiceDateError;
     
-    const paymentDateError = validateField('paymentDate', fields.paymentDate);
-    if (paymentDateError) newErrors.paymentDate = paymentDateError;
     
     const creditToError = validateField('creditTo', fields.creditTo);
     if (creditToError) newErrors.creditTo = creditToError;
-    
+
     const itemsError = validateField('items', fields.items);
     if (itemsError) newErrors.items = itemsError;
     
@@ -340,7 +392,6 @@ export const CreateInvoice: React.FC = () => {
       fields.dealer?.trim() &&
       fields.dealerCode?.trim() &&
       fields.invoiceDate?.trim() &&
-      fields.paymentDate?.trim() &&
       fields.creditTo?.trim() &&
       fields.items &&
       fields.items.length > 0 &&
@@ -350,7 +401,19 @@ export const CreateInvoice: React.FC = () => {
         parseFloat(item.quantity) > 0 &&
         item.unit?.trim() &&
         item.pricePerQuantity?.trim() &&
-        parseFloat(item.pricePerQuantity) > 0
+        parseFloat(item.pricePerQuantity) > 0 &&
+        item.discountType?.trim() &&
+        item.discountValue?.trim() &&
+        ((Array.isArray((item as any).taxes) &&
+          (item as any).taxes.some(
+            (t: any) =>
+              t?.taxType?.trim() &&
+              t?.taxPercentage?.toString().trim() &&
+              Number(t.taxPercentage) >= 0,
+          )) ||
+          (item.taxType?.trim() &&
+            item.taxPercentage?.toString().trim() &&
+            Number(item.taxPercentage) >= 0))
       )
     );
   }, [fields]);
@@ -362,8 +425,8 @@ export const CreateInvoice: React.FC = () => {
         p => p.party.entity_name === patch.dealer,
       );
       if (participant) {
-        patch.dealerCode = participant.company_code;
-        patch.odAccountNumber = participant.od_account_no;
+        patch.dealerCode = decryptValue(participant.company_code ?? '') || participant.company_code;
+        patch.odAccountNumber = decryptValue(participant.od_account_no ?? '') || participant.od_account_no;
         setSelectedParticipant(participant);
       }
     }
@@ -381,64 +444,19 @@ export const CreateInvoice: React.FC = () => {
     });
   };
 
-  const handleImagePath = async (uriOrPath: string | null) => {
-    if (!uriOrPath) return;
-    try {
-      setLoading(true);
-      
-      // Use Gemini AI only for extraction
-      const {gstInvoice} = await runGSTInvoiceExtractionWithAI(uriOrPath);
-      
-      // Convert AI-extracted items to form format
-      let extractedItems: InvoiceLineItem[] = [];
-      
-      if (gstInvoice?.line_items && gstInvoice.line_items.length > 0) {
-        // Use AI-extracted items
-        extractedItems = convertGSTItemsToInvoiceItems(gstInvoice.line_items);
-      }
-      
-      setFields(prev => {
-        const header = gstInvoice.invoice_header;
-        const merged = {
-          ...prev,
-          // Extract invoice header fields from Gemini result
-          invoiceNumber: header.invoice_number || prev.invoiceNumber,
-          invoiceDate: header.invoice_date || prev.invoiceDate,
-          associatedPO: header.order_no || prev.associatedPO,
-          earlyPaymentDiscount: header.early_payment_discount || prev.earlyPaymentDiscount || '',
-          grnDate: header.grn_date || prev.grnDate || '',
-          // Keep dropdown fields empty (user must select manually - NOT filled by OCR)
-          dealer: prev.dealer || '',
-          dealerCode: prev.dealerCode || '',
-          odAccountNumber: prev.odAccountNumber || '',
-          // Additional fields (keep existing or empty)
-          paymentDate: prev.paymentDate || '',
-          invoiceDueDate: prev.invoiceDueDate || '',
-          creditTo: prev.creditTo || '',
-          remark: prev.remark || '',
-        };
-        // Ensure currency remains INR
-        merged.currency = 'INR';
-        
-        // Set items - number of rows will match number of items found (discount/tax from OCR if on invoice)
-        if (extractedItems.length > 0) {
-          merged.items = extractedItems;
-        }
-        
-        return merged;
+  const openUploadPreview = useCallback(
+    (previewFields: InvoiceFields, previewAttachment: DocumentPickerResponse) => {
+      (navigation as any).navigate('InvoiceUploadPreview', {
+        previewFields,
+        previewAttachment,
+        previewAnchorName:
+          decryptValue(dealerInfo?.party?.entity_name ?? '') ||
+          dealerInfo?.party?.entity_name ||
+          '',
       });
-      
-      const itemCount = extractedItems.length;
-      Alert.alert(
-        'Success', 
-        `Invoice data extracted using Gemini AI! Found ${itemCount} item${itemCount !== 1 ? 's' : ''} and filled automatically.`
-      );
-    } catch (e: any) {
-      Alert.alert('Gemini AI Error', e?.message ?? 'Failed to extract invoice data using Gemini AI. Please try again or enter manually.');
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [navigation, dealerInfo?.party?.entity_name],
+  );
 
   const openCamera = async () => {
     const ok = await ensureCameraPermission();
@@ -448,20 +466,82 @@ export const CreateInvoice: React.FC = () => {
     setShowCamera(true);
   };
 
-  const handleUploadFile = async (file: DocumentPickerResponse | undefined) => {
-    if (!file) return;
-    setSelectedAttachment(file);
-    if (file.type?.startsWith('image/')) {
-      handleImagePath(file.uri);
+  const runOcrAndPatchForm = async (uriOrPath: string | null) => {
+    if (!uriOrPath) return;
+    try {
+      setOcrLoading(true);
+      const {gstInvoice} = await runGSTInvoiceExtractionWithAI(uriOrPath);
+      const header = gstInvoice?.invoice_header;
+      const extractedItems =
+        gstInvoice?.line_items?.length > 0
+          ? convertGSTItemsToInvoiceItems(gstInvoice.line_items)
+          : [];
+
+      setFields(prev => ({
+        ...prev,
+        invoiceNumber: header?.invoice_number || prev.invoiceNumber,
+        invoiceDate: header?.invoice_date || prev.invoiceDate,
+        associatedPO: header?.order_no || prev.associatedPO,
+        earlyPaymentDiscount:
+          header?.early_payment_discount || prev.earlyPaymentDiscount || '',
+        grnDate: header?.grn_date || prev.grnDate || '',
+        items: extractedItems.length > 0 ? extractedItems : prev.items,
+      }));
+
+      Toast.show({
+        type: 'success',
+        text1: `OCR completed (${extractedItems.length} item${
+          extractedItems.length === 1 ? '' : 's'
+        } extracted)`,
+        visibilityTime: 2500,
+      });
+    } catch (e: any) {
+      Alert.alert('OCR Error', e?.message ?? 'Failed to extract invoice data.');
+    } finally {
+      setOcrLoading(false);
     }
   };
 
+  const handleOcrUploadFile = async (file: DocumentPickerResponse | undefined) => {
+    if (!file) return;
+    if (!file.type?.startsWith('image/')) {
+      Toast.show({
+        type: 'error',
+        text1: 'OCR upload supports images only',
+        visibilityTime: 2500,
+      });
+      return;
+    }
+    await runOcrAndPatchForm(file.uri);
+  };
+
+  const handleProofUploadFile = async (
+    file: DocumentPickerResponse | undefined,
+  ) => {
+    if (!file) return;
+    setSelectedAttachment(file);
+    openUploadPreview(fields, file);
+  };
+
   const handleSubmit = async () => {
+    if (!selectedAttachment) {
+      Toast.show({
+        type: 'error',
+        text1: 'Please upload invoice first',
+        visibilityTime: 3000,
+      });
+      return;
+    }
     if (!validateForm()) {
       const firstErrorKey = Object.keys(errors)[0];
-      if (firstErrorKey) {
-        Alert.alert('Validation Error', errors[firstErrorKey] || 'Please fill all required fields');
-      }
+      const msg = firstErrorKey && errors[firstErrorKey]
+        ? errors[firstErrorKey]
+        : 'Please fill all required fields';
+      Toast.show({
+        type: 'error',
+        text1: msg,
+        visibilityTime: 3000,
+      });
       return;
     }
 
@@ -469,32 +549,23 @@ export const CreateInvoice: React.FC = () => {
 
     const partnerBankId = programSelection?.bankId;
     if (dealerInfo && (!selectedParticipant || !partnerBankId)) {
-      Alert.alert(
-        'Validation Error',
-        'Please select a Program (with Bank) and Dealer first.',
-      );
+      Toast.show({
+        type: 'error',
+        text1: 'Please select a Program (with Bank) and Dealer first.',
+        visibilityTime: 3000,
+      });
       return;
     }
     if (dealerInfo && !createdBy) {
-      Alert.alert('Error', 'User session not found. Please log in again.');
+      Toast.show({
+        type: 'error',
+        text1: 'User session not found. Please log in again.',
+        visibilityTime: 3000,
+      });
       return;
     }
 
     if (dealerInfo && selectedParticipant && programSelection?.programId && partnerBankId) {
-      const requestPayload = {
-        fields,
-        createdBy,
-        partnerBank: partnerBankId,
-        program: programSelection.programId,
-        anchorParticipantMapping: selectedParticipant.id,
-        party: dealerInfo.party.id,
-        counterPartyName: selectedParticipant.party.entity_name,
-        counterPartyCode: selectedParticipant.company_code,
-        counterPartyOdAccount: selectedParticipant.od_account_no,
-        hasAttachment: !!selectedAttachment,
-      };
-      // eslint-disable-next-line no-console
-      console.log('[CreateInvoice] Request payload (full body sent from page):', JSON.stringify(requestPayload, null, 2));
       dispatch(
         createInvoiceRequest({
           fields,
@@ -512,10 +583,11 @@ export const CreateInvoice: React.FC = () => {
         }),
       );
     } else {
-      Alert.alert(
-        'Setup Required',
-        'Please select a Program from the dashboard first, then try again.',
-      );
+      Toast.show({
+        type: 'error',
+        text1: 'Please select a Program from the dashboard first, then try again.',
+        visibilityTime: 3000,
+      });
     }
   };
 
@@ -532,7 +604,7 @@ export const CreateInvoice: React.FC = () => {
           text: 'Yes',
           style: 'destructive',
           onPress: () => {
-            setFields(emptyFields);
+            resetCreateInvoiceForm();
             (navigation as any).navigate('InvoiceDetails');
           },
         },
@@ -540,10 +612,36 @@ export const CreateInvoice: React.FC = () => {
     );
   };
 
+  const resetCreateInvoiceForm = useCallback(() => {
+    setFields(getInitialFields());
+    setErrors({});
+    setSelectedParticipant(null);
+    setSelectedAttachment(null);
+    setShowCamera(false);
+    setIsOcrUploadModalVisible(false);
+    setIsProofUploadModalVisible(false);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = (navigation as any).addListener('beforeRemove', (e: any) => {
+      const actionType = e?.data?.action?.type;
+      const targetRouteName = e?.data?.action?.payload?.name;
+      const isGoingToPreview =
+        actionType === 'NAVIGATE' && targetRouteName === 'InvoiceUploadPreview';
+      if (!isGoingToPreview) {
+        InteractionManager.runAfterInteractions(() => {
+          resetCreateInvoiceForm();
+        });
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, resetCreateInvoiceForm]);
+
   const dealerOptions = useMemo(
     () =>
       dealerInfo?.participants?.map(p => ({
-        label: p.party.entity_name,
+        label: decryptValue(p.party.entity_name ?? '') || p.party.entity_name,
         value: p.party.entity_name,
       })) ?? [],
     [dealerInfo],
@@ -551,7 +649,7 @@ export const CreateInvoice: React.FC = () => {
   const creditToOptions = useMemo(
     () =>
       dealerInfo?.party?.party_bank_details?.map(b => ({
-        label: b.account_number,
+        label: decryptValue(b.account_number ?? '') || b.account_number,
         value: b.account_number,
       })) ?? [],
     [dealerInfo],
@@ -572,29 +670,26 @@ export const CreateInvoice: React.FC = () => {
           <Text style={styles.pageTitleText} numberOfLines={1}>
             {headerModeTitle}
           </Text>
-          {programContext && (
-            <Text style={styles.pageSubtitleText} numberOfLines={1}>
-              {programContext}
-            </Text>
-          )}
-          {!!headerRefTitle && (
-            <Text style={styles.pageSubtitleText} numberOfLines={1}>
-              {headerRefTitle}
-            </Text>
-          )}
+          
         </View>
       </View>
       <View style={styles.container}>
-        {/* AI Badge */}
+        {/* OCR Badge */}
         <View style={styles.aiBadge}>
-          <AI width={scaleWidth(18)} height={scaleHeight(18)} color={Colors.primaryColor} />
-          <Text style={styles.aiBadgeText}>AI-Powered Invoice Processing</Text>
+          <AI
+            width={scaleWidth(18)}
+            height={scaleHeight(18)}
+            color={Colors.primaryColor}
+          />
+          <Text style={styles.aiBadgeText}>OCR Extraction (Capture / Upload)</Text>
         </View>
 
-        {/* OCR Action Section */}
+        {/* OCR Section */}
         <View style={styles.ocrSection}>
-          <Text style={styles.ocrTitle}>Scan Invoice with OCR</Text>
-          <Text style={styles.ocrSubtitle}>Capture or upload invoice to auto-fill form using AI</Text>
+          <Text style={styles.ocrTitle}>Scan invoice for OCR</Text>
+          <Text style={styles.ocrSubtitle}>
+            Capture or upload invoice image to auto-fill form fields.
+          </Text>
 
           <View style={styles.ocrButtons}>
             <TouchableOpacity
@@ -606,23 +701,24 @@ export const CreateInvoice: React.FC = () => {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.ocrButton, styles.galleryButton]}
-              onPress={() => setIsUploadModalVisible(true)}
+              onPress={() => setIsOcrUploadModalVisible(true)}
               disabled={disabled}>
               <Upload width={scaleWidth(20)} height={scaleHeight(20)} />
               <Text style={styles.ocrButtonText}>Upload</Text>
             </TouchableOpacity>
           </View>
 
-          {loading && (
+          {ocrLoading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={Colors.primaryColor} />
               <Text style={styles.loadingText}>Extracting invoice data...</Text>
             </View>
           )}
+
           {selectedAttachment && (
             <View style={styles.selectedFileRow}>
               <Text style={styles.selectedFileText} numberOfLines={1}>
-                Selected: {selectedAttachment.name}
+                Proof Uploaded: {selectedAttachment.name}
               </Text>
               <TouchableOpacity onPress={() => setSelectedAttachment(null)} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
                 <Text style={styles.removeFileText}>Remove</Text>
@@ -641,12 +737,15 @@ export const CreateInvoice: React.FC = () => {
             onChange={applyPatch}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
-            loading={loading || createInvoiceLoading}
+            loading={createInvoiceLoading}
             errors={errors}
             isFormValid={isFormValid}
+            submitButtonAppearsDisabled={!selectedAttachment || !isFormValid}
             productType={productType}
             dealerOptions={dealerOptions.length > 0 ? dealerOptions : undefined}
             creditToOptions={creditToOptions.length > 0 ? creditToOptions : undefined}
+            staleInvoicePeriodDays={dealerInfo?.basic_parameters?.stale_invoice_period_days != null ? Number(dealerInfo.basic_parameters.stale_invoice_period_days) : undefined}
+            defaultPaymentTermsDays={dealerInfo?.basic_parameters?.default_payment_terms_days != null ? Number(dealerInfo.basic_parameters.default_payment_terms_days) : undefined}
           />
         </ScrollView>
 
@@ -654,7 +753,7 @@ export const CreateInvoice: React.FC = () => {
         <View style={styles.footer}>
           <TouchableOpacity
             style={styles.uploadInvoiceButton}
-            onPress={() => setIsUploadModalVisible(true)}
+            onPress={() => setIsProofUploadModalVisible(true)}
             disabled={disabled}>
             <View style={styles.buttonIconContainer}>
               <Plus width={scaleWidth(16)} height={scaleHeight(16)} />
@@ -667,24 +766,43 @@ export const CreateInvoice: React.FC = () => {
       {/* Camera Modal */}
       <Modal visible={showCamera} animationType="slide">
         <InvoiceCamera
-          onCaptured={(path) => {
+          onCaptured={async path => {
             setShowCamera(false);
-            handleImagePath('file://' + path);
+            const cameraAttachment: DocumentPickerResponse = {
+              uri: 'file://' + path,
+              name: `captured-invoice-${Date.now()}.jpg`,
+              type: 'image/jpeg',
+            } as DocumentPickerResponse;
+            await runOcrAndPatchForm(cameraAttachment.uri);
           }}
           onClose={() => setShowCamera(false)}
         />
       </Modal>
 
-      {/* UploadModal */}
+      {/* OCR UploadModal */}
       <UploadModal
-        visible={isUploadModalVisible}
+        visible={isOcrUploadModalVisible}
         allowedFileTypes={['jpg', 'jpeg', 'png']}
         onClose={(file) => {
           if (file) {
-            handleUploadFile(file);
-            setIsUploadModalVisible(false);
+            handleOcrUploadFile(file);
+            setIsOcrUploadModalVisible(false);
           } else {
-            setIsUploadModalVisible(false);
+            setIsOcrUploadModalVisible(false);
+          }
+        }}
+      />
+
+      {/* Proof UploadModal */}
+      <UploadModal
+        visible={isProofUploadModalVisible}
+        allowedFileTypes={['jpg', 'jpeg', 'png', 'pdf']}
+        onClose={(file) => {
+          if (file) {
+            handleProofUploadFile(file);
+            setIsProofUploadModalVisible(false);
+          } else {
+            setIsProofUploadModalVisible(false);
           }
         }}
       />

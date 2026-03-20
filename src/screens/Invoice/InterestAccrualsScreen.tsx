@@ -1,18 +1,19 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   TextInput,
+  FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import {AppBar, Container, ProgramBreadcrumb} from '@components/index';
+import {AppBar, Container, ProgramBreadcrumb, FilterModal} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -22,6 +23,7 @@ import {AppRole} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {invoiceApi} from '@services/api/invoice.api';
 import {formatDateDash} from './InvoiceDetails/types';
+import {decryptValue} from '@utils/decrypt';
 
 type InterestAccrualInvoiceRow = {
   id: string;
@@ -39,6 +41,10 @@ type InterestAccrualInvoiceRow = {
   disburseAmount: string;
   totalAccInterest: string;
   totalInterestPaid: string;
+  // raw numeric fields for summary calculations
+  finalTotalRaw: number;
+  disbursedAmountRaw: number;
+  cumulativeInterestRaw: number;
 };
 
 export const InterestAccrualsScreen: React.FC = () => {
@@ -48,13 +54,15 @@ export const InterestAccrualsScreen: React.FC = () => {
   >>();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const programSelection = useSelector(selectProgramSelection);
-  const programName = programSelection?.programName ?? 'Sun Pharma PGM';
+  const programName = programSelection?.programName ?? '';
   const isDealerMaker = userRole === 'dealer_maker';
 
   const [rows, setRows] = useState<InterestAccrualInvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
   const programIds =
     programSelection?.programScope === 'all' &&
     programSelection?.allProgramIds?.length
@@ -62,6 +70,8 @@ export const InterestAccrualsScreen: React.FC = () => {
       : programSelection?.programId
       ? [programSelection.programId]
       : undefined;
+  // Stable dependency key so useEffect doesn't loop due to new array instances
+  const programIdsKey = JSON.stringify(programIds ?? []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -80,6 +90,9 @@ export const InterestAccrualsScreen: React.FC = () => {
           const invoiceDate = formatDateDash(item.invoice_date ?? '');
           const dueDate = formatDateDash(item.invoice_due_date ?? '');
           const disburseDate = formatDateDash(item.disbursement_date ?? '');
+          const finalTotalRaw = Number(item.final_total ?? 0);
+          const disbursedAmountRaw = Number(item.disbursed_amount ?? 0);
+          const cumulativeInterestRaw = Number(item.cumulative_interest ?? 0);
           return {
             id: item.id,
             loanRefNo: item.loan_ref_no ?? '-',
@@ -87,8 +100,8 @@ export const InterestAccrualsScreen: React.FC = () => {
             bankName: item.bank_name ?? '-',
             productName: item.name ?? '-',
             programName: item.program_name ?? '-',
-            primaryParty: item.partyName ?? '-',
-            counterParty: item.counterPartyName ?? '-',
+            primaryParty: decryptValue(item.partyName ?? '') || '-',
+            counterParty: decryptValue(item.counterPartyName ?? '') || '-',
             invoiceAmount: fmtMoney(item.final_total),
             invoiceDate,
             dueDate,
@@ -96,6 +109,9 @@ export const InterestAccrualsScreen: React.FC = () => {
             disburseAmount: fmtMoney(item.disbursed_amount),
             totalAccInterest: fmtMoney(item.cumulative_interest),
             totalInterestPaid: '-', // backend field not available yet
+            finalTotalRaw,
+            disbursedAmountRaw,
+            cumulativeInterestRaw,
           };
         });
         setRows(mapped);
@@ -108,9 +124,10 @@ export const InterestAccrualsScreen: React.FC = () => {
     };
 
     fetchData();
-  }, [programIds]);
+  }, [programIdsKey]);
 
-  const filteredData = !searchText.trim()
+  // Client-side filter + search
+  const filteredBySearch = !searchText.trim()
     ? rows
     : rows.filter(item => {
         const term = searchText.toLowerCase();
@@ -123,6 +140,130 @@ export const InterestAccrualsScreen: React.FC = () => {
         );
       });
 
+  const filteredData = filteredBySearch.filter(item => {
+    const f = appliedFilters;
+    const passesBank =
+      !f['Bank']?.length || f['Bank']!.includes(item.bankName);
+    const passesProduct =
+      !f['Product']?.length || f['Product']!.includes(item.productName);
+    const passesProgram =
+      !f['Program']?.length || f['Program']!.includes(item.programName);
+    const passesPrimary =
+      !f['Primary Party']?.length ||
+      f['Primary Party']!.includes(item.primaryParty);
+    const passesCounter =
+      !f['Counter Party']?.length ||
+      f['Counter Party']!.includes(item.counterParty);
+    return (
+      passesBank &&
+      passesProduct &&
+      passesProgram &&
+      passesPrimary &&
+      passesCounter
+    );
+  });
+
+  const [visibleCount, setVisibleCount] = useState(30);
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [searchText, appliedFilters]);
+  const paginatedData = filteredData.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredData.length;
+  const loadMore = useCallback(() => {
+    setVisibleCount(prev => Math.min(prev + 20, filteredData.length));
+  }, [filteredData.length]);
+
+  // Summary metrics (all client-side, based on rows)
+  const totalDisInvoices = rows.length;
+  const totalDisAmount = rows.reduce(
+    (sum, r) => sum + (r.disbursedAmountRaw || 0),
+    0,
+  );
+  const totalAccrualInterest = rows.reduce(
+    (sum, r) => sum + (r.cumulativeInterestRaw || 0),
+    0,
+  );
+  const totalOutstandingAmount = rows.reduce(
+    (sum, r) =>
+      sum + Math.max(0, (r.finalTotalRaw || 0) - (r.disbursedAmountRaw || 0)),
+    0,
+  );
+  // Placeholder: overdue interest = total accrual interest (until backend provides separate field)
+  const overdueInterest = totalAccrualInterest;
+
+  const renderRow = ({item: row}: {item: InterestAccrualInvoiceRow}) => (
+    <View style={styles.cardWrapper}>
+      <TouchableOpacity
+        style={styles.listCard}
+        activeOpacity={0.8}
+        onPress={() =>
+          (navigation as any).navigate('InvoiceDailyInterestScreen', {
+            invoiceId: row.id,
+            invoiceNo: row.invoiceNo,
+          })
+        }>
+        <View style={styles.infoGrid}>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Loan Ref No.</Text>
+            <Text style={styles.infoValue}>{row.loanRefNo}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice No</Text>
+            <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Bank Name</Text>
+            <Text style={styles.infoValue}>{row.bankName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Product Name</Text>
+            <Text style={styles.infoValue}>{row.productName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Program Name</Text>
+            <Text style={styles.infoValue}>{row.programName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Primary Party</Text>
+            <Text style={styles.infoValue}>{row.primaryParty}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Counter Party</Text>
+            <Text style={styles.infoValue}>{row.counterParty}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+            <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Date</Text>
+            <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Due Date</Text>
+            <Text style={styles.infoValue}>{row.dueDate}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Disburse Date</Text>
+            <Text style={styles.infoValue}>{row.disburseDate}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Disburse Amount (₹)</Text>
+            <Text style={styles.infoValue}>{row.disburseAmount}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Total Acc Interest (₹)</Text>
+            <Text style={styles.infoValue}>{row.totalAccInterest}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Total Interest Paid Amount (₹)</Text>
+            <Text style={styles.infoValue}>{row.totalInterestPaid}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <Container>
       <AppBar
@@ -130,153 +271,160 @@ export const InterestAccrualsScreen: React.FC = () => {
         navigation={navigation as any}
       />
       <ProgramBreadcrumb />
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Program Title */}
-        <View style={styles.pageTitleBar}>
-          <Text style={styles.pageTitleText}>{programName}</Text>
-        </View>
-
-        {/* Summary Metrics - Grid Cards (simple counters based on rows) */}
-        <View style={styles.cardGrid}>
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Total Dis. Invoices</Text>
-            <Text style={styles.cardValue}>{rows.length}</Text>
-          </View>
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Total Dis. Amount</Text>
-            <Text style={styles.cardValue}>
-              {rows.length
-                ? `₹ ${rows
-                    .reduce(
-                      (sum, r) =>
-                        sum +
-                        (parseFloat(r.disburseAmount.replace(/[,₹/-]/g, '')) || 0),
-                      0,
-                    )
-                    .toLocaleString('en-IN', {minimumFractionDigits: 2})}`
-                : '₹ 0.00'}
-            </Text>
-          </View>
-        </View>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>Loading interest accruals...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : (
+      <FlatList
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        data={loading ? [] : paginatedData}
+        keyExtractor={row => row.id}
+        ListHeaderComponent={
           <>
-            {/* Interest Accruals Section */}
-            <View style={styles.invoicesHeader}>
-              <Text style={styles.invoicesLabel}>Interest Accruals</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{filteredData.length}</Text>
+            {programName ? (
+              <View style={styles.pageTitleBar}>
+                <Text style={styles.pageTitleText}>{programName}</Text>
+              </View>
+            ) : null}
+            <View style={styles.cardGrid}>
+              <View style={styles.card}>
+                <Text style={styles.cardLabel}>Total Dis. Invoices</Text>
+                <Text style={styles.cardValue}>{totalDisInvoices}</Text>
+              </View>
+              <View style={styles.card}>
+                <Text style={styles.cardLabel}>Total Dis. Amount</Text>
+                <Text style={styles.cardValue}>
+                  {`₹ ${totalDisAmount.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                  })}`}
+                </Text>
+              </View>
+              <View style={styles.card}>
+                <Text style={styles.cardLabel}>Total Accrual interest</Text>
+                <Text style={styles.cardValue}>
+                  {`₹ ${totalAccrualInterest.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                  })}`}
+                </Text>
+              </View>
+              <View style={styles.card}>
+                <Text style={styles.cardLabel}>Overdue Interest</Text>
+                <Text style={styles.cardValue}>
+                  {`₹ ${overdueInterest.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                  })}`}
+                </Text>
+              </View>
+              <View style={styles.card}>
+                <Text style={styles.cardLabel}>Total Outstanding Amount</Text>
+                <Text style={styles.cardValue}>
+                  {totalOutstandingAmount.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                  })}
+                </Text>
               </View>
             </View>
-
-            {/* Search */}
-            <View style={styles.searchFilterRow}>
-              <View style={styles.searchContainer}>
-                <Search width={scaleWidth(18)} height={scaleHeight(18)} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search Entity"
-                  placeholderTextColor={Colors.graybase}
-                  value={searchText}
-                  onChangeText={setSearchText}
-                />
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.primaryColor} />
+                <Text style={styles.loadingText}>Loading interest accruals...</Text>
               </View>
-            </View>
-
-            {/* Interest Accruals List - Card view */}
-            <View style={styles.verticalList}>
-              {filteredData.map(row => (
-                <View key={row.id} style={styles.cardWrapper}>
+            ) : error ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
+            {!loading && (
+              <>
+                <View style={styles.invoicesHeader}>
+                  <Text style={styles.invoicesLabel}>Interest Accruals</Text>
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{filteredData.length}</Text>
+                  </View>
+                </View>
+                <View style={styles.searchFilterRow}>
+                  <View style={styles.searchContainer}>
+                    <Search width={scaleWidth(18)} height={scaleHeight(18)} />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Search Entity"
+                      placeholderTextColor={Colors.graybase}
+                      value={searchText}
+                      onChangeText={setSearchText}
+                    />
+                  </View>
                   <TouchableOpacity
-                    style={styles.listCard}
-                    activeOpacity={0.8}
-                    onPress={() =>
-                      (navigation as any).navigate('InvoiceDailyInterestScreen', {
-                        invoiceId: row.id,
-                        invoiceNo: row.invoiceNo,
-                      })
-                    }>
-                    <View style={styles.infoGrid}>
-                      {isDealerMaker ? (
-                        <View style={styles.infoColumn}>
-                          <Text style={styles.infoLabel}>Counter Party</Text>
-                          <Text style={styles.infoValue}>{row.counterParty}</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.infoColumn}>
-                          <Text style={styles.infoLabel}>Primary Party</Text>
-                          <Text style={styles.infoValue}>{row.primaryParty}</Text>
-                        </View>
-                      )}
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Loan Ref No.</Text>
-                        <Text style={styles.infoValue}>{row.loanRefNo}</Text>
-                      </View>
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Invoice No</Text>
-                        <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-                      </View>
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Bank Name</Text>
-                        <Text style={styles.infoValue}>{row.bankName}</Text>
-                      </View>
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Product Name</Text>
-                        <Text style={styles.infoValue}>{row.productName}</Text>
-                      </View>
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Program Name</Text>
-                        <Text style={styles.infoValue}>{row.programName}</Text>
-                      </View>
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                        <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-                      </View>
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Invoice Date</Text>
-                        <Text style={styles.infoValue}>{row.invoiceDate}</Text>
-                      </View>
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Due Date</Text>
-                        <Text style={styles.infoValue}>{row.dueDate}</Text>
-                      </View>
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Disburse Date</Text>
-                        <Text style={styles.infoValue}>{row.disburseDate}</Text>
-                      </View>
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Disburse Amount (₹)</Text>
-                        <Text style={styles.infoValue}>{row.disburseAmount}</Text>
-                      </View>
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Total Acc Interest (₹)</Text>
-                        <Text style={styles.infoValue}>{row.totalAccInterest}</Text>
-                      </View>
-                      <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>Total Interest Paid Amount (₹)</Text>
-                        <Text style={styles.infoValue}>{row.totalInterestPaid}</Text>
-                      </View>
-                    </View>
+                    style={styles.filterButton}
+                    onPress={() => setShowFilterModal(true)}>
+                    <Text style={styles.filterButtonText}>Filter</Text>
                   </TouchableOpacity>
                 </View>
-              ))}
-            </View>
+              </>
+            )}
           </>
-        )}
-      </ScrollView>
+        }
+        ItemSeparatorComponent={() => <View style={{height: scaleHeight(12)}} />}
+        renderItem={renderRow}
+        ListEmptyComponent={
+          !loading && !error && filteredData.length === 0 ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>No interest accruals found</Text>
+            </View>
+          ) : null
+        }
+        onEndReached={!loading && hasMore ? loadMore : undefined}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={
+          !loading && hasMore ? (
+            <View style={styles.loadMoreFooter}>
+              <ActivityIndicator size="small" color={Colors.primaryColor} />
+              <Text style={styles.loadMoreText}>Loading more...</Text>
+            </View>
+          ) : null
+        }
+      />
+
+      <FilterModal
+        visible={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        onApply={filters => {
+          setAppliedFilters(filters);
+          setShowFilterModal(false);
+        }}
+        filterData={{
+          Bank: [
+            ...new Set(rows.map(r => r.bankName).filter(Boolean)),
+          ].length
+            ? [...new Set(rows.map(r => r.bankName).filter(Boolean))]
+            : ['No data'],
+          Product: [
+            ...new Set(rows.map(r => r.productName).filter(Boolean)),
+          ].length
+            ? [...new Set(rows.map(r => r.productName).filter(Boolean))]
+            : ['No data'],
+          Program: [
+            ...new Set(rows.map(r => r.programName).filter(Boolean)),
+          ].length
+            ? [...new Set(rows.map(r => r.programName).filter(Boolean))]
+            : ['No data'],
+          'Primary Party': [
+            ...new Set(rows.map(r => r.primaryParty).filter(Boolean)),
+          ].length
+            ? [...new Set(rows.map(r => r.primaryParty).filter(Boolean))]
+            : ['No data'],
+          'Counter Party': [
+            ...new Set(rows.map(r => r.counterParty).filter(Boolean)),
+          ].length
+            ? [...new Set(rows.map(r => r.counterParty).filter(Boolean))]
+            : ['No data'],
+        }}
+        appliedFilters={appliedFilters}
+      />
     </Container>
   );
 };
 
 const styles = StyleSheet.create({
+  scroll: {
+    backgroundColor: Colors.white,
+  },
   content: {
     paddingHorizontal: scaleWidth(16),
     paddingBottom: scaleHeight(24),
@@ -284,9 +432,22 @@ const styles = StyleSheet.create({
   loadingContainer: {
     paddingVertical: scaleHeight(40),
     alignItems: 'center',
+    gap: scaleHeight(12),
   },
   loadingText: {
     fontSize: scaleFont(14),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  loadMoreFooter: {
+    paddingVertical: scaleHeight(16),
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: scaleWidth(8),
+  },
+  loadMoreText: {
+    fontSize: scaleFont(13),
     color: Colors.graybase,
     fontFamily: Fonts.GilroyMedium,
   },

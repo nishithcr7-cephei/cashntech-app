@@ -4,6 +4,7 @@ import {contactSaga, registerSaga, gstLookupSaga, applySaga} from '@store/regist
 import invoiceSaga from '@store/invoice/inv.saga';
 import invoiceOverviewSaga from '@store/invoiceOverview/invOverview.saga';
 import {programSelectionSaga} from '@store/programSelection';
+import {permissionsSaga} from '@store/permissions';
 
 export default function* rootSaga() {
   yield all([
@@ -15,5 +16,6 @@ export default function* rootSaga() {
     invoiceSaga(),
     invoiceOverviewSaga(),
     programSelectionSaga(),
+    permissionsSaga(),
   ]);
 }

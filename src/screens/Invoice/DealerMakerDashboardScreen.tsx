@@ -132,38 +132,27 @@ export const DealerMakerDashboardScreen: React.FC = () => {
 
     switch (action) {
       case 'viewDetail':
-        // Navigate to credit account detail view
-        console.log('View detail for account:', accountId);
-        // TODO: Navigate to detail screen when available
+        void accountId;
         break;
       case 'repayment':
-        // Navigate to repayment screen
-        console.log('Repayment for account:', accountId);
-        // TODO: Navigate to repayment screen when available
+        void accountId;
         break;
       case 'payMeEarly':
-        // Pay me Early action
-        console.log('Pay me Early for account:', accountId);
-        // TODO: Implement Pay me Early functionality
+        void accountId;
         break;
       case 'attachment':
-        // Show attachment upload modal
         setSelectedAccountId(accountId);
         setShowAttachmentModal(true);
         break;
       case 'print':
-        // Print functionality
-        console.log('Print account summary:', accountId);
-        // TODO: Implement print functionality
+        void accountId;
         break;
     }
   };
 
   const handleAttachmentUpload = (file?: DocumentPickerResponse) => {
-    if (file && selectedAccountId) {
-      // TODO: Upload file to API
-      console.log('Upload attachment for account:', selectedAccountId, file.name);
-    }
+    void file;
+    void selectedAccountId;
     setShowAttachmentModal(false);
     setSelectedAccountId(null);
   };

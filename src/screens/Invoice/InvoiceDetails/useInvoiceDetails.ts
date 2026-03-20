@@ -4,7 +4,6 @@ import {View, Alert, Dimensions} from 'react-native';
 import {scaleWidth, scaleHeight} from '@utils/Scale';
 import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
-import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {
   fetchInvoiceListRequest,
   updateInvoiceStatusRequest,
@@ -24,9 +23,9 @@ import {ProgramSelectionState} from '@store/programSelection/programSelection.ty
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {mapApiToRow, formatDateDash, mapApprovalLogToEntry} from './types';
-import type {InvoiceRow} from './types';
 import {InvoiceListItemApi} from '@store/invoice/inv.types';
 import {invoiceApi} from '@services/api/invoice.api';
+import {decryptValue} from '@utils/decrypt';
 import type {CheckerApprovalEntry} from '@components/CheckerApprovalModal/CheckerApprovalModal';
 import type {ApproveRejectInvoiceDetails} from '@components/ApproveRejectModal/ApproveRejectModal';
 
@@ -40,14 +39,14 @@ export function useInvoiceDetails() {
   const invoiceListLoading = useSelector(selectInvoiceListLoading);
   const invoiceListError = useSelector(selectInvoiceListError);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
-  
-  // Route params: from Invoice Overview (bank/dealer/program breadcrumb) or from drawer (All Program breadcrumb)
+
   const routeParams = route.params as {
     fromInvoiceDashboard?: boolean;
     bankName?: string;
     dealerName?: string;
     programName?: string;
     programId?: string;
+    refreshList?: boolean;
   } | undefined;
   const selectedDealerName = routeParams?.dealerName;
   const fromInvoiceDashboard = routeParams?.fromInvoiceDashboard === true;
@@ -56,7 +55,6 @@ export function useInvoiceDetails() {
   const breadcrumbProgram = routeParams?.programName || (programSelection?.programScope !== 'all' ? programSelection?.programName : undefined);
 
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
-  // Global "All Program" scope from Program selector (breadcrumb).
   const isAllProgramScope = programSelection?.programScope === 'all';
 
   const isAnchorMaker = userRole === 'anchor_maker';
@@ -84,23 +82,18 @@ export function useInvoiceDetails() {
   const menuButtonRefs = React.useRef<Record<string, View | null>>({});
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [showSendForApprovalModal, setShowSendForApprovalModal] = useState(false);
-  const [showSelectProgramForCreateModal, setShowSelectProgramForCreateModal] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(30);
   const [anchorCheckerInvoiceDetails, setAnchorCheckerInvoiceDetails] = useState<ApproveRejectInvoiceDetails | null>(null);
   const [anchorCheckerDetailsLoading, setAnchorCheckerDetailsLoading] = useState(false);
   const [approvalHistoryEntries, setApprovalHistoryEntries] = useState<CheckerApprovalEntry[]>([]);
   const [approvalHistoryLoading, setApprovalHistoryLoading] = useState(false);
 
-  // Use programId from Redux; fallback to route params when navigating back from InvoiceDetailView.
-  // When Program scope is "All", we intentionally pass an empty string – API then returns all
-  // invoices within the user's scope (no program filter applied).
   const programIdFromParams = routeParams?.programId;
   const concreteProgramId = programSelection?.programId ?? programIdFromParams;
   const programId = isAllProgramScope ? '' : concreteProgramId ?? '';
 
-  // Restore program selection when coming back with programId in params (e.g. from InvoiceDetailView)
   useEffect(() => {
     if (!programIdFromParams || programSelection?.programId) return;
-    // Try to restore full selection from scopeData if available
     if (scopeData?.length) {
       for (const bank of scopeData) {
         for (const product of bank.products || []) {
@@ -135,20 +128,24 @@ export function useInvoiceDetails() {
 
   const hasAnyProgramContext = isAllProgramScope || !!concreteProgramId;
 
+  const refreshInvoiceList = useCallback(() => {
+    if (!hasAnyProgramContext) return;
+    dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
+  }, [hasAnyProgramContext, programId, apiFilters, dispatch]);
+
   useEffect(() => {
     if (!hasAnyProgramContext) return;
     dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
   }, [hasAnyProgramContext, programId, apiFilters, dispatch]);
 
-  // Refetch list when screen comes into focus (e.g. back from InvoiceDetailView)
   useFocusEffect(
     useCallback(() => {
-      if (!hasAnyProgramContext) return;
+      if (!hasAnyProgramContext || routeParams?.refreshList !== true) return;
       dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
-    }, [hasAnyProgramContext, programId, apiFilters, dispatch]),
+      (navigation as any).setParams({refreshList: false});
+    }, [hasAnyProgramContext, programId, apiFilters, dispatch, navigation, routeParams?.refreshList]),
   );
 
-  // Fetch invoice details for anchor_checker or CashnTech when ApproveReject modal opens
   useEffect(() => {
     if ((!isAnchorChecker && !isCashnTechUser) || !showApproveRejectModal || !selectedInvoiceId) {
       setAnchorCheckerInvoiceDetails(null);
@@ -163,12 +160,13 @@ export function useInvoiceDetails() {
         if (cancelled) return;
         const apm = data?.anchorParticipantMapping;
         const party = data?.party;
-        const dealerName = apm?.party?.entity_name ?? apm?.party?.name ?? '-';
-        const creditAccountNumber = apm?.od_account_no ?? '-';
-        const anchorName = party?.entity_name ?? party?.name ?? '-';
+        const dealerName =
+          decryptValue(apm?.party?.entity_name ?? apm?.party?.name ?? '') ||
+          '-';
+        const anchorName =
+          decryptValue(party?.entity_name ?? party?.name ?? '') || '-';
         const invoiceDate = data?.invoice_date ? formatDateDash(data.invoice_date) : 'DD / MM / YYYY';
         const invoiceDueDate = data?.invoice_due_date ? formatDateDash(data.invoice_due_date) : 'DD / MM / YYYY';
-        // Use final_total (total invoice amount including tax/discount) for approval modal
         const totalAmount = data?.final_total ?? data?.sub_total;
         const invoiceAmount =
           totalAmount != null
@@ -176,7 +174,6 @@ export function useInvoiceDetails() {
             : 'Rs. 0 /-';
         setAnchorCheckerInvoiceDetails({
           dealerName,
-          creditAccountNumber,
           anchorName,
           invoiceDate,
           invoiceDueDate,
@@ -194,7 +191,6 @@ export function useInvoiceDetails() {
     };
   }, [isAnchorChecker, isCashnTechUser, showApproveRejectModal, selectedInvoiceId]);
 
-  // Fetch approval history when Approval History modal opens
   useEffect(() => {
     if (!showCheckerApprovalModal || !selectedInvoiceId) {
       setApprovalHistoryEntries([]);
@@ -249,28 +245,6 @@ export function useInvoiceDetails() {
     'Approval Status': approvalStatuses.length ? approvalStatuses : ['No data'],
   };
 
-  // Summary metrics for Invoice List & Approval (match design: Dealers, Total Invoices, Amount, Pending, Approved, Rejected)
-  const dealersCount = new Set(invoiceData.map(r => r.dealerName)).size;
-  const totalInvoices = invoiceData.length;
-  let pending = 0;
-  let approved = 0;
-  let rejected = 0;
-  invoiceData.forEach(r => {
-    const a = (r.approvalStatus || '').toLowerCase();
-    const s = (r.invoiceStatus || '').toLowerCase();
-    if (a.includes('reject') || s.includes('reject')) rejected += 1;
-    else if (a.includes('approval_complete') || a.includes('approved') || a.includes('complete')) approved += 1;
-    else pending += 1;
-  });
-  const summaryStats = {
-    dealers: dealersCount,
-    totalInvoices,
-    totalInvoiceAmount: '₹ 20,000,000.00', // placeholder until API provides amount
-    pendingInvoices: pending,
-    approvedInvoices: approved,
-    rejectedInvoices: rejected,
-  };
-
   let filteredData = invoiceData;
   if (selectedDealerName && invoiceData.length > 0) {
     const dealerNameLower = selectedDealerName.toLowerCase().trim();
@@ -298,6 +272,16 @@ export function useInvoiceDetails() {
     );
   }
 
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [appliedFilters, searchText, programId, selectedDealerName]);
+
+  const paginatedData = filteredData.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredData.length;
+  const loadMore = useCallback(() => {
+    setVisibleCount(prev => Math.min(prev + 20, filteredData.length));
+  }, [filteredData.length]);
+
   const handleMenuToggle = (invoiceId: string) => {
     if (openMenuId === invoiceId) {
       setOpenMenuId(null);
@@ -315,6 +299,18 @@ export function useInvoiceDetails() {
       setOpenMenuId(invoiceId);
     }
   };
+
+  const handleInvoiceNoPress = useCallback(
+    (invoiceId: string, invoiceNo: string) => {
+      (navigation as any).navigate('InvoiceDetailView', {
+        invoiceId,
+        invoiceNo,
+        programId,
+        fromInvoiceDashboard,
+      });
+    },
+    [navigation, programId, fromInvoiceDashboard],
+  );
 
   const handleMenuAction = (action: string, invoiceId: string) => {
     setOpenMenuId(null);
@@ -367,9 +363,7 @@ export function useInvoiceDetails() {
             {
               text: 'Delete',
               style: 'destructive',
-              onPress: async () => {
-                console.log('Delete invoice:', invoiceId);
-              },
+              onPress: async () => {},
             },
           ],
         );
@@ -389,21 +383,10 @@ export function useInvoiceDetails() {
         setShowAttachmentModal(true);
         break;
       case 'print':
-        console.log('Print invoice:', invoiceId, invoiceNo);
-        // TODO: Implement print functionality
         break;
       case 'payMeEarly':
-        console.log('Pay me Early for invoice:', invoiceId);
         break;
     }
-  };
-
-  const handleAttachmentUpload = (file?: DocumentPickerResponse) => {
-    if (file && selectedInvoiceId) {
-      console.log('Upload attachment for invoice:', selectedInvoiceId, file.name);
-    }
-    setShowAttachmentModal(false);
-    setSelectedInvoiceId(null);
   };
 
   const toggleInvoiceSelection = (invoiceId: string) => {
@@ -458,15 +441,6 @@ export function useInvoiceDetails() {
   };
 
   const onApproveRejectApprove = (invoiceId: string, remarks?: string) => {
-    const invNo = selectedInvoiceNo;
-    if (__DEV__) {
-      console.log('[DEBUG 1] onApproveRejectApprove:', {
-        invoiceId,
-        invoiceNo: invNo,
-        programId,
-        apiFilters,
-      });
-    }
     dispatch(
       updateInvoiceStatusRequest({
         invoiceId,
@@ -541,8 +515,7 @@ export function useInvoiceDetails() {
   };
 
   const onBulkApply = (action: 'approve' | 'reject' | 'verify' | 'cancel') => {
-    // TODO: Call API to apply bulk action (approve/reject/verify/cancel) to selectedInvoiceIds
-    console.log('Bulk apply:', action, selectedInvoiceIds);
+    void action;
     setShowSendForApprovalModal(false);
     setSelectedInvoiceIds([]);
     if (programId) {
@@ -553,7 +526,7 @@ export function useInvoiceDetails() {
   const getMenuPosition = useCallback(
     (anchor: {x: number; y: number; width: number; height: number} | null) => {
       const screen = Dimensions.get('window');
-      const menuWidth = scaleWidth(180);
+      const menuWidth = scaleWidth(210);
       const horizontalPadding = scaleWidth(12);
       const topPadding = scaleHeight(8);
       if (!anchor) {
@@ -575,29 +548,24 @@ export function useInvoiceDetails() {
   );
 
   const onCreateInvoicePress = useCallback(() => {
-    setShowSelectProgramForCreateModal(true);
-  }, []);
-
-  const onProgramSelectedForCreate = useCallback(() => {
-    setShowSelectProgramForCreateModal(false);
     (navigation as any).navigate('CreateInvoice');
   }, [navigation]);
 
-  // Create Invoice should be disabled when user is on global "All Program" scope
-  // or when no concrete program is selected.
   const isCreateInvoiceEnabled =
     !isAllProgramScope && !!concreteProgramId;
 
   return {
     programId,
     programName: routeParams?.programName || programSelection?.programName || '',
-    summaryStats,
     apiFilters,
     dispatch,
     navigation,
     invoiceData,
     invoiceFilterData,
     filteredData,
+    paginatedData,
+    hasMore,
+    loadMore,
     invoiceListLoading,
     invoiceListError,
     isAnchorMaker,
@@ -634,6 +602,7 @@ export function useInvoiceDetails() {
     anchorCheckerInvoiceDetails,
     anchorCheckerDetailsLoading,
     showAttachmentModal,
+    setShowAttachmentModal,
     selectedInvoiceIds,
     setSelectedInvoiceIds,
     showSendForApprovalModal,
@@ -646,7 +615,8 @@ export function useInvoiceDetails() {
     showAllProgramBreadcrumb: isAllProgramScope,
     handleMenuToggle,
     handleMenuAction,
-    handleAttachmentUpload,
+    handleInvoiceNoPress,
+    refreshInvoiceList,
     toggleInvoiceSelection,
     toggleSelectAllVisible,
     onApproveRejectApprove,
@@ -655,10 +625,7 @@ export function useInvoiceDetails() {
     onVerifyReject,
     onBulkApply,
     getMenuPosition,
-    showSelectProgramForCreateModal,
-    setShowSelectProgramForCreateModal,
     onCreateInvoicePress,
-    onProgramSelectedForCreate,
     isCreateInvoiceEnabled,
     hasAnyProgramContext,
   };

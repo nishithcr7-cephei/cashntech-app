@@ -18,8 +18,24 @@ const getUserRole = createSelector(
   (user) => user.appRole
 );
 
+const getIsClient = createSelector(
+  _selectState,
+  (user) => user.is_client
+);
+
+export const getPrimaryPermissionGroupId = createSelector(
+  _selectState,
+  (user) => {
+    const pg = user.permission_group;
+    if (!Array.isArray(pg) || pg.length === 0) return null;
+    return pg[0]?.id ?? null;
+  }
+);
+
 export default {
   getUserInfo,
   getFullName,
-  getUserRole
+  getUserRole,
+  getIsClient,
+  getPrimaryPermissionGroupId,
 };

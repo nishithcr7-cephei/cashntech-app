@@ -145,9 +145,9 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
             [
               { text: 'Cancel', style: 'cancel', onPress: () => setSelectedRow(null) },
               { text: 'Delete', style: 'destructive', onPress: () => {
-                console.log('Delete row:', row.id, row.loanRefNo);
+                void row.id;
+                void row.loanRefNo;
                 setSelectedRow(null);
-                // TODO: call API to delete, then refresh list
               }},
             ]
           );
@@ -344,7 +344,8 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
         accountNo={selectedRow?.loanRefNo ?? '(Account No.)'}
         totalOutstanding={selectedRow?.totalOutstandingAmount?.replace('/-', '') ?? '25,10,556'}
         onSubmit={data => {
-          console.log('Record Repayment:', selectedRow?.id, data);
+          void selectedRow?.id;
+          void data;
           setShowRecordRepaymentModal(false);
           setSelectedRow(null);
         }}
@@ -362,7 +363,8 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
         loanRefNo={selectedRow?.loanRefNo ?? ''}
         outstandingAmount={selectedRow?.totalOutstandingAmount?.replace('/-', '') ?? '15,556'}
         onSubmit={data => {
-          console.log('Request Waiver:', selectedRow?.id, data);
+          void selectedRow?.id;
+          void data;
           setShowRequestWaiverModal(false);
           setSelectedRow(null);
         }}

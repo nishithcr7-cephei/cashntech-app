@@ -7,11 +7,11 @@ import LottieView from 'lottie-react-native';
 import {successLottie} from '@assets/Lottie';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {useDispatch, useSelector} from 'react-redux';
+import {useDispatch} from 'react-redux';
 import moment from 'moment';
 import {authActions} from '@store/auth';
-import {setStorage, getStorage} from '@services/localStorage';
-import {selectIsProgramSelected} from '@store/programSelection/programSelection.selector';
+import {setStorage} from '@services/localStorage';
+import {fetchUserScopeRequest, setProgramScope} from '@store/programSelection/programSelection.slice';
 
 const Strings = {
   copyright: `Copyright ${moment().year()}, CashnTech Pvt Ltd., All Rights Reserved`,
@@ -26,7 +26,6 @@ export const SuccessScreen = ({
   route: {params},
 }: SuccessScreenProps) => {
   const dispatch = useDispatch();
-  const isProgramSelected = useSelector(selectIsProgramSelected);
 
   const message = useMemo(() => {
     const firstName = (params.firstName ?? '').trim();
@@ -58,12 +57,15 @@ export const SuccessScreen = ({
       if (params.authMode === 'signin') {
         dispatch(authActions.setIsLoggedIn(true));
         setStorage(StorageKeys.IS_LOGGED_IN, true);
-        // Navigate to SelectRoleScreen after login
+        // Default to All Program; user can change via breadcrumb when needed
+        dispatch(setProgramScope('all'));
+        dispatch(fetchUserScopeRequest());
+        // Navigate directly to Home (skip role/program selection)
         navigation.reset({
           index: 0,
           routes: [
             {
-              name: 'SelectRoleScreen',
+              name: 'HomeNavigator',
             },
           ],
         });

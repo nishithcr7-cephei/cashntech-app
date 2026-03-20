@@ -33,6 +33,7 @@ const userSlice = createSlice({
       state.appRole = action.payload.appRole ?? state.appRole;
       state.scope = action.payload.scope ?? state.scope;
       state.final_user_permission = action.payload.final_user_permission ?? state.final_user_permission;
+      state.permission_group = action.payload.permission_group ?? state.permission_group;
     },
     setUserRole: (state, action: PayloadAction<AppRole | null>) => {
       state.appRole = action.payload;
@@ -59,6 +60,7 @@ const userSlice = createSlice({
       state.appRole = null;
       state.scope = undefined;
       state.final_user_permission = undefined;
+      state.permission_group = undefined;
     },
   },
 });

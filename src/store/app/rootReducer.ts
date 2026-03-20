@@ -5,6 +5,7 @@ import registerwebReducer from '@store/registerweb/register.slice';
 import {programSelectionReducer} from '@store/programSelection';
 import {invoiceReducer} from '@store/invoice';
 import {invoiceOverviewReducer} from '@store/invoiceOverview';
+import {permissionsReducer} from '@store/permissions';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -12,6 +13,7 @@ const rootReducer = combineReducers({
   programSelection: programSelectionReducer,
   invoice: invoiceReducer,
   invoiceOverview: invoiceOverviewReducer,
+  permissions: permissionsReducer,
   ...registerwebReducer,
 });
 

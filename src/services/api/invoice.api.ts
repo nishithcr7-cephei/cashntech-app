@@ -106,7 +106,6 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     credit_to: fields.creditTo?.trim() || '',
     invoice_date: toYYYYMMDD(fields.invoiceDate),
     invoice_due_date: toYYYYMMDD(fields.invoiceDueDate),
-    payment_date: toYYYYMMDD(fields.paymentDate),
     currency: fields.currency || 'INR',
     remark: fields.remark || '',
     created_by: createdBy,
@@ -123,6 +122,9 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
 
   if (fields.grnDate?.trim()) {
     payload.grn_date = toYYYYMMDD(fields.grnDate);
+  }
+  if (fields.paymentDate?.trim()) {
+    payload.payment_date = toYYYYMMDD(fields.paymentDate);
   }
 
   return payload;
@@ -191,6 +193,16 @@ export type DailyInterestApiRow = {
   penal_interest_on_principal: number;
   cumulative_interest: number;
   accrual_type: string;
+};
+
+export type InvoiceKpisResponse = {
+  total_program_limit: string;
+  utilized_amount: string;
+  utilized_rate?: string;
+  active_dealer_ratio?: string;
+  available_limit: string;
+  overdue_amount?: string;
+  dpd_days: string;
 };
 
 export const invoiceApi = {
@@ -262,6 +274,27 @@ export const invoiceApi = {
     return response.data;
   },
 
+  getInvoiceKpis: async (programIds?: string[]): Promise<InvoiceKpisResponse> => {
+    const body: InvoiceSummaryRequest = {
+      programIds: programIds ?? [],
+    };
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiInvoiceKpis,
+      body,
+      {authRequired: true} as any,
+    );
+    const raw = response?.data?.data ?? {};
+    return {
+      total_program_limit: raw.total_program_limit ?? '0',
+      utilized_amount: raw.utilized_amount ?? '0',
+      utilized_rate: raw.utilized_rate ?? '0',
+      active_dealer_ratio: raw.active_dealer_ratio ?? '0',
+      available_limit: raw.available_limit ?? '0',
+      overdue_amount: raw.overdue_amount ?? '0',
+      dpd_days: raw.dpd_days ?? '0',
+    };
+  },
+
   getInvoiceDetails: async (invoiceId: string): Promise<any> => {
     const response = await axiosInstance.get(
       ApiEndPoints.apiGetInvoiceDetails(invoiceId),
@@ -269,6 +302,34 @@ export const invoiceApi = {
     );
     const data = response?.data;
     return data?.data ?? data;
+  },
+
+  /** POST multipart file to `/invoice/attachment/:invoiceId` */
+  uploadInvoiceAttachment: async (
+    invoiceId: string,
+    file: DocumentPickerResponse,
+  ): Promise<any> => {
+    const formData = new FormData();
+    formData.append('attachments', {
+      uri: file.uri,
+      name: file.name ?? 'attachment.pdf',
+      type: file.type ?? 'application/octet-stream',
+    } as any);
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiUploadInvoiceAttachment(invoiceId),
+      formData,
+      {isFormData: true, authRequired: true} as any,
+    );
+    return response.data;
+  },
+
+  /** DELETE `/invoice/:attachmentId` (attachment row id, not invoice uuid) */
+  deleteInvoiceAttachment: async (attachmentId: number | string): Promise<any> => {
+    const response = await axiosInstance.delete(
+      ApiEndPoints.apiDeleteInvoiceAttachment(attachmentId),
+      {authRequired: true} as any,
+    );
+    return response.data;
   },
 
   /**
@@ -460,7 +521,7 @@ export const invoiceApi = {
         }
       });
       
-      formData.append('attachment', {
+      formData.append('attachments', {
         uri: input.attachment.uri,
         name: input.attachment.name ?? 'invoice.pdf',
         type: input.attachment.type ?? 'application/pdf',

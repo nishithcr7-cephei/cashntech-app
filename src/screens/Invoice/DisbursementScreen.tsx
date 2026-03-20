@@ -1,6 +1,5 @@
-import React, {useState, useRef, useEffect, useCallback} from 'react';
+import React, {useState, useRef, useEffect, useCallback, useMemo} from 'react';
 import {
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -11,6 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  FlatList,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -35,6 +35,7 @@ import {selectProgramSelection} from '@store/programSelection/programSelection.s
 import {invoiceApi} from '@services/api/invoice.api';
 import {formatDateDash} from './InvoiceDetails/types';
 import Toast from 'react-native-toast-message';
+import {decryptValue} from '@utils/decrypt';
 
 export type DisbursementRow = {
   id: string;
@@ -54,6 +55,7 @@ export type DisbursementRow = {
   approvalStatus: string;
   adminStatus: string;
   finalTotal?: number;
+  disbursedAmount?: number | null;
   bankId?: string;
   programId?: string;
   productId?: string;
@@ -78,12 +80,16 @@ function mapToDisbursementRow(item: any): DisbursementRow {
     '-';
   const programName = item.program_name ?? item.program?.program_name ?? '-';
   const primaryParty =
-    item.partyName ?? item.party?.entity_name ?? item.primary_party_name ?? '-';
+    decryptValue(
+      item.partyName ?? item.party?.entity_name ?? item.primary_party_name ?? '',
+    ) || '-';
   const counterParty =
-    item.counterPartyName ??
-    item.anchorParticipantMapping?.party?.entity_name ??
-    item.counter_party_name ??
-    '-';
+    decryptValue(
+      item.counterPartyName ??
+        item.anchorParticipantMapping?.party?.entity_name ??
+        item.counter_party_name ??
+        '',
+    ) || '-';
   const bankId =
     item.partner_bank_id ??
     item.program?.productConfig?.partnerBank?.id ??
@@ -124,6 +130,7 @@ function mapToDisbursementRow(item: any): DisbursementRow {
     approvalStatus: item.approval_status ?? item.approvalStatus ?? '',
     adminStatus: item.admin_status ?? item.adminStatus ?? '',
     finalTotal: finalTotal != null ? Number(finalTotal) : undefined,
+    disbursedAmount: item.disbursed_amount ?? item.disbursedAmount ?? null,
   };
 }
 
@@ -150,13 +157,20 @@ export const DisbursementScreen: React.FC = () => {
   const [mailLoadingId, setMailLoadingId] = useState<string | null>(null);
   const menuButtonRefs = useRef<Record<string, any>>({});
 
-  const programIds =
-    programSelection?.programScope === 'all' &&
-    programSelection?.allProgramIds?.length
-      ? programSelection.allProgramIds
-      : programSelection?.programId
-      ? [programSelection.programId]
-      : undefined;
+  const programIds = useMemo(
+    () =>
+      programSelection?.programScope === 'all' &&
+      programSelection?.allProgramIds?.length
+        ? programSelection.allProgramIds
+        : programSelection?.programId
+        ? [programSelection.programId]
+        : undefined,
+    [
+      programSelection?.programScope,
+      programSelection?.programId,
+      programSelection?.allProgramIds,
+    ],
+  );
 
   const fetchDisbursementData = useCallback(async () => {
     setLoading(true);
@@ -215,9 +229,8 @@ export const DisbursementScreen: React.FC = () => {
           ),
         );
       }
-      let rows = verifiedItems.map(mapToDisbursementRow).sort((a, b) =>
-        a.id.localeCompare(b.id),
-      );
+      // Preserve backend order (created_at DESC) – don't re-sort here
+      let rows = verifiedItems.map(mapToDisbursementRow);
       // CashnTech user: only Disbursed, Submitted, Paid
       const cashntechStatuses = ['disbursed', 'submitted', 'paid'];
       const finalRows = isCashnTechUser
@@ -242,38 +255,36 @@ export const DisbursementScreen: React.FC = () => {
     fetchDisbursementData();
   }, [fetchDisbursementData]);
 
-  const submitted = disbursementRows.filter(
-    r => (r.invoiceStatus || '').toLowerCase() === 'submitted',
+  // Client-side metrics from /invoice/verified/list data (backend returns final_total, disbursed_amount)
+  const totalDisbursedAmount = disbursementRows.reduce(
+    (sum, r) => sum + (r.disbursedAmount ?? 0),
+    0,
   );
-  const disbursed = disbursementRows.filter(
-    r => (r.invoiceStatus || '').toLowerCase() === 'disbursed',
-  );
-  const dealerSet = new Set(
-    disbursementRows.map(r => r.counterParty || r.primaryParty).filter(Boolean),
-  );
-  const totalSubmitted = submitted.reduce(
+  const totalInvoiceAmount = disbursementRows.reduce(
     (sum, r) => sum + (r.finalTotal ?? 0),
     0,
   );
-  const totalDisbursed = disbursed.reduce(
-    (sum, r) => sum + (r.finalTotal ?? 0),
+  const pendingDisAmount = disbursementRows.reduce(
+    (sum, r) => sum + Math.max(0, (r.finalTotal ?? 0) - (r.disbursedAmount ?? 0)),
     0,
   );
-  const pendingAmount = totalSubmitted;
+  const utilizationPct =
+    totalInvoiceAmount > 0
+      ? ((totalDisbursedAmount / totalInvoiceAmount) * 100).toFixed(2)
+      : '0.00';
   const disbursementMetrics = [
-    {label: 'Dealers', value: String(dealerSet.size)},
-    {label: 'Total Invoices Submitted', value: String(submitted.length)},
     {
-      label: 'Total Dis. Amount',
-      value: `₹ ${(totalSubmitted + totalDisbursed).toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
+      label: 'Total Dis Amount',
+      value: `₹ ${totalDisbursedAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
+    },
+    {label: 'Total Invoices', value: String(disbursementRows.length)},
+    {
+      label: 'Pending Dis Amount',
+      value: `₹ ${pendingDisAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
     },
     {
-      label: 'Disbursed Amount',
-      value: `₹ ${totalDisbursed.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
-    },
-    {
-      label: 'Pending Dis. Amount',
-      value: `₹ ${pendingAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
+      label: 'Repeated Usage',
+      value: `${utilizationPct}%`,
     },
   ];
 
@@ -308,6 +319,16 @@ export const DisbursementScreen: React.FC = () => {
           (item.invoiceNo?.toLowerCase() || '').includes(term)
         );
       });
+
+  const [visibleCount, setVisibleCount] = useState(30);
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [searchText, appliedFilters]);
+  const paginatedData = filteredData.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredData.length;
+  const loadMore = useCallback(() => {
+    setVisibleCount(prev => Math.min(prev + 20, filteredData.length));
+  }, [filteredData.length]);
 
   const handleMenuToggle = (disbursementId: string) => {
     if (openMenuId === disbursementId) {
@@ -381,28 +402,94 @@ export const DisbursementScreen: React.FC = () => {
     const menuWidth = scaleWidth(180);
     const horizontalPadding = scaleWidth(12);
     const topPadding = scaleHeight(8);
-
     if (!anchor) {
-      return {
-        position: 'absolute' as const,
-        top: topPadding + scaleHeight(60),
-        right: horizontalPadding,
-      };
+      return {position: 'absolute' as const, top: topPadding + scaleHeight(60), right: horizontalPadding};
     }
-
     const desiredLeft = anchor.x + anchor.width - menuWidth;
-    const left = Math.max(
-      horizontalPadding,
-      Math.min(desiredLeft, screen.width - menuWidth - horizontalPadding),
-    );
-
-    return {
-      position: 'absolute' as const,
-      top: anchor.y + anchor.height + topPadding,
-      left,
-    };
+    const left = Math.max(horizontalPadding, Math.min(desiredLeft, screen.width - menuWidth - horizontalPadding));
+    return {position: 'absolute' as const, top: anchor.y + anchor.height + topPadding, left};
   };
 
+
+  const renderDisbursementRow = ({item: row}: {item: DisbursementRow}) => (
+    <View style={styles.cardWrapper}>
+      <View style={styles.listCard}>
+        {isCashnTechUser && (
+          <View
+            ref={(r: View | null) => {
+              if (r) menuButtonRefs.current[row.id] = r;
+            }}
+            collapsable={false}
+            style={styles.threeDotsButton}>
+            <TouchableOpacity
+              onPress={() => handleMenuToggle(row.id)}
+              activeOpacity={0.7}
+              style={styles.threeDotsTouchable}>
+              <Dots
+                width={scaleWidth(20)}
+                height={scaleHeight(20)}
+                style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+        <View style={styles.infoGrid}>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Loan Ref No.</Text>
+            <Text style={styles.infoValue}>{row.loanRefNo}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice No.</Text>
+            <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Bank Name</Text>
+            <Text style={styles.infoValue}>{row.bankName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Product Name</Text>
+            <Text style={styles.infoValue}>{row.productName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Program Name</Text>
+            <Text style={styles.infoValue}>{row.programName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Primary Party</Text>
+            <Text style={styles.infoValue}>{row.primaryParty}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Counter Party</Text>
+            <Text style={styles.infoValue}>{row.counterParty}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Amount</Text>
+            <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Date</Text>
+            <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Due Date</Text>
+            <Text style={styles.infoValue}>{row.dueDate}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Disbur Date</Text>
+            <Text style={styles.infoValue}>{row.disburseDate}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>UTR No.</Text>
+            <Text style={styles.infoValue}>{row.utrNo}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Status</Text>
+            <Text style={[styles.infoValue, styles.statusGreen]}>{row.invoiceStatus}</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
 
   return (
     <Container>
@@ -411,165 +498,95 @@ export const DisbursementScreen: React.FC = () => {
         navigation={navigation as any}
       />
       <ProgramBreadcrumb />
-      <ScrollView
+      <FlatList
+        style={styles.scroll}
         contentContainerStyle={styles.content}
-        onScrollBeginDrag={() => {
-          setOpenMenuId(null);
-          setMenuAnchor(null);
-        }}>
-        {/* Program Title */}
-        <View style={styles.pageTitleBar}>
-          <Text style={styles.pageTitleText}>{programName}</Text>
-        </View>
-
-        {/* Summary Metrics - Grid Cards Layout */}
-        <View style={styles.cardGrid}>
-          {disbursementMetrics.map((metric, index) => (
-            <View key={index} style={styles.card}>
-              <Text style={styles.cardLabel}>{metric.label}</Text>
-              <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
-                {metric.value}
-              </Text>
+        data={loading ? [] : paginatedData}
+        keyExtractor={row => row.id}
+        ListHeaderComponent={
+          <>
+            <View style={styles.pageTitleBar}>
+              <Text style={styles.pageTitleText}>{programName}</Text>
             </View>
-          ))}
-        </View>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primaryColor} />
-            <Text style={styles.loadingText}>Loading disbursement data...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={fetchDisbursementData}>
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        {/* Invoices Section - hide when loading */}
-        {!loading && (
-          <View>
-            <View style={styles.invoicesHeader}>
-              <Text style={styles.invoicesLabel}>Verified Invoices</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{filteredData.length}</Text>
-              </View>
-            </View>
-
-            {/* Search & Filter */}
-            <View style={styles.searchFilterRow}>
-              <View style={styles.searchContainer}>
-                <Search width={scaleWidth(18)} height={scaleHeight(18)} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search Entity"
-                  placeholderTextColor={Colors.graybase}
-                  value={searchText}
-                  onChangeText={setSearchText}
-                />
-              </View>
-              <TouchableOpacity
-                style={styles.filterButton}
-                onPress={() => setShowFilterModal(true)}>
-                <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
-                <Text style={styles.filterButtonText}>Filters</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Invoice List */}
-            <View style={styles.verticalList}>
-              {filteredData.map(row => (
-                <View key={row.id} style={styles.cardWrapper}>
-                  <View style={styles.listCard}>
-                {(() => {
-                  const isInProgress = ['in progress', 'inprogress'].includes(
-                    (row.invoiceStatus || '').toLowerCase(),
-                  );
-                  const hasAction = isCashnTechUser ? isInProgress : true;
-                  return hasAction && (
-                  <TouchableOpacity
-                    ref={ref => {
-                      if (ref) {
-                        menuButtonRefs.current[row.id] = ref;
-                      }
-                    }}
-                    style={styles.threeDotsButton}
-                    onPress={() => handleMenuToggle(row.id)}
-                    activeOpacity={0.7}>
-                    <Dots
-                      width={scaleWidth(20)}
-                      height={scaleHeight(20)}
-                      style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}}
-                    />
-                  </TouchableOpacity>
-                  );
-                })()}
-                <View style={styles.infoGrid}>
-                  {/* Web order: Loan Ref No. → Invoice No. → Bank Name → Product Name → Program Name → Primary Party → Counter Party → Invoice Amount → Invoice Date → Due Date → Disbur Date → UTR No. → Invoice Status */}
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Loan Ref No.</Text>
-                    <Text style={styles.infoValue}>{row.loanRefNo}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice No.</Text>
-                    <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Bank Name</Text>
-                    <Text style={styles.infoValue}>{row.bankName}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Product Name</Text>
-                    <Text style={styles.infoValue}>{row.productName}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Program Name</Text>
-                    <Text style={styles.infoValue}>{row.programName}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Primary Party</Text>
-                    <Text style={styles.infoValue}>{row.primaryParty}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Counter Party</Text>
-                    <Text style={styles.infoValue}>{row.counterParty}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice Amount</Text>
-                    <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice Date</Text>
-                    <Text style={styles.infoValue}>{row.invoiceDate}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Due Date</Text>
-                    <Text style={styles.infoValue}>{row.dueDate}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Disbur Date</Text>
-                    <Text style={styles.infoValue}>{row.disburseDate}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>UTR No.</Text>
-                    <Text style={styles.infoValue}>{row.utrNo}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice Status</Text>
-                    <Text style={[styles.infoValue, styles.statusGreen]}>{row.invoiceStatus}</Text>
-                  </View>
-                </View>
-                  </View>
+            <View style={styles.cardGrid}>
+              {disbursementMetrics.map((metric, index) => (
+                <View key={index} style={styles.card}>
+                  <Text style={styles.cardLabel}>{metric.label}</Text>
+                  <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
+                    {metric.value}
+                  </Text>
                 </View>
               ))}
             </View>
-          </View>
-        )}
-      </ScrollView>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.primaryColor} />
+                <Text style={styles.loadingText}>Loading disbursement data...</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={fetchDisbursementData}>
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+            {!loading && (
+              <>
+                <View style={styles.invoicesHeader}>
+                  <Text style={styles.invoicesLabel}>Verified Invoices</Text>
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{filteredData.length}</Text>
+                  </View>
+                </View>
+                <View style={styles.searchFilterRow}>
+                  <View style={styles.searchContainer}>
+                    <Search width={scaleWidth(18)} height={scaleHeight(18)} />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Search Entity"
+                      placeholderTextColor={Colors.graybase}
+                      value={searchText}
+                      onChangeText={setSearchText}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={styles.filterButton}
+                    onPress={() => setShowFilterModal(true)}>
+                    <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
+                    <Text style={styles.filterButtonText}>Filters</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </>
+        }
+        ItemSeparatorComponent={() => <View style={{height: scaleHeight(12)}} />}
+        renderItem={renderDisbursementRow}
+        ListEmptyComponent={
+          !loading && !error && filteredData.length === 0 ? (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>No verified invoices found</Text>
+            </View>
+          ) : null
+        }
+        onEndReached={!loading && hasMore ? loadMore : undefined}
+        onEndReachedThreshold={0.3}
+        onScrollBeginDrag={() => {
+          setOpenMenuId(null);
+          setMenuAnchor(null);
+        }}
+        ListFooterComponent={
+          !loading && hasMore ? (
+            <View style={styles.loadMoreFooter}>
+              <ActivityIndicator size="small" color={Colors.primaryColor} />
+              <Text style={styles.loadMoreText}>Loading more...</Text>
+            </View>
+          ) : null
+        }
+      />
 
       {/* 3-dot Action Menu - Disbursal list view: Checker & CashnTech User - Send Mail to Bank, Mark as Disbursed, Delete */}
       {showDisbursementActionMenu && (
@@ -587,19 +604,31 @@ export const DisbursementScreen: React.FC = () => {
               setOpenMenuId(null);
               setMenuAnchor(null);
             }}>
-            <Pressable style={[styles.actionMenu, getMenuPosition(menuAnchor)]} onPress={e => e.stopPropagation()}>
+            <Pressable
+              style={[styles.actionMenu, getMenuPosition(menuAnchor)]}
+              onPress={() => {}}
+            >
               {(() => {
                 const selectedRow = filteredData.find(r => r.id === openMenuId);
-                const isInProgress = ['in progress', 'inprogress'].includes(
-                  (selectedRow?.invoiceStatus || '').toLowerCase(),
-                );
-                return isInProgress && (
-                  <TouchableOpacity
-                    style={styles.menuItem}
-                    onPress={() => handleMenuAction('sendMail', openMenuId as string)}>
-                    <FontAwesome6 name="envelope" iconStyle="regular" color={Colors.darkblack} size={16} />
-                    <Text style={styles.menuItemText}>Send Mail to Bank</Text>
-                  </TouchableOpacity>
+                const status = (selectedRow?.invoiceStatus || '').toLowerCase();
+                const isDisbursed = status === 'disbursed';
+                return (
+                  <>
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => handleMenuAction('sendMail', openMenuId as string)}>
+                      <FontAwesome6 name="envelope" iconStyle="regular" color={Colors.darkblack} size={16} />
+                      <Text style={styles.menuItemText}>Send Mail to Bank</Text>
+                    </TouchableOpacity>
+                    {!isDisbursed && (
+                      <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => handleMenuAction('markAsDisbursed', openMenuId as string)}>
+                        <FontAwesome6 name="money-bill-1" iconStyle="regular" color={Colors.darkblack} size={16} />
+                        <Text style={styles.menuItemText}>Mark as Disbursed</Text>
+                      </TouchableOpacity>
+                    )}
+                  </>
                 );
               })()}
             </Pressable>
@@ -637,20 +666,21 @@ export const DisbursementScreen: React.FC = () => {
           if (!selectedDisbursementId) return;
           try {
             const amount = parseFloat(
-              (data.disbursedAmount || '0').replace(/,/g, ''),
+              (data.disbursedAmount || '0').replace(/[,\s₹]/g, ''),
             );
             const dateParts = (data.date || '').split('-');
             const disbursementDate =
               dateParts.length === 3
                 ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`
                 : data.date;
+            const isDisbursed = (data.status || '').toLowerCase() === 'disbursed';
             await invoiceApi.markAsDisbursed(selectedDisbursementId, {
-              utr_no: data.utrRefNo || '',
-              transaction_no: data.userId || data.debitFrom || data.utrRefNo || '',
-              disbursed_amount: isNaN(amount) ? 0 : amount,
+              utr_no: data.utrNo || '',
+              transaction_no: data.transactionNo || '',
+              disbursed_amount: isDisbursed && !isNaN(amount) ? amount : 0,
               disbursement_date: disbursementDate || new Date().toISOString().slice(0, 10),
-              status: 'Disbursed',
-              remark: '',
+              status: data.status || 'Disbursed',
+              remark: data.remark || '',
             });
             Toast.show({
               type: 'success',
@@ -674,6 +704,9 @@ export const DisbursementScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  scroll: {
+    backgroundColor: Colors.white,
+  },
   content: {
     paddingHorizontal: scaleWidth(16),
     paddingBottom: scaleHeight(24),
@@ -814,6 +847,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
   },
+  threeDotsTouchable: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   menuOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
@@ -877,6 +916,18 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: scaleFont(14),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  loadMoreFooter: {
+    paddingVertical: scaleHeight(16),
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: scaleWidth(8),
+  },
+  loadMoreText: {
+    fontSize: scaleFont(13),
     color: Colors.graybase,
     fontFamily: Fonts.GilroyMedium,
   },

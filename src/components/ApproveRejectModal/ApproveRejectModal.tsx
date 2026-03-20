@@ -21,7 +21,6 @@ export type ApproveRejectInvoiceDetails = {
   finalDueDate?: string;
   /** Anchor checker layout fields */
   dealerName?: string;
-  creditAccountNumber?: string;
   anchorName?: string;
   invoiceDate?: string;
   invoiceDueDate?: string;
@@ -33,7 +32,7 @@ type ApproveRejectModalProps = {
   onClose: () => void;
   invoiceId?: string | null;
   invoiceNo?: string | null;
-  /** Use 'anchor_checker' for Dealer Name, Credit Account, Anchor Name, Invoice Date/Due Date, Invoice Amount layout; 'cashntech_verification' for CashnTech Verify/Reject */
+  /** Use 'anchor_checker' for Dealer Name, Anchor Name, Invoice Date/Due Date, Invoice Amount layout; 'cashntech_verification' for CashnTech Verify/Reject */
   variant?: 'default' | 'anchor_checker' | 'cashntech_verification';
   invoiceDetails?: ApproveRejectInvoiceDetails;
   /** Show loading in details table (e.g. when fetching invoice details for anchor_checker) */
@@ -62,20 +61,15 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   const isAnchorChecker = variant === 'anchor_checker';
   const isCashnTechVerification = variant === 'cashntech_verification';
   const invoiceLabel = invoiceNo || invoiceId || 'N/A';
-  const modalTitle =
-    isCashnTechVerification || isAnchorChecker
+  const modalTitle = isAnchorChecker
+    ? 'Invoice Verification'
+    : isCashnTechVerification
       ? `Invoice : ${invoiceLabel}`
       : 'Approval or reject popup';
   const confirmText = isCashnTechVerification ? (
     <>
       Are you sure you want to verify or reject this Invoice{' '}
       <Text style={styles.invoiceNoBold}>{invoiceLabel}</Text>?
-    </>
-  ) : isAnchorChecker ? (
-    <>
-      Are you sure, you want to approve or reject this
-      {' '}
-      <Text style={styles.invoiceNoBold}>invoice</Text>?
     </>
   ) : (
     <>
@@ -97,7 +91,6 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
     finalPayableAmount: '10,80,025/-',
     finalDueDate: 'dd-mm-yyyy',
     dealerName: 'Dealer Name',
-    creditAccountNumber: '-',
     anchorName: 'Anchor Name',
     invoiceDate: 'DD / MM / YYYY',
     invoiceDueDate: 'DD / MM / YYYY',
@@ -140,7 +133,13 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
             <View style={styles.modalContainer}>
               {/* Header with Title and Close Button */}
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{modalTitle}</Text>
+                <Text
+                  style={[
+                    styles.modalTitle,
+                    isAnchorChecker && styles.modalTitleAnchorChecker,
+                  ]}>
+                  {modalTitle}
+                </Text>
                 <TouchableOpacity
                   onPress={handleClose}
                   style={styles.closeButton}
@@ -151,8 +150,21 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
 
               {/* Content */}
               <View style={styles.modalContent}>
-                {/* Confirmation Message */}
-                <Text style={styles.confirmationText}>{confirmText}</Text>
+                {isAnchorChecker ? (
+                  <>
+                    <Text style={styles.anchorCheckerConfirmText}>
+                      Are you sure, you want to approve or reject this invoice?
+                    </Text>
+                    <Text style={styles.anchorCheckerRefLine}>
+                      Invoice / Unique Ref. No - {invoiceLabel}
+                    </Text>
+                    <View style={styles.detailsSectionHeader}>
+                      <Text style={styles.detailsSectionHeaderText}>Details</Text>
+                    </View>
+                  </>
+                ) : (
+                  <Text style={styles.confirmationText}>{confirmText}</Text>
+                )}
 
                 {/* Invoice Details Table */}
                 <View style={styles.detailsTable}>
@@ -170,10 +182,6 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                       <View style={styles.tableRow}>
                         <Text style={styles.tableLabel}>Anchor Name:</Text>
                         <Text style={styles.tableValue}>{details.anchorName || '-'}</Text>
-                      </View>
-                      <View style={styles.tableRow}>
-                        <Text style={styles.tableLabel}>Credit Account Number:</Text>
-                        <Text style={styles.tableValue}>{details.creditAccountNumber || '-'}</Text>
                       </View>
                       <View style={styles.tableRow}>
                         <Text style={styles.tableLabel}>Dealer Name:</Text>
@@ -320,6 +328,45 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
     flex: 1,
+  },
+  modalTitleAnchorChecker: {
+    textAlign: 'center',
+  },
+  /** Anchor checker: order matches web — question, then ref, then Details bar */
+  anchorCheckerConfirmText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: '#4A4A4A',
+    textAlign: 'center',
+    marginBottom: scaleHeight(12),
+    lineHeight: scaleHeight(20),
+  },
+  anchorCheckerRefLine: {
+    fontSize: scaleFont(15),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    textAlign: 'center',
+    marginBottom: scaleHeight(12),
+  },
+  detailsSectionHeader: {
+    backgroundColor: '#E8EAED',
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: scaleWidth(12),
+    marginBottom: scaleHeight(10),
+    marginHorizontal: -scaleWidth(16),
+    borderRadius: scaleWidth(6),
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  detailsSectionHeaderText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
   },
   closeButton: {
     width: scaleWidth(24),

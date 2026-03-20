@@ -286,85 +286,89 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                         </Text>
                       </TouchableOpacity>
 
-                      {/* 3. Disbursement - Anchor Maker, Anchor Checker, Dealer Maker, Dealer Checker & CashnTech User */}
+                      {/* 3. Disbursement - disabled for Anchor Checker (like Repayment & Settlement) */}
                       {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) && (
-                        <TouchableOpacity
-                          style={[
-                            styles.button,
-                            currentRoute === 'DisbursementScreen' && styles.activeButton,
-                          ]}
-                          onPress={() => {
-                            navigation.navigate('DisbursementScreen');
-                            navigation.closeDrawer();
-                          }}>
-                          <Text
+                        isAnchorChecker ? (
+                          <TouchableOpacity
+                            style={[styles.button, styles.disabledMenuItem]}
+                            onPress={() => {}}
+                            activeOpacity={1}>
+                            <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
+                              Disbursement
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity
                             style={[
-                              styles.buttonText,
-                              currentRoute === 'DisbursementScreen' && styles.activeButtonText,
-                            ]}>
-                            Disbursement
-                          </Text>
-                        </TouchableOpacity>
+                              styles.button,
+                              currentRoute === 'DisbursementScreen' && styles.activeButton,
+                            ]}
+                            onPress={() => {
+                              navigation.navigate('DisbursementScreen');
+                              navigation.closeDrawer();
+                            }}>
+                            <Text
+                              style={[
+                                styles.buttonText,
+                                currentRoute === 'DisbursementScreen' && styles.activeButtonText,
+                              ]}>
+                              Disbursement
+                            </Text>
+                          </TouchableOpacity>
+                        )
                       )}
 
-                      {/* 4. Interest Accruals - Anchor Maker, Anchor Checker, Dealer Maker, Dealer Checker & CashnTech User */}
+                      {/* 4. Interest Accruals - disabled for Anchor Checker (like Repayment & Settlement) */}
                       {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) && (
-                        <TouchableOpacity
-                          style={[
-                            styles.button,
-                            currentRoute === 'InterestAccrualsScreen' && styles.activeButton,
-                          ]}
-                          onPress={() => {
-                            navigation.navigate('InterestAccrualsScreen');
-                            navigation.closeDrawer();
-                          }}>
-                          <Text
+                        isAnchorChecker ? (
+                          <TouchableOpacity
+                            style={[styles.button, styles.disabledMenuItem]}
+                            onPress={() => {}}
+                            activeOpacity={1}>
+                            <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
+                              Interest Accruals
+                            </Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity
                             style={[
-                              styles.buttonText,
-                              currentRoute === 'InterestAccrualsScreen' && styles.activeButtonText,
-                            ]}>
-                            Interest Accruals
-                          </Text>
-                        </TouchableOpacity>
+                              styles.button,
+                              currentRoute === 'InterestAccrualsScreen' && styles.activeButton,
+                            ]}
+                            onPress={() => {
+                              navigation.navigate('InterestAccrualsScreen');
+                              navigation.closeDrawer();
+                            }}>
+                            <Text
+                              style={[
+                                styles.buttonText,
+                                currentRoute === 'InterestAccrualsScreen' && styles.activeButtonText,
+                              ]}>
+                              Interest Accruals
+                            </Text>
+                          </TouchableOpacity>
+                        )
                       )}
 
-                      {/* 5. Repayment & Settlement - Anchor Maker, Anchor Checker, Dealer Maker, Dealer Checker & CashnTech User */}
+                      {/* 5. Repayment & Settlement - visible but disabled for now */}
                       {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) && (
                         <TouchableOpacity
-                          style={[
-                            styles.button,
-                            currentRoute === 'RepaymentSettlementScreen' && styles.activeButton,
-                          ]}
-                          onPress={() => {
-                            navigation.navigate('RepaymentSettlementScreen');
-                            navigation.closeDrawer();
-                          }}>
-                          <Text
-                            style={[
-                              styles.buttonText,
-                              currentRoute === 'RepaymentSettlementScreen' && styles.activeButtonText,
-                            ]}>
+                          style={[styles.button, styles.disabledMenuItem]}
+                          onPress={() => {}}
+                          activeOpacity={1}>
+                          <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
                             Repayment & Settlement
                           </Text>
                         </TouchableOpacity>
                       )}
 
-                      {/* 6. DPD / Penal Interest / NPA - Anchor Maker, Anchor Checker, Dealer Maker, Dealer Checker & CashnTech User */}
+                      {/* 6. DPD / Penal Interest / NPA - visible but disabled for now */}
                       {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) && (
                         <TouchableOpacity
-                          style={[
-                            styles.button,
-                            currentRoute === 'DPDPenalInterestNPAScreen' && styles.activeButton,
-                          ]}
-                          onPress={() => {
-                            navigation.navigate('DPDPenalInterestNPAScreen');
-                            navigation.closeDrawer();
-                          }}>
-                          <Text
-                            style={[
-                              styles.buttonText,
-                              currentRoute === 'DPDPenalInterestNPAScreen' && styles.activeButtonText,
-                            ]}>
+                          style={[styles.button, styles.disabledMenuItem]}
+                          onPress={() => {}}
+                          activeOpacity={1}>
+                          <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
                             DPD / Penal Interest / NPA
                           </Text>
                         </TouchableOpacity>
