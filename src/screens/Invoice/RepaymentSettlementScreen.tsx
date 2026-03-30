@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useMemo, useState, useEffect} from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -6,12 +6,17 @@ import {
   TouchableOpacity,
   View,
   TextInput,
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  Dimensions,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useSelector} from 'react-redux';
+import {useSelector, useDispatch} from 'react-redux';
+import {repaymentActions, repaymentSelectors} from '@store/repayment';
 import {
   AppBar,
   Container,
@@ -21,10 +26,16 @@ import {
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
-import {Search, Filter} from '@assets/Icons';
+import {Search, Filter, Dots} from '@assets/Icons';
+import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
-import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import {selectProgramSelection, selectAllProgramIds} from '@store/programSelection/programSelection.selector';
+import {decryptValue} from '@utils/decrypt';
+import Endpoints from '@constants/ApiEndPoints';
+import {formatDateDash} from '@screens/Invoice/InvoiceDetails/types';
+import {PaymentHistoryModal} from './DPDPenalInterestNPAScreen/PaymentHistoryModal';
+import {RequestWaiverModal} from './DPDPenalInterestNPAScreen/RequestWaiverModal';
 
 // Summary metrics for Repayment & Settlement
 const repaymentMetrics = [
@@ -34,20 +45,6 @@ const repaymentMetrics = [
   {label: 'Overdue Amount', value: '₹8,20,000'},
   {label: 'Total Closed Invoices', value: '12'},
 ];
-
-const repaymentRows = Array.from({length: 5}).map((_, index) => ({
-  id: `repayment-${index}`,
-  loanRefNo: '125423',
-  invoiceNo: '1234566',
-  bankName: 'UGRO',
-  productName: 'Dealer Finance',
-  programName: 'Sun Pharma PGM',
-  primaryParty: 'Sun Pharma',
-  counterParty: 'Hero Finanace',
-  invoiceAmount: '25,000.00/-',
-  invoiceDate: 'dd-mm-yyyy',
-  disbursedAmount: '25,000/-',
-}));
 
 const repaymentFilterData = {
   'Primary Party': ['Sun Pharma', 'Hero Finanace', 'ABC Finance'],
@@ -62,19 +59,107 @@ export const RepaymentSettlementScreen: React.FC = () => {
   >>();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const programSelection = useSelector(selectProgramSelection);
-  const programName = programSelection?.programName ?? 'Sun Pharma PGM';
+  const allProgramIds = useSelector(selectAllProgramIds);
   const isDealerMaker = userRole === 'dealer_maker';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
+  
+  const dispatch = useDispatch();
+  const repaymentData = useSelector(repaymentSelectors.selectRepaymentList);
+  const loading = useSelector(repaymentSelectors.selectRepaymentLoading);
+
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<{x: number; y: number; width: number; height: number} | null>(null);
+  const menuButtonRefs = React.useRef<Record<string, any>>({});
+  const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
+  const [showRequestWaiverModal, setShowRequestWaiverModal] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<any | null>(null);
+
+  const handleMenuToggle = (rowId: string) => {
+    if (openMenuId === rowId) {
+      setOpenMenuId(null);
+      setMenuAnchor(null);
+      return;
+    }
+    const ref = menuButtonRefs.current[rowId] as any;
+    if (ref?.measureInWindow) {
+      ref.measureInWindow((x: number, y: number, width: number, height: number) => {
+        setMenuAnchor({x, y, width, height});
+        setOpenMenuId(rowId);
+      });
+    } else {
+      setMenuAnchor(null);
+      setOpenMenuId(rowId);
+    }
+  };
+
+  const handleMenuAction = (action: string, rowId: string) => {
+    setOpenMenuId(null);
+    setMenuAnchor(null);
+    const row = filteredData.find(r => r.id === rowId) ?? null;
+    setSelectedRow(row);
+    switch (action) {
+      case 'paymentHistory':
+        setShowPaymentHistoryModal(true);
+        break;
+      case 'requestWaiver':
+        setShowRequestWaiverModal(true);
+        break;
+    }
+  };
+
+  const getMenuPosition = (anchor: {x: number; y: number; width: number; height: number} | null) => {
+    const screen = Dimensions.get('window');
+    const menuWidth = scaleWidth(200);
+    const horizontalPadding = scaleWidth(12);
+    const topPadding = scaleHeight(8);
+    if (!anchor) {
+      return {position: 'absolute' as const, top: topPadding + scaleHeight(60), right: horizontalPadding};
+    }
+    const desiredLeft = anchor.x + anchor.width - menuWidth;
+    const left = Math.max(horizontalPadding, Math.min(desiredLeft, screen.width - menuWidth - horizontalPadding));
+    return {position: 'absolute' as const, top: anchor.y + anchor.height + topPadding, left};
+  };
+
+  useEffect(() => {
+    const programIds = programSelection?.programScope === 'all'
+      ? allProgramIds || undefined
+      : programSelection?.programId
+        ? [programSelection.programId]
+        : undefined;
+
+    const payload = programSelection?.programScope === 'all'
+      ? {}
+      : {programIds};
+
+    dispatch(repaymentActions.fetchRepaymentListRequest(payload));
+  }, [programSelection?.programScope, programSelection?.programId, allProgramIds, dispatch]);
 
   const filteredData = useMemo(() => {
-    let data = repaymentRows;
+    let data = repaymentData.map((item: any) => ({
+      id: item.id,
+      loanRefNo: item.loan_ref_no || '-',
+      invoiceNo: item.invoice_ref_no || '-',
+      bankName: item.bank_name || '-',
+      productName: item.name || '-',
+      programName: item.program_name || '-',
+      primaryParty: item.partyName ? decryptValue(item.partyName) : '-',
+      counterParty: item.counterPartyName ? decryptValue(item.counterPartyName) : '-',
+      invoiceAmount: item.final_total ? `₹${Number(item.final_total).toLocaleString('en-IN')}` : '-',
+      invoiceDate: item.invoice_date ? formatDateDash(item.invoice_date) : '-',
+      disbursedAmount: item.disbursed_amount ? `₹${Number(item.disbursed_amount).toLocaleString('en-IN')}` : '-',
+      totalOutstandingAmount: item.total_outstanding ? `₹${Number(item.total_outstanding).toLocaleString('en-IN')}` : '-',
+      outstandingPrinciple: item.outstanding_principal ? `₹${Number(item.outstanding_principal).toLocaleString('en-IN')}` : '-',
+      dueDate: item.invoice_due_date ? formatDateDash(item.invoice_due_date) : '-',
+      invoiceStatus: item.invoice_status || '-'
+    }));
+
     if (searchText.trim()) {
       const term = searchText.toLowerCase();
       data = data.filter(
-        item =>
+        (item: any) =>
           (item.primaryParty?.toLowerCase() || '').includes(term) ||
           (item.counterParty?.toLowerCase() || '').includes(term) ||
           (item.loanRefNo?.toLowerCase() || '').includes(term) ||
@@ -83,7 +168,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
       );
     }
     return data;
-  }, [searchText]);
+  }, [searchText, repaymentData]);
 
   return (
     <Container>
@@ -92,7 +177,9 @@ export const RepaymentSettlementScreen: React.FC = () => {
         navigation={navigation as any}
       />
       <ProgramBreadcrumb />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView 
+        contentContainerStyle={styles.content}
+        onScrollBeginDrag={() => { setOpenMenuId(null); setMenuAnchor(null); }}>
         <View style={styles.pageTitleBar}>
           <Text style={styles.pageTitleText}>Repayment and Settlement</Text>
         </View>
@@ -136,68 +223,84 @@ export const RepaymentSettlementScreen: React.FC = () => {
         </View>
 
         <View style={styles.verticalList}>
-          {filteredData.map(row => (
-            <View key={row.id} style={styles.cardWrapper}>
-              <View style={styles.listCard}>
-                <View style={styles.infoGrid}>
-                  {isDealerMaker ? (
-                    <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Counter Party</Text>
-                      <Text style={styles.infoValue}>{row.counterParty}</Text>
+          {loading ? (
+            <ActivityIndicator size="large" color={Colors.primaryColor} style={{ marginTop: scaleHeight(20) }} />
+          ) : (
+            filteredData.map(row => (
+                <View key={row.id} style={styles.cardWrapper}>
+                  <View style={styles.listCard}>
+                    <View style={styles.indexBadge}>
+                      <Text style={styles.indexText}>{filteredData.indexOf(row) + 1}</Text>
                     </View>
-                  ) : (
+                    <TouchableOpacity
+                    ref={r => { if (r) menuButtonRefs.current[row.id] = r; }}
+                    style={styles.threeDotsButton}
+                    onPress={() => handleMenuToggle(row.id)}
+                    activeOpacity={0.7}>
+                    <Dots width={scaleWidth(20)} height={scaleHeight(20)} style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}} />
+                  </TouchableOpacity>
+                  <View style={styles.infoGrid}>
                     <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Primary Party</Text>
-                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                      <Text style={styles.infoLabel}>Loan Ref No.</Text>
+                      <Text style={styles.infoValue}>{row.loanRefNo}</Text>
                     </View>
-                  )}
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Loan Ref No.</Text>
-                    <Text style={styles.infoValue}>{row.loanRefNo}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice No</Text>
-                    <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Bank Name</Text>
-                    <Text style={styles.infoValue}>{row.bankName}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Product Name</Text>
-                    <Text style={styles.infoValue}>{row.productName}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Program Name</Text>
-                    <Text style={styles.infoValue}>{row.programName}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice Date</Text>
-                    <Text style={styles.infoValue}>{row.invoiceDate}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Disbursed Amount</Text>
-                    <Text style={styles.infoValue}>{row.disbursedAmount}</Text>
-                  </View>
-                  {isDealerMaker ? (
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice No</Text>
+                      <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Bank Name</Text>
+                      <Text style={styles.infoValue}>{row.bankName}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Product Name</Text>
+                      <Text style={styles.infoValue}>{row.productName}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Program Name</Text>
+                      <Text style={styles.infoValue}>{row.programName}</Text>
+                    </View>
                     <View style={styles.infoColumn}>
                       <Text style={styles.infoLabel}>Primary Party</Text>
                       <Text style={styles.infoValue}>{row.primaryParty}</Text>
                     </View>
-                  ) : (
                     <View style={styles.infoColumn}>
                       <Text style={styles.infoLabel}>Counter Party</Text>
                       <Text style={styles.infoValue}>{row.counterParty}</Text>
                     </View>
-                  )}
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Date</Text>
+                      <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Disbursed Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.disbursedAmount}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Total Outstanding Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.totalOutstandingAmount}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Outstanding Principle (₹)</Text>
+                      <Text style={styles.infoValue}>{row.outstandingPrinciple}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Due Date</Text>
+                      <Text style={styles.infoValue}>{row.dueDate}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Status</Text>
+                      <Text style={[styles.infoValue, { color: Colors.green, fontFamily: Fonts.GilroySemiBold }]}>{row.invoiceStatus}</Text>
+                    </View>
+                  </View>
                 </View>
               </View>
-            </View>
-          ))}
+            ))
+          )}
         </View>
       </ScrollView>
 
@@ -210,6 +313,40 @@ export const RepaymentSettlementScreen: React.FC = () => {
         }}
         filterData={repaymentFilterData}
         appliedFilters={appliedFilters}
+      />
+
+      <Modal transparent visible={!!openMenuId} animationType="fade" onRequestClose={() => { setOpenMenuId(null); setMenuAnchor(null); }}>
+        <Pressable style={styles.menuOverlay} onPress={() => { setOpenMenuId(null); setMenuAnchor(null); }}>
+          <Pressable style={[styles.actionMenu, getMenuPosition(menuAnchor)]} onPress={e => e.stopPropagation()}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuAction('paymentHistory', openMenuId as string)}>
+              <FontAwesome6 name="calendar-check" iconStyle="solid" color={Colors.darkblack} size={16} />
+              <Text style={styles.menuItemText}>Payment History</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuAction('requestWaiver', openMenuId as string)}>
+              <FontAwesome6 name="calendar-check" iconStyle="solid" color={Colors.darkblack} size={16} />
+              <Text style={styles.menuItemText}>Request Waiver</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <PaymentHistoryModal
+        visible={showPaymentHistoryModal}
+        onClose={() => { setShowPaymentHistoryModal(false); setSelectedRow(null); }}
+        accountNo={selectedRow?.loanRefNo}
+      />
+
+      <RequestWaiverModal
+        visible={showRequestWaiverModal}
+        onClose={() => { setShowRequestWaiverModal(false); setSelectedRow(null); }}
+        loanRefNo={selectedRow?.loanRefNo ?? ''}
+        outstandingAmount={selectedRow?.totalOutstandingAmount?.replace('/-', '') ?? '15,556'}
+        onSubmit={data => {
+          void selectedRow?.id;
+          void data;
+          setShowRequestWaiverModal(false);
+          setSelectedRow(null);
+        }}
       />
     </Container>
   );
@@ -283,6 +420,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(12),
     padding: scaleWidth(16),
+    paddingRight: scaleWidth(50),
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E6E6E6',
     shadowColor: '#00000035',
@@ -291,8 +429,29 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
+  threeDotsButton: { position: 'absolute', top: scaleHeight(12), right: scaleWidth(12), width: scaleWidth(32), height: scaleWidth(32), borderRadius: scaleWidth(16), backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.1)' },
+  actionMenu: { backgroundColor: Colors.white, borderRadius: scaleWidth(8), paddingVertical: scaleHeight(8), paddingHorizontal: scaleWidth(12), minWidth: scaleWidth(180), elevation: 8, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.25, shadowRadius: 4 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: scaleWidth(12), paddingVertical: scaleHeight(8) },
+  menuItemText: { fontSize: scaleFont(14), fontFamily: Fonts.GilroyMedium, color: Colors.darkblack },
   infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: scaleWidth(12) },
   infoColumn: { width: '47%', backgroundColor: '#F7F8FB', borderRadius: scaleWidth(10), padding: scaleWidth(12) },
   infoLabel: { fontSize: scaleFont(12), color: Colors.graybase, marginBottom: scaleHeight(4) },
   infoValue: { fontSize: scaleFont(14), color: Colors.darkblack, fontFamily: Fonts.GilroyMedium },
+  indexBadge: {
+    backgroundColor: '#F7F8FB',
+    width: scaleWidth(28),
+    height: scaleWidth(28),
+    borderRadius: scaleWidth(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: scaleHeight(12),
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+  },
+  indexText: {
+    color: Colors.graybase,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
+  },
 });

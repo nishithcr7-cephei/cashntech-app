@@ -55,6 +55,9 @@ export type InvoiceFields = {
   sgst: string; // State GST
   grandTotal: string; // Grand Total (Final Amount + CGST + SGST)
 
+  // Attachments
+  attachments?: {id: number; attachment_url: string}[];
+
   // Legacy fields (keep for backward compatibility / additional extraction)
   vendorName?: string;
   memberName?: string;

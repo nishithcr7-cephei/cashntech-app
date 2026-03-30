@@ -4,6 +4,10 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Dots} from '@assets/Icons';
 import type {InvoiceRow} from './types';
+import {useHasPermission} from '@hooks/index';
+import {PERMISSIONS} from '@constants/permissions';
+import {useSelector} from 'react-redux';
+import {selectPermissionsLoading} from '@store/permissions';
 
 const STATUS_ORANGE = '#E86C00';
 
@@ -38,11 +42,13 @@ type Props = {
   isDealerChecker: boolean;
   isAnchorChecker: boolean;
   isCashnTechUser?: boolean;
+  storedUserRole?: string;
   isSelected: boolean;
   onMenuToggle: (id: string) => void;
   onToggleSelection: (id: string) => void;
   onInvoiceNoPress?: (invoiceId: string, invoiceNo: string) => void;
   registerMenuRef: (id: string, ref: View | null) => void;
+  index: number;
 };
 
 export const InvoiceDetailsCard: React.FC<Props> = ({
@@ -52,17 +58,44 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   isDealerChecker,
   isAnchorChecker,
   isCashnTechUser = false,
+  storedUserRole,
   isSelected,
   onMenuToggle,
   onToggleSelection,
   onInvoiceNoPress,
   registerMenuRef,
+  index,
 }) => {
+  const permissionsLoading = useSelector(selectPermissionsLoading);
+  const canEdit = useHasPermission(PERMISSIONS.INVOICE_LIST_EDIT);
+  const canDelete = useHasPermission(PERMISSIONS.INVOICE_LIST_DELETE);
+  const canApprove = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVE);
+  const canReject = useHasPermission(PERMISSIONS.INVOICE_LIST_REJECT);
+  const canViewHistory = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVAL_HISTORY);
+  const canAttachment = useHasPermission(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
+  const canRecreate = useHasPermission(PERMISSIONS.INVOICE_LIST_RECREATE);
+  const canPrint = useHasPermission(PERMISSIONS.INVOICE_LIST_PRINT);
+
+  const hasAnyActionPermission = 
+    canEdit || canDelete || canApprove || canReject || 
+    canViewHistory || canAttachment || canRecreate || canPrint;
+
   const invoiceStatusLower = (row.invoiceStatus || '').toLowerCase();
   const approvalStatusLower = (row.approvalStatus || '').toLowerCase();
-  const showPendingBlueDot = isAnchorChecker
-    ? approvalStatusLower.includes('pending')
-    : invoiceStatusLower.includes('in progress');
+  const adminStatusLower = (row.adminStatus || '').toLowerCase();
+
+  // Role-based Blue Dot Logic (Case-insensitive check)
+  const roleCheckStr = `Pending ${storedUserRole || ''}`.trim().toLowerCase();
+  const isPendingMyRole = !!storedUserRole && (approvalStatusLower === roleCheckStr || approvalStatusLower.includes(roleCheckStr));
+  
+  const rawAdminStatusLower = (row.rawAdminStatus || '').toLowerCase();
+  const isNotVerified = rawAdminStatusLower !== 'verified' && rawAdminStatusLower !== 'pending_verification' && adminStatusLower !== 'verified' && adminStatusLower !== 'pending verification';
+  
+  const rawApprovalStatusLower = (row.rawApprovalStatus || '').toLowerCase();
+  const isNotCompletedOrRejected = rawApprovalStatusLower !== 'approval_complete' && rawApprovalStatusLower !== 'completed' && !approvalStatusLower.includes('completed') && !approvalStatusLower.includes('rejected');
+
+  const showPendingBlueDot = !!storedUserRole && isPendingMyRole && isNotVerified && isNotCompletedOrRejected;
+
   const partyTitle = isDealerMaker || isDealerChecker
     ? row.counterParty || row.dealerName
     : row.dealerName;
@@ -70,55 +103,62 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   return (
     <View style={styles.cardWrapper}>
       <View style={styles.listCard}>
-        {(isAnchorMaker || isDealerMaker || isDealerChecker || isAnchorChecker || isCashnTechUser) && (
+        {hasAnyActionPermission && (
           <View
             ref={(r: View | null) => registerMenuRef(row.id, r)}
             collapsable={false}
             style={styles.threeDotsButton}>
             <TouchableOpacity
               onPress={() => onMenuToggle(row.id)}
+              disabled={permissionsLoading}
               activeOpacity={0.7}
               hitSlop={10}
               style={styles.threeDotsTouchable}>
               <Dots
                 width={scaleWidth(20)}
                 height={scaleHeight(20)}
+                fill={permissionsLoading ? Colors.graybase : Colors.darkblack}
                 style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}}
               />
             </TouchableOpacity>
           </View>
         )}
 
-        <View style={styles.cardHeaderContainer}>
-          {(isDealerChecker || isAnchorChecker) ? (
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={styles.dmCardHeaderRow}
-              onPress={() => onToggleSelection(row.id)}>
-              <View
-                style={[
-                  styles.checkboxBox,
-                  isSelected && styles.checkboxBoxSelected,
-                ]}>
-                {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
-              </View>
-              <View style={styles.dmCardHeaderTextWrap}>
-                {showPendingBlueDot && <View style={styles.pendingDotInline} />}
+        <View style={styles.cardHeaderArea}>
+          <View style={styles.indexBadge}>
+            <Text style={styles.indexText}>{index + 1}</Text>
+          </View>
+          <View style={styles.cardHeaderContainer}>
+            {(isDealerChecker || isAnchorChecker) ? (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.dmCardHeaderRow}
+                onPress={() => onToggleSelection(row.id)}>
+                <View
+                  style={[
+                    styles.checkboxBox,
+                    isSelected && styles.checkboxBoxSelected,
+                  ]}>
+                  {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
+                </View>
+                <View style={styles.dmCardHeaderTextWrap}>
+                  {showPendingBlueDot && <View style={styles.pendingDotInline} />}
+                  {!!partyTitle && (
+                    <Text style={styles.cardTitle}>{partyTitle}</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.makerHeaderRow}>
+                {showPendingBlueDot && <View style={styles.pendingDotStandalone} />}
                 {!!partyTitle && (
-                  <Text style={styles.cardTitle}>{partyTitle}</Text>
+                  <Text style={[styles.cardTitle, styles.cardTitleSpacing]}>
+                    {partyTitle}
+                  </Text>
                 )}
               </View>
-            </TouchableOpacity>
-          ) : (
-            <>
-              {showPendingBlueDot && <View style={styles.pendingDotStandalone} />}
-              {!!partyTitle && (
-                <Text style={[styles.cardTitle, styles.cardTitleSpacing]}>
-                  {partyTitle}
-                </Text>
-              )}
-            </>
-          )}
+            )}
+          </View>
         </View>
 
         <View style={styles.infoGrid}>
@@ -201,9 +241,17 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
-  cardHeaderContainer: {
+  cardHeaderArea: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     marginBottom: scaleHeight(12),
+  },
+  cardHeaderContainer: {
+    flex: 1,
     paddingRight: scaleWidth(50),
+  },
+  makerHeaderRow: {
+    justifyContent: 'center',
   },
   pendingDotInline: {
     width: scaleWidth(8),
@@ -319,5 +367,21 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  indexBadge: {
+    backgroundColor: '#F7F8FB',
+    width: scaleWidth(28),
+    height: scaleWidth(28),
+    borderRadius: scaleWidth(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    marginRight: scaleWidth(12),
+  },
+  indexText: {
+    color: Colors.graybase,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
   },
 });

@@ -39,6 +39,8 @@ import {
   InvoiceDailyInterestScreen,
   RepaymentSettlementScreen,
   DPDPenalInterestNPAScreen,
+  StatementOfAccount,
+  SOADealerList,
   ProfileScreen,
 } from '@screens/index';
 
@@ -99,6 +101,8 @@ export const HomeNavigator = () => {
       />
       <Drawer.Screen name="RepaymentSettlementScreen" component={RepaymentSettlementScreen} />
       <Drawer.Screen name="DPDPenalInterestNPAScreen" component={DPDPenalInterestNPAScreen} />
+      <Drawer.Screen name="StatementOfAccount" component={StatementOfAccount} />
+      <Drawer.Screen name="SOADealerList" component={SOADealerList} />
       <Drawer.Screen name="OcrInvoice" component={OcrInvoiceScreen} />
       <Drawer.Screen name="Profile" component={ProfileScreen} />
     </Drawer.Navigator>

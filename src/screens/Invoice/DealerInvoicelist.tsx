@@ -124,10 +124,13 @@ export const DealerInvoiceList: React.FC = () => {
 
         {/* Dealer List - Vertical Card View */}
         <View style={styles.verticalList}>
-          {filteredData.map(row => (
+          {filteredData.map((row, index) => (
             <View key={row.id} style={styles.listCard}>
               <View style={styles.cardHeaderRow}>
-                <View>
+                <View style={styles.indexBadge}>
+                  <Text style={styles.indexText}>{index + 1}</Text>
+                </View>
+                <View style={styles.cardHeaderTextContent}>
                   <Text style={styles.cardTitle}>{row.dealerName}</Text>
                   <Text style={styles.cardSubtitle}>
                     Company Unique ID: {row.companyUniqueId}
@@ -306,6 +309,25 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     color: Colors.darkblack,
     fontFamily: Fonts.GilroyMedium,
+  },
+  indexBadge: {
+    backgroundColor: '#F7F8FB',
+    width: scaleWidth(28),
+    height: scaleWidth(28),
+    borderRadius: scaleWidth(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    marginRight: scaleWidth(12),
+  },
+  indexText: {
+    color: Colors.graybase,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
+  },
+  cardHeaderTextContent: {
+    flex: 1,
   },
 });
 

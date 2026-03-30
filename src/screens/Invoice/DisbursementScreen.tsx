@@ -36,6 +36,9 @@ import {invoiceApi} from '@services/api/invoice.api';
 import {formatDateDash} from './InvoiceDetails/types';
 import Toast from 'react-native-toast-message';
 import {decryptValue} from '@utils/decrypt';
+import {useHasPermission} from '@hooks/index';
+import {PERMISSIONS} from '@constants/permissions';
+import {selectPermissionsLoading} from '@store/permissions';
 
 export type DisbursementRow = {
   id: string;
@@ -142,7 +145,17 @@ export const DisbursementScreen: React.FC = () => {
       ? 'All Program'
       : programSelection?.programName ?? 'Sun Pharma PGM';
   const isCashnTechUser = userRole === 'cashntech_user';
-  const showDisbursementActionMenu = isCashnTechUser;
+  
+  // Permissions
+  const permissionsLoading = useSelector(selectPermissionsLoading);
+  const canViewDisbursement = useHasPermission(PERMISSIONS.DISBURSEMENT);
+  const canMarkAsDisbursed = useHasPermission(PERMISSIONS.DISBURSEMENT_MARK_AS_DISBURSED);
+  const canSendMail = useHasPermission(PERMISSIONS.DISBURSEMENT_SEND_MAIL);
+  const canDeleteDisbursement = useHasPermission(PERMISSIONS.DISBURSEMENT_DELETE);
+  const canExport = useHasPermission(PERMISSIONS.DISBURSEMENT_EXPORT);
+  const canFilter = useHasPermission(PERMISSIONS.DISBURSEMENT_FILTER);
+
+  const showDisbursementActionMenu = canMarkAsDisbursed || canSendMail || canDeleteDisbursement;
 
   const [disbursementRows, setDisbursementRows] = useState<DisbursementRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -414,7 +427,7 @@ export const DisbursementScreen: React.FC = () => {
   const renderDisbursementRow = ({item: row}: {item: DisbursementRow}) => (
     <View style={styles.cardWrapper}>
       <View style={styles.listCard}>
-        {isCashnTechUser && (
+        {showDisbursementActionMenu && (
           <View
             ref={(r: View | null) => {
               if (r) menuButtonRefs.current[row.id] = r;
@@ -423,16 +436,21 @@ export const DisbursementScreen: React.FC = () => {
             style={styles.threeDotsButton}>
             <TouchableOpacity
               onPress={() => handleMenuToggle(row.id)}
+              disabled={permissionsLoading}
               activeOpacity={0.7}
               style={styles.threeDotsTouchable}>
               <Dots
                 width={scaleWidth(20)}
                 height={scaleHeight(20)}
+                fill={permissionsLoading ? Colors.graybase : Colors.darkblack}
                 style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}}
               />
             </TouchableOpacity>
           </View>
         )}
+        <View style={styles.indexBadge}>
+          <Text style={styles.indexText}>{disbursementRows.indexOf(row) + 1}</Text>
+        </View>
         <View style={styles.infoGrid}>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Loan Ref No.</Text>
@@ -588,6 +606,12 @@ export const DisbursementScreen: React.FC = () => {
         }
       />
 
+      {!canViewDisbursement && !loading && (
+        <View style={styles.accessDeniedOverlay}>
+          <Text style={styles.accessDeniedText}>You do not have permission to view this screen.</Text>
+        </View>
+      )}
+
       {/* 3-dot Action Menu - Disbursal list view: Checker & CashnTech User - Send Mail to Bank, Mark as Disbursed, Delete */}
       {showDisbursementActionMenu && (
         <Modal
@@ -614,18 +638,31 @@ export const DisbursementScreen: React.FC = () => {
                 const isDisbursed = status === 'disbursed';
                 return (
                   <>
-                    <TouchableOpacity
-                      style={styles.menuItem}
-                      onPress={() => handleMenuAction('sendMail', openMenuId as string)}>
-                      <FontAwesome6 name="envelope" iconStyle="regular" color={Colors.darkblack} size={16} />
-                      <Text style={styles.menuItemText}>Send Mail to Bank</Text>
-                    </TouchableOpacity>
-                    {!isDisbursed && (
+                    {canSendMail && (
                       <TouchableOpacity
-                        style={styles.menuItem}
+                        style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}
+                        disabled={permissionsLoading}
+                        onPress={() => handleMenuAction('sendMail', openMenuId as string)}>
+                        <FontAwesome6 name="envelope" iconStyle="regular" color={Colors.darkblack} size={16} />
+                        <Text style={[styles.menuItemText, permissionsLoading && styles.menuItemTextDisabled]}>Send Mail to Bank</Text>
+                      </TouchableOpacity>
+                    )}
+                    {canMarkAsDisbursed && !isDisbursed && (
+                      <TouchableOpacity
+                        style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}
+                        disabled={permissionsLoading}
                         onPress={() => handleMenuAction('markAsDisbursed', openMenuId as string)}>
                         <FontAwesome6 name="money-bill-1" iconStyle="regular" color={Colors.darkblack} size={16} />
-                        <Text style={styles.menuItemText}>Mark as Disbursed</Text>
+                        <Text style={[styles.menuItemText, permissionsLoading && styles.menuItemTextDisabled]}>Mark as Disbursed</Text>
+                      </TouchableOpacity>
+                    )}
+                    {canDeleteDisbursement && (
+                      <TouchableOpacity
+                        style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}
+                        disabled={permissionsLoading}
+                        onPress={() => handleMenuAction('delete', openMenuId as string)}>
+                        <FontAwesome6 name="trash-can" iconStyle="regular" color={Colors.red} size={16} />
+                        <Text style={[styles.menuItemText, {color: Colors.red}, permissionsLoading && styles.menuItemTextDisabled]}>Delete</Text>
                       </TouchableOpacity>
                     )}
                   </>
@@ -778,6 +815,26 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
   },
+  accessDeniedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  accessDeniedText: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.red,
+    textAlign: 'center',
+    paddingHorizontal: scaleWidth(40),
+  },
+  menuItemDisabled: {
+    opacity: 0.5,
+  },
+  menuItemTextDisabled: {
+    color: Colors.graybase,
+  },
   searchFilterRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -908,6 +965,22 @@ const styles = StyleSheet.create({
   statusGreen: {
     color: Colors.green,
     fontFamily: Fonts.GilroySemiBold,
+  },
+  indexBadge: {
+    backgroundColor: '#F7F8FB',
+    width: scaleWidth(28),
+    height: scaleWidth(28),
+    borderRadius: scaleWidth(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: scaleHeight(12),
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+  },
+  indexText: {
+    color: Colors.graybase,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
   },
   loadingContainer: {
     paddingVertical: scaleHeight(40),

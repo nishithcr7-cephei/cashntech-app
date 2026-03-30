@@ -21,7 +21,7 @@ export const MainNavigator = () => {
   return (
     <NavigationContainer linking={linking}>
       {isInitialized ? (
-        isLoggedIn ? <AuthNavigator /> : <AuthNavigator />
+        isLoggedIn ? <HomeNavigator /> : <AuthNavigator />
       ) : (
         <AuthNavigator />
       )}

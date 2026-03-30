@@ -14,10 +14,10 @@ export function mapApprovalLogToEntry(
   const approvedBy =
     firstName || lastName
       ? `${firstName} ${lastName}`.trim()
-      : log.action_by_role ?? log.actionByRole ?? 'Unknown';
+      : (log as any).action_by_role ?? (log as any).actionByRole ?? 'Unknown';
   const status: 'Approved' | 'Rejected' =
     log.action === 'Approve' || log.action === 'Verify' ? 'Approved' : 'Rejected';
-  const role = log.action_by_role ?? log.actionByRole ?? '';
+  const role = (log as any).action_by_role ?? (log as any).actionByRole ?? '';
   const approvalLevelRaw = log.role_approval_level;
   const approvalLevel =
     typeof approvalLevelRaw === 'number'
@@ -28,11 +28,11 @@ export function mapApprovalLogToEntry(
   const action = log.action ?? '';
   const remark = log.remark ?? '';
   const rejectionReason =
-    log.rejection_reason ?? log.rejectionReason ?? '';
+    (log as any).rejection_reason ?? (log as any).rejectionReason ?? '';
   return {
     id: log.id ?? String(Math.random()),
     approvedBy,
-    approvalDate: formatDateDash(log.action_at ?? log.actionAt ?? ''),
+    approvalDate: formatDateDash((log as any).action_at ?? (log as any).actionAt ?? ''),
     status,
     role,
     approvalLevel,
@@ -88,6 +88,9 @@ export type InvoiceRow = {
   invoiceStatus: string;
   approvalStatus: string;
   adminStatus: string;
+  rawInvoiceStatus?: string;
+  rawApprovalStatus?: string;
+  rawAdminStatus?: string;
   loanRefNo: string;
   bankName: string;
   productName: string;
@@ -119,6 +122,9 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
     invoiceStatus: item.invoice_status ? formatStatus(item.invoice_status) : '',
     approvalStatus: item.approval_status ? formatStatus(item.approval_status) : '',
     adminStatus: item.admin_status ? formatStatus(item.admin_status) : '',
+    rawInvoiceStatus: item.invoice_status,
+    rawApprovalStatus: item.approval_status,
+    rawAdminStatus: item.admin_status,
     loanRefNo: item.loan_ref_no ?? '-',
     bankName:
       item.bank_name ??

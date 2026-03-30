@@ -54,7 +54,7 @@ const invoiceOverviewSlice = createSlice({
       state,
       _action: PayloadAction<{programIds: string[]}>,
     ) => {
-      // keep existing summary/latest loading state; KPIs are lightweight
+      state.kpisLoading = true;
     },
     fetchInvoiceKpisSuccess: (
       state,
@@ -69,6 +69,7 @@ const invoiceOverviewSlice = createSlice({
       }>,
     ) => {
       state.kpis = action.payload;
+      state.kpisLoading = false;
     },
     fetchInvoiceKpisFailure: (state, _action: PayloadAction<string>) => {
       state.kpis = {
@@ -80,6 +81,7 @@ const invoiceOverviewSlice = createSlice({
         overdue_amount: '0',
         dpd_days: '0',
       };
+      state.kpisLoading = false;
     },
   },
 });

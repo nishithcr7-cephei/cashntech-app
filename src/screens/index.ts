@@ -35,7 +35,7 @@ export * from './Invoice/RejectedFinances';
 export * from './Invoice/DPDInvoiceList';
 export * from './Invoice/FundingLimitsForDealers';
 export * from './Invoice/ANCreditAccount';
-export * from './Invoice/CreditAccountDetails';
+export {CreditAccountDetails} from '../store/soa/creditAccountDetails';
 export * from './Invoice/CreditAccountInvoiceNumber';
 export * from './Invoice/CreditAccountDailyInterest';
 export * from './Invoice/FinancingRequestScreen';
@@ -52,6 +52,8 @@ export * from './Invoice/InterestAccrualsScreen';
 export * from './Invoice/InvoiceDailyInterestScreen';
 export * from './Invoice/RepaymentSettlementScreen';
 export * from './Invoice/DPDPenalInterestNPAScreen';
+export * from './Invoice/StatementOfAccount';
+export * from './Invoice/SOADealerList';
 
 // Profile exports
 export * from './Profile/ProfileScreen';

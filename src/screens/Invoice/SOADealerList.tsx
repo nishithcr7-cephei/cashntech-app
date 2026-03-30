@@ -1,0 +1,400 @@
+import React, {useEffect, useState, useCallback} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {useDispatch, useSelector} from 'react-redux';
+import {AppBar, Container} from '@components/index';
+import {Colors, Fonts} from '@constants/index';
+import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+import {Search, Filter, LeftChevron} from '@assets/Icons';
+import Toast from 'react-native-toast-message';
+import {
+  fetchDealerListRequest,
+  resetDealerState,
+} from '@store/soa/dealer/dealer.slice';
+import {
+  dealerListSelector,
+  dealerLoadingSelector,
+  dealerPageSelector,
+  dealerHasMoreSelector,
+  totalDealersSelector,
+  dealerErrorSelector,
+} from '@store/soa/dealer/dealer.selector';
+
+export const SOADealerList: React.FC = () => {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const dispatch = useDispatch();
+  const [searchText, setSearchText] = useState('');
+  
+  const programId = (route.params as any)?.programId || '';
+  const programName = (route.params as any)?.programName || 'Program name';
+
+  const dealerList = useSelector(dealerListSelector);
+  const loading = useSelector(dealerLoadingSelector);
+  const page = useSelector(dealerPageSelector);
+  const hasMore = useSelector(dealerHasMoreSelector);
+  const totalDealers = useSelector(totalDealersSelector);
+  const dealerError = useSelector(dealerErrorSelector);
+
+  useEffect(() => {
+    if (dealerError && (dealerError.toLowerCase().includes('token expired') || dealerError.toLowerCase().includes('unauthorized'))) {
+      Toast.show({
+        type: 'error',
+        text1: 'Session Expired',
+        text2: 'Your token has expired. Please log in again.',
+        visibilityTime: 4000,
+      });
+    } else if (dealerError) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: dealerError,
+      });
+    }
+  }, [dealerError]);
+
+  useEffect(() => {
+    if (programId) {
+      dispatch(fetchDealerListRequest({programId, isInitialLoad: true}));
+    }
+    return () => {
+      dispatch(resetDealerState());
+    };
+  }, [dispatch, programId]);
+
+  const handleSearch = useCallback((text: string) => {
+    setSearchText(text);
+    dispatch(fetchDealerListRequest({programId, search: text, isInitialLoad: true}));
+  }, [dispatch, programId]);
+
+  const loadMore = () => {
+    // API provides all data at once, so infinite scroll logic is removed.
+  };
+
+  const renderDealerItem = ({item, index}: {item: any; index: number}) => {
+    const isStatusActive = item.status?.toLowerCase() === 'active';
+
+    return (
+      <View style={styles.cardWrapper}>
+        <View style={styles.listCard}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.indexBadge}>
+              <Text style={styles.indexText}>{index + 1}</Text>
+            </View>
+            <View style={styles.cardHeaderTextContent}>
+              <Text style={styles.cardTitle}>{item.counterPartyName}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoGrid}>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>OD Account</Text>
+              <TouchableOpacity
+                onPress={() => (navigation as any).navigate('CreditAccountDetails', {
+                  id: item.id,
+                  programId: programId, // Added to fix program-summary fetch
+                  dealerName: item.counterPartyName,
+                  creditAccount: item.odAccount,
+                  anchor: programName, // Passing program name as anchor
+                })}>
+                <Text style={[styles.infoValue, styles.linkText]}>{item.odAccount}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>OD Expiry Date</Text>
+              <Text style={styles.infoValue}>{item.odExpiryDate}</Text>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Sanction Limit</Text>
+              <Text style={styles.infoValue}>{item.sanctionLimit}</Text>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Drawing Power</Text>
+              <Text style={styles.infoValue}>{item.drawingPower}</Text>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Utilized Limit</Text>
+              <Text style={styles.infoValue}>{item.utilizedLimit}</Text>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Pipeline Requests</Text>
+              <Text style={styles.infoValue}>{item.pipelineRequests}</Text>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Excess Credit</Text>
+              <Text style={styles.infoValue}>{item.excessCredit}</Text>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Available Limit</Text>
+              <Text style={styles.infoValue}>{item.availableLimit}</Text>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Overdue Days</Text>
+              <Text style={styles.infoValue}>{item.overdueDays}</Text>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Status</Text>
+              <Text style={[styles.infoValue, isStatusActive ? styles.statusGreen : styles.statusRed]}>
+                {item.status}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderFooter = () => {
+    if (!loading) return null;
+    return (
+      <View style={styles.loaderFooter}>
+        <ActivityIndicator size="small" color={Colors.primaryColor} />
+      </View>
+    );
+  };
+
+  return (
+    <Container>
+      <AppBar 
+        title="Transactions > Statement of Account (SOA)" 
+        navigation={navigation as any} 
+        hideHamburger={true}
+        renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
+        onPressLeftIcon={() => (navigation as any).navigate('StatementOfAccount')}
+      />
+      
+      <View style={styles.pageTitleBar}>
+        <Text style={styles.pageTitleText}>Dealer list of {programName}</Text>
+      </View>
+
+      <View style={styles.content}>
+        <View style={styles.dealersHeader}>
+          <Text style={styles.dealersLabel}>Dealers</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{totalDealers}</Text>
+          </View>
+        </View>
+
+        <View style={styles.toolbar}>
+          <View style={styles.searchBox}>
+            <Search width={scaleWidth(18)} height={scaleHeight(18)} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by counter party"
+              placeholderTextColor={Colors.graybase}
+              value={searchText}
+              onChangeText={handleSearch}
+            />
+          </View>
+          <TouchableOpacity style={styles.filterBtn}>
+            <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
+            <Text style={styles.filterText}>Filters</Text>
+          </TouchableOpacity>
+        </View>
+
+        <FlatList
+          data={dealerList}
+          renderItem={renderDealerItem}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={renderFooter}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No dealers found</Text>
+              </View>
+            ) : null
+          }
+        />
+      </View>
+    </Container>
+  );
+};
+
+const styles = StyleSheet.create({
+  pageTitleBar: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
+    backgroundColor: Colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E6E6E6',
+  },
+  pageTitleText: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: scaleWidth(16),
+  },
+  dealersHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: scaleHeight(12),
+    marginBottom: scaleHeight(12),
+    gap: scaleWidth(8),
+  },
+  dealersLabel: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  badge: {
+    backgroundColor: Colors.primaryColor,
+    borderRadius: scaleWidth(12),
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(4),
+    minWidth: scaleWidth(40),
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: Colors.white,
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(12),
+    marginBottom: scaleHeight(16),
+  },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: scaleWidth(8),
+    paddingVertical: scaleHeight(8),
+    paddingHorizontal: scaleWidth(12),
+    backgroundColor: Colors.white,
+    gap: scaleWidth(8),
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: scaleFont(14),
+    color: Colors.darkblack,
+    padding: 0,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  filterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryColor,
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(10),
+    borderRadius: scaleWidth(8),
+    gap: scaleWidth(6),
+  },
+  filterText: {
+    color: Colors.white,
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  listContent: {
+    paddingBottom: scaleHeight(20),
+  },
+  cardWrapper: {
+    position: 'relative',
+    marginBottom: scaleHeight(16),
+  },
+  listCard: {
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(12),
+    padding: scaleWidth(16),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E6E6E6',
+    shadowColor: '#00000035',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: scaleHeight(12),
+  },
+  indexBadge: {
+    backgroundColor: '#F7F8FB',
+    width: scaleWidth(28),
+    height: scaleWidth(28),
+    borderRadius: scaleWidth(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    marginRight: scaleWidth(12),
+  },
+  indexText: {
+    color: Colors.graybase,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
+  },
+  cardTitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  cardHeaderTextContent: {
+    flex: 1,
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: scaleWidth(12),
+  },
+  infoColumn: {
+    width: '47%',
+    backgroundColor: '#F7F8FB',
+    borderRadius: scaleWidth(10),
+    padding: scaleWidth(12),
+  },
+  infoLabel: {
+    fontSize: scaleFont(12),
+    color: Colors.graybase,
+    marginBottom: scaleHeight(4),
+  },
+  infoValue: {
+    fontSize: scaleFont(14),
+    color: Colors.darkblack,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  statusGreen: {
+    color: Colors.green,
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  statusRed: {
+    color: Colors.red,
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  loaderFooter: {
+    paddingVertical: scaleHeight(12),
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    paddingVertical: scaleHeight(40),
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: scaleFont(16),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  linkText: {
+    color: Colors.tertiaryColor,
+    textDecorationLine: 'underline',
+  },
+});

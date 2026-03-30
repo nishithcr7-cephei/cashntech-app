@@ -126,8 +126,11 @@ export const PendingApprovals: React.FC = () => {
 
         {/* Approval List - Vertical Card View */}
         <View style={styles.verticalList}>
-          {filteredData.map(row => (
+          {filteredData.map((row, index) => (
             <View key={row.id} style={styles.listCard}>
+              <View style={styles.indexBadge}>
+                <Text style={styles.indexText}>{index + 1}</Text>
+              </View>
               <TouchableOpacity
                 style={styles.moreButton}
                 hitSlop={10}
@@ -377,6 +380,22 @@ const styles = StyleSheet.create({
   },
   statusValue: {
     color: '#4CAF50',
+  },
+  indexBadge: {
+    backgroundColor: '#F7F8FB',
+    width: scaleWidth(28),
+    height: scaleWidth(28),
+    borderRadius: scaleWidth(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: scaleHeight(12),
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+  },
+  indexText: {
+    color: Colors.graybase,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
   },
 });
 

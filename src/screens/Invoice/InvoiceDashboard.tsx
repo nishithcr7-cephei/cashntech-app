@@ -7,6 +7,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Modal,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -44,10 +45,14 @@ import {
   selectInvoiceOverviewLatestLoading,
   fetchInvoiceKpisRequest,
   selectInvoiceOverviewKpis,
+  selectInvoiceOverviewKpisLoading,
 } from '@store/invoiceOverview';
 import type {Bank} from '@constants/programSelection';
 import {formatDateDash} from '@screens/Invoice/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
+import {useHasPermission} from '@hooks/index';
+import {PERMISSIONS} from '@constants/permissions';
+import {selectPermissionsLoading} from '@store/permissions';
 
 type ProductTabType = 'all_product' | 'dealer_finance' | 'vendor_finance' | 'pid';
 
@@ -134,6 +139,7 @@ export const InvoiceDashboard: React.FC = () => {
   const latestData = useSelector(selectInvoiceOverviewLatest);
   const latestLoading = useSelector(selectInvoiceOverviewLatestLoading);
   const kpis = useSelector(selectInvoiceOverviewKpis);
+  const kpisLoading = useSelector(selectInvoiceOverviewKpisLoading);
   
   // Role-based visibility flags
   const isAnchorMaker = userRole === 'anchor_maker';
@@ -156,6 +162,18 @@ export const InvoiceDashboard: React.FC = () => {
     DrawerNavigationProp<HomeNavigatorType>,
     NativeStackNavigationProp<any>
   >>();
+
+  // Permissions
+  const permissionsLoading = useSelector(selectPermissionsLoading);
+  const canEdit = useHasPermission(PERMISSIONS.INVOICE_LIST_EDIT);
+  const canDelete = useHasPermission(PERMISSIONS.INVOICE_LIST_DELETE);
+  const canApprove = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVE);
+  const canReject = useHasPermission(PERMISSIONS.INVOICE_LIST_REJECT);
+  const canAttachment = useHasPermission(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
+  const canPrint = useHasPermission(PERMISSIONS.INVOICE_LIST_PRINT);
+  const canViewApprovalHistory = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVAL_HISTORY);
+
+  const canShowApproveReject = canApprove || canReject;
 
   // Derived programIds based on program scope + active product tab
   // - selected scope  → single programId
@@ -197,11 +215,22 @@ export const InvoiceDashboard: React.FC = () => {
 
   // Fetch summary/latest whenever we have programIds (including when scope loads after "All Program" land)
   useEffect(() => {
-    if (!programIds.length) return;
-    dispatch(fetchInvoiceSummaryRequest({programIds}));
-    dispatch(fetchLatestInvoicesRequest({programIds}));
-    dispatch(fetchInvoiceKpisRequest({programIds}));
-  }, [dispatch, programIds]);
+    if (!scopeData || scopeData.length === 0) return;
+
+    const finalProgramIds =
+      programSelection?.programScope === 'all' ? [] : programIds;
+
+    if (
+      programSelection?.programScope === 'selected' &&
+      finalProgramIds.length === 0
+    ) {
+      return;
+    }
+
+    dispatch(fetchInvoiceSummaryRequest({programIds: finalProgramIds}));
+    dispatch(fetchLatestInvoicesRequest({programIds: finalProgramIds}));
+    dispatch(fetchInvoiceKpisRequest({programIds: finalProgramIds}));
+  }, [dispatch, programIds, scopeData, programSelection?.programScope, productTab]);
 
   const handleMenuToggle = (dealerId: string) => {
     if (openMenuId === dealerId) {
@@ -243,6 +272,14 @@ export const InvoiceDashboard: React.FC = () => {
         setSelectedDealerId(dealerId);
         setSelectedDealerNo(dealerId);
         setShowApproveRejectModal(true);
+        break;
+      case 'edit':
+        // Navigation or logic for edit
+        void dealerId;
+        break;
+      case 'delete':
+        // Logic for delete
+        void dealerId;
         break;
     }
   };
@@ -333,25 +370,16 @@ export const InvoiceDashboard: React.FC = () => {
             : row.partyName != null
               ? decryptValue(row.partyName) || '-'
               : '-',
-        invoiceNo: row.invoice_ref_no,
-        invoiceAmount: `₹${
-          row.final_total != null
-            ? (typeof row.final_total === 'string'
-                ? parseFloat(row.final_total)
-                : row.final_total
-              ).toLocaleString('en-IN')
-            : '0'
-        }`,
-        piAmount: '-',
+        invoiceNo: row.invoice_ref_no || '-',
+        invoiceAmount: row.final_total ? `₹ ${parseFloat(row.final_total).toLocaleString('en-IN')}` : '-',
         invoiceDate: row.invoice_date ? formatDateDash(row.invoice_date) : '-',
-        invoiceStatus: row.invoice_status || '',
-        approvalStatus: row.approval_status || '',
-        adminStatus: row.admin_status || '',
-        financeStatus: '-',
-        disbursementDate: '-',
-        disbAmount: '-',
+        invoiceStatus: row.invoice_status || '-',
+        approvalStatus: row.approval_status || '-',
+        adminStatus: row.admin_status || '-',
+        disbursementDate: row.disbursement_date ? formatDateDash(row.disbursement_date) : '-',
+        disbAmount: row.disbursed_amount ? `₹ ${parseFloat(row.disbursed_amount).toLocaleString('en-IN')}` : '-',
         utrNo: row.utr_no || '-',
-        invoiceDueDate: row.invoice_due_date || '',
+        invoiceDueDate: row.invoice_due_date || '-',
       })),
     [latestData],
   );
@@ -371,15 +399,14 @@ export const InvoiceDashboard: React.FC = () => {
               </View>
             </View>
         )}
-        <View style={styles.listToolbar}>
-          <View style={styles.searchBox}>
-            <Text style={styles.searchPlaceholder}>Search Entity</Text>
-          </View>
-        </View>
+
         <View style={styles.verticalList}>
-          {filteredDealerRows.map(row => (
-            <View key={row.id} style={styles.cardWrapper}>
+          {filteredDealerRows.map((row, index) => (
+            <View key={`${row.id}-${index}`} style={styles.cardWrapper}>
               <View style={styles.listCard}>
+                <View style={styles.indexBadge}>
+                  <Text style={styles.indexText}>{index + 1}</Text>
+                </View>
                 <View style={styles.cardHeaderRow}>
                   <View style={styles.cardHeaderContent}>
                     <View style={styles.cardTitleRow}>
@@ -388,6 +415,16 @@ export const InvoiceDashboard: React.FC = () => {
                     <Text style={styles.cardSubtitle}>
                       OD Account: {row.odAccount || '-'}
                     </Text>
+                  </View>
+                  <View
+                    ref={el => { menuButtonRefs.current[row.id] = el; }}
+                    style={styles.threeDotsButton}>
+                    <TouchableOpacity
+                      style={styles.threeDotsTouchable}
+                      onPress={() => handleMenuToggle(row.id)}
+                      disabled={permissionsLoading}>
+                      <Dots width={scaleWidth(18)} height={scaleWidth(18)} fill={permissionsLoading ? Colors.graybase : Colors.darkblack} />
+                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -455,16 +492,12 @@ export const InvoiceDashboard: React.FC = () => {
           </View>
         </View>
 
-        <View style={styles.listToolbar}>
-          <View style={styles.searchBox}>
-            <Text style={styles.searchPlaceholder}>Search by All</Text>
-          </View>
-        </View>
+
 
         <View style={styles.verticalList}>
-          {filteredLatestRows.map(row => (
+          {filteredLatestRows.map((row, index) => (
             <TouchableOpacity
-              key={row.id}
+              key={`${row.id}-${index}`}
               style={styles.listCard}
               onPress={() => {
                 navigation.navigate('InvoiceDetails', {
@@ -472,28 +505,54 @@ export const InvoiceDashboard: React.FC = () => {
                   dealerName: row.dealer,
                 });
               }}>
+              <View style={styles.indexBadge}>
+                <Text style={styles.indexText}>{index + 1}</Text>
+              </View>
               <View style={styles.cardHeaderRow}>
                 <View>
                   <Text style={styles.cardTitle}>{row.dealer}</Text>
                   <Text style={styles.cardSubtitle}>
-                    Invoice / Unique Ref. No: {row.invoiceNo}
+                    Invoice Number: {row.invoiceNo}
                   </Text>
+                </View>
+                <View
+                  ref={el => { menuButtonRefs.current[row.id] = el; }}
+                  style={styles.threeDotsButton}>
+                  <TouchableOpacity
+                    style={styles.threeDotsTouchable}
+                    onPress={() => handleMenuToggle(row.id)}
+                    disabled={permissionsLoading}>
+                    <Dots width={scaleWidth(18)} height={scaleWidth(18)} fill={permissionsLoading ? Colors.graybase : Colors.darkblack} />
+                  </TouchableOpacity>
                 </View>
               </View>
 
               <View style={styles.infoGrid}>
                 <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                  <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-                </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>PI Amount (₹)</Text>
-                  <Text style={styles.infoValue}>{row.piAmount}</Text>
-                </View>
-                <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Invoice Date</Text>
                   <Text style={styles.infoValue}>{row.invoiceDate}</Text>
                 </View>
+
+                <View style={styles.infoColumn}>
+                  <Text style={styles.infoLabel}>Disbursed Date</Text>
+                  <Text style={styles.infoValue}>{row.disbursementDate}</Text>
+                </View>
+
+                <View style={styles.infoColumn}>
+                  <Text style={styles.infoLabel}>Invoice Amount</Text>
+                  <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+                </View>
+
+                <View style={styles.infoColumn}>
+                  <Text style={styles.infoLabel}>Disb. Amount</Text>
+                  <Text style={styles.infoValue}>{row.disbAmount}</Text>
+                </View>
+
+                <View style={styles.infoColumn}>
+                  <Text style={styles.infoLabel}>UTR No.</Text>
+                  <Text style={styles.infoValue}>{row.utrNo}</Text>
+                </View>
+
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Invoice Status</Text>
                   <Text
@@ -513,6 +572,7 @@ export const InvoiceDashboard: React.FC = () => {
                     {row.invoiceStatus}
                   </Text>
                 </View>
+
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Approval Status</Text>
                   <Text
@@ -530,6 +590,7 @@ export const InvoiceDashboard: React.FC = () => {
                     {row.approvalStatus}
                   </Text>
                 </View>
+
                 <View style={styles.infoColumn}>
                   <Text style={styles.infoLabel}>Admin Status</Text>
                   <Text
@@ -541,18 +602,6 @@ export const InvoiceDashboard: React.FC = () => {
                     ]}>
                     {row.adminStatus}
                   </Text>
-                </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Disbursed Date</Text>
-                  <Text style={styles.infoValue}>{row.disbursementDate}</Text>
-                </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Disb. Amount (₹)</Text>
-                  <Text style={styles.infoValue}>{row.disbAmount}</Text>
-                </View>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>UTR No.</Text>
-                  <Text style={styles.infoValue}>{row.utrNo}</Text>
                 </View>
               </View>
             </TouchableOpacity>
@@ -616,9 +665,17 @@ export const InvoiceDashboard: React.FC = () => {
           {getCardMetrics(productTab, kpis ?? undefined).map(card => (
             <View key={card.label} style={styles.card}>
               <Text style={styles.cardLabel}>{card.label}</Text>
-              <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
-                {card.value}
-              </Text>
+              {kpisLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={Colors.primaryColor}
+                  style={styles.cardLoader}
+                />
+              ) : (
+                <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
+                  {card.value}
+                </Text>
+              )}
             </View>
           ))}
         </View>
@@ -723,6 +780,76 @@ export const InvoiceDashboard: React.FC = () => {
         onClose={handleAttachmentUpload}
       />
 
+      {/* Action Menu Modal */}
+      <Modal
+        visible={!!openMenuId}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpenMenuId(null)}>
+        <TouchableOpacity
+          style={styles.menuModalOverlay}
+          activeOpacity={1}
+          onPress={() => setOpenMenuId(null)}>
+          <View style={getMenuPosition(menuAnchor)}>
+            <View style={styles.actionMenu}>
+              {canShowApproveReject && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleMenuAction('approveReject', openMenuId!)}>
+                  <FontAwesome6 name="check-double" size={14} color={Colors.darkblack} iconStyle="solid" />
+                  <Text style={styles.menuText}>Approve / Reject</Text>
+                </TouchableOpacity>
+              )}
+              {canViewApprovalHistory && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleMenuAction('checkerApproval', openMenuId!)}>
+                  <FontAwesome6 name="clock-rotate-left" size={14} color={Colors.darkblack} iconStyle="solid" />
+                  <Text style={styles.menuText}>Approval History</Text>
+                </TouchableOpacity>
+              )}
+              {canAttachment && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleMenuAction('attachment', openMenuId!)}>
+                  <FontAwesome6 name="paperclip" size={14} color={Colors.darkblack} iconStyle="solid" />
+                  <Text style={styles.menuText}>Attachment</Text>
+                </TouchableOpacity>
+              )}
+              {canEdit && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleMenuAction('edit', openMenuId!)}>
+                  <FontAwesome6 name="pen-to-square" size={14} color={Colors.darkblack} />
+                  <Text style={styles.menuText}>Edit</Text>
+                </TouchableOpacity>
+              )}
+              {canPrint && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleMenuAction('print', openMenuId!)}>
+                  <FontAwesome6 name="print" size={14} color={Colors.darkblack} iconStyle="solid" />
+                  <Text style={styles.menuText}>Print</Text>
+                </TouchableOpacity>
+              )}
+              {canDelete && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => handleMenuAction('delete', openMenuId!)}>
+                  <FontAwesome6 name="trash-can" size={14} color={Colors.red} />
+                  <Text style={[styles.menuText, {color: Colors.red}]}>Delete</Text>
+                </TouchableOpacity>
+              )}
+              {!canShowApproveReject && !canViewApprovalHistory && !canAttachment && !canEdit && !canPrint && !canDelete && (
+                <View style={[styles.menuItem, {opacity: 0.5}]}>
+                  <Text style={styles.menuText}>No actions allowed</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
     </Container>
   );
 };
@@ -730,6 +857,10 @@ export const InvoiceDashboard: React.FC = () => {
 const styles = StyleSheet.create({
   loader: {
     marginTop: scaleHeight(40),
+  },
+  cardLoader: {
+    marginTop: scaleHeight(8),
+    alignSelf: 'flex-start',
   },
   pageTitleBar: {
     paddingHorizontal: scaleWidth(16),
@@ -1053,6 +1184,22 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     color: Colors.darkblack,
     fontFamily: Fonts.GilroyMedium,
+  },
+  indexBadge: {
+    backgroundColor: '#F7F8FB',
+    width: scaleWidth(28),
+    height: scaleWidth(28),
+    borderRadius: scaleWidth(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: scaleHeight(12),
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+  },
+  indexText: {
+    color: Colors.graybase,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useMemo} from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,7 +12,8 @@ import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useSelector} from 'react-redux';
+import {useSelector, useDispatch} from 'react-redux';
+import {interestAccrualActions, interestAccrualSelectors} from '@store/interestAccrual';
 import {AppBar, Container, ProgramBreadcrumb, FilterModal} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -21,7 +22,6 @@ import {Search} from '@assets/Icons';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
-import {invoiceApi} from '@services/api/invoice.api';
 import {formatDateDash} from './InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 
@@ -57,10 +57,13 @@ export const InterestAccrualsScreen: React.FC = () => {
   const programName = programSelection?.programName ?? '';
   const isDealerMaker = userRole === 'dealer_maker';
 
-  const [rows, setRows] = useState<InterestAccrualInvoiceRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useDispatch();
+  const rawInterestData = useSelector(interestAccrualSelectors.selectInterestAccrualList);
+  const loading = useSelector(interestAccrualSelectors.selectInterestAccrualLoading);
+  const apiError = useSelector(interestAccrualSelectors.selectInterestAccrualError);
+  
   const [searchText, setSearchText] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
   const programIds =
@@ -74,57 +77,46 @@ export const InterestAccrualsScreen: React.FC = () => {
   const programIdsKey = JSON.stringify(programIds ?? []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const disbursed = await invoiceApi.getDisbursedList(programIds);
-        const mapped: InterestAccrualInvoiceRow[] = (disbursed || []).map((item: any) => {
-          const fmtMoney = (v: any) =>
-            v != null
-              ? `${Number(v).toLocaleString('en-IN', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}/-`
-              : '-';
-          const invoiceDate = formatDateDash(item.invoice_date ?? '');
-          const dueDate = formatDateDash(item.invoice_due_date ?? '');
-          const disburseDate = formatDateDash(item.disbursement_date ?? '');
-          const finalTotalRaw = Number(item.final_total ?? 0);
-          const disbursedAmountRaw = Number(item.disbursed_amount ?? 0);
-          const cumulativeInterestRaw = Number(item.cumulative_interest ?? 0);
-          return {
-            id: item.id,
-            loanRefNo: item.loan_ref_no ?? '-',
-            invoiceNo: item.invoice_ref_no ?? '-',
-            bankName: item.bank_name ?? '-',
-            productName: item.name ?? '-',
-            programName: item.program_name ?? '-',
-            primaryParty: decryptValue(item.partyName ?? '') || '-',
-            counterParty: decryptValue(item.counterPartyName ?? '') || '-',
-            invoiceAmount: fmtMoney(item.final_total),
-            invoiceDate,
-            dueDate,
-            disburseDate,
-            disburseAmount: fmtMoney(item.disbursed_amount),
-            totalAccInterest: fmtMoney(item.cumulative_interest),
-            totalInterestPaid: '-', // backend field not available yet
-            finalTotalRaw,
-            disbursedAmountRaw,
-            cumulativeInterestRaw,
-          };
-        });
-        setRows(mapped);
-      } catch (err: any) {
-        setError(err?.message || 'Failed to load interest accruals');
-        setRows([]);
-      } finally {
-        setLoading(false);
-      }
-    };
+    dispatch(interestAccrualActions.fetchInterestAccrualListRequest({programIds}));
+  }, [programIdsKey, dispatch]);
 
-    fetchData();
-  }, [programIdsKey]);
+  const rows = useMemo(() => {
+    return (rawInterestData || []).map((item: any) => {
+      const fmtMoney = (v: any) =>
+        v != null
+          ? `${Number(v).toLocaleString('en-IN', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}/-`
+          : '-';
+      const invoiceDate = formatDateDash(item.invoice_date ?? '');
+      const dueDate = formatDateDash(item.invoice_due_date ?? '');
+      const disburseDate = formatDateDash(item.disbursement_date ?? '');
+      const finalTotalRaw = Number(item.final_total ?? 0);
+      const disbursedAmountRaw = Number(item.disbursed_amount ?? 0);
+      const cumulativeInterestRaw = Number(item.cumulative_interest ?? 0);
+      return {
+        id: item.id,
+        loanRefNo: item.loan_ref_no ?? '-',
+        invoiceNo: item.invoice_ref_no ?? '-',
+        bankName: item.bank_name ?? '-',
+        productName: item.name ?? '-',
+        programName: item.program_name ?? '-',
+        primaryParty: decryptValue(item.partyName ?? '') || '-',
+        counterParty: decryptValue(item.counterPartyName ?? '') || '-',
+        invoiceAmount: fmtMoney(item.final_total),
+        invoiceDate,
+        dueDate,
+        disburseDate,
+        disburseAmount: fmtMoney(item.disbursed_amount),
+        totalAccInterest: fmtMoney(item.cumulative_interest),
+        totalInterestPaid: '-', 
+        finalTotalRaw,
+        disbursedAmountRaw,
+        cumulativeInterestRaw,
+      };
+    });
+  }, [rawInterestData]);
 
   // Client-side filter + search
   const filteredBySearch = !searchText.trim()
@@ -193,15 +185,10 @@ export const InterestAccrualsScreen: React.FC = () => {
 
   const renderRow = ({item: row}: {item: InterestAccrualInvoiceRow}) => (
     <View style={styles.cardWrapper}>
-      <TouchableOpacity
-        style={styles.listCard}
-        activeOpacity={0.8}
-        onPress={() =>
-          (navigation as any).navigate('InvoiceDailyInterestScreen', {
-            invoiceId: row.id,
-            invoiceNo: row.invoiceNo,
-          })
-        }>
+      <View style={styles.listCard}>
+        <View style={styles.indexBadge}>
+          <Text style={styles.indexText}>{rows.indexOf(row) + 1}</Text>
+        </View>
         <View style={styles.infoGrid}>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Loan Ref No.</Text>
@@ -209,7 +196,16 @@ export const InterestAccrualsScreen: React.FC = () => {
           </View>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Invoice No</Text>
-            <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() =>
+                (navigation as any).navigate('InvoiceDailyInterestScreen', {
+                  invoiceId: row.id,
+                  invoiceNo: row.invoiceNo,
+                })
+              }>
+              <Text style={[styles.infoValue, styles.linkText]}>{row.invoiceNo}</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Bank Name</Text>
@@ -260,7 +256,7 @@ export const InterestAccrualsScreen: React.FC = () => {
             <Text style={styles.infoValue}>{row.totalInterestPaid}</Text>
           </View>
         </View>
-      </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -326,9 +322,9 @@ export const InterestAccrualsScreen: React.FC = () => {
                 <ActivityIndicator size="large" color={Colors.primaryColor} />
                 <Text style={styles.loadingText}>Loading interest accruals...</Text>
               </View>
-            ) : error ? (
+            ) : (error || apiError) ? (
               <View style={styles.loadingContainer}>
-                <Text style={styles.errorText}>{error}</Text>
+                <Text style={styles.errorText}>{error || apiError}</Text>
               </View>
             ) : null}
             {!loading && (
@@ -612,5 +608,25 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     color: Colors.darkblack,
     fontFamily: Fonts.GilroyMedium,
+  },
+  indexBadge: {
+    backgroundColor: '#F7F8FB',
+    width: scaleWidth(28),
+    height: scaleWidth(28),
+    borderRadius: scaleWidth(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: scaleHeight(12),
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+  },
+  indexText: {
+    color: Colors.graybase,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
+  },
+  linkText: {
+    color: Colors.primaryColor,
+    textDecorationLine: 'underline',
   },
 });

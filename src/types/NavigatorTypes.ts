@@ -118,6 +118,11 @@ export type HomeNavigatorType = {
   };
   RepaymentSettlementScreen: undefined;
   DPDPenalInterestNPAScreen: undefined;
+  StatementOfAccount: undefined;
+  SOADealerList: {
+    programId?: string;
+    programName?: string;
+  };
   OcrInvoice: undefined;
   Profile: undefined;
 };

@@ -44,7 +44,7 @@ function RowLabelValue({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.labelValueRow}>
       <Text style={styles.labelText}>{label}</Text>
-      <Text style={styles.valueText} numberOfLines={1}>{value}</Text>
+      <Text style={styles.valueText}>{value}</Text>
     </View>
   );
 }
@@ -54,6 +54,7 @@ export const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
   onClose,
   data: dataProp,
   loading = false,
+  accountNo,
 }) => {
   const listData = dataProp && dataProp.length > 0 ? dataProp : defaultMockData;
 
@@ -70,19 +71,13 @@ export const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
       <RowLabelValue label="Total Outstanding Amount" value={item.totalOutstandingAmount} />
       <View style={styles.labelValueRow}>
         <Text style={styles.labelText}>Status</Text>
-        <View
+        <Text
           style={[
-            styles.statusBadge,
-            item.status === 'Closed' ? styles.statusClosed : styles.statusOpen,
+            styles.valueText,
+            item.status === 'Closed' ? styles.statusTextClosed : styles.statusTextOpen,
           ]}>
-          <Text
-            style={[
-              styles.statusText,
-              item.status === 'Closed' ? styles.statusTextClosed : styles.statusTextOpen,
-            ]}>
-            {item.status}
-          </Text>
-        </View>
+          {item.status}
+        </Text>
       </View>
     </View>
   );
@@ -96,13 +91,9 @@ export const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
           <TouchableWithoutFeedback onPress={() => {}}>
             <View style={styles.modalContainer}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Payment History</Text>
-                <TouchableOpacity
-                  onPress={onClose}
-                  style={styles.closeButton}
-                  hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-                  <Text style={styles.closeButtonText}>×</Text>
-                </TouchableOpacity>
+                <Text style={styles.modalTitle}>
+                  {accountNo ? `Invoice No: ${accountNo}` : 'Payment History'}
+                </Text>
               </View>
 
               <View style={styles.modalContent}>
@@ -172,15 +163,16 @@ const styles = StyleSheet.create({
     color: Colors.darkblack,
   },
   closeButton: {
-    width: scaleWidth(24),
-    height: scaleWidth(24),
+    width: scaleWidth(36),
+    height: scaleWidth(36),
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: -scaleWidth(4), // Slightly pull it in or align it, but give it a larger touch surface
   },
   closeButtonText: {
-    fontSize: scaleFont(24),
-    color: Colors.darkblack,
-    fontWeight: '300',
+    fontSize: scaleFont(28),
+    color: '#666',
+    fontWeight: '400',
   },
   modalContent: {
     padding: scaleWidth(16),
@@ -244,12 +236,6 @@ const styles = StyleSheet.create({
     color: Colors.darkblack,
     flex: 1,
     textAlign: 'right',
-  },
-  statusBadge: {
-    paddingHorizontal: scaleWidth(10),
-    paddingVertical: scaleHeight(4),
-    borderRadius: scaleWidth(12),
-    alignSelf: 'flex-end',
   },
   statusClosed: { backgroundColor: '#E8F5E9' },
   statusOpen: { backgroundColor: '#FFEBEE' },

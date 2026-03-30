@@ -9,7 +9,12 @@ import {
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Search, Filter, Plus} from '@assets/Icons';
+import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import Toast from 'react-native-toast-message';
+import {useHasPermission} from '@hooks/index';
+import {PERMISSIONS} from '@constants/permissions';
+import {useSelector} from 'react-redux';
+import {selectPermissionsLoading} from '@store/permissions';
 
 type Props = {
   dealerListTitle: string;
@@ -52,6 +57,10 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   onCreateInvoicePress,
   isCreateInvoiceEnabled = true,
 }) => {
+  const permissionsLoading = useSelector(selectPermissionsLoading);
+  const canCreateInvoice = useHasPermission(PERMISSIONS.INVOICE_LIST_CREATE);
+  const canUploadInvoice = useHasPermission(PERMISSIONS.INVOICE_LIST_IMPORT);
+
   const onPressCreateInvoice = () => {
     if (!isCreateInvoiceEnabled) {
       Toast.show({
@@ -108,6 +117,14 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
             value={searchText}
             onChangeText={setSearchText}
           />
+          {searchText.length > 0 && (
+            <TouchableOpacity 
+              onPress={() => setSearchText('')}
+              hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+              activeOpacity={0.7}>
+              <FontAwesome6 name="circle-xmark" iconStyle="solid" size={18} color={Colors.graybase} />
+            </TouchableOpacity>
+          )}
         </View>
         <TouchableOpacity
           style={styles.filterButton}
@@ -129,13 +146,14 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
       )}
 
       <View style={styles.primaryActionsRow}>
-        {isAnchorMaker && !isCashnTechUser && (
+        {(isAnchorMaker || isCashnTechUser) && canCreateInvoice && (
           <TouchableOpacity
             style={[
               styles.primaryButton,
               styles.primaryButtonSingle,
-              !isCreateInvoiceEnabled && styles.primaryButtonDisabled,
+              (!isCreateInvoiceEnabled || permissionsLoading) && styles.primaryButtonDisabled,
             ]}
+            disabled={permissionsLoading}
             onPress={onPressCreateInvoice}>
             <View style={styles.buttonIconContainer}>
               <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
@@ -145,26 +163,36 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
         )}
         {isDealerMaker && !isCashnTechUser && (
           <>
-            <TouchableOpacity
-              style={[styles.primaryButton, styles.primaryButtonHalf]}
-              onPress={() => navigation.navigate('UploadInvoiceList' as never)}>
-              <View style={styles.buttonIconContainer}>
-                <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
-              </View>
-              <Text style={styles.primaryButtonText}>Upload Invoice List</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.primaryButton,
-                styles.primaryButtonHalf,
-                !isCreateInvoiceEnabled && styles.primaryButtonDisabled,
-              ]}
-              onPress={onPressCreateInvoice}>
-              <View style={styles.buttonIconContainer}>
-                <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
-              </View>
-              <Text style={styles.primaryButtonText}>Create Invoice</Text>
-            </TouchableOpacity>
+            {canUploadInvoice && (
+              <TouchableOpacity
+                style={[
+                  styles.primaryButton,
+                  styles.primaryButtonHalf,
+                  permissionsLoading && styles.primaryButtonDisabled,
+                ]}
+                disabled={permissionsLoading}
+                onPress={() => navigation.navigate('UploadInvoiceList' as never)}>
+                <View style={styles.buttonIconContainer}>
+                  <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
+                </View>
+                <Text style={styles.primaryButtonText}>Upload Invoice List</Text>
+              </TouchableOpacity>
+            )}
+            {canCreateInvoice && (
+              <TouchableOpacity
+                style={[
+                  styles.primaryButton,
+                  styles.primaryButtonHalf,
+                  (!isCreateInvoiceEnabled || permissionsLoading) && styles.primaryButtonDisabled,
+                ]}
+                disabled={permissionsLoading}
+                onPress={onPressCreateInvoice}>
+                <View style={styles.buttonIconContainer}>
+                  <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
+                </View>
+                <Text style={styles.primaryButtonText}>Create Invoice</Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
       </View>

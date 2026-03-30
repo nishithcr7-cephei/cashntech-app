@@ -249,9 +249,11 @@ export const invoiceApi = {
   getInvoiceSummary: async (
     programIds?: string[],
   ): Promise<any> => {
-    const body: InvoiceSummaryRequest = {
-      programIds: programIds ?? [],
+    const body: any = {
+      programIds: (programIds && programIds.length === 1) ? programIds[0] : (programIds ?? []),
     };
+    // eslint-disable-next-line no-console
+    console.log('[InvoiceSummary] POST Body:', JSON.stringify(body));
     const response = await axiosInstance.post(
       ApiEndPoints.apiInvoiceSummary,
       body,
@@ -263,9 +265,11 @@ export const invoiceApi = {
   getLatestInvoices: async (
     programIds?: string[],
   ): Promise<any> => {
-    const body: InvoiceLatestRequest = {
-      programIds: programIds ?? [],
+    const body: any = {
+      programIds: (programIds && programIds.length === 1) ? programIds[0] : (programIds ?? []),
     };
+    // eslint-disable-next-line no-console
+    console.log('[InvoiceLatest] POST Body:', JSON.stringify(body));
     const response = await axiosInstance.post(
       ApiEndPoints.apiInvoiceLatest,
       body,
@@ -275,9 +279,11 @@ export const invoiceApi = {
   },
 
   getInvoiceKpis: async (programIds?: string[]): Promise<InvoiceKpisResponse> => {
-    const body: InvoiceSummaryRequest = {
-      programIds: programIds ?? [],
+    const body: any = {
+      programIds: (programIds && programIds.length === 1) ? programIds[0] : (programIds ?? []),
     };
+    // eslint-disable-next-line no-console
+    console.log('[InvoiceKpis] POST Body:', JSON.stringify(body));
     const response = await axiosInstance.post(
       ApiEndPoints.apiInvoiceKpis,
       body,
@@ -540,4 +546,45 @@ export const invoiceApi = {
     } as any);
     return response.data;
   },
+  /**
+   * TODO: Enable this when PATCH /invoice/:id is ready on backend.
+   * Currently commented out as requested.
+   */
+  // updateInvoice: async (invoiceId: string, input: CreateInvoicePayloadInput): Promise<any> => {
+  //   const payload = buildCreateInvoicePayload(input);
+  //   const formData = new FormData();
+  //   
+  //   // Append fields (same as create)
+  //   for (const [key, value] of Object.entries(payload)) {
+  //     if (key !== 'items' && value !== undefined && value !== null) {
+  //       formData.append(key, String(value));
+  //     }
+  //   }
+  //   
+  //   // Append items
+  //   const items = payload.items as any[];
+  //   items.forEach((item, index) => {
+  //     formData.append(`items[${index}][name]`, item.name);
+  //     formData.append(`items[${index}][description]`, item.description);
+  //     formData.append(`items[${index}][quantity]`, String(item.quantity));
+  //     formData.append(`items[${index}][unit]`, String(item.unit));
+  //     formData.append(`items[${index}][price_per_quantity]`, String(item.price_per_quantity));
+  //     formData.append(`items[${index}][total]`, String(item.total));
+  //     // ... append taxes if needed, similar to createInvoice
+  //   });
+  //   
+  //   if (input.attachment) {
+  //     formData.append('attachments', {
+  //       uri: input.attachment.uri,
+  //       name: input.attachment.name ?? 'invoice_update.pdf',
+  //       type: input.attachment.type ?? 'application/pdf',
+  //     } as any);
+  //   }
+  //   
+  //   const response = await axiosInstance.patch(`/invoice/${invoiceId}`, formData, {
+  //     isFormData: true,
+  //     authRequired: true,
+  //   } as any);
+  //   return response.data;
+  // },
 };

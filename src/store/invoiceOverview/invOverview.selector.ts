@@ -24,3 +24,6 @@ export const selectInvoiceOverviewLatestError = (state: RootState) =>
 export const selectInvoiceOverviewKpis = (state: RootState) =>
   state.invoiceOverview.kpis;
 
+export const selectInvoiceOverviewKpisLoading = (state: RootState) =>
+  state.invoiceOverview.kpisLoading;
+

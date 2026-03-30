@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useMemo} from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -14,22 +14,11 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {invoiceApi, DailyInterestApiRow} from '@services/api/invoice.api';
+import {useSelector, useDispatch} from 'react-redux';
+import {interestAccrualActions, interestAccrualSelectors} from '@store/interestAccrual';
 import {formatDateDash} from './InvoiceDetails/types';
 
-type InvoiceDailyInterestRow = {
-  id: string;
-  srNo: number;
-  invoiceNo: string;
-  balanceAmount: string;
-  interestRate: string;
-  interestAmount: string;
-  date: string;
-  penalRate: string;
-  penalValues: string;
-  penalAmount: string;
-  cumulativeInterest: string;
-};
+
 
 export const InvoiceDailyInterestScreen: React.FC = () => {
   const navigation =
@@ -39,59 +28,48 @@ export const InvoiceDailyInterestScreen: React.FC = () => {
   const invoiceId: string = route.params?.invoiceId;
   const invoiceNo: string = route.params?.invoiceNo ?? '-';
 
-  const [rows, setRows] = useState<InvoiceDailyInterestRow[]>([]);
+  const dispatch = useDispatch();
+  const dailyInterestData = useSelector(interestAccrualSelectors.selectDailyInterestList);
+  const loading = useSelector(interestAccrualSelectors.selectInterestAccrualLoading);
+  const apiError = useSelector(interestAccrualSelectors.selectInterestAccrualError);
+  
   const [searchText, setSearchText] = useState('');
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!invoiceId) {
       setError('Missing invoice id');
-      setLoading(false);
       return;
     }
+    dispatch(interestAccrualActions.fetchDailyInterestRequest({invoiceId}));
+  }, [invoiceId, dispatch]);
 
-    const fetchDailyInterest = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await invoiceApi.getDailyInterest(invoiceId);
-        const mapped: InvoiceDailyInterestRow[] = (data || []).map(
-          (item: DailyInterestApiRow, index: number) => {
-            const fmt = (v: number | string) =>
-              Number(v || 0).toLocaleString('en-IN', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              });
-            const penalAmount =
-              (item.penal_interest_on_interest || 0) +
-              (item.penal_interest_on_principal || 0);
-            return {
-              id: String(item.id ?? index + 1),
-              srNo: index + 1,
-              invoiceNo,
-              balanceAmount: `₹ ${fmt(item.outstanding_principal_date)}`,
-              interestRate: fmt(item.interest_rate),
-              interestAmount: `₹ ${fmt(item.daily_interest)}`,
-              date: formatDateDash(item.accrual_date),
-              penalRate: penalAmount ? '-' : '-',
-              penalValues: penalAmount ? '-' : '-',
-              penalAmount: penalAmount ? `₹ ${fmt(penalAmount)}` : '-',
-              cumulativeInterest: `₹ ${fmt(item.cumulative_interest)}`,
-            };
-          },
-        );
-        setRows(mapped);
-      } catch (err: any) {
-        setError(err?.message || 'Failed to load daily interest');
-        setRows([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDailyInterest();
-  }, [invoiceId, invoiceNo]);
+  const rows = useMemo(() => {
+    return (dailyInterestData || []).map((item: any, index: number) => {
+      const fmt = (v: number | string) =>
+        Number(v || 0).toLocaleString('en-IN', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+      const penalAmount =
+        (item.penal_interest_on_interest || 0) +
+        (item.penal_interest_on_principal || 0);
+      return {
+        id: String(item.id ?? index + 1),
+        srNo: index + 1,
+        invoiceNo,
+        balanceAmount: '-',
+        interestRate: fmt(item.interest_rate),
+        interestAmount: `₹ ${fmt(item.daily_interest)}`,
+        date: formatDateDash(item.accrual_date),
+        penalRate: penalAmount ? '-' : '-',
+        penalValues: penalAmount ? '-' : '-',
+        penalAmount: penalAmount ? `₹ ${fmt(penalAmount)}` : '-',
+        cumulativeInterest: `₹ ${fmt(item.cumulative_interest)}`,
+        outstandingPrincipal: `₹ ${fmt(item.outstanding_principal ?? item.outstanding_principal_date)}`,
+      };
+    });
+  }, [dailyInterestData, invoiceNo]);
 
   const filteredRows = !searchText.trim()
     ? rows
@@ -110,7 +88,7 @@ export const InvoiceDailyInterestScreen: React.FC = () => {
       <View style={styles.pageTitleBar}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}>
+          onPress={() => (navigation as any).navigate('InterestAccrualsScreen')}>
           <LeftChevron height={scaleWidth(16)} width={scaleHeight(16)} />
         </TouchableOpacity>
         <Text style={styles.pageTitleText}>Daily Interest - {invoiceNo}</Text>
@@ -135,9 +113,9 @@ export const InvoiceDailyInterestScreen: React.FC = () => {
           <View style={styles.infoRow}>
             <Text style={styles.infoValue}>Loading daily interest...</Text>
           </View>
-        ) : error ? (
+        ) : (error || apiError) ? (
           <View style={styles.infoRow}>
-            <Text style={[styles.infoValue, {color: Colors.red}]}>{error}</Text>
+            <Text style={[styles.infoValue, {color: Colors.red}]}>{error || apiError}</Text>
           </View>
         ) : (
           <View style={styles.verticalList}>
@@ -149,6 +127,10 @@ export const InvoiceDailyInterestScreen: React.FC = () => {
                     <Text style={styles.infoValue}>{row.srNo}</Text>
                   </View>
                   <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Date</Text>
+                    <Text style={styles.infoValue}>{row.date}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Invoice No.</Text>
                     <Text style={styles.infoValue}>{row.invoiceNo}</Text>
                   </View>
@@ -157,16 +139,16 @@ export const InvoiceDailyInterestScreen: React.FC = () => {
                     <Text style={styles.infoValue}>{row.balanceAmount}</Text>
                   </View>
                   <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Outstanding Principal (₹)</Text>
+                    <Text style={styles.infoValue}>{row.outstandingPrincipal}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Interest Rate (%)</Text>
                     <Text style={styles.infoValue}>{row.interestRate}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Interest Amount (₹)</Text>
                     <Text style={styles.infoValue}>{row.interestAmount}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Date</Text>
-                    <Text style={styles.infoValue}>{row.date}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Penal Rate (%)</Text>

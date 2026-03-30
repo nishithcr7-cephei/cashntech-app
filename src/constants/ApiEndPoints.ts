@@ -155,6 +155,8 @@ const Endpoints = {
   apiGetInvoiceApprovalLogs: (invoiceId: string) => `/invoice/logs/${invoiceId}`,
   apiVerifiedList: '/invoice/verified/list',
   apiDisbursedList: '/invoice/disbursed/list',
+  apiRepaymentList: '/invoice/repayment/list',
+  apiDPDList: '/invoice/dpd/list',
   apiMailToBank: (invoiceId: string) => `/invoice/mail-to-bank/${invoiceId}`,
   apiTransactionAccount: (invoiceId: string) => `/invoice/transaction-account/${invoiceId}`,
   apiDisbursement: (invoiceId: string) => `/invoice/disbursement/${invoiceId}`,
@@ -164,6 +166,10 @@ const Endpoints = {
   apiUserScope: '/user/scope',
   // User Permissions (feature/action access)
   apiUserPermissions: '/user/permissions',
+  apiProgramList: 'transactions/program/list',
+  apiProgramDealers: (programId: string) => `transactions/program/dealers/${programId}`,
+  apiProgramSummary: (id: string) => `transactions/program-summary/${id}`,
+  apiProgramDealersDetails: (id: string) => `transactions/dealers/${id}`,
 } as const;
 
 export default Endpoints;

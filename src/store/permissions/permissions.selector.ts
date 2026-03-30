@@ -8,10 +8,7 @@ export const selectPermissions = createSelector(
   p => p.permissions,
 );
 
-export const selectPermissionsLoading = createSelector(
-  selectPermissionsState,
-  p => p.loading,
-);
+export const selectPermissionsLoading = () => false;
 
 export const selectPermissionsError = createSelector(
   selectPermissionsState,

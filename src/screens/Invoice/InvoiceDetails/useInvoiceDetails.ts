@@ -9,7 +9,10 @@ import {
   updateInvoiceStatusRequest,
   updateInvoiceVerificationRequest,
 } from '@store/invoice/inv.slice';
-import {setProgramSelection} from '@store/programSelection/programSelection.slice';
+import {
+  setProgramSelection,
+  toggleProgramSelection,
+} from '@store/programSelection/programSelection.slice';
 import {
   selectInvoiceList,
   selectInvoiceListLoading,
@@ -63,7 +66,7 @@ export function useInvoiceDetails() {
   const isDealerChecker = userRole === 'dealer_checker';
   const isCashnTechUser = userRole === 'cashntech_user';
 
-  const dealerListTitle = 'Dealer Wise Invoice Details';
+  const dealerListTitle = isCashnTechUser ? 'Invoice' : 'Dealer Wise Invoice Details';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -93,20 +96,22 @@ export function useInvoiceDetails() {
   const programId = isAllProgramScope ? '' : concreteProgramId ?? '';
 
   useEffect(() => {
-    if (!programIdFromParams || programSelection?.programId) return;
+    const isAlreadySet = programSelection?.programId === programIdFromParams && !!programSelection?.programName;
+    if (!programIdFromParams || isAlreadySet) return;
     if (scopeData?.length) {
       for (const bank of scopeData) {
         for (const product of bank.products || []) {
           const program = product.programs?.find((p: any) => p.id === programIdFromParams);
           if (program) {
             dispatch(
-              setProgramSelection({
+              toggleProgramSelection({
                 bankId: bank.id,
                 bankName: bank.name,
                 productId: product.id,
                 productName: product.name,
                 programId: program.id,
                 programName: program.name,
+                userType: (product.name || '').toLowerCase().includes('dealer') ? 'dealer' : 'vendor',
               }),
             );
             return;
@@ -114,8 +119,16 @@ export function useInvoiceDetails() {
         }
       }
     }
-    dispatch(setProgramSelection({programId: programIdFromParams}));
-  }, [programIdFromParams, programSelection?.programId, scopeData, dispatch]);
+    // Final fallback: set as much as we have from route params to keep breadcrumb visible
+    dispatch(
+      setProgramSelection({
+        programId: programIdFromParams,
+        programName: routeParams?.programName || '',
+        bankName: routeParams?.bankName || '',
+        productName: routeParams?.dealerName || '', // Fallback dealer to product name if missing
+      }),
+    );
+  }, [programIdFromParams, programSelection, scopeData, dispatch, routeParams]);
 
   const inv = appliedFilters['Invoice Status'];
   const appr = appliedFilters['Approval Status'];
@@ -144,6 +157,13 @@ export function useInvoiceDetails() {
       dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
       (navigation as any).setParams({refreshList: false});
     }, [hasAnyProgramContext, programId, apiFilters, dispatch, navigation, routeParams?.refreshList]),
+  );
+
+  // Auto-reset search on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      setSearchText('');
+    }, []),
   );
 
   useEffect(() => {
@@ -357,13 +377,15 @@ export function useInvoiceDetails() {
       case 'delete':
         Alert.alert(
           'Delete Invoice',
-          'Are you sure you want to delete this invoice?',
+          'Are you sure you want to delete this invoice? This action cannot be undone.',
           [
             {text: 'Cancel', style: 'cancel'},
             {
               text: 'Delete',
               style: 'destructive',
-              onPress: async () => {},
+              onPress: async () => {
+                // TODO: Dispatch deleteInvoiceRequest once API is ready
+              },
             },
           ],
         );
@@ -396,6 +418,14 @@ export function useInvoiceDetails() {
         : [...prev, invoiceId],
     );
   };
+
+  const selectedRowForMenu = openMenuId 
+    ? (filteredData.find(r => r.id === openMenuId) ?? invoiceData.find(r => r.id === openMenuId))
+    : undefined;
+
+  const userInfoFull = useSelector(userSelector.getUserInfo);
+  const userDepartment = userInfoFull?.permission_group?.[0]?.department;
+  const storedUserRole = userInfoFull?.permission_group?.[0]?.business_role || userInfoFull?.permission_group?.[0]?.functional_role;
 
   const selectedRowsForModal = invoiceData.filter(row =>
     selectedInvoiceIds.includes(row.id),
@@ -479,7 +509,7 @@ export function useInvoiceDetails() {
     dispatch(
       updateInvoiceVerificationRequest({
         invoiceId,
-        action: 'Verify',
+        action: 'Approve',
         remark: remarks,
         programId,
         filters: apiFilters,
@@ -556,7 +586,9 @@ export function useInvoiceDetails() {
 
   return {
     programId,
-    programName: routeParams?.programName || programSelection?.programName || '',
+    programName: isAllProgramScope
+      ? 'All Program'
+      : routeParams?.programName || programSelection?.programName || '',
     apiFilters,
     dispatch,
     navigation,
@@ -628,5 +660,10 @@ export function useInvoiceDetails() {
     onCreateInvoicePress,
     isCreateInvoiceEnabled,
     hasAnyProgramContext,
+    selectedInvoiceRawAdminStatus: selectedRowForMenu?.rawAdminStatus,
+    selectedInvoiceRawApprovalStatus: selectedRowForMenu?.rawApprovalStatus,
+    selectedInvoiceRawInvoiceStatus: selectedRowForMenu?.rawInvoiceStatus,
+    userDepartment,
+    storedUserRole,
   };
 }

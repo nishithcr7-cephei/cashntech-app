@@ -1,4 +1,5 @@
 import React, {useMemo, useState, useEffect, useCallback} from 'react';
+import moment from 'moment';
 import {
   View,
   Text,
@@ -9,8 +10,9 @@ import {
   StyleSheet,
   Modal,
   InteractionManager,
+  BackHandler,
 } from 'react-native';
-import {useNavigation, useRoute} from '@react-navigation/native';
+import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
 import {AppBar, Container} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
@@ -39,10 +41,16 @@ import {
   selectCreateInvoiceError,
 } from '@store/invoice/inv.selector';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import {
+  setProgramSelection,
+  setProgramScope,
+  clearSelectedPrograms,
+} from '@store/programSelection/programSelection.slice';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import type {DealerInfoParticipant} from '@store/invoice/inv.types';
 import {decryptValue} from '@utils/decrypt';
+import {invoiceApi} from '@services/api/invoice.api';
 
 const getInitialFields = (): InvoiceFields => ({
   dealer: '',
@@ -116,7 +124,7 @@ export const CreateInvoice: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
   const dispatch = useDispatch();
-  const programSelection = useSelector(selectProgramSelection);
+  const programSelection = useSelector((state: any) => state.programSelection);
   const dealerInfo = useSelector(selectDealerInfo);
   const dealerInfoError = useSelector(selectDealerInfoError);
   const createInvoiceLoading = useSelector(selectCreateInvoiceLoading);
@@ -126,6 +134,7 @@ export const CreateInvoice: React.FC = () => {
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isAnchorMaker = userRole === 'anchor_maker';
   const isDealerMaker = userRole === 'dealer_maker';
+  const isCashnTechUser = userRole === 'cashntech_user';
 
   const [fields, setFields] = useState<InvoiceFields>(() => getInitialFields());
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -145,7 +154,7 @@ export const CreateInvoice: React.FC = () => {
   const previewFieldsFromRoute: InvoiceFields | undefined = route?.params?.previewFields;
   const previewAttachmentFromRoute: DocumentPickerResponse | undefined = route?.params?.previewAttachment;
   const previewReturnToken: number | undefined = route?.params?.previewReturnToken;
-  const headerModeTitle ="Invoice Details";
+  const headerModeTitle = mode === 'edit' ? "Invoice Details [Edit Invoice]" : "Invoice Details";
    
   const headerRefTitle = invoiceNo
     ? `Invoice / Unique Ref. No: ${invoiceNo}`
@@ -193,24 +202,15 @@ export const CreateInvoice: React.FC = () => {
     }
   }, [programSelection?.programId, dispatch]);
 
-  // Toast: programId debug - verify if program selection reached Create Invoice
+  // Toast: removed debug program selection toasts
   useEffect(() => {
-    const programId = programSelection?.programId;
-    Toast.show({
-      type: programId ? 'success' : 'error',
-      text1: programId ? `Program selected: ${programId}` : 'No program selected',
-      text2: programId ? `Fetching dealer info...` : 'Select a program first from Select Program screen',
-    });
+    // Debug toasts removed for better UX
   }, [programSelection?.programId]);
 
-  // Toast: dealer info API result (debug)
+  // Toast: removed debug dealer info toasts
   useEffect(() => {
     if (dealerInfo) {
-      const count = dealerInfo?.participants?.length ?? 0;
-      Toast.show({
-        type: count > 0 ? 'success' : 'info',
-        text1: count > 0 ? `Dealer info loaded: ${count} dealer(s)` : 'No dealers found for this program',
-      });
+      // Debug toasts removed for better UX
     }
   }, [dealerInfo]);
 
@@ -252,6 +252,112 @@ export const CreateInvoice: React.FC = () => {
     previewAttachmentFromRoute,
     dealerInfo?.participants,
   ]);
+
+  // Fetch invoice details when in 'edit' or 'recreate' mode
+  useEffect(() => {
+    if ((mode !== 'edit' && mode !== 'recreate') || !route?.params?.invoiceId) return;
+
+    let cancelled = false;
+    setOcrLoading(true);
+    invoiceApi
+      .getInvoiceDetails(route.params.invoiceId)
+      .then((res: any) => {
+        if (cancelled || !res) return;
+        const data = res;
+        const apm = data.anchorParticipantMapping;
+
+        // In edit mode the dealer field is read-only (not a dropdown), so store the decrypted name for display
+        const rawDealerEntityName = apm?.party?.entity_name || '';
+        const decryptedDealerName = decryptValue(rawDealerEntityName) || rawDealerEntityName;
+        const dealerCode = apm?.company_code_given_by_party || '';
+        const odAccountNumber =
+          decryptValue(apm?.od_account_no ?? '') || apm?.od_account_no || '';
+
+        const mappedItems: InvoiceLineItem[] = (data.invoiceItems || []).map(
+          (item: any) => ({
+            itemName: item.name || '',
+            description: item.description || '',
+            quantity: String(item.quantity || '0'),
+            unit: item.unit || 'PCS',
+            pricePerQuantity: String(item.price_per_quantity || '0'),
+            total: String(item.total || '0'),
+            discountType: item.discount_type || '',
+            discountValue: String(item.discount_value || '0'),
+            discountAmount: String(item.discount_amount || '0'),
+            taxes: (item.taxes || []).map((t: any) => ({
+              taxType: t.tax_type || 'GST',
+              taxPercentage: String(t.tax_percentage || '0'),
+              taxAmount: String(t.tax_amount || '0'),
+            })),
+          }),
+        );
+
+        const formatDate = (date: string) =>
+          date ? moment(date).format('DD-MM-YYYY') : '';
+
+        const nextFields: InvoiceFields = {
+          ...getInitialFields(),
+          dealer: decryptedDealerName,
+          dealerCode,
+          odAccountNumber,
+          invoiceNumber: data.invoice_ref_no || '',
+          associatedPO: '',
+          invoiceDate: formatDate(data.invoice_date),
+          paymentDate: formatDate(data.payment_date),
+          invoiceDueDate: formatDate(data.invoice_due_date),
+          grnDate: formatDate(data.grn_date),
+          remark: data.remark || '',
+          currency: data.currency || 'INR',
+          creditTo: data.partnerBank?.bank_name || '',
+          items: mappedItems,
+          discountValue: String(data.discount_total || '0'),
+          grandTotal: String(data.final_total || '0'),
+          attachments: (data.attachment || []).map((a: any) => ({
+            id: a.id,
+            attachment_url: a.attachment_url,
+          })),
+        };
+
+        setFields(nextFields);
+
+        // Update flat program fields so dealerInfo can be fetched.
+        // Use setProgramSelection (not toggleProgramSelection) so selectedPrograms
+        // is NOT updated — this keeps the breadcrumb in its previous state and
+        // allows the beforeRemove reset to 'all' to work correctly on back.
+        if (data.program?.id) {
+          dispatch(clearSelectedPrograms());
+          dispatch(
+            setProgramSelection({
+              programId: data.program?.id || '',
+              programName: data.program?.program_name || data.program_name || '',
+              bankId: data.program?.productConfig?.partnerBank?.id || data.partnerBank?.id || '',
+              bankName: data.program?.productConfig?.partnerBank?.bank_name || data.bank_name || data.partnerBank?.bank_name || '',
+              productId: data.program?.productConfig?.product?.id || '',
+              productName: data.program?.productConfig?.product?.name || data.product_name || '',
+            }),
+          );
+        }
+
+        // Pre-select participant from dealerInfo if available
+        if (dealerInfo?.participants?.length) {
+          const participant = dealerInfo.participants.find(
+            p => p.party.entity_name === rawDealerEntityName || p.id === apm?.id,
+          );
+          if (participant) setSelectedParticipant(participant);
+        }
+      })
+      .catch(err => {
+        Alert.alert('Error', 'Failed to fetch invoice details for editing.');
+        console.error('Fetch edit details error:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setOcrLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, route?.params?.invoiceId, dealerInfo?.participants]);
 
   // Handle create invoice success / error
   useEffect(() => {
@@ -387,7 +493,7 @@ export const CreateInvoice: React.FC = () => {
 
   // Check if form is valid
   const isFormValid = useMemo(() => {
-    return (
+    return !!(
       fields.invoiceNumber?.trim() &&
       fields.dealer?.trim() &&
       fields.dealerCode?.trim() &&
@@ -514,7 +620,7 @@ export const CreateInvoice: React.FC = () => {
     }
     await runOcrAndPatchForm(file.uri);
   };
-
+  
   const handleProofUploadFile = async (
     file: DocumentPickerResponse | undefined,
   ) => {
@@ -522,12 +628,13 @@ export const CreateInvoice: React.FC = () => {
     setSelectedAttachment(file);
     openUploadPreview(fields, file);
   };
-
+    
   const handleSubmit = async () => {
-    if (!selectedAttachment) {
+    const hasAnyAttachment = !!selectedAttachment || (fields.attachments && fields.attachments.length > 0);
+    if (!hasAnyAttachment) {
       Toast.show({
         type: 'error',
-        text1: 'Please upload invoice first',
+        text1: 'Please upload the invoice file first',
         visibilityTime: 3000,
       });
       return;
@@ -566,6 +673,33 @@ export const CreateInvoice: React.FC = () => {
     }
 
     if (dealerInfo && selectedParticipant && programSelection?.programId && partnerBankId) {
+      if (mode === 'edit' && route?.params?.invoiceId) {
+        // Edit Mode path: Ready for PATCH API
+        // eslint-disable-next-line no-console
+        console.log('Edit Mode Active: Ready for PATCH API', {
+          invoiceId: route.params.invoiceId,
+          fields,
+          attachment: selectedAttachment,
+        });
+        
+        /* TODO: Dispatch update action when backend is ready
+        dispatch(
+          updateInvoiceRequest({
+            id: route.params.invoiceId,
+            fields,
+            attachment: selectedAttachment ?? undefined,
+          })
+        );
+        */
+        
+        Toast.show({
+          type: 'info',
+          text1: 'Update logic triggered (Mock)',
+          text2: 'The backend update feature is still being prepared.',
+        });
+        return;
+      }
+
       dispatch(
         createInvoiceRequest({
           fields,
@@ -588,6 +722,25 @@ export const CreateInvoice: React.FC = () => {
         text1: 'Please select a Program from the dashboard first, then try again.',
         visibilityTime: 3000,
       });
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: number) => {
+    try {
+      setOcrLoading(true);
+      await invoiceApi.deleteInvoiceAttachment(attachmentId);
+      setFields(prev => ({
+        ...prev,
+        attachments: (prev.attachments || []).filter(a => a.id !== attachmentId),
+      }));
+      Toast.show({
+        type: 'success',
+        text1: 'Attachment deleted',
+      });
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to delete attachment');
+    } finally {
+      setOcrLoading(false);
     }
   };
 
@@ -629,6 +782,7 @@ export const CreateInvoice: React.FC = () => {
       const isGoingToPreview =
         actionType === 'NAVIGATE' && targetRouteName === 'InvoiceUploadPreview';
       if (!isGoingToPreview) {
+        dispatch(setProgramScope('all'));
         InteractionManager.runAfterInteractions(() => {
           resetCreateInvoiceForm();
         });
@@ -637,6 +791,25 @@ export const CreateInvoice: React.FC = () => {
 
     return unsubscribe;
   }, [navigation, resetCreateInvoiceForm]);
+
+  // Handle Android hardware back button
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        (navigation as any).navigate('InvoiceDetails');
+        return true; // Prevent default behavior (going back to Home)
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [navigation]),
+  );
+
+  const hasAnyAttachment = !!selectedAttachment || (fields.attachments && fields.attachments.length > 0);
+  const submitButtonAppearsDisabledInternal = !hasAnyAttachment || !isFormValid;
+  const submitDisabledReasonInternal = !hasAnyAttachment 
+    ? 'Please upload the invoice file first (tap "Upload Invoice" below)' 
+    : undefined;
 
   const dealerOptions = useMemo(
     () =>
@@ -657,19 +830,22 @@ export const CreateInvoice: React.FC = () => {
   return (
     <Container>
       <AppBar 
-        title={(isAnchorMaker || isDealerMaker) ? "Transactions > Invoice List & Approval" : "Create Invoice"} 
+        title={(isAnchorMaker || isDealerMaker || isCashnTechUser) ? "Transactions > Invoice List & Approval" : "Create Invoice"} 
         navigation={navigation as any}
-        hideHamburger={isAnchorMaker || isDealerMaker}
+        hideHamburger={isAnchorMaker || isDealerMaker || isCashnTechUser}
         renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
-        onPressLeftIcon={() => {
-          (navigation as any).navigate('InvoiceDetails');
-        }}
+        onPressLeftIcon={() => (navigation as any).navigate('InvoiceDetails')}
       />
       <View style={styles.pageTitleBar}>
         <View style={styles.titleContainer}>
           <Text style={styles.pageTitleText} numberOfLines={1}>
             {headerModeTitle}
           </Text>
+          {(fields.invoiceNumber || invoiceNo) && (
+            <Text style={styles.pageSubtitleText}>
+              {fields.invoiceNumber || invoiceNo}
+            </Text>
+          )}
           
         </View>
       </View>
@@ -740,12 +916,15 @@ export const CreateInvoice: React.FC = () => {
             loading={createInvoiceLoading}
             errors={errors}
             isFormValid={isFormValid}
-            submitButtonAppearsDisabled={!selectedAttachment || !isFormValid}
+            submitButtonAppearsDisabled={submitButtonAppearsDisabledInternal}
+            submitDisabledReason={submitDisabledReasonInternal}
             productType={productType}
             dealerOptions={dealerOptions.length > 0 ? dealerOptions : undefined}
             creditToOptions={creditToOptions.length > 0 ? creditToOptions : undefined}
             staleInvoicePeriodDays={dealerInfo?.basic_parameters?.stale_invoice_period_days != null ? Number(dealerInfo.basic_parameters.stale_invoice_period_days) : undefined}
             defaultPaymentTermsDays={dealerInfo?.basic_parameters?.default_payment_terms_days != null ? Number(dealerInfo.basic_parameters.default_payment_terms_days) : undefined}
+            mode={mode}
+            onDeleteAttachment={handleDeleteAttachment}
           />
         </ScrollView>
 

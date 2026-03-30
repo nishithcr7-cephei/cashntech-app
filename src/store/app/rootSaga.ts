@@ -5,6 +5,12 @@ import invoiceSaga from '@store/invoice/inv.saga';
 import invoiceOverviewSaga from '@store/invoiceOverview/invOverview.saga';
 import {programSelectionSaga} from '@store/programSelection';
 import {permissionsSaga} from '@store/permissions';
+import {repaymentSaga} from '@store/repayment';
+import {dpdSaga} from '@store/dpd';
+import {interestAccrualSaga} from '@store/interestAccrual';
+import {soaSaga} from '@store/soa/soa.saga';
+import {dealerSaga} from '@store/soa/dealer/dealer.saga';
+import {creditAccountDetailsSaga} from '@store/soa/creditAccountDetails/saga';
 
 export default function* rootSaga() {
   yield all([
@@ -17,5 +23,11 @@ export default function* rootSaga() {
     invoiceOverviewSaga(),
     programSelectionSaga(),
     permissionsSaga(),
+    repaymentSaga(),
+    dpdSaga(),
+    interestAccrualSaga(),
+    soaSaga(),
+    dealerSaga(),
+    creditAccountDetailsSaga(),
   ]);
 }

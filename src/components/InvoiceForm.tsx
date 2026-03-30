@@ -1,7 +1,24 @@
 import React, {useState, useEffect} from 'react';
-import {View, TextInput, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, TouchableWithoutFeedback} from 'react-native';
+import Toast from 'react-native-toast-message';
+import {
+  View,
+  TextInput,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Modal,
+  TouchableWithoutFeedback,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Linking,
+} from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
+import {Colors, Fonts} from '@constants/index';
+import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {useSelector} from 'react-redux';
@@ -62,6 +79,10 @@ type Props = {
   defaultPaymentTermsDays?: number;
   /** When true, submit button appears disabled but remains pressable (for toast feedback) */
   submitButtonAppearsDisabled?: boolean;
+  /** Human-readable reason WHY the submit button is disabled — shown as toast when pressed */
+  submitDisabledReason?: string;
+  mode?: 'edit' | 'recreate';
+  onDeleteAttachment?: (id: number) => void;
 };
 
 export const InvoiceForm: React.FC<Props> = ({
@@ -82,7 +103,12 @@ export const InvoiceForm: React.FC<Props> = ({
   staleInvoicePeriodDays = 30,
   defaultPaymentTermsDays = 60,
   submitButtonAppearsDisabled = false,
+  submitDisabledReason,
+  mode,
+  onDeleteAttachment,
 }) => {
+  const insets = useSafeAreaInsets(); // Not available here but can use view padding
+  const storageBaseUrl = 'https://d2wayd1he5a7q1.cloudfront.net'; // Same as DetailView
   const dealerData = dealerOptions ?? [];
   const creditToData = creditToOptions ?? [];
   const [showInvoiceNumberTooltip, setShowInvoiceNumberTooltip] = useState(false);
@@ -278,13 +304,12 @@ export const InvoiceForm: React.FC<Props> = ({
     }
     newItems[index].discountAmount = discountAmount.toFixed(2);
     
-    // Auto-calculate item-level taxes (on amount after discount)
-    const afterDiscount = Math.max(0, lineTotal - discountAmount);
+    // Auto-calculate item-level taxes on Sub Total (base price), NOT on the after-discount amount
     const rawTaxes = newItems[index].taxes?.length ? newItems[index].taxes! : (newItems[index].taxType ? [{taxType: newItems[index].taxType!, taxPercentage: newItems[index].taxPercentage || '', taxAmount: newItems[index].taxAmount || ''}] : []);
     const taxes = rawTaxes.map(t => ({...t}));
     taxes.forEach((t, i) => {
       const pct = parseFloat(t.taxPercentage || '0') || 0;
-      taxes[i] = {...t, taxAmount: ((afterDiscount * pct) / 100).toFixed(2)};
+      taxes[i] = {...t, taxAmount: ((lineTotal * pct) / 100).toFixed(2)};
     });
     newItems[index].taxes = taxes.length ? taxes : [{taxType: '', taxPercentage: '', taxAmount: ''}];
     newItems[index].taxAmount = taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0).toFixed(2);
@@ -299,10 +324,11 @@ export const InvoiceForm: React.FC<Props> = ({
     const taxes = [...(item.taxes?.length ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}])];
     if (!taxes[taxIndex]) taxes[taxIndex] = {taxType: '', taxPercentage: '', taxAmount: ''};
     taxes[taxIndex] = {...taxes[taxIndex], [field]: fieldValue};
-    const afterDiscount = Math.max(0, (parseFloat(item.total) || 0) - (parseFloat(item.discountAmount || '0') || 0));
+    // Tax is calculated on Sub Total (base price), not on the after-discount amount
+    const itemSubTotal = parseFloat(item.total) || 0;
     taxes.forEach((t, i) => {
       const pct = parseFloat(t.taxPercentage || '0') || 0;
-      taxes[i] = {...t, taxAmount: ((afterDiscount * pct) / 100).toFixed(2)};
+      taxes[i] = {...t, taxAmount: ((itemSubTotal * pct) / 100).toFixed(2)};
     });
     newItems[itemIndex] = {...item, taxes};
     newItems[itemIndex].taxAmount = taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0).toFixed(2);
@@ -325,10 +351,11 @@ export const InvoiceForm: React.FC<Props> = ({
     const taxes = item?.taxes?.length ? item.taxes : (item?.taxType ? [{taxType: item.taxType, taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}] : []);
     if (!item || taxes.length <= 1) return;
     const taxesFiltered = taxes.filter((_, i) => i !== taxIndex);
-    const afterDiscount = Math.max(0, (parseFloat(item.total) || 0) - (parseFloat(item.discountAmount || '0') || 0));
+    // Tax is calculated on Sub Total (base price), not on the after-discount amount
+    const itemSubTotalForRemove = parseFloat(item.total) || 0;
     taxesFiltered.forEach((t, i) => {
       const pct = parseFloat(t.taxPercentage || '0') || 0;
-      taxesFiltered[i] = {...t, taxAmount: ((afterDiscount * pct) / 100).toFixed(2)};
+      taxesFiltered[i] = {...t, taxAmount: ((itemSubTotalForRemove * pct) / 100).toFixed(2)};
     });
     newItems[itemIndex] = {...item, taxes: taxesFiltered, taxAmount: taxesFiltered.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0).toFixed(2)};
     onChange({items: newItems});
@@ -370,40 +397,74 @@ export const InvoiceForm: React.FC<Props> = ({
         </Text>
         <View style={styles.row}>
           <View style={styles.dealerNameWidth}>
-            <CustomDropdown
-              label={`${entityNameLabel} *`}
-              data={dealerData}
-              value={value.dealer}
-              onChange={set('dealer')}
-              placeholder={`Select ${entityLabel}`}
-              containerStyle={styles.dropdownContainer}
-            />
+            {mode === 'edit' ? (
+              <View style={styles.readOnlyFieldContainer}>
+                <Text style={styles.label}>{`${entityNameLabel} *`}</Text>
+                <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
+                  <Text style={styles.readOnlyText} numberOfLines={1}>
+                    {value.dealer || `Select ${entityLabel}`}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <CustomDropdown
+                label={`${entityNameLabel} *`}
+                data={dealerData}
+                value={value.dealer}
+                onChange={set('dealer')}
+                placeholder={`Select ${entityLabel}`}
+                containerStyle={styles.dropdownContainer}
+              />
+            )}
             {errors.dealer && <Text style={styles.errorText}>{errors.dealer}</Text>}
           </View>
           <View style={styles.dealerCodeWidth}>
-            <CustomDropdown
-              label={`${entityCodeLabel} *`}
-              data={dealerOptions && value.dealerCode ? [{label: value.dealerCode, value: value.dealerCode}] : []}
-              value={value.dealerCode}
-              onChange={set('dealerCode')}
-              placeholder={entityCodeLabel}
-              containerStyle={styles.dropdownContainer}
-              editable={!dealerOptions || !dealerOptions.length}
-            />
+            {mode === 'edit' ? (
+              <View style={styles.readOnlyFieldContainer}>
+                <Text style={styles.label}>{`${entityCodeLabel} *`}</Text>
+                <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
+                  <Text
+                    style={value.dealerCode ? styles.readOnlyText : styles.readOnlyPlaceholder}
+                    numberOfLines={1}>
+                    {value.dealerCode || entityCodeLabel}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <CustomDropdown
+                label={`${entityCodeLabel} *`}
+                data={dealerOptions && value.dealerCode ? [{label: value.dealerCode, value: value.dealerCode}] : []}
+                value={value.dealerCode}
+                onChange={set('dealerCode')}
+                placeholder={entityCodeLabel}
+                containerStyle={styles.dropdownContainer}
+                editable={!dealerOptions || !dealerOptions.length}
+              />
+            )}
             {errors.dealerCode && <Text style={styles.errorText}>{errors.dealerCode}</Text>}
           </View>
         </View>
         <View style={styles.field}>
           <Text style={styles.label}>OD Account No</Text>
-          <CustomDropdown
-            label=""
-            data={dealerOptions && value.odAccountNumber ? [{label: value.odAccountNumber, value: value.odAccountNumber}] : []}
-            value={value.odAccountNumber}
-            onChange={set('odAccountNumber')}
-            placeholder="Select Acc. No"
-            containerStyle={styles.dropdownContainer}
-            editable={!dealerOptions || !dealerOptions.length}
-          />
+          {mode === 'edit' ? (
+            <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
+              <Text
+                style={value.odAccountNumber ? styles.readOnlyText : styles.readOnlyPlaceholder}
+                numberOfLines={1}>
+                {value.odAccountNumber || 'OD Account No'}
+              </Text>
+            </View>
+          ) : (
+            <CustomDropdown
+              label=""
+              data={dealerOptions && value.odAccountNumber ? [{label: value.odAccountNumber, value: value.odAccountNumber}] : []}
+              value={value.odAccountNumber}
+              onChange={set('odAccountNumber')}
+              placeholder="Select Acc. No"
+              containerStyle={styles.dropdownContainer}
+              editable={!dealerOptions || !dealerOptions.length}
+            />
+          )}
         </View>
       </View>
 
@@ -469,7 +530,7 @@ export const InvoiceForm: React.FC<Props> = ({
                 containerStyle={styles.datePickerContainer}
               />
               {errors.invoiceDate && <Text style={styles.errorText}>{errors.invoiceDate}</Text>}
-              {value.invoiceDate && validateInvoiceDate(value.invoiceDate) && (
+              {value.invoiceDate && !mode && validateInvoiceDate(value.invoiceDate) && (
                 <Text style={styles.warningText}>{validateInvoiceDate(value.invoiceDate)}</Text>
               )}
             </View>
@@ -551,14 +612,25 @@ export const InvoiceForm: React.FC<Props> = ({
         <View style={styles.row}>
           <View style={styles.halfWidth}>
             <View style={styles.creditToField}>
-              <CustomDropdown
-                label="Credit To *"
-                data={creditToData}
-                value={value.creditTo}
-                onChange={set('creditTo')}
-                placeholder="Select credit to"
-                containerStyle={styles.dropdownContainer}
-              />
+              {mode === 'edit' ? (
+                <View style={styles.readOnlyFieldContainer}>
+                  <Text style={styles.label}>Credit To *</Text>
+                  <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
+                    <Text style={styles.readOnlyText} numberOfLines={1}>
+                      {value.creditTo || 'Select credit to'}
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <CustomDropdown
+                  label="Credit To *"
+                  data={creditToData}
+                  value={value.creditTo}
+                  onChange={set('creditTo')}
+                  placeholder="Select credit to"
+                  containerStyle={styles.dropdownContainer}
+                />
+              )}
               {errors.creditTo && <Text style={styles.errorText}>{errors.creditTo}</Text>}
             </View>
           </View>
@@ -1056,16 +1128,100 @@ export const InvoiceForm: React.FC<Props> = ({
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.button, styles.submitButton, (loading || !isFormValid || submitButtonAppearsDisabled) && styles.submitButtonDisabled]}
-          onPress={onSubmit}
-          disabled={loading || submitButtonAppearsDisabled}>
+          style={[styles.button, styles.submitButton, (loading || submitButtonAppearsDisabled) && styles.submitButtonDisabled]}
+          disabled={loading}
+          onPress={() => {
+            if (submitButtonAppearsDisabled) {
+              // Show a specific reason so the user knows exactly what to fix
+              const reason =
+                submitDisabledReason ||
+                (!value.invoiceNumber?.trim()
+                  ? 'Invoice / Unique Ref. No is required'
+                  : !value.dealer?.trim()
+                  ? 'Dealer Name is required'
+                  : !value.dealerCode?.trim()
+                  ? 'Dealer Code is required'
+                  : !value.invoiceDate?.trim()
+                  ? 'Invoice Date is required'
+                  : !value.creditTo?.trim()
+                  ? 'Credit To is required'
+                  : !value.items || value.items.length === 0
+                  ? 'Please add at least one item'
+                  : 'Please fill all required fields before submitting');
+              Toast.show({
+                type: 'error',
+                text1: 'Cannot Submit',
+                text2: reason,
+                visibilityTime: 3000,
+              });
+              return;
+            }
+            onSubmit?.();
+          }}>
           {loading ? (
             <Text style={styles.submitButtonText}>Submitting...</Text>
           ) : (
-            <Text style={styles.submitButtonText}>Submit</Text>
+            <Text style={styles.submitButtonText}>{mode === 'edit' ? 'Update Invoice' : 'Submit'}</Text>
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Attachments Section (Edit Mode) */}
+      {mode === 'edit' && value.attachments && value.attachments.length > 0 && (
+        <View style={styles.attachmentSection}>
+          <Text style={styles.attachmentSectionTitle}>Attachments</Text>
+          {value.attachments.map((att, idx) => {
+            const fileName = att.attachment_url?.split('/').pop() || `Attachment ${idx + 1}`;
+            const isPdf = fileName.toLowerCase().endsWith('.pdf');
+            const fullUrl = att.attachment_url.startsWith('http') 
+              ? att.attachment_url 
+              : `${storageBaseUrl.replace(/\/$/, '')}/${att.attachment_url.replace(/^\//, '')}`;
+            
+            return (
+              <View key={att.id} style={styles.attachmentWrapper}>
+                <TouchableOpacity
+                  style={styles.attachmentPreview}
+                  onPress={async () => {
+                    try {
+                      await Linking.openURL(fullUrl);
+                    } catch (e: any) {
+                      Alert.alert('Error', e?.message || 'Failed to open attachment');
+                    }
+                  }}
+                  activeOpacity={0.7}>
+                  <View style={[styles.attachmentIcon, isPdf && styles.attachmentIconPdf]}>
+                    <Text style={styles.attachmentIconText}>{isPdf ? 'PDF' : 'FILE'}</Text>
+                  </View>
+                  <View style={styles.attachmentInfo}>
+                    <Text style={styles.attachmentLabel} numberOfLines={1} ellipsizeMode="middle">
+                      {fileName}
+                    </Text>
+                    <Text style={styles.attachmentMeta}>Tap to view</Text>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.deleteAttachmentButton}
+                  onPress={() => {
+                    Alert.alert(
+                      'Delete Attachment',
+                      'Are you sure you want to delete this attachment?',
+                      [
+                        { text: 'No', style: 'cancel' },
+                        { 
+                          text: 'Yes', 
+                          style: 'destructive', 
+                          onPress: () => onDeleteAttachment?.(att.id) 
+                        },
+                      ]
+                    );
+                  }}>
+                  <FontAwesome6 name="trash" iconStyle="solid" size={16} color="#DC3545" />
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </View>
+      )}
     </ScrollView>
   );
 };
@@ -1599,5 +1755,91 @@ const styles = StyleSheet.create({
   },
   discountDropdown: {
     marginBottom: 0,
+  },
+  readOnlyFieldContainer: {
+    flex: 1,
+  },
+  readOnlyBox: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    justifyContent: 'center',
+  },
+  readOnlyText: {
+    fontSize: 14,
+    color: '#888',
+    fontFamily: 'System',
+  },
+  readOnlyPlaceholder: {
+    fontSize: 14,
+    color: '#BBBBBB',
+    fontFamily: 'System',
+  },
+  attachmentSection: {
+    marginTop: scaleHeight(24),
+    paddingHorizontal: 16,
+    paddingBottom: scaleHeight(32),
+  },
+  attachmentSectionTitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroyBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(12),
+  },
+  attachmentWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(12),
+    marginBottom: scaleHeight(12),
+  },
+  attachmentPreview: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: scaleWidth(12),
+    backgroundColor: '#F7F8FB',
+    borderRadius: scaleWidth(8),
+  },
+  attachmentIcon: {
+    width: scaleWidth(48),
+    height: scaleWidth(48),
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: scaleWidth(12),
+  },
+  attachmentIconText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
+    color: Colors.darkblack,
+  },
+  attachmentIconPdf: {
+    backgroundColor: '#E8F4FD',
+  },
+  attachmentInfo: {
+    flex: 1,
+  },
+  attachmentLabel: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(4),
+  },
+  attachmentMeta: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyRegular,
+    color: Colors.graybase,
+  },
+  deleteAttachmentButton: {
+    width: scaleWidth(40),
+    height: scaleWidth(40),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF0F0',
+    borderRadius: scaleWidth(8),
   },
 });

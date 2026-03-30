@@ -23,6 +23,7 @@ export type DealerInfoResponse = {
   basic_parameters?: DealerInfoBasicParameters;
   party: {
     id: string;
+    entity_name?: string;
     party_bank_details: PartyBankDetail[];
   };
   participants: DealerInfoParticipant[];
@@ -112,7 +113,7 @@ export type UpdateInvoiceStatusRequest = {
 /** CashnTech admin verification (PATCH /invoice/admin/:invoiceId) */
 export type UpdateInvoiceVerificationRequest = {
   invoiceId: string;
-  action: 'Verify' | 'Reject';
+  action: 'Approve' | 'Reject' | 'Verify';
   remark?: string;
   programId?: string;
   filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]};

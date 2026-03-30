@@ -20,7 +20,9 @@ export type InvoiceOverviewLatestItem = {
   invoice_status?: string;
   approval_status?: string;
   admin_status?: string;
-  final_total?: number;
+  final_total?: string;
+  disbursement_date?: string;
+  disbursed_amount?: string;
   utr_no?: string;
 };
 
@@ -40,6 +42,7 @@ export type InvoiceOverviewState = {
     overdue_amount: string;
     dpd_days: string;
   } | null;
+  kpisLoading: boolean;
 };
 
 export const initialInvoiceOverviewState: InvoiceOverviewState = {
@@ -50,5 +53,6 @@ export const initialInvoiceOverviewState: InvoiceOverviewState = {
   latestLoading: false,
   latestError: null,
   kpis: null,
+  kpisLoading: false,
 };
 

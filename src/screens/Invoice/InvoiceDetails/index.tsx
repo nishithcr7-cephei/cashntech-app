@@ -94,6 +94,11 @@ export const InvoiceDetails: React.FC = () => {
     hasAnyProgramContext,
     invoiceFilterData,
     showAllProgramBreadcrumb,
+    selectedInvoiceRawAdminStatus,
+    selectedInvoiceRawApprovalStatus,
+    selectedInvoiceRawInvoiceStatus,
+    userDepartment,
+    storedUserRole,
   } = useInvoiceDetails();
 
   const registerMenuRef = (id: string, ref: View | null) => {
@@ -113,11 +118,7 @@ export const InvoiceDetails: React.FC = () => {
       {hasAnyProgramContext && (
         <View style={styles.selectedProgramRow}>
           <Text style={styles.selectedProgramText}>
-            {programName
-              ? programName
-              : showAllProgramBreadcrumb
-                ? 'All Program'
-                : '-'}
+            {programName || '-'}
           </Text>
         </View>
       )}
@@ -173,14 +174,16 @@ export const InvoiceDetails: React.FC = () => {
             </>
           }
           ItemSeparatorComponent={() => <View style={{height: scaleHeight(12)}} />}
-          renderItem={({item: row}) => (
+          renderItem={({item: row, index}) => (
             <InvoiceDetailsCard
               row={row}
+              index={index}
               isAnchorMaker={isAnchorMaker}
               isDealerMaker={isDealerMaker}
               isDealerChecker={isDealerChecker}
               isAnchorChecker={isAnchorChecker}
               isCashnTechUser={isCashnTechUser}
+              storedUserRole={storedUserRole}
               isSelected={(isDealerChecker || isAnchorChecker) && selectedInvoiceIds.includes(row.id)}
               onMenuToggle={handleMenuToggle}
               onToggleSelection={toggleInvoiceSelection}
@@ -311,6 +314,10 @@ export const InvoiceDetails: React.FC = () => {
         isDealerMaker={isDealerMaker}
         isDealerChecker={isDealerChecker}
         isCashnTechUser={isCashnTechUser}
+        rawAdminStatus={selectedInvoiceRawAdminStatus}
+        rawApprovalStatus={selectedInvoiceRawApprovalStatus}
+        rawInvoiceStatus={selectedInvoiceRawInvoiceStatus}
+        userDepartment={userDepartment}
       />
 
     </Container>

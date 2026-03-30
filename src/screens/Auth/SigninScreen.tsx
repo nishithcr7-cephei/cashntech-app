@@ -35,8 +35,8 @@ const Strings = {
 
 
 export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
-  const [email, setEmail] = useState('sm_maker@yopmail.com');
-  const [passwordValue, setPassword] = useState('Welcome@123');
+  const [email, setEmail] = useState('itsupport@cashntech.com');
+  const [passwordValue, setPassword] = useState('santram@123');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
