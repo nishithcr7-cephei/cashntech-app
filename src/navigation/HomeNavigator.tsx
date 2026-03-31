@@ -16,10 +16,7 @@ import {
   CreateInvoice,
   UploadInvoiceList,
   DealerInvoiceList,
-  DiscountingPayments,
-  PendingApprovals,
-  RejectedFinances,
-  DPDInvoiceList,
+
   FundingLimitsForDealers,
   ANCreditAccount,
   CreditAccountDetails,
@@ -42,6 +39,7 @@ import {
   StatementOfAccount,
   SOADealerList,
   ProfileScreen,
+  SelectProgramScreen,
 } from '@screens/index';
 
 const Drawer = createDrawerNavigator<HomeNavigatorType>();
@@ -75,10 +73,7 @@ export const HomeNavigator = () => {
       <Drawer.Screen name="CreateInvoice" component={CreateInvoice} />
       <Drawer.Screen name="UploadInvoiceList" component={UploadInvoiceList} />
       <Drawer.Screen name="DealerInvoiceList" component={DealerInvoiceList} />
-      <Drawer.Screen name="DiscountingPayments" component={DiscountingPayments} />
-      <Drawer.Screen name="PendingApprovals" component={PendingApprovals} />
-      <Drawer.Screen name="RejectedFinances" component={RejectedFinances} />
-      <Drawer.Screen name="DPDInvoiceList" component={DPDInvoiceList} />
+
       <Drawer.Screen name="FundingLimitsForDealers" component={FundingLimitsForDealers} />
       <Drawer.Screen name="ANCreditAccount" component={ANCreditAccount} />
       <Drawer.Screen name="CreditAccountDetails" component={CreditAccountDetails} />
@@ -105,6 +100,7 @@ export const HomeNavigator = () => {
       <Drawer.Screen name="SOADealerList" component={SOADealerList} />
       <Drawer.Screen name="OcrInvoice" component={OcrInvoiceScreen} />
       <Drawer.Screen name="Profile" component={ProfileScreen} />
+      <Drawer.Screen name="SelectProgramScreen" component={SelectProgramScreen} />
     </Drawer.Navigator>
   );
 };

@@ -16,6 +16,7 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
 import {invoiceApi} from '@services/api/invoice.api';
 import Toast from 'react-native-toast-message';
+import {decryptValue} from '@utils/decrypt';
 
 type MarkAsDisbursedModalProps = {
   visible: boolean;
@@ -23,6 +24,7 @@ type MarkAsDisbursedModalProps = {
   invoiceId?: string;
   invoiceAmount?: string;
   invoiceNo?: string;
+  programName?: string;
   onSubmit?: (data: {
     debitFrom: string;
     creditTo: string;
@@ -32,6 +34,9 @@ type MarkAsDisbursedModalProps = {
     utrNo: string;
     remark: string;
     transactionNo: string;
+    rejectionReason?: string;
+    holdCategory?: string;
+    expectedReleaseDate?: string;
   }) => void | Promise<void>;
 };
 
@@ -45,12 +50,20 @@ const statusOptions = [
   {label: 'Reject', value: 'Reject'},
 ];
 
+const holdCategoryOptions = [
+  {label: 'Verification Pending', value: 'Verification Pending'},
+  {label: 'Insufficient Funds', value: 'Insufficient Funds'},
+  {label: 'KYC Issue', value: 'KYC Issue'},
+  {label: 'Other', value: 'Other'},
+];
+
 export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   visible,
   onClose,
   invoiceId,
   invoiceAmount = '15,556',
   invoiceNo,
+  programName,
   onSubmit,
 }) => {
   const [accountOptions, setAccountOptions] = useState<{label: string; value: string}[]>(accountOptionsFallback);
@@ -63,19 +76,42 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   const [utrNo, setUtrNo] = useState('');
   const [remark, setRemark] = useState('');
   const [transactionNo, setTransactionNo] = useState('');
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [holdCategory, setHoldCategory] = useState('');
+  const [expectedReleaseDate, setExpectedReleaseDate] = useState('');
 
   useEffect(() => {
     if (visible) {
       setDebitFrom('');
       setCreditTo('');
-      setDisbursedAmount(invoiceAmount || '10,000');
+      setDisbursedAmount(invoiceAmount || '0.00');
       setStatus('');
       setDate('');
       setUtrNo('');
       setRemark('');
       setTransactionNo('');
+      setRejectionReason('');
+      setHoldCategory('');
+      setExpectedReleaseDate('');
     }
   }, [visible, invoiceAmount]);
+
+  useEffect(() => {
+    // Clear specific fields when swapping statuses to avoid dirty data
+    if (status !== 'Disbursed') {
+      setUtrNo('');
+      setTransactionNo('');
+      setDate('');
+    }
+    if (status !== 'Hold') {
+      setHoldCategory('');
+      setExpectedReleaseDate('');
+    }
+    if (status === 'Disbursed') {
+      setRejectionReason('');
+      setHoldCategory('');
+    }
+  }, [status]);
 
   useEffect(() => {
     if (visible && invoiceId) {
@@ -85,27 +121,31 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
         .then((data: any) => {
           const d = data?.data ?? data;
           const opts: {label: string; value: string}[] = [];
-          const party = d?.party ?? d?.Party;
-          const bankDetails = party?.party_bank_details ?? party?.partyBankDetails ?? [];
-          if (Array.isArray(bankDetails)) {
-            bankDetails.forEach((b: any) => {
-              const acc = b?.account_number ?? b?.accountNumber ?? '';
-              const name = b?.name_as_per_bank ?? b?.nameAsPerBank ?? '';
-              if (acc) opts.push({label: name ? `${acc} - ${name}` : acc, value: acc});
-            });
-          }
           const apm = d?.anchorParticipantMapping ?? d?.anchor_participant_mapping;
           const apmObj = Array.isArray(apm) ? apm[0] : apm;
           const odAccount = apmObj?.od_account_no ?? apmObj?.odAccountNo ?? '';
+          const entityName = apmObj?.party?.entity_name ?? apmObj?.Party?.entityName ?? '';
+
           if (odAccount) {
-            opts.push({label: `OD Account - ${odAccount}`, value: odAccount});
+            // Debit From remains the OD account according to previous roll-back
+            const decryptedOd = decryptValue(odAccount);
+            const displayDebitLabel = entityName ? `${decryptedOd} (${entityName})` : decryptedOd;
+            setDebitFrom(displayDebitLabel);
           }
-          setAccountOptions(opts.length ? opts : accountOptionsFallback);
-          if (opts.length > 0) {
-            setDebitFrom(opts[0].value);
-          }
-          if (odAccount) {
-            setCreditTo(odAccount);
+
+          const program = d?.program ?? d?.Program;
+          const apiProgramName = program?.program_name ?? program?.programName ?? '';
+          const finalProgName = programName || apiProgramName; // Prioritize prop from list
+          const programBankDetails = program?.bank_details ?? [];
+          const programAcc = Array.isArray(programBankDetails) && programBankDetails.length > 0 
+                             ? programBankDetails[0]?.account_number ?? programBankDetails[0]?.accountNumber ?? '' 
+                             : '';
+
+          if (programAcc) {
+            // Credit To is now based on Program details
+            const decryptedPg = decryptValue(programAcc);
+            const displayCreditLabel = finalProgName ? `${decryptedPg} (${finalProgName})` : decryptedPg;
+            setCreditTo(displayCreditLabel);
           }
         })
         .catch((err: any) => {
@@ -133,21 +173,30 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       Toast.show({type: 'error', text1: 'Status is required'});
       return;
     }
-    if (!date) {
-      Toast.show({type: 'error', text1: 'Date is required'});
-      return;
+    if (status === 'Disbursed') {
+      if (!date) {
+        Toast.show({type: 'error', text1: 'Date is required'});
+        return;
+      }
+      if (!utrNo.trim()) {
+        Toast.show({type: 'error', text1: 'UTR No is required'});
+        return;
+      }
+      if (!transactionNo.trim()) {
+        Toast.show({type: 'error', text1: 'Transaction No is required'});
+        return;
+      }
     }
-    if (!utrNo.trim()) {
-      Toast.show({type: 'error', text1: 'UTR No is required'});
-      return;
-    }
-    if (!remark.trim()) {
-      Toast.show({type: 'error', text1: 'Remark is required'});
-      return;
-    }
-    if (!transactionNo.trim()) {
-      Toast.show({type: 'error', text1: 'Transaction No is required'});
-      return;
+
+    if (status === 'Hold') {
+      if (!holdCategory) {
+        Toast.show({type: 'error', text1: 'Hold Category is required'});
+        return;
+      }
+      if (!expectedReleaseDate) {
+        Toast.show({type: 'error', text1: 'Expected Release Date is required'});
+        return;
+      }
     }
     if (onSubmit) {
       await onSubmit({
@@ -155,24 +204,58 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
         creditTo,
         disbursedAmount: disbursedAmount.trim(),
         status,
-        date,
-        utrNo: utrNo.trim(),
-        remark: remark.trim(),
-        transactionNo: transactionNo.trim(),
+        date: status === 'Disbursed' ? date : status === 'Hold' ? expectedReleaseDate : '',
+        utrNo: status === 'Disbursed' ? utrNo.trim() : '',
+        remark: (status === 'Hold' || status === 'Disbursed' || status === 'Reject') ? remark.trim() : '',
+        transactionNo: status === 'Disbursed' ? transactionNo.trim() : '',
+        rejectionReason: status === 'Reject' ? remark.trim() : '',
+        holdCategory,
+        expectedReleaseDate,
       });
     }
     handleClose();
   };
 
+  const getSubmitButtonStyle = () => {
+    if (!status) return {backgroundColor: Colors.graybase, opacity: 0.5};
+    
+    // Check missing mandatory fields per status
+    let isMissing = false;
+    if (status === 'Disbursed') {
+      if (!date || !utrNo.trim() || !transactionNo.trim() || !debitFrom) isMissing = true;
+    } else if (status === 'Reject') {
+      if (!remark.trim()) isMissing = true;
+    } else if (status === 'Hold') {
+      if (!holdCategory || !expectedReleaseDate) isMissing = true;
+    }
+
+    const baseColor = status === 'Disbursed' ? Colors.green : 
+                     status === 'Reject' ? Colors.red : 
+                     status === 'Hold' ? Colors.Yellow : Colors.graybase;
+
+    return {
+      backgroundColor: isMissing ? Colors.graybase : baseColor,
+      opacity: isMissing ? 0.6 : 1
+    };
+  };
+
+  const isSubmitDisabled =
+    !status ||
+    (status === 'Disbursed' &&
+      (!date || !utrNo.trim() || !transactionNo.trim() || !disbursedAmount));
+
   const handleClose = () => {
     setDebitFrom('');
     setCreditTo('');
-    setDisbursedAmount('10,000');
+    setDisbursedAmount('0.00');
     setStatus('');
     setDate('');
     setUtrNo('');
     setRemark('');
     setTransactionNo('');
+    setRejectionReason('');
+    setHoldCategory('');
+    setExpectedReleaseDate('');
     onClose();
   };
 
@@ -218,68 +301,30 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                     </View>
                   </View>
 
-                  {/* Debit From */}
+                  {/* Debit From - Decoded Label */}
                   <View style={styles.tableRow}>
                     <View style={styles.detailColumn}>
-                      <Text style={styles.detailLabel}>Debit From <Text style={styles.required}>*</Text></Text>
+                      <Text style={styles.detailLabel}>Debit From</Text>
                     </View>
                     <View style={styles.amountColumn}>
-                      {accountsLoading ? (
-                        <ActivityIndicator size="small" color={Colors.primaryColor} />
-                      ) : (
-                        <CustomDropdown
-                          label=""
-                          data={accountOptions}
-                          value={debitFrom}
-                          onChange={setDebitFrom}
-                          placeholder="Value"
-                          containerStyle={styles.dropdownContainer}
-                          showSearch={false}
-                        />
-                      )}
+                      <Text style={styles.infoValueText}>{decryptValue(debitFrom) || '-'}</Text>
                     </View>
                   </View>
 
-                  {/* Credit To */}
+                  {/* Credit To - Combined String (Already Decrypted) */}
                   <View style={styles.tableRow}>
                     <View style={styles.detailColumn}>
                       <Text style={styles.detailLabel}>Credit To</Text>
                     </View>
                     <View style={styles.amountColumn}>
-                      <TextInput
-                        style={[styles.input, styles.readOnlyInput]}
-                        value={creditTo}
-                        editable={false}
-                        placeholder="Value"
-                        placeholderTextColor={Colors.graybase}
-                      />
+                      <Text style={styles.infoValueText}>{creditTo || '-'}</Text>
                     </View>
                   </View>
 
-                  {/* Disbursed Amount */}
+                  {/* Status Selection */}
                   <View style={styles.tableRow}>
                     <View style={styles.detailColumn}>
-                      <Text style={styles.detailLabel}>Disbursed Amount <Text style={styles.required}>*</Text></Text>
-                    </View>
-                    <View style={styles.amountColumn}>
-                      <TextInput
-                        style={styles.input}
-                        value={disbursedAmount ? `₹ ${disbursedAmount}` : ''}
-                        onChangeText={text => {
-                          const amount = text.replace(/^₹\s*/, '').trim();
-                          setDisbursedAmount(amount);
-                        }}
-                        placeholder="Value"
-                        placeholderTextColor={Colors.graybase}
-                        keyboardType="numeric"
-                      />
-                    </View>
-                  </View>
-
-                  {/* Status */}
-                  <View style={styles.tableRow}>
-                    <View style={styles.detailColumn}>
-                      <Text style={styles.detailLabel}>Status <Text style={styles.required}>*</Text></Text>
+                      <Text style={styles.detailLabel}>Status</Text>
                     </View>
                     <View style={styles.amountColumn}>
                       <CustomDropdown
@@ -293,83 +338,108 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                       />
                     </View>
                   </View>
-
-                  {/* Date */}
-                  <View style={styles.tableRow}>
-                    <View style={styles.detailColumn}>
-                      <Text style={styles.detailLabel}>Date <Text style={styles.required}>*</Text></Text>
-                    </View>
-                    <View style={styles.amountColumn}>
-                      <DateNTimePicker
-                        label=""
-                        mode="date"
-                        value={date}
-                        onConfirm={(selectedDate: Date) => {
-                          const day = String(selectedDate.getDate()).padStart(2, '0');
-                          const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-                          const year = selectedDate.getFullYear();
-                          setDate(`${day}-${month}-${year}`);
-                        }}
-                        placeholder="DD-MM-YYYY"
-                        containerStyle={styles.datePickerContainer}
-                      />
-                    </View>
-                  </View>
                 </View>
 
-                {/* Transaction Details Section - Second view */}
-                <View style={[styles.sectionHeader, {marginTop: scaleHeight(16)}]}>
-                  <Text style={styles.sectionHeaderText}>Transaction Details</Text>
-                </View>
-                <View style={styles.tableContainer}>
-                  {/* UTR No */}
-                  <View style={styles.tableRow}>
-                    <View style={styles.detailColumn}>
-                      <Text style={styles.detailLabel}>UTR No</Text>
+                {/* Disbursement Specific Details */}
+                {status === 'Disbursed' && (
+                  <>
+                    <View style={[styles.sectionHeader, {marginTop: scaleHeight(16)}]}>
+                      <Text style={styles.sectionHeaderText}>Disbursement Details</Text>
                     </View>
-                    <View style={styles.amountColumn}>
-                      <TextInput
-                        style={styles.input}
-                        value={utrNo}
-                        onChangeText={setUtrNo}
-                        placeholder="Value"
-                        placeholderTextColor={Colors.graybase}
-                      />
+                    <View style={styles.tableContainer}>
+                      <View style={styles.tableRow}>
+                        <View style={styles.detailColumn}>
+                          <Text style={styles.detailLabel}>Disburse Amount <Text style={styles.required}>*</Text></Text>
+                        </View>
+                        <View style={styles.amountColumn}>
+                          <TextInput
+                            style={styles.input}
+                            value={disbursedAmount}
+                            onChangeText={setDisbursedAmount}
+                            keyboardType="numeric"
+                            placeholder="0.00"
+                            placeholderTextColor={Colors.graybase}
+                          />
+                        </View>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <View style={styles.detailColumn}>
+                          <Text style={styles.detailLabel}>Disburse Date <Text style={styles.required}>*</Text></Text>
+                        </View>
+                        <View style={styles.amountColumn}>
+                          <DateNTimePicker
+                            label=""
+                            mode="date"
+                            value={date}
+                            datePickerProps={{maximumDate: new Date()}} // Restricted to Today or Past
+                            onConfirm={(selectedDate: Date) => {
+                              const day = String(selectedDate.getDate()).padStart(2, '0');
+                              const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                              const year = selectedDate.getFullYear();
+                              setDate(`${day}-${month}-${year}`);
+                            }}
+                            placeholder="DD-MM-YYYY"
+                            containerStyle={styles.datePickerContainer}
+                          />
+                        </View>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <View style={styles.detailColumn}>
+                          <Text style={styles.detailLabel}>Enter UTR No <Text style={styles.required}>*</Text></Text>
+                        </View>
+                        <View style={styles.amountColumn}>
+                          <TextInput
+                            style={styles.input}
+                            value={utrNo}
+                            onChangeText={setUtrNo}
+                            placeholder="Bank Ref No"
+                            placeholderTextColor={Colors.graybase}
+                          />
+                        </View>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <View style={styles.detailColumn}>
+                          <Text style={styles.detailLabel}>Enter Transaction No <Text style={styles.required}>*</Text></Text>
+                        </View>
+                        <View style={styles.amountColumn}>
+                          <TextInput
+                            style={styles.input}
+                            value={transactionNo}
+                            onChangeText={setTransactionNo}
+                            placeholder="Internal Ref No"
+                            placeholderTextColor={Colors.graybase}
+                          />
+                        </View>
+                      </View>
                     </View>
-                  </View>
+                  </>
+                )}
 
-                  {/* Remark */}
-                  <View style={styles.tableRow}>
-                    <View style={styles.detailColumn}>
-                      <Text style={styles.detailLabel}>Remark <Text style={styles.required}>*</Text></Text>
+                {/* Remarks Field - Very Bottom Placement */}
+                {(status === 'Disbursed' || status === 'Hold' || status === 'Reject') && (
+                  <>
+                    <View style={[styles.sectionHeader, {marginTop: scaleHeight(16)}]}>
+                      <Text style={styles.sectionHeaderText}>Final Remarks</Text>
                     </View>
-                    <View style={styles.amountColumn}>
-                      <TextInput
-                        style={styles.input}
-                        value={remark}
-                        onChangeText={setRemark}
-                        placeholder="Value"
-                        placeholderTextColor={Colors.graybase}
-                      />
+                    <View style={styles.tableContainer}>
+                      <View style={[styles.tableRow, {borderBottomWidth: 0}]}>
+                        <View style={styles.detailColumn}>
+                          <Text style={styles.detailLabel}>Remarks</Text>
+                        </View>
+                        <View style={styles.amountColumn}>
+                          <TextInput
+                            style={[styles.input, {height: scaleHeight(80), textAlignVertical: 'top'}]}
+                            value={remark}
+                            onChangeText={setRemark}
+                            placeholder="Enter any final comments..."
+                            placeholderTextColor={Colors.graybase}
+                            multiline
+                          />
+                        </View>
+                      </View>
                     </View>
-                  </View>
-
-                  {/* Transaction No */}
-                  <View style={styles.tableRow}>
-                    <View style={styles.detailColumn}>
-                      <Text style={styles.detailLabel}>Transaction No <Text style={styles.required}>*</Text></Text>
-                    </View>
-                    <View style={styles.amountColumn}>
-                      <TextInput
-                        style={styles.input}
-                        value={transactionNo}
-                        onChangeText={setTransactionNo}
-                        placeholder="Value"
-                        placeholderTextColor={Colors.graybase}
-                      />
-                    </View>
-                  </View>
-                </View>
+                  </>
+                )}
               </ScrollView>
 
               {/* Action Buttons */}
@@ -381,9 +451,12 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.actionButton, styles.submitButton]}
+                  style={[styles.actionButton, styles.submitButton, getSubmitButtonStyle()]}
+                  disabled={isSubmitDisabled}
                   onPress={handleSubmit}>
-                  <Text style={styles.submitButtonText}>Submit</Text>
+                  <Text style={styles.submitButtonText}>
+                    {status === 'Reject' ? 'Reject' : status === 'Hold' ? 'Hold Transaction' : 'Submit'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -549,5 +622,10 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.white,
+  },
+  infoValueText: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
   },
 });

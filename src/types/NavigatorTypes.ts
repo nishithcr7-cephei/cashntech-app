@@ -20,7 +20,7 @@ export type AuthNavigatorType = {
   };
   OcrInvoice: undefined;
   SelectUserTypeScreen: undefined;
-  SelectProgramScreen: undefined;
+  SelectProgramScreen: {fromScreen?: string} | undefined;
   SelectRoleScreen: undefined;
   HomeNavigator: undefined;
 };
@@ -125,4 +125,5 @@ export type HomeNavigatorType = {
   };
   OcrInvoice: undefined;
   Profile: undefined;
+  SelectProgramScreen: {fromScreen?: string} | undefined;
 };

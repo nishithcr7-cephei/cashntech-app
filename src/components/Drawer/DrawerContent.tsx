@@ -55,7 +55,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const showTransactions = true;
 
   // Show Payments section for all roles (visible but disabled/gray for everyone)
-  const showPayments = isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser;
+  const showPayments = false;
   
   // Show Fund Planner for Dealer Maker only (removed dealer_checker)
   const showFundPlanner = isDealerMaker;
@@ -76,9 +76,9 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const canViewDPD = useHasPermission(PERMISSIONS.LMS); // Mapping based on user requirements if specific keys exist
   
   // Show specific Invoice menu items based on role (including CashnTech User - same menu)
-  const showPendingApprovals = isAnchorMaker || isAnchorChecker || isDealerChecker || isCashnTechUser;
-  const showRejectedFinances = isAnchorMaker || isAnchorChecker || isDealerChecker || isCashnTechUser;
-  const showDiscountingPayments = isAnchorMaker || isAnchorChecker || isDealerChecker || isCashnTechUser;
+  const showPendingApprovals = false;
+  const showRejectedFinances = false;
+  const showDiscountingPayments = false;
   
   // Get current route (name + params) for highlighting active menu item
   const currentRouteInfo = useNavigationState(state => {
@@ -115,10 +115,6 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       currentRoute === 'InvoiceDetails' ||
       currentRoute === 'CreateInvoice' ||
       currentRoute === 'UploadInvoiceList' ||
-      currentRoute === 'PendingApprovals' ||
-      currentRoute === 'RejectedFinances' ||
-      currentRoute === 'DiscountingPayments' ||
-      currentRoute === 'DPDInvoiceList' ||
       currentRoute === 'DealerInvoiceList' ||
       currentRoute === 'FundingLimitsForDealers' ||
       currentRoute === 'ANCreditAccount' ||
@@ -464,65 +460,12 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                         </TouchableOpacity>
                       )}
 
-                      {/* Pending Approvals - visible but disabled for now */}
-                      {showPendingApprovals && (
-                        <TouchableOpacity
-                          style={[styles.button, styles.disabledMenuItem]}
-                          onPress={() => {}}
-                          activeOpacity={1}>
-                          <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                            Pending Approvals
-                          </Text>
-                        </TouchableOpacity>
-                      )}
 
-                      {/* Rejected Finance - visible but disabled for now */}
-                      {showRejectedFinances && (
-                        <TouchableOpacity
-                          style={[styles.button, styles.disabledMenuItem]}
-                          onPress={() => {}}
-                          activeOpacity={1}>
-                          <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                            Rejected Finance
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-
-                      {/* Discounting Invoices - visible but disabled for now */}
-                      {showDiscountingPayments && (
-                        <TouchableOpacity
-                          style={[styles.button, styles.disabledMenuItem]}
-                          onPress={() => {}}
-                          activeOpacity={1}>
-                          <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                            Discounting Invoices
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-
-                      {/* DPD Invoice List - visible but disabled for now */}
-                      <TouchableOpacity
-                        style={[styles.button, styles.disabledMenuItem]}
-                        onPress={() => {}}
-                        activeOpacity={1}>
-                        <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                          DPD Invoice List
-                        </Text>
-                      </TouchableOpacity>
                     </>
                   )}
 
                   {/* Payments - visible but disabled for all users (gray, no expand) */}
-                  {showPayments && (
-                    <TouchableOpacity
-                      style={[styles.button, styles.disabledMenuItem]}
-                      onPress={() => {}}
-                      activeOpacity={1}>
-                      <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                        Payments
-                      </Text>
-                    </TouchableOpacity>
-                  )}
+
 
                   {/* Fund Planner Submenu - Dealer Maker only */}
                   {showFundPlanner && (

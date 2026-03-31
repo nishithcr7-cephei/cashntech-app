@@ -380,6 +380,7 @@ export const InvoiceDashboard: React.FC = () => {
         disbAmount: row.disbursed_amount ? `₹ ${parseFloat(row.disbursed_amount).toLocaleString('en-IN')}` : '-',
         utrNo: row.utr_no || '-',
         invoiceDueDate: row.invoice_due_date || '-',
+        loanRefNo: row.loan_ref_no || '',
       })),
     [latestData],
   );
@@ -497,7 +498,7 @@ export const InvoiceDashboard: React.FC = () => {
         <View style={styles.verticalList}>
           {filteredLatestRows.map((row, index) => (
             <TouchableOpacity
-              key={`${row.id}-${index}`}
+              key={`${row.id}-${row.loanRefNo || 'ref'}-${index}`}
               style={styles.listCard}
               onPress={() => {
                 navigation.navigate('InvoiceDetails', {

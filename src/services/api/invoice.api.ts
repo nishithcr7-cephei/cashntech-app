@@ -161,12 +161,16 @@ export type DisbursementListRequest = {
 };
 
 export type MarkAsDisbursedPayload = {
-  utr_no: string;
-  transaction_no: string;
+  utr_no?: string;
+  transaction_no?: string;
   disbursed_amount: number;
   disbursement_date: string; // YYYY-MM-DD
   status: string;
   remark?: string;
+  payment_mode?: string;
+  rejection_reason?: string;
+  hold_category?: string;
+  expected_release_date?: string;
 };
 
 /** API response shape for invoice approval log (GET /invoice/logs/:invoiceId) */

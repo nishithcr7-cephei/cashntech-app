@@ -62,6 +62,45 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   const canAttachment = useHasPermission(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
   const canRecreate = useHasPermission(PERMISSIONS.INVOICE_LIST_RECREATE);
 
+  const canEditInvoice = (
+    status?: string,
+    approvalStatus?: string,
+    adminStatus?: string,
+    isCashnTech?: boolean,
+  ) => {
+    const s = status?.toLowerCase() || '';
+    const a = approvalStatus?.toLowerCase() || '';
+    const ad = adminStatus?.toLowerCase() || '';
+
+    // Standard edit logic (Created, Rejected, etc.)
+    const isStandardEditable =
+      (s === 'created' || s === 'rejected' || s === 'attachment pending') &&
+      !a.includes('completed');
+
+    // Web-specific Hold logic for CashnTech Admin users
+    const isOnHold =
+      (s.includes('hold') || ad.includes('hold')) &&
+      (a.includes('completed') || a === 'completed');
+
+    if (isCashnTech) {
+      return isStandardEditable || isOnHold;
+    }
+    return isStandardEditable;
+  };
+
+  const isEditable = canEditInvoice(
+    rawInvoiceStatus,
+    rawApprovalStatus,
+    rawAdminStatus,
+    isCashnTechUser,
+  );
+  const isDeletable = canEditInvoice(
+    rawInvoiceStatus,
+    rawApprovalStatus,
+    rawAdminStatus,
+    false, // Usually delete is only for standard maker editable states
+  );
+
   const canShowApproveReject = canApprove || canReject;
 
   if (!openMenuId) return null;
@@ -82,11 +121,11 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
               {/* Edit – disabled for makers, but also check permission */}
               {canEdit && (
                 <TouchableOpacity
-                  disabled={isAnchorMaker || isDealerMaker || permissionsLoading}
-                  onPress={isAnchorMaker || isDealerMaker ? () => {} : () => onMenuAction('edit', openMenuId)}
-                  style={[styles.menuItem, (isAnchorMaker || isDealerMaker || permissionsLoading) && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="pen-to-square" iconStyle="regular" color="#858594" size={18} />
-                  <Text style={[styles.menuText, (isAnchorMaker || isDealerMaker || permissionsLoading) && styles.menuTextDisabled]}>
+                  disabled={!isEditable || permissionsLoading}
+                  onPress={() => onMenuAction('edit', openMenuId)}
+                  style={[styles.menuItem, (!isEditable || permissionsLoading) && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="pen-to-square" iconStyle="regular" color={isEditable ? '#858594' : Colors.graybase} size={18} />
+                  <Text style={[styles.menuText, (!isEditable || permissionsLoading) && styles.menuTextDisabled]}>
                     Edit
                   </Text>
                 </TouchableOpacity>
@@ -95,11 +134,11 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
               {/* Recreate Invoice */}
               {canRecreate && (
                 <TouchableOpacity
-                  disabled={isAnchorMaker || isDealerMaker || permissionsLoading}
-                  onPress={isAnchorMaker || isDealerMaker ? () => {} : () => onMenuAction('recreateInvoice', openMenuId)}
-                  style={[styles.menuItem, (isAnchorMaker || isDealerMaker || permissionsLoading) && styles.menuItemDisabled]}>
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('recreateInvoice', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
                   <FontAwesome6 name="square-plus" iconStyle="solid" color={Colors.darkblack} size={16} />
-                  <Text style={[styles.menuText, (isAnchorMaker || isDealerMaker || permissionsLoading) && styles.menuTextDisabled]}>
+                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>
                     Recreate Invoice
                   </Text>
                 </TouchableOpacity>
@@ -130,11 +169,11 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
               {/* Delete – disabled for makers */}
               {canDelete && (
                 <TouchableOpacity
-                  disabled={isAnchorMaker || isDealerMaker || permissionsLoading}
-                  onPress={isAnchorMaker || isDealerMaker ? () => {} : () => onMenuAction('delete', openMenuId)}
-                  style={[styles.menuItem, (isAnchorMaker || isDealerMaker || permissionsLoading) && styles.menuItemDisabled]}>
+                  disabled={!isDeletable || permissionsLoading}
+                  onPress={() => onMenuAction('delete', openMenuId)}
+                  style={[styles.menuItem, (!isDeletable || permissionsLoading) && styles.menuItemDisabled]}>
                   <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
-                  <Text style={[styles.menuText, (isAnchorMaker || isDealerMaker || permissionsLoading) && styles.menuTextDisabled]}>
+                  <Text style={[styles.menuText, (!isDeletable || permissionsLoading) && styles.menuTextDisabled]}>
                     Delete
                   </Text>
                 </TouchableOpacity>
@@ -207,11 +246,11 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                  {/* Edit – active for CashnTech user */}
                 {canEdit && (
                   <TouchableOpacity
-                    disabled={permissionsLoading}
+                    disabled={!isEditable || permissionsLoading}
                     onPress={() => onMenuAction('edit', openMenuId)}
-                    style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                    <FontAwesome6 name="pen-to-square" iconStyle="regular" color="#858594" size={18} />
-                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Edit</Text>
+                    style={[styles.menuItem, (!isEditable || permissionsLoading) && styles.menuItemDisabled]}>
+                    <FontAwesome6 name="pen-to-square" iconStyle="regular" color={isEditable ? '#858594' : Colors.graybase} size={18} />
+                    <Text style={[styles.menuText, (!isEditable || permissionsLoading) && styles.menuTextDisabled]}>Edit</Text>
                   </TouchableOpacity>
                 )}
 
@@ -251,11 +290,11 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 {/* Delete – active for CashnTech user */}
                 {canDelete && (
                   <TouchableOpacity
-                    disabled={permissionsLoading}
+                    disabled={!isDeletable || permissionsLoading}
                     onPress={() => onMenuAction('delete', openMenuId)}
-                    style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                    style={[styles.menuItem, (!isDeletable || permissionsLoading) && styles.menuItemDisabled]}>
                     <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
-                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Delete</Text>
+                    <Text style={[styles.menuText, (!isDeletable || permissionsLoading) && styles.menuTextDisabled]}>Delete</Text>
                   </TouchableOpacity>
                 )}
               </>

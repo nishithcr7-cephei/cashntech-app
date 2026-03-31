@@ -1,7 +1,7 @@
 import React, {useMemo, useState} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {useSelector} from 'react-redux';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -16,6 +16,7 @@ import {AppRole} from '@constants/roles';
 
 export const ProgramBreadcrumb: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute();
   const selection = useSelector(selectProgramSelection);
   const selectedPrograms = useSelector(selectSelectedPrograms);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
@@ -179,7 +180,7 @@ export const ProgramBreadcrumb: React.FC = () => {
 
           <TouchableOpacity
             style={styles.changePill}
-            onPress={() => navigation.navigate('SelectProgramScreen')}
+            onPress={() => navigation.navigate('SelectProgramScreen', {fromScreen: route.name})}
             hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
             <EditIcon />
             <Text style={styles.changeText}>Change</Text>
@@ -204,9 +205,9 @@ export const ProgramBreadcrumb: React.FC = () => {
             </Text>
           </View>
 
-          <TouchableOpacity
+            <TouchableOpacity
             style={styles.changePill}
-            onPress={() => navigation.navigate('SelectProgramScreen')}
+            onPress={() => navigation.navigate('SelectProgramScreen', {fromScreen: route.name})}
             hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
             <EditIcon />
             <Text style={styles.changeText}>Change</Text>

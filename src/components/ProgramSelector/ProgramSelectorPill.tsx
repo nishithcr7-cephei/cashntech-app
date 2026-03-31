@@ -1,7 +1,7 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {useSelector} from 'react-redux';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -14,6 +14,7 @@ import {
 export const ProgramSelectorPill: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthNavigatorType>>();
+  const route = useRoute();
   const displayText = useSelector(selectProgramDisplayText);
   const isSelected = useSelector(selectIsProgramSelected);
 
@@ -22,7 +23,7 @@ export const ProgramSelectorPill: React.FC = () => {
   return (
     <TouchableOpacity
       style={styles.pill}
-      onPress={() => navigation.navigate('SelectProgramScreen')}>
+      onPress={() => navigation.navigate('SelectProgramScreen', {fromScreen: route.name})}>
       <Text style={styles.pillText} numberOfLines={1}>
         {displayText}
       </Text>

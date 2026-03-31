@@ -120,17 +120,84 @@ interface ValidationErrors {
   [key: string]: string | undefined;
 }
 
+import {
+  fetchPermissionsRequest,
+  selectPermissions,
+  selectPermissionsLoading,
+  selectPermissionsError,
+} from '@store/permissions';
+
 export const CreateInvoice: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
   const dispatch = useDispatch();
   const programSelection = useSelector((state: any) => state.programSelection);
+
+  const resetScreenData = useCallback(() => {
+    setFields(getInitialFields());
+    setSelectedParticipant(null);
+    setSelectedAttachment(null);
+    dispatch(resetCreateInvoiceState());
+  }, [dispatch]);
+
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(fetchPermissionsRequest());
+      
+      const onBackPress = () => {
+        // When device back button is pressed, flush and allow default back behavior
+        resetScreenData();
+        return false;
+      };
+
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
+
+      return () => {
+        backHandler.remove();
+      };
+    }, [dispatch, resetScreenData]),
+  );
+
+  // Flush screen data on unmount or when navigating away (back button)
+  useEffect(() => {
+    const unsubscribeFocus = navigation.addListener('focus', () => {
+      // If we are not coming back from preview, ensure we have a fresh state.
+      if (!route.params?.previewReturnToken) {
+        resetScreenData();
+      }
+    });
+
+    const removeListener = navigation.addListener('beforeRemove', (e) => {
+      // If we are navigating to Preview, do NOT flush data.
+      // We check the action to see where we are going.
+      const action = e.data.action;
+      const isGoingToPreview = action.type === 'NAVIGATE' && (action.payload as any)?.name === 'InvoiceUploadPreview';
+      
+      if (!isGoingToPreview) {
+        // Flush state if leaving the screen (Back button, menu switch, etc.)
+        resetScreenData();
+      }
+    });
+
+    return () => {
+      unsubscribeFocus();
+      removeListener();
+      // Final flush on unmount
+      resetScreenData();
+    };
+  }, [navigation, dispatch, route.params?.previewReturnToken, resetScreenData]);
   const dealerInfo = useSelector(selectDealerInfo);
   const dealerInfoError = useSelector(selectDealerInfoError);
   const createInvoiceLoading = useSelector(selectCreateInvoiceLoading);
   const createInvoiceSuccess = useSelector(selectCreateInvoiceSuccess);
   const createInvoiceError = useSelector(selectCreateInvoiceError);
   const userId = useSelector((s: any) => s.user?.id);
+  const permissions = useSelector(selectPermissions) || [];
+  const permissionsLoading = useSelector(selectPermissionsLoading);
+  const permissionsError = useSelector(selectPermissionsError);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isAnchorMaker = userRole === 'anchor_maker';
   const isDealerMaker = userRole === 'dealer_maker';
@@ -145,8 +212,8 @@ export const CreateInvoice: React.FC = () => {
   const [selectedParticipant, setSelectedParticipant] = useState<DealerInfoParticipant | null>(null);
   const [selectedAttachment, setSelectedAttachment] = useState<DocumentPickerResponse | null>(null);
   const disabled = useMemo(
-    () => createInvoiceLoading || ocrLoading,
-    [createInvoiceLoading, ocrLoading],
+    () => createInvoiceLoading || ocrLoading || permissionsLoading,
+    [createInvoiceLoading, ocrLoading, permissionsLoading],
   );
   const [productType, setProductType] = useState<'dealer_finance' | 'vendor_finance'>('dealer_finance');
   const invoiceNo: string | undefined = route?.params?.invoiceNo;
@@ -154,6 +221,12 @@ export const CreateInvoice: React.FC = () => {
   const previewFieldsFromRoute: InvoiceFields | undefined = route?.params?.previewFields;
   const previewAttachmentFromRoute: DocumentPickerResponse | undefined = route?.params?.previewAttachment;
   const previewReturnToken: number | undefined = route?.params?.previewReturnToken;
+  
+  const hasCreatePerm = permissions.includes('lms.transactions.invoices.invoice_details.action.create_invoice');
+  const hasUploadPerm = permissions.includes('lms.transactions.invoices.invoice_details.action.upload_invoices');
+  const hasAttachmentPerm = permissions.includes('lms.transactions.invoices.invoice_details.action.attachment');
+  const canUploadFinal = hasUploadPerm && hasAttachmentPerm;
+
   const headerModeTitle = mode === 'edit' ? "Invoice Details [Edit Invoice]" : "Invoice Details";
    
   const headerRefTitle = invoiceNo
@@ -193,6 +266,37 @@ export const CreateInvoice: React.FC = () => {
       );
     }
   }, [userRole, navigation]);
+
+  // Permission validation for Create Invoice
+  useEffect(() => {
+    if (!permissionsLoading && !hasCreatePerm) {
+      Alert.alert(
+        'Access Denied',
+        'You do not have permission to create an invoice. Please contact your administrator.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              (navigation as any).goBack();
+            },
+          },
+        ],
+      );
+      
+      // Optional: Automatically navigate the user back after 3 seconds
+      const timer = setTimeout(() => {
+        (navigation as any).goBack();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [permissionsLoading, hasCreatePerm, navigation]);
+
+  // Handle Permissions API Error
+  useEffect(() => {
+    if (permissionsError) {
+      Alert.alert('Error', 'Failed to verify permissions. Please try again.');
+    }
+  }, [permissionsError]);
   
   // Fetch dealer info and bank list when program is selected
   useEffect(() => {
@@ -410,6 +514,11 @@ export const CreateInvoice: React.FC = () => {
           return 'Invoice Date is required';
         }
         return undefined;
+      case 'invoiceDueDate':
+        if (!value?.trim()) {
+          return 'Invoice Due Date is required';
+        }
+        return undefined;
       case 'paymentDate':
         return undefined;
       case 'creditTo':
@@ -464,31 +573,50 @@ export const CreateInvoice: React.FC = () => {
     }
   };
 
-  // Validate all fields
-  const validateForm = (): boolean => {
+  // Validate all fields in order of appearance
+  const validateForm = (returnFirstOnly = false): {isValid: boolean; firstError?: string; errors: ValidationErrors} => {
     const newErrors: ValidationErrors = {};
-    
-    const invoiceNumberError = validateField('invoiceNumber', fields.invoiceNumber);
-    if (invoiceNumberError) newErrors.invoiceNumber = invoiceNumberError;
-    
-    const dealerError = validateField('dealer', fields.dealer);
-    if (dealerError) newErrors.dealer = dealerError;
-    
-    const dealerCodeError = validateField('dealerCode', fields.dealerCode);
-    if (dealerCodeError) newErrors.dealerCode = dealerCodeError;
-    
-    const invoiceDateError = validateField('invoiceDate', fields.invoiceDate);
-    if (invoiceDateError) newErrors.invoiceDate = invoiceDateError;
-    
-    
-    const creditToError = validateField('creditTo', fields.creditTo);
-    if (creditToError) newErrors.creditTo = creditToError;
+    let firstError: string | undefined;
 
-    const itemsError = validateField('items', fields.items);
-    if (itemsError) newErrors.items = itemsError;
+    const validationOrder: string[] = [
+      'dealer',
+      'dealerCode',
+      'invoiceNumber',
+      'invoiceDate',
+      'invoiceDueDate',
+      'creditTo',
+      'items',
+    ];
+
+    if (canUploadFinal) {
+      validationOrder.push('attachment');
+    }
+
+    for (const field of validationOrder) {
+      let error: string | undefined;
+      
+      if (field === 'attachment') {
+        const hasAnyAttachmentForValidation = !!selectedAttachment || (fields.attachments && fields.attachments.length > 0);
+        if (!hasAnyAttachmentForValidation) {
+           error = 'Please upload the invoice file';
+        }
+      } else {
+        error = validateField(field as keyof InvoiceFields, fields[field as keyof InvoiceFields]);
+      }
+
+      if (error) {
+        newErrors[field] = error;
+        if (!firstError) firstError = error;
+        if (returnFirstOnly) break;
+      }
+    }
     
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return {
+      isValid: Object.keys(newErrors).length === 0,
+      firstError,
+      errors: newErrors,
+    };
   };
 
   // Check if form is valid
@@ -498,6 +626,7 @@ export const CreateInvoice: React.FC = () => {
       fields.dealer?.trim() &&
       fields.dealerCode?.trim() &&
       fields.invoiceDate?.trim() &&
+      fields.invoiceDueDate?.trim() &&
       fields.creditTo?.trim() &&
       fields.items &&
       fields.items.length > 0 &&
@@ -630,23 +759,12 @@ export const CreateInvoice: React.FC = () => {
   };
     
   const handleSubmit = async () => {
-    const hasAnyAttachment = !!selectedAttachment || (fields.attachments && fields.attachments.length > 0);
-    if (!hasAnyAttachment) {
+    // 1. First, validate all form fields in order of appearance
+    const validation = validateForm(true);
+    if (!validation.isValid) {
       Toast.show({
         type: 'error',
-        text1: 'Please upload the invoice file first',
-        visibilityTime: 3000,
-      });
-      return;
-    }
-    if (!validateForm()) {
-      const firstErrorKey = Object.keys(errors)[0];
-      const msg = firstErrorKey && errors[firstErrorKey]
-        ? errors[firstErrorKey]
-        : 'Please fill all required fields';
-      Toast.show({
-        type: 'error',
-        text1: msg,
+        text1: validation.firstError || 'Please fill all required fields',
         visibilityTime: 3000,
       });
       return;
@@ -806,10 +924,30 @@ export const CreateInvoice: React.FC = () => {
   );
 
   const hasAnyAttachment = !!selectedAttachment || (fields.attachments && fields.attachments.length > 0);
-  const submitButtonAppearsDisabledInternal = !hasAnyAttachment || !isFormValid;
-  const submitDisabledReasonInternal = !hasAnyAttachment 
-    ? 'Please upload the invoice file first (tap "Upload Invoice" below)' 
-    : undefined;
+  const submitButtonAppearsDisabledInternal = (canUploadFinal && !hasAnyAttachment) || !isFormValid;
+  
+  const submitDisabledReasonInternal = useMemo(() => {
+    if (!fields.dealer?.trim()) return 'Dealer Name is required';
+    if (!fields.dealerCode?.trim()) return 'Dealer Code is required';
+    if (!fields.invoiceNumber?.trim()) return 'Invoice / Unique Ref. No is required';
+    if (!fields.invoiceDate?.trim()) return 'Invoice Date is required';
+    if (!fields.creditTo?.trim()) return 'Credit To is required';
+    if (!fields.items || fields.items.length === 0) return 'At least one item is required';
+    
+    // Items detail check
+    for (let i = 0; i < (fields.items?.length || 0); i++) {
+       const item = fields.items![i];
+       if (!item.itemName?.trim()) return `Item ${i + 1}: Item Name is required`;
+       if (!item.quantity?.trim() || parseFloat(item.quantity) <= 0) return `Item ${i + 1}: Valid Quantity is required`;
+       if (!item.unit?.trim()) return `Item ${i + 1}: Unit is required`;
+       if (!item.pricePerQuantity?.trim() || parseFloat(item.pricePerQuantity) <= 0) return `Item ${i + 1}: Valid Price is required`;
+    }
+
+    if (canUploadFinal && !hasAnyAttachment) {
+      return 'Please upload the invoice file';
+    }
+    return undefined;
+  }, [fields, canUploadFinal, hasAnyAttachment]);
 
   const dealerOptions = useMemo(
     () =>
@@ -820,13 +958,38 @@ export const CreateInvoice: React.FC = () => {
     [dealerInfo],
   );
   const creditToOptions = useMemo(
-    () =>
-      dealerInfo?.party?.party_bank_details?.map(b => ({
+    () => {
+      // Use bank_details from party root if available
+      const details = (dealerInfo as any)?.bank_details || dealerInfo?.party?.party_bank_details;
+      return details?.map((b: any) => ({
         label: decryptValue(b.account_number ?? '') || b.account_number,
         value: b.account_number,
-      })) ?? [],
+      })) ?? [];
+    },
     [dealerInfo],
   );
+  if (permissionsLoading) {
+    return (
+      <Container>
+        <AppBar 
+          title="Create Invoice" 
+          navigation={navigation as any} 
+          renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
+          onPressLeftIcon={() => {
+          resetScreenData();
+          (navigation as any).navigate('InvoiceDetails');
+        }}
+        />
+        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.white}}>
+          <ActivityIndicator size="large" color={Colors.primaryColor} />
+          <Text style={{marginTop: scaleHeight(12), fontFamily: Fonts.GilroyMedium, color: Colors.graybase}}>
+            Verifying permissions...
+          </Text>
+        </View>
+      </Container>
+    );
+  }
+
   return (
     <Container>
       <AppBar 
@@ -851,57 +1014,50 @@ export const CreateInvoice: React.FC = () => {
       </View>
       <View style={styles.container}>
         {/* OCR Badge */}
-        <View style={styles.aiBadge}>
-          <AI
-            width={scaleWidth(18)}
-            height={scaleHeight(18)}
-            color={Colors.primaryColor}
-          />
-          <Text style={styles.aiBadgeText}>OCR Extraction (Capture / Upload)</Text>
-        </View>
+        {hasCreatePerm && (
+          <View style={styles.aiBadge}>
+            <AI
+              width={scaleWidth(18)}
+              height={scaleHeight(18)}
+              color={Colors.primaryColor}
+            />
+            <Text style={styles.aiBadgeText}>OCR Extraction (Capture / Upload)</Text>
+          </View>
+        )}
 
         {/* OCR Section */}
-        <View style={styles.ocrSection}>
-          <Text style={styles.ocrTitle}>Scan invoice for OCR</Text>
-          <Text style={styles.ocrSubtitle}>
-            Capture or upload invoice image to auto-fill form fields.
-          </Text>
+        {hasCreatePerm && (
+          <View style={styles.ocrSection}>
+            <Text style={styles.ocrTitle}>Scan invoice for OCR</Text>
+            <Text style={styles.ocrSubtitle}>
+              Capture or upload invoice image to auto-fill form fields.
+            </Text>
 
-          <View style={styles.ocrButtons}>
-            <TouchableOpacity
-              style={[styles.ocrButton, styles.cameraButton]}
-              onPress={openCamera}
-              disabled={disabled}>
-              <Camera width={scaleWidth(20)} height={scaleHeight(20)} />
-              <Text style={styles.ocrButtonText}>Capture</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.ocrButton, styles.galleryButton]}
-              onPress={() => setIsOcrUploadModalVisible(true)}
-              disabled={disabled}>
-              <Upload width={scaleWidth(20)} height={scaleHeight(20)} />
-              <Text style={styles.ocrButtonText}>Upload</Text>
-            </TouchableOpacity>
-          </View>
-
-          {ocrLoading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={Colors.primaryColor} />
-              <Text style={styles.loadingText}>Extracting invoice data...</Text>
-            </View>
-          )}
-
-          {selectedAttachment && (
-            <View style={styles.selectedFileRow}>
-              <Text style={styles.selectedFileText} numberOfLines={1}>
-                Proof Uploaded: {selectedAttachment.name}
-              </Text>
-              <TouchableOpacity onPress={() => setSelectedAttachment(null)} hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-                <Text style={styles.removeFileText}>Remove</Text>
+            <View style={styles.ocrButtons}>
+              <TouchableOpacity
+                style={[styles.ocrButton, styles.cameraButton]}
+                onPress={openCamera}
+                disabled={disabled}>
+                <Camera width={scaleWidth(20)} height={scaleHeight(20)} />
+                <Text style={styles.ocrButtonText}>Capture</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.ocrButton, styles.galleryButton]}
+                onPress={() => setIsOcrUploadModalVisible(true)}
+                disabled={disabled}>
+                <Upload width={scaleWidth(20)} height={scaleHeight(20)} />
+                <Text style={styles.ocrButtonText}>Upload</Text>
               </TouchableOpacity>
             </View>
-          )}
-        </View>
+
+            {ocrLoading && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={Colors.primaryColor} />
+                <Text style={styles.loadingText}>Extracting invoice data...</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Invoice Form */}
         <ScrollView
@@ -925,21 +1081,11 @@ export const CreateInvoice: React.FC = () => {
             defaultPaymentTermsDays={dealerInfo?.basic_parameters?.default_payment_terms_days != null ? Number(dealerInfo.basic_parameters.default_payment_terms_days) : undefined}
             mode={mode}
             onDeleteAttachment={handleDeleteAttachment}
+            canUploadFinal={canUploadFinal}
+            onAddAttachment={() => setIsProofUploadModalVisible(true)}
+            selectedAttachment={selectedAttachment}
           />
         </ScrollView>
-
-        {/* Footer (Upload Invoice only) */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.uploadInvoiceButton}
-            onPress={() => setIsProofUploadModalVisible(true)}
-            disabled={disabled}>
-            <View style={styles.buttonIconContainer}>
-              <Plus width={scaleWidth(16)} height={scaleHeight(16)} />
-            </View>
-            <Text style={styles.uploadInvoiceButtonText}>Upload Invoice</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       {/* Camera Modal */}
@@ -1094,6 +1240,14 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(12),
     color: Colors.graybase,
   },
+  proofSection: {
+    paddingHorizontal: scaleWidth(16),
+    paddingTop: scaleHeight(12),
+    paddingBottom: scaleHeight(12),
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray200,
+  },
   selectedFileRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1120,7 +1274,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   formContent: {
-    paddingBottom: scaleHeight(100),
+    paddingBottom: scaleHeight(20),
   },
   footer: {
     paddingHorizontal: scaleWidth(16),

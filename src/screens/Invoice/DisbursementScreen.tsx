@@ -12,7 +12,7 @@ import {
   Alert,
   FlatList,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -38,7 +38,13 @@ import Toast from 'react-native-toast-message';
 import {decryptValue} from '@utils/decrypt';
 import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
-import {selectPermissionsLoading} from '@store/permissions';
+import {
+  selectPermissionsLoading,
+  fetchPermissionsRequest,
+  selectCanSendMailToBank,
+  selectCanMarkAsDisbursed,
+} from '@store/permissions';
+import {useDispatch} from 'react-redux';
 
 export type DisbursementRow = {
   id: string;
@@ -138,7 +144,14 @@ function mapToDisbursementRow(item: any): DisbursementRow {
 }
 
 export const DisbursementScreen: React.FC = () => {
+  const dispatch = useDispatch();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(fetchPermissionsRequest());
+    }, [dispatch]),
+  );
   const programSelection = useSelector(selectProgramSelection);
   const programName =
     programSelection?.programScope === 'all'
@@ -149,13 +162,16 @@ export const DisbursementScreen: React.FC = () => {
   // Permissions
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canViewDisbursement = useHasPermission(PERMISSIONS.DISBURSEMENT);
-  const canMarkAsDisbursed = useHasPermission(PERMISSIONS.DISBURSEMENT_MARK_AS_DISBURSED);
-  const canSendMail = useHasPermission(PERMISSIONS.DISBURSEMENT_SEND_MAIL);
+  const canMarkAsDisbursed = useSelector(selectCanMarkAsDisbursed);
+  const canSendMail = useSelector(selectCanSendMailToBank);
   const canDeleteDisbursement = useHasPermission(PERMISSIONS.DISBURSEMENT_DELETE);
   const canExport = useHasPermission(PERMISSIONS.DISBURSEMENT_EXPORT);
   const canFilter = useHasPermission(PERMISSIONS.DISBURSEMENT_FILTER);
 
-  const showDisbursementActionMenu = canMarkAsDisbursed || canSendMail || canDeleteDisbursement;
+  // The 3-dots icon itself should be visible if the user can view the screen,
+  // even if they don't have secondary action permissions (per requirements).
+  const show3DotsIcon = canViewDisbursement;
+  const hasNoActionPermissions = !canMarkAsDisbursed && !canSendMail;
 
   const [disbursementRows, setDisbursementRows] = useState<DisbursementRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -169,6 +185,7 @@ export const DisbursementScreen: React.FC = () => {
   const [selectedDisbursementId, setSelectedDisbursementId] = useState<string | null>(null);
   const [mailLoadingId, setMailLoadingId] = useState<string | null>(null);
   const menuButtonRefs = useRef<Record<string, any>>({});
+  const fetchRequestId = useRef(0);
 
   const programIds = useMemo(
     () =>
@@ -186,53 +203,32 @@ export const DisbursementScreen: React.FC = () => {
   );
 
   const fetchDisbursementData = useCallback(async () => {
+    const requestId = ++fetchRequestId.current;
     setLoading(true);
     setError(null);
     try {
       const filters = appliedFilters;
       let apiFilters: Parameters<typeof invoiceApi.getVerifiedList>[1] = undefined;
+      // Note: Removed local row-based ID lookup to prevent cumulative filtering bugs.
+      // IDs should be managed via state or direct program selection when possible.
       if (Object.keys(filters).length > 0) {
-        const bankIds = filters['Bank Name']?.length
-          ? [...new Set(disbursementRows.filter(r => filters['Bank Name']!.includes(r.bankName)).map(r => r.bankId).filter(Boolean) as string[])]
-          : undefined;
-        const programIdsFilter = filters['Program Name']?.length
-          ? [...new Set(disbursementRows.filter(r => filters['Program Name']!.includes(r.programName)).map(r => r.programId).filter(Boolean) as string[])]
-          : undefined;
-        const productIds = filters['Product Name']?.length
-          ? [...new Set(disbursementRows.filter(r => filters['Product Name']!.includes(r.productName)).map(r => r.productId).filter(Boolean) as string[])]
-          : undefined;
-        const partyIds = filters['Primary Party']?.length
-          ? [...new Set(disbursementRows.filter(r => filters['Primary Party']!.includes(r.primaryParty)).map(r => r.partyId).filter(Boolean) as string[])]
-          : undefined;
-        const counterPartyIds = filters['Counter Party']?.length
-          ? [...new Set(disbursementRows.filter(r => filters['Counter Party']!.includes(r.counterParty)).map(r => r.counterPartyId).filter(Boolean) as string[])]
-          : undefined;
         const byInvoiceStatus = filters['Invoice Status']?.length ? filters['Invoice Status'] : undefined;
-        if (bankIds || programIdsFilter || productIds || partyIds || counterPartyIds || byInvoiceStatus) {
+        if (byInvoiceStatus) {
           apiFilters = {
-            bankIds,
-            programIds: programIdsFilter,
-            productIds,
-            partyIds,
-            counterPartyIds,
             byInvoiceStatus,
           };
         }
       }
       const verifiedList = await invoiceApi.getVerifiedList(programIds, apiFilters);
-      const allowedStatuses = [
-        'submitted',
-        'in progress',
-        'inprogress',
-        'disbursed',
-        'paid',
-      ];
+      
+      if (requestId !== fetchRequestId.current) return;
+
       let verifiedItems = (verifiedList || []).filter(
         (item: any) => {
-          const adminStatus = (item.admin_status || '').toLowerCase();
-          if (adminStatus !== 'verified') return false;
-          const status = (item.invoice_status || '').toLowerCase();
-          return allowedStatuses.includes(status) || !!item.disbursement_date || !!item.disbursed_amount;
+          // Rule: If it's verified by admin, it belongs on this screen.
+          // Don't filter out items based on invoice_status yet, as they need to be visible to be processed.
+          const adminStatus = (item.admin_status || '').toLowerCase().trim();
+          return adminStatus === 'verified';
         },
       );
       if (apiFilters?.byInvoiceStatus?.length) {
@@ -242,25 +238,33 @@ export const DisbursementScreen: React.FC = () => {
           ),
         );
       }
-      // Preserve backend order (created_at DESC) – don't re-sort here
+      
+      // Mapping preserves the backend array order exactly as returned by the API
       let rows = verifiedItems.map(mapToDisbursementRow);
-      // CashnTech user: only Disbursed, Submitted, Paid
-      const cashntechStatuses = ['disbursed', 'submitted', 'paid'];
+      
       const finalRows = isCashnTechUser
-        ? rows.filter(r =>
-            cashntechStatuses.includes((r.invoiceStatus || '').toLowerCase()),
-          )
+        ? rows.filter(r => {
+            const status = (r.invoiceStatus || '').toLowerCase().trim();
+            // CashnTech users should see everything except perhaps very early drafts/rejected items
+            // But if it's Verified, it's already past that stage.
+            return status !== 'rejected' && status !== 'cancelled';
+          })
         : rows;
+      
       setDisbursementRows(finalRows);
     } catch (err: any) {
-      const msg =
-        err?.message?.includes('fetch') || err?.code === 'ECONNABORTED'
-          ? 'Network error. Check connection.'
-          : err?.message || 'Failed to load disbursement data';
-      setError(msg);
-      setDisbursementRows([]);
+      if (requestId === fetchRequestId.current) {
+        const msg =
+          err?.message?.includes('fetch') || err?.code === 'ECONNABORTED'
+            ? 'Network error. Check connection.'
+            : err?.message || 'Failed to load disbursement data';
+        setError(msg);
+        setDisbursementRows([]);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === fetchRequestId.current) {
+        setLoading(false);
+      }
     }
   }, [programIds, isCashnTechUser, appliedFilters]);
 
@@ -404,9 +408,7 @@ export const DisbursementScreen: React.FC = () => {
           ],
         );
         break;
-      case 'delete':
-        // TODO: Delete - not implemented in backend
-        break;
+
     }
   };
 
@@ -424,10 +426,10 @@ export const DisbursementScreen: React.FC = () => {
   };
 
 
-  const renderDisbursementRow = ({item: row}: {item: DisbursementRow}) => (
+  const renderDisbursementRow = ({item: row, index}: {item: DisbursementRow; index: number}) => (
     <View style={styles.cardWrapper}>
       <View style={styles.listCard}>
-        {showDisbursementActionMenu && (
+        {show3DotsIcon && row.invoiceStatus.toLowerCase() !== 'disbursed' && (
           <View
             ref={(r: View | null) => {
               if (r) menuButtonRefs.current[row.id] = r;
@@ -449,7 +451,7 @@ export const DisbursementScreen: React.FC = () => {
           </View>
         )}
         <View style={styles.indexBadge}>
-          <Text style={styles.indexText}>{disbursementRows.indexOf(row) + 1}</Text>
+          <Text style={styles.indexText}>{index + 1}</Text>
         </View>
         <View style={styles.infoGrid}>
           <View style={styles.infoColumn}>
@@ -520,7 +522,11 @@ export const DisbursementScreen: React.FC = () => {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         data={loading ? [] : paginatedData}
-        keyExtractor={row => row.id}
+        keyExtractor={(row, index) => `${row.id || 'id'}-${row.loanRefNo || 'ref'}-${index}`}
+        removeClippedSubviews={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
         ListHeaderComponent={
           <>
             <View style={styles.pageTitleBar}>
@@ -536,10 +542,12 @@ export const DisbursementScreen: React.FC = () => {
                 </View>
               ))}
             </View>
-            {loading ? (
+            {loading || permissionsLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={Colors.primaryColor} />
-                <Text style={styles.loadingText}>Loading disbursement data...</Text>
+                <Text style={styles.loadingText}>
+                  {permissionsLoading ? 'Fetching permissions...' : 'Loading disbursement data...'}
+                </Text>
               </View>
             ) : error ? (
               <View style={styles.errorContainer}>
@@ -613,8 +621,7 @@ export const DisbursementScreen: React.FC = () => {
       )}
 
       {/* 3-dot Action Menu - Disbursal list view: Checker & CashnTech User - Send Mail to Bank, Mark as Disbursed, Delete */}
-      {showDisbursementActionMenu && (
-        <Modal
+      <Modal
           transparent
           visible={!!openMenuId}
           animationType="fade"
@@ -638,32 +645,35 @@ export const DisbursementScreen: React.FC = () => {
                 const isDisbursed = status === 'disbursed';
                 return (
                   <>
-                    {canSendMail && (
-                      <TouchableOpacity
-                        style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}
-                        disabled={permissionsLoading}
-                        onPress={() => handleMenuAction('sendMail', openMenuId as string)}>
-                        <FontAwesome6 name="envelope" iconStyle="regular" color={Colors.darkblack} size={16} />
-                        <Text style={[styles.menuItemText, permissionsLoading && styles.menuItemTextDisabled]}>Send Mail to Bank</Text>
-                      </TouchableOpacity>
-                    )}
-                    {canMarkAsDisbursed && !isDisbursed && (
-                      <TouchableOpacity
-                        style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}
-                        disabled={permissionsLoading}
-                        onPress={() => handleMenuAction('markAsDisbursed', openMenuId as string)}>
-                        <FontAwesome6 name="money-bill-1" iconStyle="regular" color={Colors.darkblack} size={16} />
-                        <Text style={[styles.menuItemText, permissionsLoading && styles.menuItemTextDisabled]}>Mark as Disbursed</Text>
-                      </TouchableOpacity>
-                    )}
-                    {canDeleteDisbursement && (
-                      <TouchableOpacity
-                        style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}
-                        disabled={permissionsLoading}
-                        onPress={() => handleMenuAction('delete', openMenuId as string)}>
-                        <FontAwesome6 name="trash-can" iconStyle="regular" color={Colors.red} size={16} />
-                        <Text style={[styles.menuItemText, {color: Colors.red}, permissionsLoading && styles.menuItemTextDisabled]}>Delete</Text>
-                      </TouchableOpacity>
+                    {hasNoActionPermissions ? (
+                      <View style={styles.menuItem}>
+                        <FontAwesome6 name="circle-info" iconStyle="solid" color={Colors.graybase} size={16} />
+                        <Text style={[styles.menuItemText, styles.menuItemTextDisabled]}>No Actions Available</Text>
+                      </View>
+                    ) : (
+                      <>
+                        {canSendMail && status !== 'disbursed' && (
+                          <TouchableOpacity
+                            style={[
+                              styles.menuItem,
+                              (permissionsLoading || (selectedRow?.adminStatus.toLowerCase() !== 'verified')) && styles.menuItemDisabled
+                            ]}
+                            disabled={permissionsLoading || (selectedRow?.adminStatus.toLowerCase() !== 'verified')}
+                            onPress={() => handleMenuAction('sendMail', openMenuId as string)}>
+                            <FontAwesome6 name="envelope" iconStyle="regular" color={Colors.darkblack} size={16} />
+                            <Text style={[styles.menuItemText, (permissionsLoading || (selectedRow?.adminStatus.toLowerCase() !== 'verified')) && styles.menuItemTextDisabled]}>Send Mail to Bank</Text>
+                          </TouchableOpacity>
+                        )}
+                        {canMarkAsDisbursed && (selectedRow?.invoiceStatus.toLowerCase() === 'submitted') && (
+                          <TouchableOpacity
+                            style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}
+                            disabled={permissionsLoading}
+                            onPress={() => handleMenuAction('markAsDisbursed', openMenuId as string)}>
+                            <FontAwesome6 name="money-bill-1" iconStyle="regular" color={Colors.darkblack} size={16} />
+                            <Text style={[styles.menuItemText, permissionsLoading && styles.menuItemTextDisabled]}>Mark as Disbursed</Text>
+                          </TouchableOpacity>
+                        )}
+                      </>
                     )}
                   </>
                 );
@@ -671,8 +681,7 @@ export const DisbursementScreen: React.FC = () => {
             </Pressable>
           </Pressable>
         </Modal>
-      )}
-
+  
       {/* Filter Modal */}
       <FilterModal
         visible={showFilterModal}
@@ -699,6 +708,9 @@ export const DisbursementScreen: React.FC = () => {
         invoiceNo={
           filteredData.find(item => item.id === selectedDisbursementId)?.invoiceNo
         }
+        programName={
+          filteredData.find(item => item.id === selectedDisbursementId)?.programName
+        }
         onSubmit={async data => {
           if (!selectedDisbursementId) return;
           try {
@@ -711,13 +723,31 @@ export const DisbursementScreen: React.FC = () => {
                 ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`
                 : data.date;
             const isDisbursed = (data.status || '').toLowerCase() === 'disbursed';
+            const isHold = (data.status || '').toLowerCase() === 'hold';
+            const isReject = (data.status || '').toLowerCase() === 'reject';
+            
+            // Format expected release date if present (DD-MM-YYYY -> YYYY-MM-DD)
+            let holdReleaseDate = '';
+            if (data.expectedReleaseDate) {
+              const relParts = data.expectedReleaseDate.split('-');
+              if (relParts.length === 3) {
+                holdReleaseDate = `${relParts[2]}-${relParts[1]}-${relParts[0]}`;
+              } else {
+                holdReleaseDate = data.expectedReleaseDate;
+              }
+            }
+
             await invoiceApi.markAsDisbursed(selectedDisbursementId, {
-              utr_no: data.utrNo || '',
-              transaction_no: data.transactionNo || '',
+              utr_no: isDisbursed ? data.utrNo || '' : undefined,
+              transaction_no: isDisbursed ? data.transactionNo || '' : undefined,
               disbursed_amount: isDisbursed && !isNaN(amount) ? amount : 0,
-              disbursement_date: disbursementDate || new Date().toISOString().slice(0, 10),
+              disbursement_date: isDisbursed ? (disbursementDate || new Date().toISOString().slice(0, 10)) : 
+                                 isHold ? (holdReleaseDate || new Date().toISOString().slice(0, 10)) : '',
               status: data.status || 'Disbursed',
-              remark: data.remark || '',
+              remark: isDisbursed || isHold ? (data.remark || '') : undefined,
+              rejection_reason: isReject ? data.rejectionReason : undefined,
+              hold_category: isHold ? data.holdCategory : undefined,
+              expected_release_date: isHold ? holdReleaseDate : undefined,
             });
             Toast.show({
               type: 'success',

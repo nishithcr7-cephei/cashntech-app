@@ -4,6 +4,14 @@
  */
 export const PERMISSIONS = {
   LMS: 'lms',
+  DASHBOARD_MANAGEMENT: 'lms.dashboard_management',
+  MASTER_DATA_MANAGEMENT: 'lms.master_data_management',
+  SCF_MASTER: 'lms.master_data_management.supply_chain_finance',
+  LMS_ID_CREATION: 'lms.master_data_management.supply_chain_finance.lms_id_creation',
+  LMS_ID_CREATION_ADD: 'lms.master_data_management.supply_chain_finance.lms_id_creation.action.add_new_id',
+  LMS_ID_CREATION_FILTER: 'lms.master_data_management.supply_chain_finance.lms_id_creation.action.filter',
+  BANK_ID_LIST: 'lms.master_data_management.supply_chain_finance.bank_id_list',
+  PRIMARY_COUNTER_PARTY: 'lms.master_data_management.supply_chain_finance.primary_party_and_counter_party',
   TRANSACTIONS: 'lms.transactions',
   TRANSACTIONS_OVERVIEW: 'lms.transactions.overview',
   INVOICE_LIST: 'lms.transactions.invoice_list',

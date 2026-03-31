@@ -8,15 +8,27 @@ export const selectPermissions = createSelector(
   p => p.permissions,
 );
 
-export const selectPermissionsLoading = () => false;
+export const selectPermissionsLoading = createSelector(
+  selectPermissionsState,
+  p => p.loading,
+);
 
 export const selectPermissionsError = createSelector(
   selectPermissionsState,
   p => p.error,
 );
 
-/** Check if user has a specific permission (e.g. 'lms.transactions.invoice_list.action.export') */
 export const selectHasPermission = (permission: string) =>
   createSelector(selectPermissionsState, p =>
     p.permissions.includes(permission),
   );
+
+export const selectCanSendMailToBank = createSelector(
+  selectPermissionsState,
+  p => p.canSendMailToBank,
+);
+
+export const selectCanMarkAsDisbursed = createSelector(
+  selectPermissionsState,
+  p => p.canMarkAsDisbursed,
+);

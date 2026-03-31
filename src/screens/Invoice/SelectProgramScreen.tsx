@@ -7,7 +7,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useDispatch, useSelector} from 'react-redux';
 import {AppBar, Container} from '@components/index';
@@ -41,6 +41,8 @@ const FolderIcon = ({size = 20, color = '#7A7C82'}: {size?: number; color?: stri
 export const SelectProgramScreen: React.FC = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<AuthNavigatorType>>();
+  const route = useRoute<any>();
+  const {fromScreen} = route.params || {};
   const dispatch = useDispatch();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isAnchorMaker = userRole === 'anchor_maker';
@@ -148,7 +150,9 @@ export const SelectProgramScreen: React.FC = () => {
         userType: program.userType,
       }),
     );
-    if (navigation.canGoBack()) {
+    if (fromScreen) {
+      navigation.navigate(fromScreen);
+    } else if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
       navigation.replace('HomeNavigator');
@@ -157,7 +161,9 @@ export const SelectProgramScreen: React.FC = () => {
 
   const handleAllProgram = () => {
     dispatch(setProgramScope('all'));
-    if (navigation.canGoBack()) {
+    if (fromScreen) {
+      navigation.navigate(fromScreen);
+    } else if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
       navigation.replace('HomeNavigator');

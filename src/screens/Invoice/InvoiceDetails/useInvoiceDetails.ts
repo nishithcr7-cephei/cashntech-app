@@ -9,6 +9,7 @@ import {
   updateInvoiceStatusRequest,
   updateInvoiceVerificationRequest,
 } from '@store/invoice/inv.slice';
+import {fetchPermissionsRequest} from '@store/permissions';
 import {
   setProgramSelection,
   toggleProgramSelection,
@@ -159,11 +160,12 @@ export function useInvoiceDetails() {
     }, [hasAnyProgramContext, programId, apiFilters, dispatch, navigation, routeParams?.refreshList]),
   );
 
-  // Auto-reset search on screen focus
+  // Auto-refresh permissions and reset search on screen focus
   useFocusEffect(
     useCallback(() => {
+      dispatch(fetchPermissionsRequest());
       setSearchText('');
-    }, []),
+    }, [dispatch]),
   );
 
   useEffect(() => {

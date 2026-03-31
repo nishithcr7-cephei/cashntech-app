@@ -83,6 +83,9 @@ type Props = {
   submitDisabledReason?: string;
   mode?: 'edit' | 'recreate';
   onDeleteAttachment?: (id: number) => void;
+  canUploadFinal?: boolean;
+  onAddAttachment?: () => void;
+  selectedAttachment?: any; // To avoid import complexity now, using any for DocumentPickerResponse
 };
 
 export const InvoiceForm: React.FC<Props> = ({
@@ -106,6 +109,9 @@ export const InvoiceForm: React.FC<Props> = ({
   submitDisabledReason,
   mode,
   onDeleteAttachment,
+  canUploadFinal = false,
+  onAddAttachment,
+  selectedAttachment,
 }) => {
   const insets = useSafeAreaInsets(); // Not available here but can use view padding
   const storageBaseUrl = 'https://d2wayd1he5a7q1.cloudfront.net'; // Same as DetailView
@@ -389,7 +395,7 @@ export const InvoiceForm: React.FC<Props> = ({
   const items = value.items || [];
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       {/* Party Information Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
@@ -568,7 +574,7 @@ export const InvoiceForm: React.FC<Props> = ({
           <View style={styles.halfWidth}>
             <View style={[styles.fieldInRow, styles.invoiceDueDateField]}>
               <DateNTimePicker
-                label="Invoice Due Date"
+                label="Invoice Due Date *"
                 value={parseDateValue(value.invoiceDueDate)}
                 onConfirm={(date) => {
                   const dateStr = formatDateForStorage(date);
@@ -584,6 +590,7 @@ export const InvoiceForm: React.FC<Props> = ({
                 }}
                 containerStyle={styles.datePickerContainer}
               />
+              {errors.invoiceDueDate && <Text style={styles.errorText}>{errors.invoiceDueDate}</Text>}
               {value.invoiceDueDate && validateInvoiceDueDate(value.invoiceDueDate) && (
                 <Text style={styles.warningText}>{validateInvoiceDueDate(value.invoiceDueDate)}</Text>
               )}
@@ -1119,6 +1126,36 @@ export const InvoiceForm: React.FC<Props> = ({
         </TouchableWithoutFeedback>
       </Modal>
 
+      {/* Add Attachment Section */}
+      {canUploadFinal && (
+        <View style={styles.addAttachmentContainer}>
+           <Text style={styles.label}>Upload Invoice *</Text>
+           
+           {selectedAttachment ? (
+             <View style={styles.selectedFilePreview}>
+               <FontAwesome6 name="file-invoice" size={20} color={Colors.primaryColor} />
+               <Text style={styles.selectedFileText} numberOfLines={1}>
+                 {selectedAttachment.name}
+               </Text>
+               <TouchableOpacity onPress={onAddAttachment} style={styles.changeFileButton}>
+                 <Text style={styles.changeFileText}>Change</Text>
+               </TouchableOpacity>
+             </View>
+           ) : (
+             <TouchableOpacity 
+               style={[styles.addAttachmentButton, errors.attachment && styles.inputError]} 
+               onPress={onAddAttachment}
+               activeOpacity={0.7}
+             >
+               <Text style={styles.addAttachmentButtonText}>Add Attachments +</Text>
+             </TouchableOpacity>
+           )}
+           {errors.attachment && (
+             <Text style={styles.errorText}>{errors.attachment}</Text>
+           )}
+        </View>
+      )}
+
       {/* Submit and Cancel Buttons */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity
@@ -1150,8 +1187,7 @@ export const InvoiceForm: React.FC<Props> = ({
                   : 'Please fill all required fields before submitting');
               Toast.show({
                 type: 'error',
-                text1: 'Cannot Submit',
-                text2: reason,
+                text1: reason,
                 visibilityTime: 3000,
               });
               return;
@@ -1222,7 +1258,7 @@ export const InvoiceForm: React.FC<Props> = ({
           })}
         </View>
       )}
-    </ScrollView>
+    </View>
   );
 };
 
@@ -1841,5 +1877,59 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#FFF0F0',
     borderRadius: scaleWidth(8),
+  },
+  addAttachmentContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    backgroundColor: '#fff',
+  },
+  addAttachmentLabel: {
+    fontSize: 13,
+    color: '#dc3545',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  addAttachmentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    gap: 8,
+    width: '55%',
+  },
+  addAttachmentButtonText: {
+    fontSize: 14,
+    color: '#337ab7',
+    fontWeight: '500',
+  },
+  selectedFilePreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    gap: 10,
+  },
+  selectedFileText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#333',
+    fontWeight: '500',
+  },
+  changeFileButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  changeFileText: {
+    fontSize: 12,
+    color: '#337ab7',
+    fontWeight: '600',
   },
 });

@@ -209,7 +209,7 @@ export const InvoiceDetails: React.FC = () => {
             setMenuAnchor(null);
           }}
           ListFooterComponent={
-            hasMore ? (
+            hasMore && !invoiceListLoading ? (
               <View style={styles.loadMoreFooter}>
                 <ActivityIndicator size="small" color={Colors.primaryColor} />
                 <Text style={styles.loadMoreText}>Loading more...</Text>
