@@ -1,11 +1,10 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useEffect} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  TextInput,
   ActivityIndicator,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
@@ -13,7 +12,7 @@ import {useDispatch, useSelector} from 'react-redux';
 import {AppBar, Container} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {Search, Filter, LeftChevron} from '@assets/Icons';
+import {LeftChevron} from '@assets/Icons';
 import Toast from 'react-native-toast-message';
 import {
   fetchDealerListRequest,
@@ -22,8 +21,6 @@ import {
 import {
   dealerListSelector,
   dealerLoadingSelector,
-  dealerPageSelector,
-  dealerHasMoreSelector,
   totalDealersSelector,
   dealerErrorSelector,
 } from '@store/soa/dealer/dealer.selector';
@@ -32,15 +29,12 @@ export const SOADealerList: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useDispatch();
-  const [searchText, setSearchText] = useState('');
   
   const programId = (route.params as any)?.programId || '';
   const programName = (route.params as any)?.programName || 'Program name';
 
   const dealerList = useSelector(dealerListSelector);
   const loading = useSelector(dealerLoadingSelector);
-  const page = useSelector(dealerPageSelector);
-  const hasMore = useSelector(dealerHasMoreSelector);
   const totalDealers = useSelector(totalDealersSelector);
   const dealerError = useSelector(dealerErrorSelector);
 
@@ -61,23 +55,15 @@ export const SOADealerList: React.FC = () => {
     }
   }, [dealerError]);
 
+  // Fetch dealer list when programId changes
   useEffect(() => {
     if (programId) {
-      dispatch(fetchDealerListRequest({programId, isInitialLoad: true}));
+      dispatch(fetchDealerListRequest({programIds: [programId], isInitialLoad: true}));
     }
     return () => {
       dispatch(resetDealerState());
     };
   }, [dispatch, programId]);
-
-  const handleSearch = useCallback((text: string) => {
-    setSearchText(text);
-    dispatch(fetchDealerListRequest({programId, search: text, isInitialLoad: true}));
-  }, [dispatch, programId]);
-
-  const loadMore = () => {
-    // API provides all data at once, so infinite scroll logic is removed.
-  };
 
   const renderDealerItem = ({item, index}: {item: any; index: number}) => {
     const isStatusActive = item.status?.toLowerCase() === 'active';
@@ -183,40 +169,29 @@ export const SOADealerList: React.FC = () => {
           </View>
         </View>
 
-        <View style={styles.toolbar}>
-          <View style={styles.searchBox}>
-            <Search width={scaleWidth(18)} height={scaleHeight(18)} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search by counter party"
-              placeholderTextColor={Colors.graybase}
-              value={searchText}
-              onChangeText={handleSearch}
-            />
+        {loading && (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color={Colors.primaryColor} />
+            <Text style={styles.loadingText}>Fetching dealers...</Text>
           </View>
-          <TouchableOpacity style={styles.filterBtn}>
-            <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
-            <Text style={styles.filterText}>Filters</Text>
-          </TouchableOpacity>
-        </View>
+        )}
 
-        <FlatList
-          data={dealerList}
-          renderItem={renderDealerItem}
-          keyExtractor={(item, index) => `${item.id}-${index}`}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={renderFooter}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            !loading ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No dealers found</Text>
-              </View>
-            ) : null
-          }
-        />
+        {!loading && dealerList.length === 0 && (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No dealers found for {programName}</Text>
+          </View>
+        )}
+
+        {!loading && dealerList.length > 0 && (
+          <FlatList
+            data={dealerList}
+            renderItem={renderDealerItem}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            scrollEnabled={true}
+          />
+        )}
       </View>
     </Container>
   );
@@ -396,5 +371,17 @@ const styles = StyleSheet.create({
   linkText: {
     color: Colors.tertiaryColor,
     textDecorationLine: 'underline',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: scaleHeight(40),
+  },
+  loadingText: {
+    marginTop: scaleHeight(12),
+    fontSize: scaleFont(14),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
   },
 });

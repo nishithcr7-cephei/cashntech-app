@@ -5,6 +5,7 @@ export type InvoiceItemTax = {
 };
 
 export type InvoiceLineItem = {
+  id?: string;
   itemName: string;
   description?: string; // Optional item description
   quantity: string;

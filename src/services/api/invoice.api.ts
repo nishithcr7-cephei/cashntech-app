@@ -2,7 +2,7 @@ import axiosInstance from './api';
 import ApiEndPoints from '@constants/ApiEndPoints';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import type {DocumentPickerResponse} from '@react-native-documents/picker';
-import type {InvoiceListItemApi} from '@store/invoice/inv.types';
+import type {InvoiceListItemApi, UpdateInvoicePayload} from '@store/invoice/inv.types';
 
 // Unit mapping: PCS=1, KG=2, LTR=3, etc. (backend accepts any number)
 const UNIT_MAP: Record<string, number> = {
@@ -20,6 +20,20 @@ const UNIT_MAP: Record<string, number> = {
   PACK: 12,
   STRIP: 13,
 };
+
+function toIsoString(dateStr: string): string {
+  if (!dateStr?.trim()) return '';
+  const ymd = toYYYYMMDD(dateStr);
+  if (!ymd) return '';
+  try {
+    const d = new Date(ymd);
+    // Explicitly set time to noon to avoid day-shifts across timezones
+    d.setHours(12, 0, 0, 0); 
+    return d.toISOString();
+  } catch {
+    return dateStr;
+  }
+}
 
 function toYYYYMMDD(dateStr: string): string {
   if (!dateStr?.trim()) return '';
@@ -39,6 +53,7 @@ export type CreateInvoicePayloadInput = {
   createdBy: string;
   partnerBank: string;
   program: string;
+  product: string;
   anchorParticipantMapping: string;
   party: string;
   counterPartyName: string;
@@ -48,7 +63,7 @@ export type CreateInvoicePayloadInput = {
 };
 
 function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<string, unknown> {
-  const {fields, createdBy, partnerBank, program, anchorParticipantMapping, party, counterPartyName, counterPartyCode, counterPartyOdAccount} = input;
+  const {fields, createdBy, partnerBank, program, product, anchorParticipantMapping, party, counterPartyName, counterPartyCode, counterPartyOdAccount} = input;
 
   // Align with InvoiceForm: use item-level discount and tax (same as form summary)
   const subtotal = fields.items.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0);
@@ -111,6 +126,7 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     created_by: createdBy,
     partnerBank,
     program,
+    product,
     anchorParticipantMapping,
     party,
     sub_total: Math.round(subtotal * 100) / 100,
@@ -263,7 +279,9 @@ export const invoiceApi = {
       body,
       {authRequired: true} as any,
     );
-    return response.data;
+    // Extract nested data structure: response.data.data contains the actual array
+    const data = response?.data?.data ?? response?.data ?? [];
+    return {data};
   },
 
   getLatestInvoices: async (
@@ -279,7 +297,9 @@ export const invoiceApi = {
       body,
       {authRequired: true} as any,
     );
-    return response.data;
+    // Extract nested data structure: response.data.data contains the actual array
+    const data = response?.data?.data ?? response?.data ?? [];
+    return {data};
   },
 
   getInvoiceKpis: async (programIds?: string[]): Promise<InvoiceKpisResponse> => {
@@ -486,6 +506,7 @@ export const invoiceApi = {
   },
 
   createInvoice: async (input: CreateInvoicePayloadInput): Promise<any> => {
+    console.log('[invoice.api] createInvoice called with input:', input);
     const payload = buildCreateInvoicePayload(input);
     // Log exact request body sent to backend (sub_total, final_total, items, etc.)
     // eslint-disable-next-line no-console
@@ -554,41 +575,126 @@ export const invoiceApi = {
    * TODO: Enable this when PATCH /invoice/:id is ready on backend.
    * Currently commented out as requested.
    */
-  // updateInvoice: async (invoiceId: string, input: CreateInvoicePayloadInput): Promise<any> => {
-  //   const payload = buildCreateInvoicePayload(input);
-  //   const formData = new FormData();
-  //   
-  //   // Append fields (same as create)
-  //   for (const [key, value] of Object.entries(payload)) {
-  //     if (key !== 'items' && value !== undefined && value !== null) {
-  //       formData.append(key, String(value));
-  //     }
-  //   }
-  //   
-  //   // Append items
-  //   const items = payload.items as any[];
-  //   items.forEach((item, index) => {
-  //     formData.append(`items[${index}][name]`, item.name);
-  //     formData.append(`items[${index}][description]`, item.description);
-  //     formData.append(`items[${index}][quantity]`, String(item.quantity));
-  //     formData.append(`items[${index}][unit]`, String(item.unit));
-  //     formData.append(`items[${index}][price_per_quantity]`, String(item.price_per_quantity));
-  //     formData.append(`items[${index}][total]`, String(item.total));
-  //     // ... append taxes if needed, similar to createInvoice
-  //   });
-  //   
-  //   if (input.attachment) {
-  //     formData.append('attachments', {
-  //       uri: input.attachment.uri,
-  //       name: input.attachment.name ?? 'invoice_update.pdf',
-  //       type: input.attachment.type ?? 'application/pdf',
-  //     } as any);
-  //   }
-  //   
-  //   const response = await axiosInstance.patch(`/invoice/${invoiceId}`, formData, {
-  //     isFormData: true,
-  //     authRequired: true,
-  //   } as any);
-  //   return response.data;
-  // },
+  updateInvoice: async (input: UpdateInvoicePayload): Promise<any> => {
+    const {invoiceId, fields, attachment, approval_level} = input;
+    
+    // Manually calculate totals for the update payload
+    const subtotal = fields.items.reduce((sum: number, item: any) => sum + (parseFloat(item.total) || 0), 0);
+    const discountTotal = fields.items.reduce(
+      (sum: number, item: any) => sum + (parseFloat(item.discountAmount || '0') || 0),
+      0,
+    );
+    const taxTotal = fields.items.reduce(
+      (sum: number, item: any) => sum + (parseFloat(item.taxAmount || '0') || 0),
+      0,
+    );
+    const finalTotalValue = Math.max(0, subtotal - discountTotal + taxTotal);
+
+    const items = fields.items.map((item: any) => {
+      const unitNum = UNIT_MAP[item.unit?.toUpperCase()] ?? 1;
+      const baseItem: Record<string, unknown> = {
+        name: item.itemName?.trim() || '',
+        description: (item.description?.trim() || item.itemName?.trim() || ''),
+        quantity: parseFloat(item.quantity) || 0,
+        unit: String(unitNum),
+        price_per_quantity: parseFloat(item.pricePerQuantity) || 0,
+        total: parseFloat(item.total) || 0,
+      };
+      
+      // Crucial: Backend needs the existing item ID if we want to update it instead of creating new ones
+      if (item.id) {
+        baseItem.id = item.id;
+      }
+
+      if (item.discountType && item.discountValue) {
+        const discountType = item.discountType === 'value' ? 'absolute' : item.discountType;
+        baseItem.discount_type = discountType;
+        baseItem.discount_value = parseFloat(item.discountValue) || 0;
+        baseItem.discount_amount = parseFloat(item.discountAmount || '0') || 0;
+      }
+      
+      const taxesArray = item.taxes?.filter((t: any) => t.taxType) || [];
+      if (taxesArray.length > 0) {
+        baseItem.taxes = taxesArray.map((t: any) => ({
+          tax_type: t.taxType,
+          tax_percentage: parseFloat(t.taxPercentage || '0') || 0,
+          tax_amount: parseFloat(t.taxAmount || '0') || 0,
+        }));
+      }
+      return baseItem;
+    });
+
+    const payload: Record<string, unknown> = {
+      approval_level: Number(approval_level ?? 1),
+      invoice_date: toIsoString(fields.invoiceDate),
+      invoice_due_date: toIsoString(fields.invoiceDueDate),
+      currency: fields.currency || 'INR',
+      remark: fields.remark || '',
+      sub_total: Number((Math.round(subtotal * 100) / 100).toFixed(2)),
+      discount_total: Number((Math.round(discountTotal * 100) / 100).toFixed(2)),
+      tax_total: Number((Math.round(taxTotal * 100) / 100).toFixed(2)),
+      final_total: Number((Math.round(finalTotalValue * 100) / 100).toFixed(2)),
+      items,
+    };
+
+    if (fields.grnDate?.trim()) {
+      payload.grn_date = toIsoString(fields.grnDate);
+    }
+    if (fields.paymentDate?.trim()) {
+      payload.payment_date = toIsoString(fields.paymentDate);
+    }
+
+    if (attachment) {
+      const formData = new FormData();
+      for (const [key, value] of Object.entries(payload)) {
+        if (key !== 'items' && value !== undefined && value !== null) {
+          formData.append(key, String(value));
+        }
+      }
+      
+      (payload.items as any[]).forEach((item, index) => {
+        if (item.id) formData.append(`items[${index}][id]`, item.id);
+        formData.append(`items[${index}][name]`, item.name);
+        formData.append(`items[${index}][description]`, item.description);
+        formData.append(`items[${index}][quantity]`, String(item.quantity));
+        formData.append(`items[${index}][unit]`, String(item.unit));
+        formData.append(`items[${index}][price_per_quantity]`, String(item.price_per_quantity));
+        formData.append(`items[${index}][total]`, String(item.total));
+        if (item.discount_type) formData.append(`items[${index}][discount_type]`, item.discount_type);
+        if (item.discount_value !== undefined) formData.append(`items[${index}][discount_value]`, String(item.discount_value));
+        if (item.discount_amount !== undefined) formData.append(`items[${index}][discount_amount]`, String(item.discount_amount));
+        if (item.taxes) {
+          item.taxes.forEach((tax: any, tIdx: number) => {
+            formData.append(`items[${index}][taxes][${tIdx}][tax_type]`, tax.tax_type);
+            formData.append(`items[${index}][taxes][${tIdx}][tax_percentage]`, String(tax.tax_percentage));
+            formData.append(`items[${index}][taxes][${tIdx}][tax_amount]`, String(tax.tax_amount));
+          });
+        }
+      });
+      
+      formData.append('attachments', {
+        uri: attachment.uri,
+        name: attachment.name ?? 'invoice_update.pdf',
+        type: attachment.type ?? 'application/pdf',
+      } as any);
+
+      const response = await axiosInstance.patch(ApiEndPoints.apiUpdateInvoice(invoiceId), formData, {
+        isFormData: true,
+        authRequired: true,
+      } as any);
+      return response.data;
+    }
+
+    const response = await axiosInstance.patch(ApiEndPoints.apiUpdateInvoice(invoiceId), payload, {
+      authRequired: true,
+    } as any);
+    return response.data;
+  },
+
+  deleteInvoice: async (invoiceId: string): Promise<any> => {
+    const response = await axiosInstance.delete(ApiEndPoints.apiUpdateInvoice(invoiceId), {
+      authRequired: true,
+    } as any);
+    return response.data;
+  },
 };

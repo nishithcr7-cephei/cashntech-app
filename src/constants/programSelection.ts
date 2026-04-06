@@ -21,6 +21,7 @@ export type BankProgram = {
 export type Bank = {
   id: string;
   name: string;
+  partyId: string; // Anchor Party UUID
   products: BankProgram[]; // Dealer Finance, Vendor Finance, etc.
 };
 
@@ -29,6 +30,7 @@ export const BANKS_DATA: Bank[] = [
   {
     id: 'UGRO',
     name: 'UGRO',
+    partyId: 'ugro-party-uuid',
     products: [
       {
         id: 'dealer_finance',
@@ -56,6 +58,7 @@ export const BANKS_DATA: Bank[] = [
   {
     id: 'TCL',
     name: 'Tata Capital Limited',
+    partyId: 'tcl-party-uuid',
     products: [
       {
         id: 'dealer_finance',

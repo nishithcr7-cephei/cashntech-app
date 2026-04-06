@@ -4,6 +4,7 @@ import {useSelector} from 'react-redux';
 import {Container, AppBar} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+import {LeftChevron} from '@assets/Icons';
 import {userSelector} from '@store/user';
 import {AppRole, ROLE_LABELS} from '@constants/roles';
 import {UserImg} from '@assets/Images';
@@ -30,7 +31,16 @@ export const ProfileScreen: React.FC = () => {
 
   return (
     <Container style={styles.container}>
-      <AppBar title="Profile" navigation={navigation as any} />
+      <AppBar 
+        title="Profile" 
+        navigation={navigation as any} 
+        hideHamburger={true}
+        renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
+        onPressLeftIcon={() => (navigation as any).reset({
+          index: 0,
+          routes: [{name: 'InvoiceDashboard'}],
+        })}
+      />
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
         {/* Header with avatar, name, role */}
         <View style={styles.headerCard}>

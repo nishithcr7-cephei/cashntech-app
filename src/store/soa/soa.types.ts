@@ -7,15 +7,13 @@ export type ProgramRecord = {
   partyName: string;
   totalSanctionedAmount: string;
   totaloutstanding: string;
+  createdAt?: string; // Formatted date (e.g., "02 Apr 2026")
 };
 
 export type SOAState = {
   programList: ProgramRecord[];
   loading: boolean;
   error: string | null;
-  page: number;
-  limit: number;
-  hasMore: boolean;
   totalPrograms: number;
 };
 
@@ -23,15 +21,10 @@ export const initialSOAState: SOAState = {
   programList: [],
   loading: false,
   error: null,
-  page: 1,
-  limit: 20,
-  hasMore: true,
   totalPrograms: 0,
 };
 
 export type FetchProgramListRequest = {
-  page: number;
-  limit: number;
-  search?: string;
+  programIds: string[];
   isInitialLoad?: boolean;
 };

@@ -15,6 +15,37 @@ import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
 import {useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
+import {userSelector} from '@store/user';
+
+/**
+ * Visibility and Actionability Logic for "Manage Attachment"
+ * VISIBLE: Super Users OR Anchor Makers (with status restrictions)
+ * HIDDEN: Dealers, Checkers, and finalized statuses for Anchor Makers
+ */
+export const shouldShowAttachmentOption = (
+  invoiceStatus: string,
+  user: any,
+  canAttachment: boolean,
+) => {
+  const pg = user?.permission_group?.[0];
+  const bRole = pg?.business_role;
+  const fRole = pg?.functional_role;
+
+  // 1. Super User (Internal CashnTech): All roles null
+  const isSuperUser = bRole === null && fRole === null;
+  if (isSuperUser) return true;
+
+  // 2. Regular Anchor Maker
+  const isAnchorMaker = bRole === 'Anchor' && fRole === 'Maker';
+  const s = invoiceStatus?.toLowerCase() || '';
+  const isAllowedStatus = ['created', 'rejected', 'attachment pending'].includes(s);
+
+  if (isAnchorMaker && canAttachment && isAllowedStatus) {
+    return true;
+  }
+
+  return false;
+};
 
 type MenuAnchor = {x: number; y: number; width: number; height: number} | null;
 
@@ -34,6 +65,7 @@ type Props = {
   rawApprovalStatus?: string;
   rawInvoiceStatus?: string;
   userDepartment?: string;
+  approvalLogsCount?: number;
 };
 
 export const InvoiceActionMenuModal: React.FC<Props> = ({
@@ -52,6 +84,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   rawApprovalStatus,
   rawInvoiceStatus,
   userDepartment,
+  approvalLogsCount = 0,
 }) => {
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canEdit = useHasPermission(PERMISSIONS.INVOICE_LIST_EDIT);
@@ -62,44 +95,48 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   const canAttachment = useHasPermission(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
   const canRecreate = useHasPermission(PERMISSIONS.INVOICE_LIST_RECREATE);
 
-  const canEditInvoice = (
+  const userInfo = useSelector(userSelector.getUserInfo);
+
+  const showAttachmentOption = shouldShowAttachmentOption(
+    rawInvoiceStatus || '',
+    userInfo,
+    canAttachment,
+  );
+
+  const isInvoiceInEditableState = (
     status?: string,
     approvalStatus?: string,
     adminStatus?: string,
-    isCashnTech?: boolean,
+    logsCount: number = 0,
   ) => {
-    const s = status?.toLowerCase() || '';
-    const a = approvalStatus?.toLowerCase() || '';
-    const ad = adminStatus?.toLowerCase() || '';
+    // 1. VISIBLE: Allowed ONLY if status matches exactly (Maker can edit these)
+    const isAllowedByStatus = ['Draft', 'Created', 'Rejected', 'Attachment Pending'].includes(status || '');
 
-    // Standard edit logic (Created, Rejected, etc.)
-    const isStandardEditable =
-      (s === 'created' || s === 'rejected' || s === 'attachment pending') &&
-      !a.includes('completed');
+    // 2. HIDDEN: Hard Stop for completed workflows
+    const isCompleted = approvalStatus?.toLowerCase().includes('completed');
 
-    // Web-specific Hold logic for CashnTech Admin users
-    const isOnHold =
-      (s.includes('hold') || ad.includes('hold')) &&
-      (a.includes('completed') || a === 'completed');
+    // 3. HIDDEN: Hard Stop for verified admin status
+    const isForbidden = adminStatus === 'Verified';
 
-    if (isCashnTech) {
-      return isStandardEditable || isOnHold;
-    }
-    return isStandardEditable;
+    return isAllowedByStatus && !isCompleted && !isForbidden;
   };
 
-  const isEditable = canEditInvoice(
-    rawInvoiceStatus,
-    rawApprovalStatus,
-    rawAdminStatus,
-    isCashnTechUser,
-  );
-  const isDeletable = canEditInvoice(
-    rawInvoiceStatus,
-    rawApprovalStatus,
-    rawAdminStatus,
-    false, // Usually delete is only for standard maker editable states
-  );
+  const isInvoiceDeletableState = (logsCount: number = 0) => {
+    // Backend allows delete if no action taken beyond creation (logs <= 1)
+    return logsCount <= 1;
+  };
+
+  const isEditable = canEdit 
+    && (isAnchorMaker || isDealerMaker) 
+    && !isCashnTechUser
+    && isInvoiceInEditableState(
+      rawInvoiceStatus,
+      rawApprovalStatus,
+      rawAdminStatus,
+      approvalLogsCount,
+    );
+
+  const isDeletable = canDelete && isInvoiceDeletableState(approvalLogsCount);
 
   const canShowApproveReject = canApprove || canReject;
 
@@ -118,28 +155,15 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
           {/* Maker actions: makers see disabled Edit/Recreate/Delete + active Approval History */}
           {(isAnchorMaker || isDealerMaker) && !isCashnTechUser && (
             <>
-              {/* Edit – disabled for makers, but also check permission */}
-              {canEdit && (
-                <TouchableOpacity
-                  disabled={!isEditable || permissionsLoading}
-                  onPress={() => onMenuAction('edit', openMenuId)}
-                  style={[styles.menuItem, (!isEditable || permissionsLoading) && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="pen-to-square" iconStyle="regular" color={isEditable ? '#858594' : Colors.graybase} size={18} />
-                  <Text style={[styles.menuText, (!isEditable || permissionsLoading) && styles.menuTextDisabled]}>
-                    Edit
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Recreate Invoice */}
-              {canRecreate && (
+              {/* Edit – ONLY visible if isEditable */}
+              {isEditable && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
-                  onPress={() => onMenuAction('recreateInvoice', openMenuId)}
+                  onPress={() => onMenuAction('edit', openMenuId)}
                   style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="square-plus" iconStyle="solid" color={Colors.darkblack} size={16} />
+                  <FontAwesome6 name="pen-to-square" iconStyle="regular" color="#858594" size={18} />
                   <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>
-                    Recreate Invoice
+                    Edit
                   </Text>
                 </TouchableOpacity>
               )}
@@ -166,14 +190,25 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
-              {/* Delete – disabled for makers */}
-              {canDelete && (
+              {/* Attachments – Conditional Visibility */}
+              {showAttachmentOption && (
                 <TouchableOpacity
-                  disabled={!isDeletable || permissionsLoading}
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('attachment', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="paperclip" iconStyle="solid" color={Colors.darkblack} size={16} />
+                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Attachments</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Delete – ONLY visible if isDeletable */}
+              {isDeletable && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
                   onPress={() => onMenuAction('delete', openMenuId)}
-                  style={[styles.menuItem, (!isDeletable || permissionsLoading) && styles.menuItemDisabled]}>
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
                   <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
-                  <Text style={[styles.menuText, (!isDeletable || permissionsLoading) && styles.menuTextDisabled]}>
+                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>
                     Delete
                   </Text>
                 </TouchableOpacity>
@@ -195,7 +230,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   </View>
                 </TouchableOpacity>
               )}
-               {canViewHistory && (
+              {canViewHistory && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('checkerApproval', openMenuId)}
@@ -205,15 +240,6 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                     <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Checker Approval</Text>
                     <Text style={styles.menuSubText}>Approval History</Text>
                   </View>
-                </TouchableOpacity>
-              )}
-              {canAttachment && (
-                <TouchableOpacity
-                  disabled={permissionsLoading}
-                  onPress={() => onMenuAction('attachment', openMenuId)}
-                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="paperclip" iconStyle="solid" color={Colors.darkblack} size={16} />
-                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Attachments</Text>
                 </TouchableOpacity>
               )}
             </>
@@ -243,14 +269,14 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
           )}
             {isCashnTechUser && (
               <>
-                 {/* Edit – active for CashnTech user */}
-                {canEdit && (
+                {/* Edit – ONLY visible if isEditable (including permission and status) */}
+                {isEditable && (
                   <TouchableOpacity
-                    disabled={!isEditable || permissionsLoading}
+                    disabled={permissionsLoading}
                     onPress={() => onMenuAction('edit', openMenuId)}
-                    style={[styles.menuItem, (!isEditable || permissionsLoading) && styles.menuItemDisabled]}>
-                    <FontAwesome6 name="pen-to-square" iconStyle="regular" color={isEditable ? '#858594' : Colors.graybase} size={18} />
-                    <Text style={[styles.menuText, (!isEditable || permissionsLoading) && styles.menuTextDisabled]}>Edit</Text>
+                    style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                    <FontAwesome6 name="pen-to-square" iconStyle="regular" color="#858594" size={18} />
+                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Edit</Text>
                   </TouchableOpacity>
                 )}
 
@@ -277,7 +303,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                     <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
                   </TouchableOpacity>
                 )}
-                {canAttachment && (
+                {showAttachmentOption && (
                   <TouchableOpacity
                     disabled={permissionsLoading}
                     onPress={() => onMenuAction('attachment', openMenuId)}
@@ -287,14 +313,14 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   </TouchableOpacity>
                 )}
 
-                {/* Delete – active for CashnTech user */}
-                {canDelete && (
+                {/* Delete – ONLY visible if isDeletable */}
+                {isDeletable && (
                   <TouchableOpacity
-                    disabled={!isDeletable || permissionsLoading}
+                    disabled={permissionsLoading}
                     onPress={() => onMenuAction('delete', openMenuId)}
-                    style={[styles.menuItem, (!isDeletable || permissionsLoading) && styles.menuItemDisabled]}>
+                    style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
                     <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
-                    <Text style={[styles.menuText, (!isDeletable || permissionsLoading) && styles.menuTextDisabled]}>Delete</Text>
+                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Delete</Text>
                   </TouchableOpacity>
                 )}
               </>

@@ -6,6 +6,7 @@ const initialState: ProgramSelectionState = {
   programScope: 'selected',
   bankId: null,
   bankName: null,
+  partyId: null,
   productId: null,
   productName: null,
   programId: null,
@@ -30,6 +31,7 @@ const programSelectionSlice = createSlice({
       action: PayloadAction<{
         bankId?: string | null;
         bankName?: string | null;
+        partyId?: string | null;
         productId?: string | null;
         productName?: string | null;
         programId?: string | null;
@@ -40,6 +42,7 @@ const programSelectionSlice = createSlice({
       const p = action.payload;
       if (p.bankId !== undefined) state.bankId = p.bankId;
       if (p.bankName !== undefined) state.bankName = p.bankName;
+      if (p.partyId !== undefined) state.partyId = p.partyId;
       if (p.productId !== undefined) state.productId = p.productId;
       if (p.productName !== undefined) state.productName = p.productName;
       if (p.programId !== undefined) state.programId = p.programId;
@@ -91,6 +94,7 @@ const programSelectionSlice = createSlice({
       // Update single selection fields
       state.bankId = program.bankId;
       state.bankName = program.bankName;
+      state.partyId = program.partyId;
       state.productId = program.productId;
       state.productName = program.productName;
       state.programId = program.programId;

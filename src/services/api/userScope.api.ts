@@ -41,6 +41,7 @@ export function mapUserScopeToBanks(data: UserScopeApiItem[]): Bank[] {
     return {
       id: bank.id,
       name: bank.name,
+      partyId: item.party.id,
       products,
     };
   });

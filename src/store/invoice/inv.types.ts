@@ -66,6 +66,7 @@ export type InvoiceListItemApi = {
   };
   party?: { entity_name?: string };
   anchorParticipantMapping?: { party?: { entity_name?: string } };
+  approvalLogs?: Array<{id: string}>;
 };
 
 export type InvoiceState = {
@@ -118,4 +119,11 @@ export type UpdateInvoiceVerificationRequest = {
   programId?: string;
   filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]};
   onSuccess?: () => void;
+};
+export type UpdateInvoicePayload = {
+  invoiceId: string;
+  fields: any;
+  createdBy: string;
+  attachment?: any;
+  approval_level?: number;
 };

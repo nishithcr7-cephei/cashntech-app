@@ -7,6 +7,9 @@ export type InvoiceOverviewSummaryItem = {
   sanctioned_limit: number | null;
   drawing_power: number | null;
   od_expiry_date: string | null;
+  bank_name?: string | null;
+  bank_id?: string | null;
+  utilized_amount?: number | null;
 };
 
 export type InvoiceOverviewLatestItem = {

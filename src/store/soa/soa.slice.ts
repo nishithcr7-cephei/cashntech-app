@@ -9,24 +9,16 @@ const soaSlice = createSlice({
       state.loading = true;
       state.error = null;
       if (action.payload.isInitialLoad) {
-          state.page = 1;
-          state.programList = [];
-          state.hasMore = true;
+        state.programList = [];
       }
     },
     fetchProgramListSuccess: (
       state,
-      action: PayloadAction<{data: ProgramRecord[]; total: number; page: number}>,
+      action: PayloadAction<{data: ProgramRecord[]; total: number}>,
     ) => {
-      const {data, total, page} = action.payload;
-      if (page === 1) {
-        state.programList = data;
-      } else {
-        state.programList = [...state.programList, ...data];
-      }
+      const {data, total} = action.payload;
+      state.programList = data;
       state.totalPrograms = total;
-      state.page = page;
-      state.hasMore = state.programList.length < total;
       state.loading = false;
       state.error = null;
     },

@@ -9,30 +9,37 @@ import {PERMISSIONS} from '@constants/permissions';
 import {useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
 
-const STATUS_ORANGE = '#E86C00';
+const STATUS_COLORS = {
+  ATTACHMENT_PENDING: { bg: '#FFF4E5', text: '#FF8C00' },
+  CREATED: { bg: '#E3F2FD', text: '#1976D2' },
+  DISBURSED: { bg: '#E8F5E9', text: '#2E7D32' },
+  REJECTED: { bg: '#FFEBEE', text: '#D32F2F' },
+  DEFAULT: { bg: '#F7F8FB', text: Colors.darkblack },
+};
 
-function getInvoiceStatusStyle(invoiceStatus: string) {
+function getInvoiceStatusStyles(invoiceStatus: string) {
   const s = (invoiceStatus || '').toLowerCase();
-  if (s.includes('in progress')) return styles.statusOrange;
-  if (s.includes('reject')) return styles.statusRed;
-  if (s.includes('completed') || s.includes('submitted') || s.includes('created') || s.includes('disbursed')) return styles.statusGreen;
-  return styles.infoValue;
+  if (s.includes('attachment pending')) return STATUS_COLORS.ATTACHMENT_PENDING;
+  if (s.includes('created')) return STATUS_COLORS.CREATED;
+  if (s.includes('disbursed')) return STATUS_COLORS.DISBURSED;
+  if (s.includes('reject')) return STATUS_COLORS.REJECTED;
+  return STATUS_COLORS.DEFAULT;
 }
 
-function getApprovalStatusStyle(approvalStatus: string) {
+function getApprovalStatusStyles(approvalStatus: string) {
   const s = (approvalStatus || '').toLowerCase();
-  if (s.includes('pending')) return styles.statusOrange;
-  if (s.includes('reject')) return styles.statusRed;
-  if (s.includes('completed') || s.includes('approval complete')) return styles.statusGreen;
-  return styles.infoValue;
+  if (s.includes('pending')) return STATUS_COLORS.ATTACHMENT_PENDING; // Using Orange for Pending
+  if (s.includes('reject')) return STATUS_COLORS.REJECTED;
+  if (s.includes('completed') || s.includes('approval complete')) return STATUS_COLORS.DISBURSED; // Using Green for Completed
+  return STATUS_COLORS.DEFAULT;
 }
 
-function getAdminStatusStyle(adminStatus: string) {
+function getAdminStatusStyles(adminStatus: string) {
   const s = (adminStatus || '').toLowerCase();
-  if (s === 'verify' || s === 'verified' || s === 'submitted') return styles.adminStatusGreen;
-  if (s === 'hold') return styles.adminStatusGrayBrown;
-  if (s === 'reject' || s === 'rejected') return styles.adminStatusRed;
-  return styles.infoValue;
+  if (s === 'verify' || s === 'verified' || s === 'submitted') return STATUS_COLORS.DISBURSED;
+  if (s === 'hold') return { bg: '#E0E0E0', text: '#6B5B4F' }; // Gray/Brown for Hold
+  if (s === 'reject' || s === 'rejected') return STATUS_COLORS.REJECTED;
+  return STATUS_COLORS.DEFAULT;
 }
 
 type Props = {
@@ -176,6 +183,10 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
             )}
           </View>
           <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Loan Ref No</Text>
+            <Text style={styles.infoValue}>{row.loanRefNo || '-'}</Text>
+          </View>
+          <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Bank Name</Text>
             <Text style={styles.infoValue}>{row.bankName}</Text>
           </View>
@@ -207,17 +218,23 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
             <Text style={styles.infoLabel}>Due Date</Text>
             <Text style={styles.infoValue}>{row.dueDate}</Text>
           </View>
-          <View style={styles.infoColumn}>
+          <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
             <Text style={styles.infoLabel}>Invoice Status</Text>
-            <Text style={[styles.infoValue, getInvoiceStatusStyle(row.invoiceStatus)]}>{row.invoiceStatus}</Text>
+            <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+              {row.invoiceStatus}
+            </Text>
           </View>
-          <View style={styles.infoColumn}>
+          <View style={[styles.infoColumn, { backgroundColor: getApprovalStatusStyles(row.approvalStatus).bg }]}>
             <Text style={styles.infoLabel}>Approval Status</Text>
-            <Text style={[styles.infoValue, getApprovalStatusStyle(row.approvalStatus)]}>{row.approvalStatus}</Text>
+            <Text style={[styles.infoValue, { color: getApprovalStatusStyles(row.approvalStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+              {row.approvalStatus}
+            </Text>
           </View>
-          <View style={styles.infoColumn}>
+          <View style={[styles.infoColumn, { backgroundColor: getAdminStatusStyles(row.adminStatus).bg }]}>
             <Text style={styles.infoLabel}>Admin Status</Text>
-            <Text style={[styles.infoValue, getAdminStatusStyle(row.adminStatus)]}>{row.adminStatus}</Text>
+            <Text style={[styles.infoValue, { color: getAdminStatusStyles(row.adminStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+              {row.adminStatus}
+            </Text>
           </View>
         </View>
       </View>
@@ -301,28 +318,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
   },
-  statusGreen: {
-    color: Colors.green,
-    fontFamily: Fonts.GilroySemiBold,
-  },
-  statusOrange: {
-    color: STATUS_ORANGE,
-    fontFamily: Fonts.GilroySemiBold,
-  },
-  statusRed: {
-    color: Colors.red,
-    fontFamily: Fonts.GilroySemiBold,
-  },
-  adminStatusGreen: {
-    color: Colors.green,
-    fontFamily: Fonts.GilroySemiBold,
-  },
   adminStatusGrayBrown: {
     color: '#6B5B4F',
-    fontFamily: Fonts.GilroySemiBold,
-  },
-  adminStatusRed: {
-    color: Colors.red,
     fontFamily: Fonts.GilroySemiBold,
   },
   infoGrid: {

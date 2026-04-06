@@ -161,12 +161,14 @@ const Endpoints = {
   apiTransactionAccount: (invoiceId: string) => `/invoice/transaction-account/${invoiceId}`,
   apiDisbursement: (invoiceId: string) => `/invoice/disbursement/${invoiceId}`,
   apiInvoiceDailyInterest: (invoiceId: string) => `/invoice/daily-interest/${invoiceId}`,
+  apiUpdateInvoice: (invoiceId: string) => `/invoice/${invoiceId}`,
 
   // User Scope (Program Selection)
   apiUserScope: '/user/scope',
   // User Permissions (feature/action access)
   apiUserPermissions: '/user/permissions',
   apiProgramList: 'transactions/program/list',
+  apiProgramDealersList: 'transactions/program/dealers',
   apiProgramDealers: (programId: string) => `transactions/program/dealers/${programId}`,
   apiProgramSummary: (id: string) => `transactions/program-summary/${id}`,
   apiProgramDealersDetails: (id: string) => `transactions/dealers/${id}`,

@@ -97,8 +97,10 @@ export const InvoiceDetails: React.FC = () => {
     selectedInvoiceRawAdminStatus,
     selectedInvoiceRawApprovalStatus,
     selectedInvoiceRawInvoiceStatus,
+    selectedInvoiceApprovalLogsCount,
     userDepartment,
     storedUserRole,
+    userInfoFull,
   } = useInvoiceDetails();
 
   const registerMenuRef = (id: string, ref: View | null) => {
@@ -163,6 +165,7 @@ export const InvoiceDetails: React.FC = () => {
                 onOpenSendForApprovalModal={() => setShowSendForApprovalModal(true)}
                 onCreateInvoicePress={onCreateInvoicePress}
                 isCreateInvoiceEnabled={isCreateInvoiceEnabled}
+                user={userInfoFull}
               />
               <View style={styles.listTopSeparator} />
               {invoiceListLoading && (
@@ -318,6 +321,7 @@ export const InvoiceDetails: React.FC = () => {
         rawApprovalStatus={selectedInvoiceRawApprovalStatus}
         rawInvoiceStatus={selectedInvoiceRawInvoiceStatus}
         userDepartment={userDepartment}
+        approvalLogsCount={selectedInvoiceApprovalLogsCount}
       />
 
     </Container>

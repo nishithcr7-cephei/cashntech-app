@@ -31,6 +31,7 @@ import Toast from 'react-native-toast-message';
 import {
   fetchDealerInfoRequest,
   createInvoiceRequest,
+  updateInvoiceRequest,
   resetCreateInvoiceState,
 } from '@store/invoice/inv.slice';
 import {
@@ -44,7 +45,7 @@ import {selectProgramSelection} from '@store/programSelection/programSelection.s
 import {
   setProgramSelection,
   setProgramScope,
-  clearSelectedPrograms,
+  toggleProgramSelection,
 } from '@store/programSelection/programSelection.slice';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
@@ -185,10 +186,17 @@ export const CreateInvoice: React.FC = () => {
     return () => {
       unsubscribeFocus();
       removeListener();
-      // Final flush on unmount
-      resetScreenData();
     };
   }, [navigation, dispatch, route.params?.previewReturnToken, resetScreenData]);
+
+  // Handle final flush only when the screen is actually unmounting
+  useEffect(() => {
+    return () => {
+      console.log('[CreateInvoice] Unmounting screen, flushing data');
+      resetScreenData();
+    };
+  }, [resetScreenData]);
+
   const dealerInfo = useSelector(selectDealerInfo);
   const dealerInfoError = useSelector(selectDealerInfoError);
   const createInvoiceLoading = useSelector(selectCreateInvoiceLoading);
@@ -208,6 +216,19 @@ export const CreateInvoice: React.FC = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [isOcrUploadModalVisible, setIsOcrUploadModalVisible] = useState(false);
   const [isProofUploadModalVisible, setIsProofUploadModalVisible] = useState(false);
+
+  const isFormValid = useMemo(() => {
+    return !!(
+      fields.invoiceNumber?.trim() &&
+      fields.dealer?.trim() &&
+      fields.invoiceDate?.trim() &&
+      fields.items &&
+      fields.items.length > 0 &&
+      fields.creditTo?.trim()
+    );
+  }, [fields]);
+
+  console.log('[CreateInvoice] Render, createInvoiceLoading:', createInvoiceLoading, 'isFormValid:', isFormValid);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [selectedParticipant, setSelectedParticipant] = useState<DealerInfoParticipant | null>(null);
   const [selectedAttachment, setSelectedAttachment] = useState<DocumentPickerResponse | null>(null);
@@ -379,6 +400,7 @@ export const CreateInvoice: React.FC = () => {
 
         const mappedItems: InvoiceLineItem[] = (data.invoiceItems || []).map(
           (item: any) => ({
+            id: item.id,
             itemName: item.name || '',
             description: item.description || '',
             quantity: String(item.quantity || '0'),
@@ -429,15 +451,16 @@ export const CreateInvoice: React.FC = () => {
         // is NOT updated — this keeps the breadcrumb in its previous state and
         // allows the beforeRemove reset to 'all' to work correctly on back.
         if (data.program?.id) {
-          dispatch(clearSelectedPrograms());
           dispatch(
-            setProgramSelection({
+            toggleProgramSelection({
               programId: data.program?.id || '',
               programName: data.program?.program_name || data.program_name || '',
               bankId: data.program?.productConfig?.partnerBank?.id || data.partnerBank?.id || '',
               bankName: data.program?.productConfig?.partnerBank?.bank_name || data.bank_name || data.partnerBank?.bank_name || '',
               productId: data.program?.productConfig?.product?.id || '',
               productName: data.program?.productConfig?.product?.name || data.product_name || '',
+              partyId: data.party?.id || '',
+              userType: (data.program?.productConfig?.product?.name || data.product_name || '').toLowerCase().includes('dealer') ? 'dealer' : 'vendor',
             }),
           );
         }
@@ -470,7 +493,7 @@ export const CreateInvoice: React.FC = () => {
       setFields(getInitialFields());
       setSelectedParticipant(null);
       setSelectedAttachment(null);
-      Alert.alert('Success', 'Invoice created successfully.', [
+      Alert.alert('Success', mode === 'edit' ? 'Invoice updated successfully.' : 'Invoice created successfully.', [
         {text: 'OK', onPress: () => (navigation as any).navigate('InvoiceDetails', {refreshList: true})},
       ]);
     }
@@ -619,40 +642,6 @@ export const CreateInvoice: React.FC = () => {
     };
   };
 
-  // Check if form is valid
-  const isFormValid = useMemo(() => {
-    return !!(
-      fields.invoiceNumber?.trim() &&
-      fields.dealer?.trim() &&
-      fields.dealerCode?.trim() &&
-      fields.invoiceDate?.trim() &&
-      fields.invoiceDueDate?.trim() &&
-      fields.creditTo?.trim() &&
-      fields.items &&
-      fields.items.length > 0 &&
-      fields.items.every(item => 
-        item.itemName?.trim() &&
-        item.quantity?.trim() &&
-        parseFloat(item.quantity) > 0 &&
-        item.unit?.trim() &&
-        item.pricePerQuantity?.trim() &&
-        parseFloat(item.pricePerQuantity) > 0 &&
-        item.discountType?.trim() &&
-        item.discountValue?.trim() &&
-        ((Array.isArray((item as any).taxes) &&
-          (item as any).taxes.some(
-            (t: any) =>
-              t?.taxType?.trim() &&
-              t?.taxPercentage?.toString().trim() &&
-              Number(t.taxPercentage) >= 0,
-          )) ||
-          (item.taxType?.trim() &&
-            item.taxPercentage?.toString().trim() &&
-            Number(item.taxPercentage) >= 0))
-      )
-    );
-  }, [fields]);
-  
   const applyPatch = (patch: Partial<InvoiceFields>) => {
     if (patch.currency && patch.currency !== 'INR') patch.currency = 'INR';
     if (patch.dealer && dealerInfo?.participants) {
@@ -761,6 +750,7 @@ export const CreateInvoice: React.FC = () => {
   const handleSubmit = async () => {
     // 1. First, validate all form fields in order of appearance
     const validation = validateForm(true);
+    console.log('[CreateInvoice] handleSubmit called, validation:', validation);
     if (!validation.isValid) {
       Toast.show({
         type: 'error',
@@ -792,49 +782,56 @@ export const CreateInvoice: React.FC = () => {
 
     if (dealerInfo && selectedParticipant && programSelection?.programId && partnerBankId) {
       if (mode === 'edit' && route?.params?.invoiceId) {
-        // Edit Mode path: Ready for PATCH API
-        // eslint-disable-next-line no-console
-        console.log('Edit Mode Active: Ready for PATCH API', {
-          invoiceId: route.params.invoiceId,
-          fields,
-          attachment: selectedAttachment,
-        });
-        
-        /* TODO: Dispatch update action when backend is ready
+        console.log('[CreateInvoice] Dispatching updateInvoiceRequest');
         dispatch(
           updateInvoiceRequest({
-            id: route.params.invoiceId,
+            invoiceId: route.params.invoiceId,
             fields,
+            createdBy,
             attachment: selectedAttachment ?? undefined,
-          })
+            approval_level: 1, // Reset to first checker as per backend discovery
+          }),
         );
-        */
-        
-        Toast.show({
-          type: 'info',
-          text1: 'Update logic triggered (Mock)',
-          text2: 'The backend update feature is still being prepared.',
-        });
         return;
       }
 
-      dispatch(
-        createInvoiceRequest({
-          fields,
-          createdBy,
-          partnerBank: partnerBankId,
-          program: programSelection.programId,
-          anchorParticipantMapping: selectedParticipant.id,
-          // For Anchor-maker: backend expects invoice.party to be the Anchor party,
-          // while counter party details come from the selected participant (dealer).
-          party: dealerInfo.party.id,
-          counterPartyName: selectedParticipant.party.entity_name,
-          counterPartyCode: selectedParticipant.company_code,
-          counterPartyOdAccount: selectedParticipant.od_account_no,
-          attachment: selectedAttachment ?? undefined,
-        }),
-      );
+      console.log('[CreateInvoice] Attempting to dispatch createInvoiceRequest', {
+        partnerBankId,
+        programId: programSelection?.programId,
+        productId: programSelection?.productId,
+        participantId: selectedParticipant?.id,
+        partyId: programSelection?.partyId || (dealerInfo as any)?.party?.id
+      });
+      try {
+        dispatch(
+          createInvoiceRequest({
+            fields,
+            createdBy,
+            partnerBank: String(partnerBankId || ''),
+            program: String(programSelection?.programId || ''),
+            product: String(programSelection?.productId || ''),
+            anchorParticipantMapping: String(selectedParticipant?.id || ''),
+            // For Anchor-maker: backend expects invoice.party to be the Anchor party.
+            // prioritize the partyId captured at program selection.
+            party: String(programSelection?.partyId || (dealerInfo as any)?.party?.id || ''),
+            counterPartyName: String(selectedParticipant?.party?.entity_name || ''),
+            counterPartyCode: String(selectedParticipant?.company_code || ''),
+            counterPartyOdAccount: String(selectedParticipant?.od_account_no || ''),
+            attachment: selectedAttachment ?? undefined,
+          }),
+        );
+        console.log('[CreateInvoice] createInvoiceRequest dispatch was successful');
+      } catch (e: any) {
+        console.error('[CreateInvoice] CRITICAL ERROR during dispatch:', e);
+        Alert.alert('Submission Error', 'A local error occurred while preparing your submission. Please try again.');
+      }
     } else {
+      console.log('[CreateInvoice] handleSubmit failed to enter a dispatch block', {
+        dealerInfo: !!dealerInfo,
+        selectedParticipant: !!selectedParticipant,
+        programId: programSelection?.programId,
+        partnerBankId
+      });
       Toast.show({
         type: 'error',
         text1: 'Please select a Program from the dashboard first, then try again.',

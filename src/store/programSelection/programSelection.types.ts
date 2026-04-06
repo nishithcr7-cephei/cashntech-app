@@ -4,6 +4,7 @@ import type {Bank} from '@constants/programSelection';
 export type SelectedProgram = {
   bankId: string;
   bankName: string;
+  partyId: string; // The anchor party ID
   productId: string;
   productName: string;
   programId: string;
@@ -16,6 +17,7 @@ export type ProgramSelectionState = {
   programScope: 'all' | 'selected';
   bankId: string | null;
   bankName: string | null;
+  partyId: string | null; // Selected anchor party ID
   productId: string | null;
   productName: string | null;
   programId: string | null;

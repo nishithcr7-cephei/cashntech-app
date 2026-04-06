@@ -5,8 +5,6 @@ const initialState: DealerState = {
   dealerList: [],
   loading: false,
   error: null,
-  page: 1,
-  hasMore: true,
   totalDealers: 0,
 };
 
@@ -14,26 +12,21 @@ const dealerSlice = createSlice({
   name: 'dealer',
   initialState,
   reducers: {
-    fetchDealerListRequest: (state, _action: PayloadAction<FetchDealerListRequest>) => {
+    fetchDealerListRequest: (state, action: PayloadAction<FetchDealerListRequest>) => {
       state.loading = true;
       state.error = null;
+      if (action.payload.isInitialLoad) {
+        state.dealerList = [];
+      }
     },
     fetchDealerListSuccess: (
       state,
-      action: PayloadAction<{data: DealerListItem[]; total: number; page: number}>
+      action: PayloadAction<{data: DealerListItem[]; total: number}>
     ) => {
       state.loading = false;
-      const {data, total, page} = action.payload;
-      
-      if (page === 1) {
-        state.dealerList = data;
-      } else {
-        state.dealerList = [...state.dealerList, ...data];
-      }
-      
-      state.page = page;
+      const {data, total} = action.payload;
+      state.dealerList = data;
       state.totalDealers = total;
-      state.hasMore = state.dealerList.length < total;
     },
     fetchDealerListFailure: (state, action: PayloadAction<string>) => {
       state.loading = false;

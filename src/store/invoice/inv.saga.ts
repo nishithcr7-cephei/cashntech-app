@@ -11,6 +11,10 @@ import {
   createInvoiceRequest,
   createInvoiceSuccess,
   createInvoiceFailure,
+  resetCreateInvoiceState,
+  updateInvoiceRequest,
+  updateInvoiceSuccess,
+  updateInvoiceFailure,
   fetchInvoiceListRequest,
   fetchInvoiceListSuccess,
   fetchInvoiceListFailure,
@@ -25,7 +29,7 @@ import {
   invoiceApi,
   CreateInvoicePayloadInput,
 } from '@services/api/invoice.api';
-import type {UpdateInvoiceStatusRequest, UpdateInvoiceVerificationRequest} from './inv.types';
+import type {UpdateInvoiceStatusRequest, UpdateInvoiceVerificationRequest, UpdateInvoicePayload} from './inv.types';
 
 function showActionToast(
   type: 'success' | 'error',
@@ -93,8 +97,10 @@ function getErrorMessage(response: any, defaultMsg: string): string {
 }
 
 function* createInvoiceSaga(action: PayloadAction<CreateInvoicePayloadInput>) {
+  console.log('[inv.saga] createInvoiceSaga started', action.payload);
   try {
     const response = yield call(invoiceApi.createInvoice, action.payload);
+    console.log('[inv.saga] createInvoice response', response);
     const statusCode = response?.statusCode;
     if (statusCode === 201) {
       yield put(createInvoiceSuccess(response));
@@ -119,25 +125,39 @@ function* createInvoiceSaga(action: PayloadAction<CreateInvoicePayloadInput>) {
   }
 }
 
+function* updateInvoiceSaga(action: PayloadAction<UpdateInvoicePayload>) {
+  try {
+    const response = yield call(invoiceApi.updateInvoice, action.payload);
+    const statusCode = response?.statusCode;
+    if (statusCode === 200 || statusCode === 201 || (response && !statusCode)) {
+      yield put(updateInvoiceSuccess(response));
+    } else {
+      yield put(
+        updateInvoiceFailure(
+          getErrorMessage(response, 'Failed to update invoice'),
+        ),
+      );
+    }
+  } catch (error: any) {
+    const data = error?.response?.data;
+    let msg = 'Network error';
+    if (error?.message?.includes('fetch') || error?.code === 'ECONNABORTED') {
+      msg = 'Network error. Check connection.';
+    } else if (data) {
+      msg = getErrorMessage(data, 'Failed to update invoice');
+    } else if (error?.message) {
+      msg = error.message;
+    }
+    yield put(updateInvoiceFailure(msg));
+  }
+}
+
 function* fetchInvoiceListSaga(
   action: PayloadAction<{programId: string; filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]}}>,
 ) {
   try {
     const {programId, filters} = action.payload;
     const data = yield call(invoiceApi.getInvoiceList, programId, filters);
-    if (__DEV__) {
-      console.log('[DEBUG 3] fetchInvoiceList API data:', {
-        programId,
-        count: Array.isArray(data) ? data.length : 0,
-        approvalStatuses: Array.isArray(data)
-          ? data.map((i: any) => ({
-              id: i.id,
-              invoice_ref_no: i.invoice_ref_no,
-              approval_status: i.approval_status,
-            }))
-          : [],
-      });
-    }
     yield put(fetchInvoiceListSuccess(data));
   } catch (error: any) {
     const msg =
@@ -168,13 +188,6 @@ function* updateInvoiceStatusSaga(
       approvalLevel,
       remark,
     });
-    if (__DEV__) {
-      console.log('[DEBUG 2] updateInvoiceStatus API response:', {
-        invoiceId,
-        response,
-        statusCode: response?.statusCode,
-      });
-    }
     showActionToast(
       'success',
       response?.message ||
@@ -237,6 +250,7 @@ export default function* invoiceSaga() {
   yield takeLatest(fetchDealerInfoRequest.type, fetchDealerInfoSaga);
   yield takeLatest(fetchBankListRequest.type, fetchBankListSaga);
   yield takeLatest(createInvoiceRequest.type, createInvoiceSaga);
+  yield takeLatest(updateInvoiceRequest.type, updateInvoiceSaga);
   yield takeLatest(fetchInvoiceListRequest.type, fetchInvoiceListSaga);
   yield takeLatest(updateInvoiceStatusRequest.type, updateInvoiceStatusSaga);
   yield takeLatest(updateInvoiceVerificationRequest.type, updateInvoiceVerificationSaga);

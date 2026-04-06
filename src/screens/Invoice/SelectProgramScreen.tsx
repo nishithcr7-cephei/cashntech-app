@@ -143,6 +143,7 @@ export const SelectProgramScreen: React.FC = () => {
       toggleProgramSelection({
         bankId: bank.id,
         bankName: bank.name,
+        partyId: bank.partyId,
         productId: product.id,
         productName: product.name,
         programId: program.id,

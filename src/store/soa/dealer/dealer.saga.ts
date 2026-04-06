@@ -15,10 +15,10 @@ import {formatIndianNumber} from '@utils/Utils';
 
 function* fetchDealerListWorker(action: PayloadAction<FetchDealerListRequest>): Generator<any, void, any> {
   try {
-    const {programId, search} = action.payload;
-    const url = `${API_URL}/${Endpoints.apiProgramDealers(programId)}`;
+    const {programIds} = action.payload;
+    const url = `${API_URL}/${Endpoints.apiProgramDealersList}`;
     const response = yield call(axiosInstance.post as any, url, {
-      search,
+      programIds,
     }, {
       authRequired: true,
     });
@@ -46,7 +46,6 @@ function* fetchDealerListWorker(action: PayloadAction<FetchDealerListRequest>): 
       yield put(fetchDealerListSuccess({
         data: mappedData,
         total,
-        page: 1, // Static page for non-paginated API
       }));
     } else {
       yield put(fetchDealerListFailure(response.data?.message || 'Failed to fetch dealer list'));

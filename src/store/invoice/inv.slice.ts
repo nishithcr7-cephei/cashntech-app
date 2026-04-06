@@ -7,6 +7,7 @@ import {
   InvoiceListItemApi,
   UpdateInvoiceStatusRequest,
   UpdateInvoiceVerificationRequest,
+  UpdateInvoicePayload,
 } from './inv.types';
 
 const invoiceSlice = createSlice({
@@ -40,25 +41,45 @@ const invoiceSlice = createSlice({
       state.bankListError = action.payload;
     },
     createInvoiceRequest: (state, _action: PayloadAction<unknown>) => {
+      console.log('[inv.slice] createInvoiceRequest reducer');
       state.createInvoiceLoading = true;
       state.createInvoiceError = null;
       state.createInvoiceSuccess = false;
     },
     createInvoiceSuccess: (state, action: PayloadAction<unknown>) => {
+      console.log('[inv.slice] createInvoiceSuccess reducer');
       state.createInvoiceLoading = false;
       state.createInvoiceSuccess = true;
       state.createInvoiceResponse = action.payload;
       state.createInvoiceError = null;
     },
     createInvoiceFailure: (state, action: PayloadAction<string>) => {
+      console.log('[inv.slice] createInvoiceFailure reducer, error:', action.payload);
       state.createInvoiceLoading = false;
       state.createInvoiceError = action.payload;
       state.createInvoiceSuccess = false;
     },
     resetCreateInvoiceState: (state) => {
+      state.createInvoiceLoading = false;
       state.createInvoiceSuccess = false;
       state.createInvoiceResponse = null;
       state.createInvoiceError = null;
+    },
+    updateInvoiceRequest: (state, _action: PayloadAction<UpdateInvoicePayload>) => {
+      state.createInvoiceLoading = true; // Use same loading flag as create for simplicity in UI
+      state.createInvoiceError = null;
+      state.createInvoiceSuccess = false;
+    },
+    updateInvoiceSuccess: (state, action: PayloadAction<unknown>) => {
+      state.createInvoiceLoading = false;
+      state.createInvoiceSuccess = true;
+      state.createInvoiceResponse = action.payload;
+      state.createInvoiceError = null;
+    },
+    updateInvoiceFailure: (state, action: PayloadAction<string>) => {
+      state.createInvoiceLoading = false;
+      state.createInvoiceError = action.payload;
+      state.createInvoiceSuccess = false;
     },
     fetchInvoiceListRequest: (
       state,
@@ -113,6 +134,9 @@ export const {
   createInvoiceSuccess,
   createInvoiceFailure,
   resetCreateInvoiceState,
+  updateInvoiceRequest,
+  updateInvoiceSuccess,
+  updateInvoiceFailure,
   fetchInvoiceListRequest,
   fetchInvoiceListSuccess,
   fetchInvoiceListFailure,

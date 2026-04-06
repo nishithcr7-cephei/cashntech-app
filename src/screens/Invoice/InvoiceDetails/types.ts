@@ -97,6 +97,7 @@ export type InvoiceRow = {
   programName: string;
   primaryParty: string;
   counterParty: string;
+  approvalLogsCount: number;
 };
 
 export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
@@ -140,6 +141,7 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
         item.primary_party_name ?? item.party?.entity_name ?? '',
       ) || '-',
     counterParty,
+    approvalLogsCount: Array.isArray(item.approvalLogs) ? item.approvalLogs.length : 0,
   };
 }
 

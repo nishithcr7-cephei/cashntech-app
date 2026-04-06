@@ -15,6 +15,7 @@ import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
 import {useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
+import {shouldShowCreateInvoice} from '@utils/permissionHelpers';
 
 type Props = {
   dealerListTitle: string;
@@ -35,6 +36,7 @@ type Props = {
   onOpenSendForApprovalModal: () => void;
   onCreateInvoicePress?: () => void;
   isCreateInvoiceEnabled?: boolean;
+  user?: any;
 };
 
 export const InvoiceDetailsControls: React.FC<Props> = ({
@@ -56,10 +58,14 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   onOpenSendForApprovalModal,
   onCreateInvoicePress,
   isCreateInvoiceEnabled = true,
+  user,
 }) => {
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canCreateInvoice = useHasPermission(PERMISSIONS.INVOICE_LIST_CREATE);
   const canUploadInvoice = useHasPermission(PERMISSIONS.INVOICE_LIST_IMPORT);
+
+  // Composite Role-based visibility check for "Create Invoice"
+  const showCreateButton = shouldShowCreateInvoice(user, canCreateInvoice);
 
   const onPressCreateInvoice = () => {
     if (!isCreateInvoiceEnabled) {
@@ -146,7 +152,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
       )}
 
       <View style={styles.primaryActionsRow}>
-        {(isAnchorMaker || isCashnTechUser) && canCreateInvoice && (
+        {(isAnchorMaker || isCashnTechUser) && showCreateButton && (
           <TouchableOpacity
             style={[
               styles.primaryButton,
@@ -178,7 +184,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
                 <Text style={styles.primaryButtonText}>Upload Invoice List</Text>
               </TouchableOpacity>
             )}
-            {canCreateInvoice && (
+            {showCreateButton && (
               <TouchableOpacity
                 style={[
                   styles.primaryButton,

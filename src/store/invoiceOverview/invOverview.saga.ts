@@ -23,15 +23,18 @@ function* fetchInvoiceSummarySaga(
   action: PayloadAction<{programIds: string[]}>,
 ) {
   try {
+    console.log('[fetchInvoiceSummarySaga] Requested with programIds:', action.payload.programIds);
     const response: any = yield call(
       invoiceApi.getInvoiceSummary,
       action.payload.programIds,
     );
+    console.log('[fetchInvoiceSummarySaga] Response:', response);
     const data = Array.isArray(response?.data) ? response.data : [];
     yield put(
       fetchInvoiceSummarySuccess(data as InvoiceOverviewSummaryItem[]),
     );
   } catch (error: any) {
+    console.error('[fetchInvoiceSummarySaga] Error:', error);
     const msg =
       error?.message?.includes('fetch') || error?.code === 'ECONNABORTED'
         ? 'Network error. Check connection.'

@@ -170,7 +170,8 @@ export const DisbursementScreen: React.FC = () => {
 
   // The 3-dots icon itself should be visible if the user can view the screen,
   // even if they don't have secondary action permissions (per requirements).
-  const show3DotsIcon = canViewDisbursement;
+  // EXCLUDED: anchor_maker role should not see 3 dots menu in Disbursement list
+  const show3DotsIcon = canViewDisbursement && userRole !== 'anchor_maker';
   const hasNoActionPermissions = !canMarkAsDisbursed && !canSendMail;
 
   const [disbursementRows, setDisbursementRows] = useState<DisbursementRow[]>([]);

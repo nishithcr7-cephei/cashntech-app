@@ -489,12 +489,18 @@ export const InvoiceForm: React.FC<Props> = ({
               </View>
             </TouchableOpacity>
           </View>
-          <TextInput 
-            style={[styles.input, errors.invoiceNumber && styles.inputError]} 
-            value={value.invoiceNumber} 
-            onChangeText={set('invoiceNumber')} 
-            placeholder="Value" 
-          />
+          {mode === 'edit' ? (
+            <View style={[styles.input, styles.readOnlyBox, styles.invoiceRefBoxEdit]}>
+              <Text style={styles.readOnlyText}>{value.invoiceNumber}</Text>
+            </View>
+          ) : (
+            <TextInput 
+              style={[styles.input, errors.invoiceNumber && styles.inputError]} 
+              value={value.invoiceNumber} 
+              onChangeText={set('invoiceNumber')} 
+              placeholder="Value" 
+            />
+          )}
           {errors.invoiceNumber && <Text style={styles.errorText}>{errors.invoiceNumber}</Text>}
         </View>
         <View style={styles.row}>
@@ -1133,7 +1139,7 @@ export const InvoiceForm: React.FC<Props> = ({
            
            {selectedAttachment ? (
              <View style={styles.selectedFilePreview}>
-               <FontAwesome6 name="file-invoice" size={20} color={Colors.primaryColor} />
+               <FontAwesome6 name="file-invoice" iconStyle="solid" size={20} color={Colors.primaryColor} />
                <Text style={styles.selectedFileText} numberOfLines={1}>
                  {selectedAttachment.name}
                </Text>
@@ -1168,6 +1174,7 @@ export const InvoiceForm: React.FC<Props> = ({
           style={[styles.button, styles.submitButton, (loading || submitButtonAppearsDisabled) && styles.submitButtonDisabled]}
           disabled={loading}
           onPress={() => {
+            console.log('[InvoiceForm] Submit pressed, disabledInternally:', submitButtonAppearsDisabled);
             if (submitButtonAppearsDisabled) {
               // Show a specific reason so the user knows exactly what to fix
               const reason =
@@ -1192,6 +1199,7 @@ export const InvoiceForm: React.FC<Props> = ({
               });
               return;
             }
+            console.log('[InvoiceForm] Calling onSubmit props');
             onSubmit?.();
           }}>
           {loading ? (
@@ -1808,6 +1816,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#888',
     fontFamily: 'System',
+  },
+  invoiceRefBoxEdit: {
+    height: 52,
+    justifyContent: 'center',
   },
   readOnlyPlaceholder: {
     fontSize: 14,

@@ -158,19 +158,29 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   }, [currentRoute]);
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to log out?', [
-      {
-        text: 'Cancel',
-        onPress: () => {},
-        style: 'cancel',
-      },
-      {
-        text: 'OK',
-        onPress: () => {
-          logoutUser();
-        },
-      },
-    ]);
+    // Add a small delay to ensure the Drawer Activity is still properly attached
+    // This prevents "Tried to show an alert while not attached to an Activity" warning
+    setTimeout(() => {
+      try {
+        Alert.alert('Logout', 'Are you sure you want to log out?', [
+          {
+            text: 'Cancel',
+            onPress: () => {},
+            style: 'cancel',
+          },
+          {
+            text: 'OK',
+            onPress: () => {
+              logoutUser();
+            },
+          },
+        ]);
+      } catch (error) {
+        // If Alert fails, proceed with logout directly
+        console.warn('Alert failed, proceeding with logout:', error);
+        logoutUser();
+      }
+    }, 300);
   };
 
   return (

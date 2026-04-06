@@ -1,6 +1,7 @@
 import * as React from 'react';
 import {useState, useEffect, useCallback} from 'react';
 import {View, Alert, Dimensions} from 'react-native';
+import Toast from 'react-native-toast-message';
 import {scaleWidth, scaleHeight} from '@utils/Scale';
 import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
@@ -113,6 +114,7 @@ export function useInvoiceDetails() {
                 programId: program.id,
                 programName: program.name,
                 userType: (product.name || '').toLowerCase().includes('dealer') ? 'dealer' : 'vendor',
+                partyId: bank.id,
               }),
             );
             return;
@@ -386,7 +388,21 @@ export function useInvoiceDetails() {
               text: 'Delete',
               style: 'destructive',
               onPress: async () => {
-                // TODO: Dispatch deleteInvoiceRequest once API is ready
+                try {
+                  const res = await invoiceApi.deleteInvoice(invoiceId);
+                  if (res?.statusCode === 200 || res?.status === 200) {
+                    Toast.show({
+                      type: 'success',
+                      text1: 'Success',
+                      text2: 'Invoice deleted successfully',
+                    });
+                    refreshInvoiceList();
+                  } else {
+                    Alert.alert('Error', res?.message || 'Failed to delete invoice');
+                  }
+                } catch (e: any) {
+                  Alert.alert('Error', e?.message || 'An error occurred during deletion');
+                }
               },
             },
           ],
@@ -665,7 +681,9 @@ export function useInvoiceDetails() {
     selectedInvoiceRawAdminStatus: selectedRowForMenu?.rawAdminStatus,
     selectedInvoiceRawApprovalStatus: selectedRowForMenu?.rawApprovalStatus,
     selectedInvoiceRawInvoiceStatus: selectedRowForMenu?.rawInvoiceStatus,
+    selectedInvoiceApprovalLogsCount: selectedRowForMenu?.approvalLogsCount || 0,
     userDepartment,
     storedUserRole,
+    userInfoFull,
   };
 }

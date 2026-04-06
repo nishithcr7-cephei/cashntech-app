@@ -14,8 +14,7 @@ export interface DealerListItem {
 }
 
 export interface FetchDealerListRequest {
-  programId: string;
-  search?: string;
+  programIds: string[];
   isInitialLoad?: boolean;
 }
 
@@ -23,7 +22,5 @@ export interface DealerState {
   dealerList: DealerListItem[];
   loading: boolean;
   error: string | null;
-  page: number;
-  hasMore: boolean;
   totalDealers: number;
 }

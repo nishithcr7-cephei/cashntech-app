@@ -1,43 +1,53 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  TextInput,
   ActivityIndicator,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
-import {AppBar, Container, ProgramBreadcrumb} from '@components/index';
+import {AppBar, Container} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {Search, Filter} from '@assets/Icons';
 import Toast from 'react-native-toast-message';
 import {
   fetchProgramListRequest,
   programListSelector,
   soaLoadingSelector,
-  soaPageSelector,
-  soaHasMoreSelector,
   totalProgramsSelector,
   soaErrorSelector,
   resetSOAState,
 } from '@store/soa';
+import {
+  selectProgramSelection,
+  selectAllProgramIds,
+} from '@store/programSelection/programSelection.selector';
 
 export const StatementOfAccount: React.FC = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
 
-  const [searchText, setSearchText] = useState('');
+  const programSelection = useSelector(selectProgramSelection);
+  const allProgramIds = useSelector(selectAllProgramIds);
   
   const programList = useSelector(programListSelector);
   const loading = useSelector(soaLoadingSelector);
-  const page = useSelector(soaPageSelector);
-  const hasMore = useSelector(soaHasMoreSelector);
   const totalPrograms = useSelector(totalProgramsSelector);
   const soaError = useSelector(soaErrorSelector);
+
+  // Determine which programIds to use
+  const selectedProgramIds = useMemo(() => {
+    if (programSelection.programScope === 'all' && allProgramIds) {
+      return allProgramIds;
+    }
+    if (programSelection.programId) {
+      return [programSelection.programId];
+    }
+    return allProgramIds || [];
+  }, [programSelection, allProgramIds]);
 
   useEffect(() => {
     if (soaError && (soaError.toLowerCase().includes('token expired') || soaError.toLowerCase().includes('unauthorized'))) {
@@ -56,23 +66,15 @@ export const StatementOfAccount: React.FC = () => {
     }
   }, [soaError]);
 
+  // Fetch program list when programIds change
   useEffect(() => {
-    dispatch(fetchProgramListRequest({page: 1, limit: 20, isInitialLoad: true}));
+    if (selectedProgramIds.length > 0) {
+      dispatch(fetchProgramListRequest({programIds: selectedProgramIds, isInitialLoad: true}));
+    }
     return () => {
       dispatch(resetSOAState());
     };
-  }, [dispatch]);
-
-  const handleSearch = useCallback((text: string) => {
-    setSearchText(text);
-    dispatch(fetchProgramListRequest({page: 1, limit: 20, search: text, isInitialLoad: true}));
-  }, [dispatch]);
-
-  const loadMore = () => {
-    if (!loading && hasMore) {
-      dispatch(fetchProgramListRequest({page: page + 1, limit: 20, search: searchText}));
-    }
-  };
+  }, [dispatch, selectedProgramIds]);
 
   const renderProgramItem = ({item, index}: {item: any; index: number}) => {
     const isStatusActive = item.status?.toLowerCase() === 'active';
@@ -107,7 +109,7 @@ export const StatementOfAccount: React.FC = () => {
               <Text style={styles.infoValue}>{item.partyName || '-'}</Text>
             </View>
             <View style={styles.infoColumn}>
-              <Text style={styles.infoLabel}>Total Sanction Amount (₹)</Text>
+              <Text style={styles.infoLabel}>Total Sanctioned Amount (₹)</Text>
               <Text style={[styles.infoValue, {color: Colors.primaryColor, fontFamily: Fonts.GilroyBold}]}>
                  {item.totalSanctionedAmount || '₹0.00'}
               </Text>
@@ -122,17 +124,14 @@ export const StatementOfAccount: React.FC = () => {
                 {item.status || 'N/A'}
               </Text>
             </View>
+            {item.createdAt && (
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Created On</Text>
+                <Text style={styles.infoValue}>{item.createdAt}</Text>
+              </View>
+            )}
           </View>
         </View>
-      </View>
-    );
-  };
-
-  const renderFooter = () => {
-    if (!loading) return null;
-    return (
-      <View style={styles.loaderFooter}>
-        <ActivityIndicator size="small" color={Colors.primaryColor} />
       </View>
     );
   };
@@ -154,40 +153,29 @@ export const StatementOfAccount: React.FC = () => {
           </View>
         </View>
 
-        <View style={styles.toolbar}>
-          <View style={styles.searchBox}>
-            <Search width={scaleWidth(18)} height={scaleHeight(18)} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder=""
-              placeholderTextColor={Colors.graybase}
-              value={searchText}
-              onChangeText={handleSearch}
-            />
+        {loading && (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color={Colors.primaryColor} />
+            <Text style={styles.loadingText}>Fetching programs...</Text>
           </View>
-          <TouchableOpacity style={styles.filterBtn}>
-            <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
-            <Text style={styles.filterText}>Filters</Text>
-          </TouchableOpacity>
-        </View>
+        )}
 
-        <FlatList
-          data={programList}
-          renderItem={renderProgramItem}
-          keyExtractor={(item) => item.programId}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={renderFooter}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            !loading ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No programs found</Text>
-              </View>
-            ) : null
-          }
-        />
+        {!loading && programList.length === 0 && (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No programs found</Text>
+          </View>
+        )}
+
+        {!loading && programList.length > 0 && (
+          <FlatList
+            data={programList}
+            renderItem={renderProgramItem}
+            keyExtractor={(item) => item.programId}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            scrollEnabled={true}
+          />
+        )}
       </View>
     </Container>
   );
@@ -351,5 +339,17 @@ const styles = StyleSheet.create({
   linkText: {
     color: Colors.tertiaryColor,
     textDecorationLine: 'underline',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: scaleHeight(40),
+  },
+  loadingText: {
+    marginTop: scaleHeight(12),
+    fontSize: scaleFont(14),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
   },
 });

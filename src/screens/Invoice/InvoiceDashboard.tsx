@@ -25,7 +25,7 @@ import {
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
-import {Dots} from '@assets/Icons';
+
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {userSelector} from '@store/user';
@@ -49,6 +49,22 @@ import {
 } from '@store/invoiceOverview';
 import type {Bank} from '@constants/programSelection';
 import {formatDateDash} from '@screens/Invoice/InvoiceDetails/types';
+
+// Format date as DD MMM YYYY (e.g., 15 Apr 2026)
+const formatDateDDMmmYYYY = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '-';
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr; // Return original if invalid
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch (error) {
+    return dateStr || '-';
+  }
+};
 import {decryptValue} from '@utils/decrypt';
 import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
@@ -150,14 +166,11 @@ export const InvoiceDashboard: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'dealers' | 'unpaid'>('dealers');
   const [productTab, setProductTab] = useState<ProductTabType>('all_product');
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showCheckerApprovalModal, setShowCheckerApprovalModal] = useState(false);
   const [showApproveRejectModal, setShowApproveRejectModal] = useState(false);
   const [selectedDealerId, setSelectedDealerId] = useState<string | null>(null);
   const [selectedDealerNo, setSelectedDealerNo] = useState<string | null>(null);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
-  const [menuAnchor, setMenuAnchor] = useState<{x: number; y: number; width: number; height: number} | null>(null);
-  const menuButtonRefs = React.useRef<Record<string, View | null>>({});
   const navigation = useNavigation<CompositeNavigationProp<
     DrawerNavigationProp<HomeNavigatorType>,
     NativeStackNavigationProp<any>
@@ -217,107 +230,24 @@ export const InvoiceDashboard: React.FC = () => {
   useEffect(() => {
     if (!scopeData || scopeData.length === 0) return;
 
-    const finalProgramIds =
-      programSelection?.programScope === 'all' ? [] : programIds;
-
     if (
       programSelection?.programScope === 'selected' &&
-      finalProgramIds.length === 0
+      programIds.length === 0
     ) {
       return;
     }
 
-    dispatch(fetchInvoiceSummaryRequest({programIds: finalProgramIds}));
-    dispatch(fetchLatestInvoicesRequest({programIds: finalProgramIds}));
-    dispatch(fetchInvoiceKpisRequest({programIds: finalProgramIds}));
+    // Always use programIds for all API calls - it's already correctly calculated based on scope and product tab
+    dispatch(fetchInvoiceSummaryRequest({programIds: programIds}));
+    dispatch(fetchLatestInvoicesRequest({programIds: programIds}));
+    dispatch(fetchInvoiceKpisRequest({programIds: programIds}));
   }, [dispatch, programIds, scopeData, programSelection?.programScope, productTab]);
-
-  const handleMenuToggle = (dealerId: string) => {
-    if (openMenuId === dealerId) {
-      setOpenMenuId(null);
-      setMenuAnchor(null);
-      return;
-    }
-
-    const ref = menuButtonRefs.current[dealerId] as any;
-    if (ref?.measureInWindow) {
-      ref.measureInWindow((x: number, y: number, width: number, height: number) => {
-        setMenuAnchor({x, y, width, height});
-        setOpenMenuId(dealerId);
-      });
-    } else {
-      // Fallback: open without anchor (top-right)
-      setMenuAnchor(null);
-      setOpenMenuId(dealerId);
-    }
-  };
-
-  const handleMenuAction = (action: string, dealerId: string) => {
-    setOpenMenuId(null);
-    setMenuAnchor(null);
-
-    switch (action) {
-      case 'checkerApproval':
-        setSelectedDealerId(dealerId);
-        setShowCheckerApprovalModal(true);
-        break;
-      case 'attachment':
-        setSelectedDealerId(dealerId);
-        setShowAttachmentModal(true);
-        break;
-      case 'print':
-        void dealerId;
-        break;
-      case 'approveReject':
-        setSelectedDealerId(dealerId);
-        setSelectedDealerNo(dealerId);
-        setShowApproveRejectModal(true);
-        break;
-      case 'edit':
-        // Navigation or logic for edit
-        void dealerId;
-        break;
-      case 'delete':
-        // Logic for delete
-        void dealerId;
-        break;
-    }
-  };
 
   const handleAttachmentUpload = (file?: DocumentPickerResponse) => {
     void file;
     void selectedDealerId;
     setShowAttachmentModal(false);
     setSelectedDealerId(null);
-  };
-
-  const getMenuPosition = (anchor: {x: number; y: number; width: number; height: number} | null) => {
-    const screen = Dimensions.get('window');
-    const menuWidth = scaleWidth(180);
-    const horizontalPadding = scaleWidth(12);
-    const topPadding = scaleHeight(8);
-
-    if (!anchor) {
-      return {
-        position: 'absolute' as const,
-        top: topPadding + scaleHeight(60),
-        right: horizontalPadding,
-      };
-    }
-
-    const desiredLeft = anchor.x + anchor.width - menuWidth;
-    const left = Math.max(
-      horizontalPadding,
-      Math.min(desiredLeft, screen.width - menuWidth - horizontalPadding),
-    );
-
-    const top = Math.max(topPadding, anchor.y + anchor.height + scaleHeight(6));
-
-    return {
-      position: 'absolute' as const,
-      top,
-      left,
-    };
   };
 
   // Dealer Checker: default to "Latest Invoice" tab
@@ -330,29 +260,39 @@ export const InvoiceDashboard: React.FC = () => {
   const dealerSummaryRows = useMemo(
     () =>
       (summaryData || []).map((row, index) => {
-        const drawingPower =
-          row.drawing_power != null
-            ? row.drawing_power.toLocaleString('en-IN')
-            : '-';
+        const drawingPower = row.drawing_power != null
+          ? row.drawing_power.toLocaleString('en-IN')
+          : '-';
+        const sanctionedLimit = row.sanctioned_limit != null
+          ? row.sanctioned_limit.toLocaleString('en-IN')
+          : '-';
+        const utilisedAmount = row.utilized_amount != null
+          ? row.utilized_amount.toLocaleString('en-IN')
+          : '-';
         const available =
           row.sanctioned_limit != null && row.drawing_power != null
             ? (row.sanctioned_limit - row.drawing_power).toLocaleString(
                 'en-IN',
               )
             : '-';
+        const expiryDate = formatDateDDMmmYYYY(row.od_expiry_date);
+        
         return {
           id: row.id || `dealer-${index}`,
-          bankName: '',
-          programName: row.program_name,
+          bankName: row.bank_name || '-',
+          bankId: row.bank_id || '-',
+          programName: row.program_name || '-',
           primaryParty: decryptValue(row.partyName || '') || '-',
           counterParty:
             row.counterPartyName != null
               ? decryptValue(row.counterPartyName) || '-'
               : '-',
-          odAccount: decryptValue(row.od_account_no || ''),
+          odAccount: decryptValue(row.od_account_no || '') || '-',
           drawingPower,
-          pipelineRequests: '-',
+          sanctionedLimit,
+          utilisedAmount,
           availableLimit: available,
+          expiryDate,
           overdueAmount: '-',
           dpdDays: '-',
         };
@@ -401,6 +341,18 @@ export const InvoiceDashboard: React.FC = () => {
             </View>
         )}
 
+        {summaryLoading ? (
+          <View style={[styles.verticalList, {justifyContent: 'center', alignItems: 'center', paddingVertical: scaleHeight(40)}]}>
+            <ActivityIndicator
+              size="large"
+              color={Colors.primaryColor}
+            />
+          </View>
+        ) : filteredDealerRows.length === 0 ? (
+          <View style={[styles.verticalList, {justifyContent: 'center', alignItems: 'center', paddingVertical: scaleHeight(40)}]}>
+            <Text style={styles.noDataText}>No OD Accounts available</Text>
+          </View>
+        ) : (
         <View style={styles.verticalList}>
           {filteredDealerRows.map((row, index) => (
             <View key={`${row.id}-${index}`} style={styles.cardWrapper}>
@@ -417,22 +369,32 @@ export const InvoiceDashboard: React.FC = () => {
                       OD Account: {row.odAccount || '-'}
                     </Text>
                   </View>
-                  <View
-                    ref={el => { menuButtonRefs.current[row.id] = el; }}
-                    style={styles.threeDotsButton}>
-                    <TouchableOpacity
-                      style={styles.threeDotsTouchable}
-                      onPress={() => handleMenuToggle(row.id)}
-                      disabled={permissionsLoading}>
-                      <Dots width={scaleWidth(18)} height={scaleWidth(18)} fill={permissionsLoading ? Colors.graybase : Colors.darkblack} />
-                    </TouchableOpacity>
-                  </View>
                 </View>
 
                 <View style={styles.infoGrid}>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Program Name</Text>
                     <Text style={styles.infoValue}>{row.programName}</Text>
+                  </View>
+
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Bank Name</Text>
+                    <Text style={styles.infoValue}>{row.bankName}</Text>
+                  </View>
+
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Bank ID</Text>
+                    <Text style={styles.infoValue}>{row.bankId}</Text>
+                  </View>
+
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>OD Account</Text>
+                    <Text style={styles.infoValue}>{row.odAccount}</Text>
+                  </View>
+
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>OD Expiry Date</Text>
+                    <Text style={styles.infoValue}>{row.expiryDate}</Text>
                   </View>
 
                   <View style={styles.infoColumn}>
@@ -446,18 +408,18 @@ export const InvoiceDashboard: React.FC = () => {
                   </View>
 
                   <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>OD Account</Text>
-                    <Text style={styles.infoValue}>{row.odAccount || '-'}</Text>
+                    <Text style={styles.infoLabel}>Sanctioned Limit (₹)</Text>
+                    <Text style={styles.infoValue}>{row.sanctionedLimit}</Text>
+                  </View>
+
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>Utilized Amount (₹)</Text>
+                    <Text style={styles.infoValue}>{row.utilisedAmount}</Text>
                   </View>
 
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Drawing Power (₹)</Text>
                     <Text style={styles.infoValue}>{row.drawingPower}</Text>
-                  </View>
-
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Pipeline Requests (₹)</Text>
-                    <Text style={styles.infoValue}>{row.pipelineRequests}</Text>
                   </View>
 
                   <View style={styles.infoColumn}>
@@ -479,6 +441,7 @@ export const InvoiceDashboard: React.FC = () => {
             </View>
           ))}
         </View>
+        )}
     </>
   );
 
@@ -515,16 +478,6 @@ export const InvoiceDashboard: React.FC = () => {
                   <Text style={styles.cardSubtitle}>
                     Invoice Number: {row.invoiceNo}
                   </Text>
-                </View>
-                <View
-                  ref={el => { menuButtonRefs.current[row.id] = el; }}
-                  style={styles.threeDotsButton}>
-                  <TouchableOpacity
-                    style={styles.threeDotsTouchable}
-                    onPress={() => handleMenuToggle(row.id)}
-                    disabled={permissionsLoading}>
-                    <Dots width={scaleWidth(18)} height={scaleWidth(18)} fill={permissionsLoading ? Colors.graybase : Colors.darkblack} />
-                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -781,75 +734,7 @@ export const InvoiceDashboard: React.FC = () => {
         onClose={handleAttachmentUpload}
       />
 
-      {/* Action Menu Modal */}
-      <Modal
-        visible={!!openMenuId}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOpenMenuId(null)}>
-        <TouchableOpacity
-          style={styles.menuModalOverlay}
-          activeOpacity={1}
-          onPress={() => setOpenMenuId(null)}>
-          <View style={getMenuPosition(menuAnchor)}>
-            <View style={styles.actionMenu}>
-              {canShowApproveReject && (
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuAction('approveReject', openMenuId!)}>
-                  <FontAwesome6 name="check-double" size={14} color={Colors.darkblack} iconStyle="solid" />
-                  <Text style={styles.menuText}>Approve / Reject</Text>
-                </TouchableOpacity>
-              )}
-              {canViewApprovalHistory && (
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuAction('checkerApproval', openMenuId!)}>
-                  <FontAwesome6 name="clock-rotate-left" size={14} color={Colors.darkblack} iconStyle="solid" />
-                  <Text style={styles.menuText}>Approval History</Text>
-                </TouchableOpacity>
-              )}
-              {canAttachment && (
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuAction('attachment', openMenuId!)}>
-                  <FontAwesome6 name="paperclip" size={14} color={Colors.darkblack} iconStyle="solid" />
-                  <Text style={styles.menuText}>Attachment</Text>
-                </TouchableOpacity>
-              )}
-              {canEdit && (
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuAction('edit', openMenuId!)}>
-                  <FontAwesome6 name="pen-to-square" size={14} color={Colors.darkblack} />
-                  <Text style={styles.menuText}>Edit</Text>
-                </TouchableOpacity>
-              )}
-              {canPrint && (
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuAction('print', openMenuId!)}>
-                  <FontAwesome6 name="print" size={14} color={Colors.darkblack} iconStyle="solid" />
-                  <Text style={styles.menuText}>Print</Text>
-                </TouchableOpacity>
-              )}
-              {canDelete && (
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleMenuAction('delete', openMenuId!)}>
-                  <FontAwesome6 name="trash-can" size={14} color={Colors.red} />
-                  <Text style={[styles.menuText, {color: Colors.red}]}>Delete</Text>
-                </TouchableOpacity>
-              )}
-              {!canShowApproveReject && !canViewApprovalHistory && !canAttachment && !canEdit && !canPrint && !canDelete && (
-                <View style={[styles.menuItem, {opacity: 0.5}]}>
-                  <Text style={styles.menuText}>No actions allowed</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+
 
     </Container>
   );
@@ -1038,24 +923,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
-  threeDotsButton: {
-    position: 'absolute',
-    top: scaleHeight(12),
-    right: scaleWidth(12),
-    width: scaleWidth(32),
-    height: scaleWidth(32),
-    borderRadius: scaleWidth(16),
-    backgroundColor: '#F5F5F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  threeDotsTouchable: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1159,33 +1026,6 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
   },
-  menuModalOverlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  actionMenu: {
-    backgroundColor: Colors.white,
-    borderRadius: scaleWidth(8),
-    paddingVertical: scaleHeight(8),
-    paddingHorizontal: scaleWidth(12),
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    minWidth: scaleWidth(180),
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scaleWidth(12),
-    paddingVertical: scaleHeight(8),
-  },
-  menuText: {
-    fontSize: scaleFont(14),
-    color: Colors.darkblack,
-    fontFamily: Fonts.GilroyMedium,
-  },
   indexBadge: {
     backgroundColor: '#F7F8FB',
     width: scaleWidth(28),
@@ -1201,6 +1041,12 @@ const styles = StyleSheet.create({
     color: Colors.graybase,
     fontSize: scaleFont(12),
     fontFamily: Fonts.GilroyBold,
+  },
+  noDataText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+    textAlign: 'center',
   },
 });
 
