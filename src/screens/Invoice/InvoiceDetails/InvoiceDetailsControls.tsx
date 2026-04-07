@@ -169,26 +169,11 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
         )}
         {isDealerMaker && !isCashnTechUser && (
           <>
-            {canUploadInvoice && (
-              <TouchableOpacity
-                style={[
-                  styles.primaryButton,
-                  styles.primaryButtonHalf,
-                  permissionsLoading && styles.primaryButtonDisabled,
-                ]}
-                disabled={permissionsLoading}
-                onPress={() => navigation.navigate('UploadInvoiceList' as never)}>
-                <View style={styles.buttonIconContainer}>
-                  <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
-                </View>
-                <Text style={styles.primaryButtonText}>Upload Invoice List</Text>
-              </TouchableOpacity>
-            )}
             {showCreateButton && (
               <TouchableOpacity
                 style={[
                   styles.primaryButton,
-                  styles.primaryButtonHalf,
+                  styles.primaryButtonSingle,
                   (!isCreateInvoiceEnabled || permissionsLoading) && styles.primaryButtonDisabled,
                 ]}
                 disabled={permissionsLoading}

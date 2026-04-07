@@ -31,16 +31,24 @@ export const shouldShowAttachmentOption = (
   const bRole = pg?.business_role;
   const fRole = pg?.functional_role;
 
-  // 1. Super User (Internal CashnTech): All roles null
-  const isSuperUser = bRole === null && fRole === null;
-  if (isSuperUser) return true;
-
-  // 2. Regular Anchor Maker
-  const isAnchorMaker = bRole === 'Anchor' && fRole === 'Maker';
   const s = invoiceStatus?.toLowerCase() || '';
   const isAllowedStatus = ['created', 'rejected', 'attachment pending'].includes(s);
 
+  // 1. Super User (Internal CashnTech): All roles null - must be in allowed status
+  const isSuperUser = bRole === null && fRole === null;
+  if (isSuperUser && canAttachment && isAllowedStatus) return true;
+
+  // 2. Regular Anchor Maker
+  const isAnchorMaker = bRole === 'Anchor' && fRole === 'Maker';
+  const isAnchorChecker = bRole === 'Anchor' && fRole === 'Checker';
+
+  // Anchor Maker must be in a specific status to view/edit attachments
   if (isAnchorMaker && canAttachment && isAllowedStatus) {
+    return true;
+  }
+
+  // Anchor Checker must also be in a specific status to view attachments for review
+  if (isAnchorChecker && canAttachment && isAllowedStatus) {
     return true;
   }
 
@@ -109,16 +117,40 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
     adminStatus?: string,
     logsCount: number = 0,
   ) => {
-    // 1. VISIBLE: Allowed ONLY if status matches exactly (Maker can edit these)
-    const isAllowedByStatus = ['Draft', 'Created', 'Rejected', 'Attachment Pending'].includes(status || '');
+    const s = status || '';
+    const approvalS = (approvalStatus || '').toLowerCase();
+    const adminS = (adminStatus || '').toLowerCase();
 
-    // 2. HIDDEN: Hard Stop for completed workflows
-    const isCompleted = approvalStatus?.toLowerCase().includes('completed');
+    // 1. 'Rejected' & 'Draft' — ALWAYS editable regardless of logs count
+    //    (mirrors backend: invoice_status === 'Rejected' || 'Draft' bypasses logs check)
+    const isRejectedOrDraft = ['Rejected', 'REJECTED_BY_CHECKER', 'Draft'].includes(s);
+    if (isRejectedOrDraft) return true;
 
-    // 3. HIDDEN: Hard Stop for verified admin status
-    const isForbidden = adminStatus === 'Verified';
+    // 2. 'Created', 'Pending', 'Attachment Pending' — editable ONLY if no workflow
+    //    action has been taken yet (logs <= 1), mirroring backend rule:
+    //    approvalLogs.length > 1 → throw UnauthorizedException
+    const isEarlyStatus = ['Pending', 'Created', 'Attachment Pending'].includes(s);
+    const hasNoWorkflowAction = logsCount <= 1;
 
-    return isAllowedByStatus && !isCompleted && !isForbidden;
+    // 3. HIDDEN: Terminal approval/admin statuses where editing is always forbidden
+    const isForbiddenByApproval = ['approved', 'disbursed', 'cancelled', 'completed', 'approval complete'].some(
+      term => approvalS.includes(term),
+    );
+    const isForbiddenByAdmin = adminS === 'verified';
+
+    return isEarlyStatus && hasNoWorkflowAction && !isForbiddenByApproval && !isForbiddenByAdmin;
+  };
+
+  const isInvoiceInActionableState = (invoiceStatus?: string, adminStatus?: string) => {
+    const iStatus = invoiceStatus?.toLowerCase() || '';
+    const aStatus = adminStatus?.toLowerCase() || '';
+
+    // Block if in Draft or missing attachments
+    const isDraftState = ['draft', 'pending attachment', 'attachment pending'].includes(iStatus);
+    // Block if in a terminal state
+    const isTerminalState = ['verified', 'rejected'].includes(aStatus);
+
+    return !isDraftState && !isTerminalState;
   };
 
   const isInvoiceDeletableState = (logsCount: number = 0) => {
@@ -127,8 +159,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   };
 
   const isEditable = canEdit 
-    && (isAnchorMaker || isDealerMaker) 
-    && !isCashnTechUser
+    && (isAnchorMaker || isDealerMaker || isCashnTechUser) 
     && isInvoiceInEditableState(
       rawInvoiceStatus,
       rawApprovalStatus,
@@ -138,7 +169,8 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
 
   const isDeletable = canDelete && isInvoiceDeletableState(approvalLogsCount);
 
-  const canShowApproveReject = canApprove || canReject;
+  const isActionable = isInvoiceInActionableState(rawInvoiceStatus, rawAdminStatus);
+  const canShowApproveReject = (canApprove || canReject) && isActionable;
 
   if (!openMenuId) return null;
 
@@ -152,8 +184,8 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
         <Pressable
           style={[styles.menu, getMenuPosition(menuAnchor)]}
           onPress={() => {}}>
-          {/* Maker actions: makers see disabled Edit/Recreate/Delete + active Approval History */}
-          {(isAnchorMaker || isDealerMaker) && !isCashnTechUser && (
+          {/* Maker actions: Anchor/Dealer Makers OR CashnTech Users with edit permission can edit (Checkers excluded) */}
+          {(isAnchorMaker || isDealerMaker || (isCashnTechUser && canEdit)) && !isAnchorChecker && !isDealerChecker && (
             <>
               {/* Edit – ONLY visible if isEditable */}
               {isEditable && (
@@ -230,15 +262,16 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   </View>
                 </TouchableOpacity>
               )}
-              {canViewHistory && (
+
+              {showAttachmentOption && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
-                  onPress={() => onMenuAction('checkerApproval', openMenuId)}
+                  onPress={() => onMenuAction('attachment', openMenuId)}
                   style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#0085FF" size={18} />
+                  <FontAwesome6 name="paperclip" iconStyle="solid" color={Colors.darkblack} size={16} />
                   <View style={styles.menuItemTextBlock}>
-                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Checker Approval</Text>
-                    <Text style={styles.menuSubText}>Approval History</Text>
+                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Attachments</Text>
+                    <Text style={styles.menuSubText}>View Supporting Docs</Text>
                   </View>
                 </TouchableOpacity>
               )}
@@ -254,15 +287,6 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
                   <FontAwesome6 name="check" iconStyle="solid" color={Colors.darkblack} size={16} />
                   <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Invoice Verification</Text>
-                </TouchableOpacity>
-              )}
-               {canViewHistory && (
-                <TouchableOpacity
-                  disabled={permissionsLoading}
-                  onPress={() => onMenuAction('checkerApproval', openMenuId)}
-                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#0085FF" size={18} />
-                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Checker Approval</Text>
                 </TouchableOpacity>
               )}
             </>
@@ -294,7 +318,8 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                     </TouchableOpacity>
                   )}
 
-                 {canViewHistory && (
+                {/* Approval History */}
+                {canViewHistory && (
                   <TouchableOpacity
                     disabled={permissionsLoading}
                     onPress={() => onMenuAction('approvalHistory', openMenuId)}
@@ -303,6 +328,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                     <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
                   </TouchableOpacity>
                 )}
+
                 {showAttachmentOption && (
                   <TouchableOpacity
                     disabled={permissionsLoading}

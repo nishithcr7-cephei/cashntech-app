@@ -1,6 +1,6 @@
 import Colors from '@constants/Colors';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import React from 'react';
+import React, {useMemo} from 'react';
 import {
   Text,
   StyleSheet,
@@ -41,7 +41,11 @@ export const CustomDropdown = ({
     }
   };
 
-  const selectedItem = data.find(item => item.value === value);
+  // Find selected item by matching value
+  const selectedItem = useMemo(() => 
+    data.find(item => item.value === value),
+    [data, value]
+  );
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -63,14 +67,21 @@ export const CustomDropdown = ({
         labelField="label"
         valueField="value"
         placeholder={placeholder}
-        value={{
-          label: selectedItem?.label || '',
-          value: value,
-        }}
-        onChange={handleChange}
+        // ✅ Pass the actual value directly - Dropdown expects string matching valueField
+        value={value}
+        onChange={(item) => handleChange(item)}
         search={showSearch && editable}
         searchPlaceholder="Search"
         disable={!editable}
+        renderItem={(item) => (
+          <Text style={styles.itemTextStyle}>{item.label}</Text>
+        )}
+        // ✅ Custom render selected item to show label instead of value
+        renderSelectedItem={(item) => (
+          <Text style={styles.selectedTextStyle}>
+            {data.find(d => d.value === item?.value)?.label || placeholder}
+          </Text>
+        )}
       />
     </View>
   );

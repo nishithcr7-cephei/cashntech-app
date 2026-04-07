@@ -68,7 +68,7 @@ export function useInvoiceDetails() {
   const isDealerChecker = userRole === 'dealer_checker';
   const isCashnTechUser = userRole === 'cashntech_user';
 
-  const dealerListTitle = isCashnTechUser ? 'Invoice' : 'Dealer Wise Invoice Details';
+  const dealerListTitle = isCashnTechUser ? 'Invoice' : isDealerMaker ? 'Anchor Wise Invoice Details' : 'Dealer Wise Invoice Details';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);

@@ -243,10 +243,23 @@ export const CreateInvoice: React.FC = () => {
   const previewAttachmentFromRoute: DocumentPickerResponse | undefined = route?.params?.previewAttachment;
   const previewReturnToken: number | undefined = route?.params?.previewReturnToken;
   
-  const hasCreatePerm = permissions.includes('lms.transactions.invoices.invoice_details.action.create_invoice');
-  const hasUploadPerm = permissions.includes('lms.transactions.invoices.invoice_details.action.upload_invoices');
-  const hasAttachmentPerm = permissions.includes('lms.transactions.invoices.invoice_details.action.attachment');
+  const hasCreatePerm = permissions.includes('lms.transactions.invoice_list.action.create_invoice');
+  const hasEditPerm = permissions.includes('lms.transactions.invoice_list.action.edit');
+  const hasRecreatePerm = permissions.includes('lms.transactions.invoice_list.action.recreate_invoice');
+  const hasUploadPerm = permissions.includes('lms.transactions.invoice_list.action.import');
+  const hasAttachmentPerm = permissions.includes('lms.transactions.invoice_list.action.attachment');
   const canUploadFinal = hasUploadPerm && hasAttachmentPerm;
+
+  // Determine required permission based on mode
+  const hasRequiredPerm = () => {
+    if (mode === 'edit') {
+      return hasEditPerm;
+    } else if (mode === 'recreate') {
+      return hasRecreatePerm;
+    } else {
+      return hasCreatePerm;
+    }
+  };
 
   const headerModeTitle = mode === 'edit' ? "Invoice Details [Edit Invoice]" : "Invoice Details";
    
@@ -288,17 +301,23 @@ export const CreateInvoice: React.FC = () => {
     }
   }, [userRole, navigation]);
 
-  // Permission validation for Create Invoice
+  // Permission validation for Create/Edit Invoice
   useEffect(() => {
-    if (!permissionsLoading && !hasCreatePerm) {
+    if (!permissionsLoading && !hasRequiredPerm()) {
+      const actionName = mode === 'edit' ? 'edit' : mode === 'recreate' ? 'recreate' : 'create';
       Alert.alert(
         'Access Denied',
-        'You do not have permission to create an invoice. Please contact your administrator.',
+        `You do not have permission to ${actionName} an invoice. Please contact your administrator.`,
         [
           {
             text: 'OK',
             onPress: () => {
-              (navigation as any).goBack();
+              // Safely navigate back - if canGoBack, use goBack, otherwise navigate to InvoiceDetails
+              if ((navigation as any).canGoBack?.()) {
+                (navigation as any).goBack();
+              } else {
+                (navigation as any).navigate('InvoiceDetails');
+              }
             },
           },
         ],
@@ -306,11 +325,15 @@ export const CreateInvoice: React.FC = () => {
       
       // Optional: Automatically navigate the user back after 3 seconds
       const timer = setTimeout(() => {
-        (navigation as any).goBack();
+        if ((navigation as any).canGoBack?.()) {
+          (navigation as any).goBack();
+        } else {
+          (navigation as any).navigate('InvoiceDetails');
+        }
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [permissionsLoading, hasCreatePerm, navigation]);
+  }, [permissionsLoading, hasCreatePerm, hasEditPerm, hasRecreatePerm, mode, navigation]);
 
   // Handle Permissions API Error
   useEffect(() => {
@@ -407,7 +430,8 @@ export const CreateInvoice: React.FC = () => {
             unit: item.unit || 'PCS',
             pricePerQuantity: String(item.price_per_quantity || '0'),
             total: String(item.total || '0'),
-            discountType: item.discount_type || '',
+            // Normalize discount_type: convert 'absolute' to 'value' for the dropdown
+            discountType: item.discount_type === 'absolute' ? 'value' : (item.discount_type || ''),
             discountValue: String(item.discount_value || '0'),
             discountAmount: String(item.discount_amount || '0'),
             taxes: (item.taxes || []).map((t: any) => ({

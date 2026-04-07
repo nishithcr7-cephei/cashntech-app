@@ -261,17 +261,17 @@ export const InvoiceDashboard: React.FC = () => {
     () =>
       (summaryData || []).map((row, index) => {
         const drawingPower = row.drawing_power != null
-          ? row.drawing_power.toLocaleString('en-IN')
+          ? Number(row.drawing_power).toLocaleString('en-IN')
           : '-';
         const sanctionedLimit = row.sanctioned_limit != null
-          ? row.sanctioned_limit.toLocaleString('en-IN')
+          ? Number(row.sanctioned_limit).toLocaleString('en-IN')
           : '-';
         const utilisedAmount = row.utilized_amount != null
-          ? row.utilized_amount.toLocaleString('en-IN')
+          ? Number(row.utilized_amount).toLocaleString('en-IN')
           : '-';
         const available =
-          row.sanctioned_limit != null && row.drawing_power != null
-            ? (row.sanctioned_limit - row.drawing_power).toLocaleString(
+          row.drawing_power != null && row.utilized_amount != null
+            ? (Number(row.drawing_power) - Number(row.utilized_amount)).toLocaleString(
                 'en-IN',
               )
             : '-';
@@ -293,8 +293,9 @@ export const InvoiceDashboard: React.FC = () => {
           utilisedAmount,
           availableLimit: available,
           expiryDate,
-          overdueAmount: '-',
-          dpdDays: '-',
+          overdueAmount: row.overdue_amount != null ? Number(row.overdue_amount).toLocaleString('en-IN') : '-',
+          dpdDays: row.dpd_days != null ? row.dpd_days.toString() : '-',
+          pipelineRequests: row.pipeline_requests != null ? Number(row.pipeline_requests).toLocaleString('en-IN') : '-',
         };
       }),
     [summaryData],
@@ -319,8 +320,13 @@ export const InvoiceDashboard: React.FC = () => {
         disbursementDate: row.disbursement_date ? formatDateDash(row.disbursement_date) : '-',
         disbAmount: row.disbursed_amount ? `₹ ${parseFloat(row.disbursed_amount).toLocaleString('en-IN')}` : '-',
         utrNo: row.utr_no || '-',
-        invoiceDueDate: row.invoice_due_date || '-',
+        invoiceDueDate: row.invoice_due_date ? formatDateDash(row.invoice_due_date) : '-',
+        uploadDate: row.created_at ? formatDateDash(row.created_at) : '-',
         loanRefNo: row.loan_ref_no || '',
+        bankName: row.bank_name || '-',
+        productName: row.product_name || '-',
+        programName: row.program_name || '-',
+        primaryParty: row.partyName ? decryptValue(row.partyName) : '-',
       })),
     [latestData],
   );
@@ -341,6 +347,17 @@ export const InvoiceDashboard: React.FC = () => {
             </View>
         )}
 
+        {isAnchorChecker && (
+            <View style={styles.allProgramHeader}>
+              <Text style={styles.allProgramTitle}>Summary of Dealers</Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {filteredDealerRows.length}
+                </Text>
+              </View>
+            </View>
+        )}
+
         {summaryLoading ? (
           <View style={[styles.verticalList, {justifyContent: 'center', alignItems: 'center', paddingVertical: scaleHeight(40)}]}>
             <ActivityIndicator
@@ -350,7 +367,7 @@ export const InvoiceDashboard: React.FC = () => {
           </View>
         ) : filteredDealerRows.length === 0 ? (
           <View style={[styles.verticalList, {justifyContent: 'center', alignItems: 'center', paddingVertical: scaleHeight(40)}]}>
-            <Text style={styles.noDataText}>No OD Accounts available</Text>
+            <Text style={styles.noDataText}>No data available</Text>
           </View>
         ) : (
         <View style={styles.verticalList}>
@@ -363,7 +380,7 @@ export const InvoiceDashboard: React.FC = () => {
                 <View style={styles.cardHeaderRow}>
                   <View style={styles.cardHeaderContent}>
                     <View style={styles.cardTitleRow}>
-                      <Text style={styles.cardTitle}>{row.programName}</Text>
+                      <Text style={styles.cardTitle}>{isAnchorChecker ? row.counterParty : row.programName}</Text>
                     </View>
                     <Text style={styles.cardSubtitle}>
                       OD Account: {row.odAccount || '-'}
@@ -371,72 +388,160 @@ export const InvoiceDashboard: React.FC = () => {
                   </View>
                 </View>
 
-                <View style={styles.infoGrid}>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Program Name</Text>
-                    <Text style={styles.infoValue}>{row.programName}</Text>
-                  </View>
+                {isAnchorChecker ? (
+                  <View style={styles.infoGrid}>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Program Name</Text>
+                      <Text style={styles.infoValue}>{row.programName}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Bank Name</Text>
-                    <Text style={styles.infoValue}>{row.bankName}</Text>
-                  </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Counter Party</Text>
+                      <Text style={styles.infoValue}>{row.counterParty}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Bank ID</Text>
-                    <Text style={styles.infoValue}>{row.bankId}</Text>
-                  </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>OD Account</Text>
+                      <Text style={styles.infoValue}>{row.odAccount}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>OD Account</Text>
-                    <Text style={styles.infoValue}>{row.odAccount}</Text>
-                  </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Drawing Power (₹)</Text>
+                      <Text style={styles.infoValue}>{row.drawingPower}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>OD Expiry Date</Text>
-                    <Text style={styles.infoValue}>{row.expiryDate}</Text>
-                  </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Utilized Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.utilisedAmount}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Primary Party</Text>
-                    <Text style={styles.infoValue}>{row.primaryParty}</Text>
-                  </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Pipeline Requests (₹)</Text>
+                      <Text style={styles.infoValue}>{row.pipelineRequests}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Counter Party</Text>
-                    <Text style={styles.infoValue}>{row.counterParty}</Text>
-                  </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Available Limit (₹)</Text>
+                      <Text style={styles.infoValue}>{row.availableLimit}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Sanctioned Limit (₹)</Text>
-                    <Text style={styles.infoValue}>{row.sanctionedLimit}</Text>
-                  </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Overdue Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.overdueAmount}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Utilized Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.utilisedAmount}</Text>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>DPD Days</Text>
+                      <Text style={styles.infoValue}>{row.dpdDays}</Text>
+                    </View>
                   </View>
+                ) : isDealerMaker ? (
+                  <View style={styles.infoGrid}>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Program Name</Text>
+                      <Text style={styles.infoValue}>{row.programName}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Primary Party</Text>
+                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>OD Account</Text>
+                      <Text style={styles.infoValue}>{row.odAccount}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Drawing Power (₹)</Text>
+                      <Text style={styles.infoValue}>{row.drawingPower}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Utilized Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.utilisedAmount}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Pipeline Requests (₹)</Text>
+                      <Text style={styles.infoValue}>{row.pipelineRequests}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Available Limit (₹)</Text>
+                      <Text style={styles.infoValue}>{row.availableLimit}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Overdue Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.overdueAmount}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>DPD Days</Text>
+                      <Text style={styles.infoValue}>{row.dpdDays}</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.infoGrid}>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Program Name</Text>
+                      <Text style={styles.infoValue}>{row.programName}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Drawing Power (₹)</Text>
-                    <Text style={styles.infoValue}>{row.drawingPower}</Text>
-                  </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Bank Name</Text>
+                      <Text style={styles.infoValue}>{row.bankName}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Available Limit (₹)</Text>
-                    <Text style={styles.infoValue}>{row.availableLimit}</Text>
-                  </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Bank ID</Text>
+                      <Text style={styles.infoValue}>{row.bankId}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Overdue Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.overdueAmount}</Text>
-                  </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>OD Account</Text>
+                      <Text style={styles.infoValue}>{row.odAccount}</Text>
+                    </View>
 
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>DPD Days</Text>
-                    <Text style={styles.infoValue}>{row.dpdDays}</Text>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>OD Expiry Date</Text>
+                      <Text style={styles.infoValue}>{row.expiryDate}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Primary Party</Text>
+                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Counter Party</Text>
+                      <Text style={styles.infoValue}>{row.counterParty}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Sanctioned Limit (₹)</Text>
+                      <Text style={styles.infoValue}>{row.sanctionedLimit}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Utilized Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.utilisedAmount}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Drawing Power (₹)</Text>
+                      <Text style={styles.infoValue}>{row.drawingPower}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Available Limit (₹)</Text>
+                      <Text style={styles.infoValue}>{row.availableLimit}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Overdue Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.overdueAmount}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>DPD Days</Text>
+                      <Text style={styles.infoValue}>{row.dpdDays}</Text>
+                    </View>
                   </View>
-                </View>
+                )}
             </View>
             </View>
           ))}
@@ -449,7 +554,9 @@ export const InvoiceDashboard: React.FC = () => {
     <>
         <View style={styles.invoiceHeader}>
           <View style={styles.invoiceBadgeContainer}>
-              <Text style={styles.invoiceLabel}>Invoice List</Text>
+              <Text style={styles.invoiceLabel}>
+                {isDealerMaker ? 'Anchor Wise Invoice Details' : 'Invoice List'}
+              </Text>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{filteredLatestRows.length}</Text>
             </View>
@@ -482,81 +589,204 @@ export const InvoiceDashboard: React.FC = () => {
               </View>
 
               <View style={styles.infoGrid}>
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Invoice Date</Text>
-                  <Text style={styles.infoValue}>{row.invoiceDate}</Text>
-                </View>
+                {isAnchorChecker ? (
+                  <>
+                    {/* Anchor-Checker Order: Invoice No → Counter Party → Invoice Date → Due Date → Invoice Amount → Invoice Status → Approval Status → Admin Status */}
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice No</Text>
+                      <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+                    </View>
 
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Disbursed Date</Text>
-                  <Text style={styles.infoValue}>{row.disbursementDate}</Text>
-                </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Counter Party</Text>
+                      <Text style={styles.infoValue}>{row.dealer}</Text>
+                    </View>
 
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Invoice Amount</Text>
-                  <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-                </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Date</Text>
+                      <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+                    </View>
 
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Disb. Amount</Text>
-                  <Text style={styles.infoValue}>{row.disbAmount}</Text>
-                </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Due Date</Text>
+                      <Text style={styles.infoValue}>{row.invoiceDueDate}</Text>
+                    </View>
 
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>UTR No.</Text>
-                  <Text style={styles.infoValue}>{row.utrNo}</Text>
-                </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+                    </View>
 
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Invoice Status</Text>
-                  <Text
-                    style={[
-                      styles.infoValue,
-                      (row.invoiceStatus || '').toLowerCase().includes('in progress')
-                        ? styles.statusOrangeText
-                        : (row.invoiceStatus || '').toLowerCase().includes('reject')
-                          ? styles.statusRedText
-                          : (row.invoiceStatus || '').toLowerCase().includes('completed') ||
-                              (row.invoiceStatus || '').toLowerCase().includes('submitted') ||
-                              (row.invoiceStatus || '').toLowerCase().includes('created') ||
-                              (row.invoiceStatus || '').toLowerCase().includes('disbursed')
+                    <View style={[styles.infoColumn, { backgroundColor: '#E8F5E9' }]}>
+                      <Text style={styles.infoLabel}>Invoice Status</Text>
+                      <Text
+                        style={[
+                          styles.infoValue,
+                          { color: '#2E7D32', fontFamily: Fonts.GilroySemiBold }
+                        ]}>
+                        {row.invoiceStatus}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.infoColumn, { backgroundColor: '#FFF4E5' }]}>
+                      <Text style={styles.infoLabel}>Approval Status</Text>
+                      <Text
+                        style={[
+                          styles.infoValue,
+                          { color: '#FF8C00', fontFamily: Fonts.GilroySemiBold }
+                        ]}>
+                        {row.approvalStatus}
+                      </Text>
+                    </View>
+
+                    <View style={[styles.infoColumn, { backgroundColor: '#FFEBEE' }]}>
+                      <Text style={styles.infoLabel}>Admin Status</Text>
+                      <Text
+                        style={[
+                          styles.infoValue,
+                          { color: '#D32F2F', fontFamily: Fonts.GilroySemiBold }
+                        ]}>
+                        {row.adminStatus}
+                      </Text>
+                    </View>
+                  </>
+                ) : isDealerMaker ? (
+                  <>
+                    {/* Dealer Maker Order: Invoice No → Bank Name → Product Name → Program Name → Primary Party → Invoice Date → Due Date → Upload Date → Invoice Amount (₹) → Invoice Status → Approval Status → Admin Status */}
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice No</Text>
+                      <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Bank Name</Text>
+                      <Text style={styles.infoValue}>{row.bankName}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Product Name</Text>
+                      <Text style={styles.infoValue}>{row.productName}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Program Name</Text>
+                      <Text style={styles.infoValue}>{row.programName}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Primary Party</Text>
+                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Date</Text>
+                      <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Due Date</Text>
+                      <Text style={styles.infoValue}>{row.invoiceDueDate}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Upload Date</Text>
+                      <Text style={styles.infoValue}>{row.uploadDate}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+                    </View>
+                    <View style={[styles.infoColumn, { backgroundColor: '#E8F5E9' }]}>
+                      <Text style={styles.infoLabel}>Invoice Status</Text>
+                      <Text style={[styles.infoValue, { color: '#2E7D32', fontFamily: Fonts.GilroySemiBold }]}>
+                        {row.invoiceStatus}
+                      </Text>
+                    </View>
+                    <View style={[styles.infoColumn, { backgroundColor: '#FFF4E5' }]}>
+                      <Text style={styles.infoLabel}>Approval Status</Text>
+                      <Text style={[styles.infoValue, { color: '#FF8C00', fontFamily: Fonts.GilroySemiBold }]}>
+                        {row.approvalStatus}
+                      </Text>
+                    </View>
+                    <View style={[styles.infoColumn, { backgroundColor: '#F0F4F9' }]}>
+                      <Text style={styles.infoLabel}>Admin Status</Text>
+                      <Text style={[styles.infoValue, { color: '#1976D2', fontFamily: Fonts.GilroySemiBold }]}>
+                        {row.adminStatus}
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Date</Text>
+                      <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Disbursed Date</Text>
+                      <Text style={styles.infoValue}>{row.disbursementDate}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Amount</Text>
+                      <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Disb. Amount</Text>
+                      <Text style={styles.infoValue}>{row.disbAmount}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>UTR No.</Text>
+                      <Text style={styles.infoValue}>{row.utrNo}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Status</Text>
+                      <Text
+                        style={[
+                          styles.infoValue,
+                          (row.invoiceStatus || '').toLowerCase().includes('in progress')
+                            ? styles.statusOrangeText
+                            : (row.invoiceStatus || '').toLowerCase().includes('reject')
+                              ? styles.statusRedText
+                              : (row.invoiceStatus || '').toLowerCase().includes('completed') ||
+                                  (row.invoiceStatus || '').toLowerCase().includes('submitted') ||
+                                  (row.invoiceStatus || '').toLowerCase().includes('created') ||
+                                  (row.invoiceStatus || '').toLowerCase().includes('disbursed')
+                                ? styles.statusGreenText
+                                : undefined,
+                        ]}>
+                        {row.invoiceStatus}
+                      </Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Approval Status</Text>
+                      <Text
+                        style={[
+                          styles.infoValue,
+                          (row.approvalStatus || '').toLowerCase().includes('pending')
+                            ? styles.statusOrangeText
+                            : (row.approvalStatus || '').toLowerCase().includes('reject')
+                              ? styles.statusRedText
+                              : (row.approvalStatus || '').toLowerCase().includes('completed') ||
+                                  (row.approvalStatus || '').toLowerCase().includes('approval complete')
+                                ? styles.statusGreenText
+                                : undefined,
+                        ]}>
+                        {row.approvalStatus}
+                      </Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Admin Status</Text>
+                      <Text
+                        style={[
+                          styles.infoValue,
+                          (row.adminStatus || '').toLowerCase() === 'verified'
                             ? styles.statusGreenText
                             : undefined,
-                    ]}>
-                    {row.invoiceStatus}
-                  </Text>
-                </View>
-
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Approval Status</Text>
-                  <Text
-                    style={[
-                      styles.infoValue,
-                      (row.approvalStatus || '').toLowerCase().includes('pending')
-                        ? styles.statusOrangeText
-                        : (row.approvalStatus || '').toLowerCase().includes('reject')
-                          ? styles.statusRedText
-                          : (row.approvalStatus || '').toLowerCase().includes('completed') ||
-                              (row.approvalStatus || '').toLowerCase().includes('approval complete')
-                            ? styles.statusGreenText
-                            : undefined,
-                    ]}>
-                    {row.approvalStatus}
-                  </Text>
-                </View>
-
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Admin Status</Text>
-                  <Text
-                    style={[
-                      styles.infoValue,
-                      (row.adminStatus || '').toLowerCase() === 'verified'
-                        ? styles.statusGreenText
-                        : undefined,
-                    ]}>
-                    {row.adminStatus}
-                  </Text>
-                </View>
+                        ]}>
+                        {row.adminStatus}
+                      </Text>
+                    </View>
+                  </>
+                )}
               </View>
             </TouchableOpacity>
           ))}

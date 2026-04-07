@@ -607,7 +607,13 @@ export const invoiceApi = {
       }
 
       if (item.discountType && item.discountValue) {
-        const discountType = item.discountType === 'value' ? 'absolute' : item.discountType;
+        let discountType = item.discountType;
+        // Normalize discount type to lowercase
+        if (discountType === 'value' || discountType === 'absolute' || discountType === 'Absolute') {
+          discountType = 'absolute';
+        } else if (discountType === 'percentage' || discountType === 'Percentage') {
+          discountType = 'percentage';
+        }
         baseItem.discount_type = discountType;
         baseItem.discount_value = parseFloat(item.discountValue) || 0;
         baseItem.discount_amount = parseFloat(item.discountAmount || '0') || 0;
@@ -626,6 +632,7 @@ export const invoiceApi = {
 
     const payload: Record<string, unknown> = {
       approval_level: Number(approval_level ?? 1),
+      invoice_ref_no: fields.invoiceNumber || '',
       invoice_date: toIsoString(fields.invoiceDate),
       invoice_due_date: toIsoString(fields.invoiceDueDate),
       currency: fields.currency || 'INR',
@@ -634,6 +641,11 @@ export const invoiceApi = {
       discount_total: Number((Math.round(discountTotal * 100) / 100).toFixed(2)),
       tax_total: Number((Math.round(taxTotal * 100) / 100).toFixed(2)),
       final_total: Number((Math.round(finalTotalValue * 100) / 100).toFixed(2)),
+      // Add counter-party information for update
+      counter_party_name: fields.dealer || '',
+      counter_party_code: fields.dealerCode || '',
+      counter_party_od_account: fields.odAccountNumber || '',
+      credit_to: fields.creditTo || '',
       items,
     };
 

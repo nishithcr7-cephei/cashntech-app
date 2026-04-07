@@ -72,8 +72,9 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const canViewDisbursement = useHasPermission(PERMISSIONS.DISBURSEMENT);
   const canViewRepayment = useHasPermission(PERMISSIONS.REPAYMENT_SETTLEMENT);
   const canViewInterestAccruals = useHasPermission(PERMISSIONS.INTEREST_ACCRUALS);
-  const canViewSOA = useHasPermission(PERMISSIONS.LMS); // Assuming LMS root permission for SOA for now or just general access
-  const canViewDPD = useHasPermission(PERMISSIONS.LMS); // Mapping based on user requirements if specific keys exist
+  const canViewSOA = useHasPermission(PERMISSIONS.SOA);
+  const canViewDPD = useHasPermission(PERMISSIONS.DPD_PENAL_NPA);
+  const canViewOverview = useHasPermission(PERMISSIONS.TRANSACTIONS_OVERVIEW);
   
   // Show specific Invoice menu items based on role (including CashnTech User - same menu)
   const showPendingApprovals = false;
@@ -260,25 +261,27 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                   {(isAnchorMaker || isAnchorChecker || isDealerChecker || isDealerMaker || isCashnTechUser) && (
                     <>
                       {/* 1. Invoice Overview - Direct item */}
-                      <TouchableOpacity
-                        style={[
-                          styles.button,
-                          (currentRoute === 'InvoiceDashboard' || isDealerInvoiceDashboardRoute) &&
-                            styles.activeButton,
-                        ]}
-                        onPress={() => {
-                          navigation.closeDrawer();
-                          navigation.navigate('InvoiceDashboard');
-                        }}>
-                        <Text
+                      {canViewOverview && (
+                        <TouchableOpacity
                           style={[
-                            styles.buttonText,
+                            styles.button,
                             (currentRoute === 'InvoiceDashboard' || isDealerInvoiceDashboardRoute) &&
-                              styles.activeButtonText,
-                          ]}>
-                          Invoice Overview
-                        </Text>
-                      </TouchableOpacity>
+                              styles.activeButton,
+                          ]}
+                          onPress={() => {
+                            navigation.closeDrawer();
+                            navigation.navigate('InvoiceDashboard');
+                          }}>
+                          <Text
+                            style={[
+                              styles.buttonText,
+                              (currentRoute === 'InvoiceDashboard' || isDealerInvoiceDashboardRoute) &&
+                                styles.activeButtonText,
+                            ]}>
+                            Invoice Overview
+                          </Text>
+                        </TouchableOpacity>
+                      )}
 
                       {/* 2. Invoice List & Approvals - Direct item */}
                       {canViewInvoices && (
@@ -312,149 +315,135 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
 
                       {/* 3. Disbursement */}
                       {canViewDisbursement && (
-                        isAnchorChecker ? (
-                          <TouchableOpacity
-                            style={[styles.button, styles.disabledMenuItem]}
-                            onPress={() => {}}
-                            activeOpacity={1}>
-                            <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                              Disbursement
-                            </Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
+                        <TouchableOpacity
+                          style={[
+                            styles.button,
+                            currentRoute === 'DisbursementScreen' && styles.activeButton,
+                            permissionsLoading && styles.disabledMenuItem,
+                          ]}
+                          disabled={permissionsLoading}
+                          onPress={() => {
+                            navigation.navigate('DisbursementScreen');
+                            navigation.closeDrawer();
+                          }}>
+                          <Text
                             style={[
-                              styles.button,
-                              currentRoute === 'DisbursementScreen' && styles.activeButton,
-                              permissionsLoading && styles.disabledMenuItem,
-                            ]}
-                            disabled={permissionsLoading}
-                            onPress={() => {
-                              navigation.navigate('DisbursementScreen');
-                              navigation.closeDrawer();
-                            }}>
-                            <Text
-                              style={[
-                                styles.buttonText,
-                                currentRoute === 'DisbursementScreen' && styles.activeButtonText,
-                                permissionsLoading && styles.disabledMenuItemText,
-                              ]}>
-                              Disbursement
-                            </Text>
-                          </TouchableOpacity>
-                        )
+                              styles.buttonText,
+                              currentRoute === 'DisbursementScreen' && styles.activeButtonText,
+                              permissionsLoading && styles.disabledMenuItemText,
+                            ]}>
+                            Disbursement
+                          </Text>
+                        </TouchableOpacity>
                       )}
 
                       {/* 4. Interest Accruals */}
-                      {canViewInterestAccruals && (
-                        isAnchorChecker ? (
-                          <TouchableOpacity
-                            style={[styles.button, styles.disabledMenuItem]}
-                            onPress={() => {}}
-                            activeOpacity={1}>
-                            <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                              Interest Accruals
-                            </Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
+                      {isAnchorChecker ? (
+                        <TouchableOpacity
+                          style={[styles.button, styles.disabledMenuItem]}
+                          onPress={() => {}}
+                          activeOpacity={1}>
+                          <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
+                            Interest Accruals
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={[
+                            styles.button,
+                            currentRoute === 'InterestAccrualsScreen' && styles.activeButton,
+                            permissionsLoading && styles.disabledMenuItem,
+                          ]}
+                          disabled={permissionsLoading || !canViewInterestAccruals}
+                          onPress={() => {
+                            navigation.navigate('InterestAccrualsScreen');
+                            navigation.closeDrawer();
+                          }}>
+                          <Text
                             style={[
-                              styles.button,
-                              currentRoute === 'InterestAccrualsScreen' && styles.activeButton,
-                              permissionsLoading && styles.disabledMenuItem,
-                            ]}
-                            disabled={permissionsLoading}
-                            onPress={() => {
-                              navigation.navigate('InterestAccrualsScreen');
-                              navigation.closeDrawer();
-                            }}>
-                            <Text
-                              style={[
-                                styles.buttonText,
-                                currentRoute === 'InterestAccrualsScreen' && styles.activeButtonText,
-                                permissionsLoading && styles.disabledMenuItemText,
-                              ]}>
-                              Interest Accruals
-                            </Text>
-                          </TouchableOpacity>
-                        )
+                              styles.buttonText,
+                              currentRoute === 'InterestAccrualsScreen' && styles.activeButtonText,
+                              (permissionsLoading || !canViewInterestAccruals) && styles.disabledMenuItemText,
+                            ]}>
+                            Interest Accruals
+                          </Text>
+                        </TouchableOpacity>
                       )}
 
                       {/* 5. Repayment & Settlement */}
-                      {canViewRepayment && (
-                        isCashnTechUser ? (
-                          <TouchableOpacity
+                      {(isCashnTechUser) ? (
+                        <TouchableOpacity
+                          style={[
+                            styles.button,
+                            currentRoute === 'RepaymentSettlementScreen' && styles.activeButton,
+                            permissionsLoading && styles.disabledMenuItem,
+                          ]}
+                          disabled={permissionsLoading || !canViewRepayment}
+                          onPress={() => {
+                            navigation.navigate('RepaymentSettlementScreen');
+                            navigation.closeDrawer();
+                          }}>
+                          <Text
                             style={[
-                              styles.button,
-                              currentRoute === 'RepaymentSettlementScreen' && styles.activeButton,
-                              permissionsLoading && styles.disabledMenuItem,
-                            ]}
-                            disabled={permissionsLoading}
-                            onPress={() => {
-                              navigation.navigate('RepaymentSettlementScreen');
-                              navigation.closeDrawer();
-                            }}>
-                            <Text
-                              style={[
-                                styles.buttonText,
-                                currentRoute === 'RepaymentSettlementScreen' && styles.activeButtonText,
-                                permissionsLoading && styles.disabledMenuItemText,
-                              ]}>
-                              Repayment & Settlement
-                            </Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
-                            style={[styles.button, styles.disabledMenuItem]}
-                            onPress={() => {}}
-                            activeOpacity={1}>
-                            <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                              Repayment & Settlement
-                            </Text>
-                          </TouchableOpacity>
-                        )
+                              styles.buttonText,
+                              currentRoute === 'RepaymentSettlementScreen' && styles.activeButtonText,
+                              (permissionsLoading || !canViewRepayment) && styles.disabledMenuItemText,
+                            ]}>
+                            Repayment & Settlement
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.button, styles.disabledMenuItem]}
+                          onPress={() => {}}
+                          activeOpacity={1}>
+                          <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
+                            Repayment & Settlement
+                          </Text>
+                        </TouchableOpacity>
                       )}
 
                       {/* 6. DPD / Penal Interest / NPA */}
-                      {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) && (
-                        isCashnTechUser ? (
-                          <TouchableOpacity
+                      {(isCashnTechUser) ? (
+                        <TouchableOpacity
+                          style={[
+                            styles.button,
+                            currentRoute === 'DPDPenalInterestNPAScreen' && styles.activeButton,
+                          ]}
+                          disabled={!canViewDPD}
+                          onPress={() => {
+                            navigation.navigate('DPDPenalInterestNPAScreen');
+                            navigation.closeDrawer();
+                          }}>
+                          <Text
                             style={[
-                              styles.button,
-                              currentRoute === 'DPDPenalInterestNPAScreen' && styles.activeButton,
-                            ]}
-                            onPress={() => {
-                              navigation.navigate('DPDPenalInterestNPAScreen');
-                              navigation.closeDrawer();
-                            }}>
-                            <Text
-                              style={[
-                                styles.buttonText,
-                                currentRoute === 'DPDPenalInterestNPAScreen' &&
-                                  styles.activeButtonText,
-                              ]}>
-                              DPD / Penal Interest / NPA
-                            </Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity
-                            style={[styles.button, styles.disabledMenuItem]}
-                            onPress={() => {}}
-                            activeOpacity={1}>
-                            <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                              DPD / Penal Interest / NPA
-                            </Text>
-                          </TouchableOpacity>
-                        )
+                              styles.buttonText,
+                              currentRoute === 'DPDPenalInterestNPAScreen' &&
+                                styles.activeButtonText,
+                              !canViewDPD && styles.disabledMenuItemText,
+                            ]}>
+                            DPD / Penal Interest / NPA
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.button, styles.disabledMenuItem]}
+                          onPress={() => {}}
+                          activeOpacity={1}>
+                          <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
+                            DPD / Penal Interest / NPA
+                          </Text>
+                        </TouchableOpacity>
                       )}
 
                       {/* 7. Statement of Account (SOA) */}
-                      {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) && (
+                      {(isAnchorMaker || isDealerMaker || isCashnTechUser) ? (
                         <TouchableOpacity
                           style={[
                             styles.button,
                             currentRoute === 'StatementOfAccount' && styles.activeButton,
                           ]}
+                          disabled={!canViewSOA}
                           onPress={() => {
                             navigation.navigate('StatementOfAccount');
                             navigation.closeDrawer();
@@ -464,7 +453,17 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                               styles.buttonText,
                               currentRoute === 'StatementOfAccount' &&
                                 styles.activeButtonText,
+                              !canViewSOA && styles.disabledMenuItemText,
                             ]}>
+                            Statement of Account (SOA)
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.button, styles.disabledMenuItem]}
+                          onPress={() => {}}
+                          activeOpacity={1}>
+                          <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
                             Statement of Account (SOA)
                           </Text>
                         </TouchableOpacity>

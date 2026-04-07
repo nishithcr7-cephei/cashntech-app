@@ -46,6 +46,21 @@ import {
 } from '@store/permissions';
 import {useDispatch} from 'react-redux';
 
+const STATUS_COLORS = {
+  PENDING: { bg: '#FFF4E5', text: '#FF8C00' },
+  SUCCESS: { bg: '#E8F5E9', text: '#2E7D32' },
+  REJECTED: { bg: '#FFEBEE', text: '#D32F2F' },
+  DEFAULT: { bg: '#F7F8FB', text: Colors.darkblack },
+};
+
+function getInvoiceStatusStyles(invoiceStatus: string) {
+  const s = (invoiceStatus || '').toLowerCase();
+  if (s === 'disbursed' || s === 'settled') return STATUS_COLORS.SUCCESS;
+  if (s === 'submitted' || s.includes('pending') || s.includes('processing')) return STATUS_COLORS.PENDING;
+  if (s.includes('reject') || s.includes('fail') || s === 'cancelled') return STATUS_COLORS.REJECTED;
+  return STATUS_COLORS.DEFAULT;
+}
+
 export type DisbursementRow = {
   id: string;
   loanRefNo: string;
@@ -158,6 +173,7 @@ export const DisbursementScreen: React.FC = () => {
       ? 'All Program'
       : programSelection?.programName ?? 'Sun Pharma PGM';
   const isCashnTechUser = userRole === 'cashntech_user';
+  const isAnchorChecker = userRole === 'anchor_checker';
   
   // Permissions
   const permissionsLoading = useSelector(selectPermissionsLoading);
@@ -430,83 +446,146 @@ export const DisbursementScreen: React.FC = () => {
   const renderDisbursementRow = ({item: row, index}: {item: DisbursementRow; index: number}) => (
     <View style={styles.cardWrapper}>
       <View style={styles.listCard}>
-        {show3DotsIcon && row.invoiceStatus.toLowerCase() !== 'disbursed' && (
-          <View
-            ref={(r: View | null) => {
-              if (r) menuButtonRefs.current[row.id] = r;
-            }}
-            collapsable={false}
-            style={styles.threeDotsButton}>
-            <TouchableOpacity
-              onPress={() => handleMenuToggle(row.id)}
-              disabled={permissionsLoading}
-              activeOpacity={0.7}
-              style={styles.threeDotsTouchable}>
-              <Dots
-                width={scaleWidth(20)}
-                height={scaleHeight(20)}
-                fill={permissionsLoading ? Colors.graybase : Colors.darkblack}
-                style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}}
-              />
-            </TouchableOpacity>
-          </View>
-        )}
+        {(() => {
+          const status = (row.invoiceStatus || '').toLowerCase();
+          const hasAvailableActions = (canSendMail && status !== 'disbursed') || (canMarkAsDisbursed && status === 'submitted');
+          
+          if (show3DotsIcon && hasAvailableActions) {
+            return (
+              <View
+                ref={(r: View | null) => {
+                  if (r) menuButtonRefs.current[row.id] = r;
+                }}
+                collapsable={false}
+                style={styles.threeDotsButton}>
+                <TouchableOpacity
+                  onPress={() => handleMenuToggle(row.id)}
+                  disabled={permissionsLoading}
+                  activeOpacity={0.7}
+                  style={styles.threeDotsTouchable}>
+                  <Dots
+                    width={scaleWidth(20)}
+                    height={scaleHeight(20)}
+                    fill={permissionsLoading ? Colors.graybase : Colors.darkblack}
+                    style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}}
+                  />
+                </TouchableOpacity>
+              </View>
+            );
+          }
+          return null;
+        })()}
         <View style={styles.indexBadge}>
           <Text style={styles.indexText}>{index + 1}</Text>
         </View>
         <View style={styles.infoGrid}>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Loan Ref No.</Text>
-            <Text style={styles.infoValue}>{row.loanRefNo}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice No.</Text>
-            <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Bank Name</Text>
-            <Text style={styles.infoValue}>{row.bankName}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Product Name</Text>
-            <Text style={styles.infoValue}>{row.productName}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Program Name</Text>
-            <Text style={styles.infoValue}>{row.programName}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Primary Party</Text>
-            <Text style={styles.infoValue}>{row.primaryParty}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Counter Party</Text>
-            <Text style={styles.infoValue}>{row.counterParty}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice Amount</Text>
-            <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice Date</Text>
-            <Text style={styles.infoValue}>{row.invoiceDate}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Due Date</Text>
-            <Text style={styles.infoValue}>{row.dueDate}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Disbur Date</Text>
-            <Text style={styles.infoValue}>{row.disburseDate}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>UTR No.</Text>
-            <Text style={styles.infoValue}>{row.utrNo}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice Status</Text>
-            <Text style={[styles.infoValue, styles.statusGreen]}>{row.invoiceStatus}</Text>
-          </View>
+          {isAnchorChecker ? (
+            <>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice No.</Text>
+                <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Bank Name</Text>
+                <Text style={styles.infoValue}>{row.bankName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Product Name</Text>
+                <Text style={styles.infoValue}>{row.productName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Program Name</Text>
+                <Text style={styles.infoValue}>{row.programName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Counter Party</Text>
+                <Text style={styles.infoValue}>{row.counterParty}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Date</Text>
+                <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Due Date</Text>
+                <Text style={styles.infoValue}>{row.dueDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Disburse Date</Text>
+                <Text style={styles.infoValue}>{row.disburseDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>UTR No.</Text>
+                <Text style={styles.infoValue}>{row.utrNo}</Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
+                <Text style={styles.infoLabel}>Invoice Status</Text>
+                <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.invoiceStatus}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Loan Ref No.</Text>
+                <Text style={styles.infoValue}>{row.loanRefNo}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice No.</Text>
+                <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Bank Name</Text>
+                <Text style={styles.infoValue}>{row.bankName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Product Name</Text>
+                <Text style={styles.infoValue}>{row.productName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Program Name</Text>
+                <Text style={styles.infoValue}>{row.programName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Primary Party</Text>
+                <Text style={styles.infoValue}>{row.primaryParty}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Counter Party</Text>
+                <Text style={styles.infoValue}>{row.counterParty}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Amount</Text>
+                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Date</Text>
+                <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Due Date</Text>
+                <Text style={styles.infoValue}>{row.dueDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Disbur Date</Text>
+                <Text style={styles.infoValue}>{row.disburseDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>UTR No.</Text>
+                <Text style={styles.infoValue}>{row.utrNo}</Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
+                <Text style={styles.infoLabel}>Invoice Status</Text>
+                <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.invoiceStatus}
+                </Text>
+              </View>
+            </>
+          )}
         </View>
       </View>
     </View>

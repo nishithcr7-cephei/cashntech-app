@@ -10,6 +10,10 @@ export type InvoiceOverviewSummaryItem = {
   bank_name?: string | null;
   bank_id?: string | null;
   utilized_amount?: number | null;
+  pipeline_requests?: number | null;
+  available_limit?: number | null;
+  overdue_amount?: number | null;
+  dpd_days?: number | null;
 };
 
 export type InvoiceOverviewLatestItem = {
@@ -27,6 +31,7 @@ export type InvoiceOverviewLatestItem = {
   disbursement_date?: string;
   disbursed_amount?: string;
   utr_no?: string;
+  loan_ref_no?: string;
 };
 
 export type InvoiceOverviewState = {

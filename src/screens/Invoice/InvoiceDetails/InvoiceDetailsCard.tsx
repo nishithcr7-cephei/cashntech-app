@@ -169,73 +169,209 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
         </View>
 
         <View style={styles.infoGrid}>
-          {/* Chip order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Amount → Invoice Date → Upload Date → Due Date → Invoice Status → Approval Status → Admin Status */}
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice No</Text>
-            {onInvoiceNoPress ? (
-              <TouchableOpacity
-                onPress={() => onInvoiceNoPress(row.id, row.invoiceNo || row.id)}
-                activeOpacity={0.7}>
-                <Text style={[styles.infoValue, styles.invoiceNoLink]}>{row.invoiceNo}</Text>
-              </TouchableOpacity>
-            ) : (
-              <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-            )}
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Loan Ref No</Text>
-            <Text style={styles.infoValue}>{row.loanRefNo || '-'}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Bank Name</Text>
-            <Text style={styles.infoValue}>{row.bankName}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Product Name</Text>
-            <Text style={styles.infoValue}>{row.productName}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Program Name</Text>
-            <Text style={styles.infoValue}>{row.programName}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Counter Party</Text>
-            <Text style={styles.infoValue}>{row.counterParty}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice Amount</Text>
-            <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice Date</Text>
-            <Text style={styles.infoValue}>{row.invoiceDate}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Upload Date</Text>
-            <Text style={styles.infoValue}>{row.requestDate}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Due Date</Text>
-            <Text style={styles.infoValue}>{row.dueDate}</Text>
-          </View>
-          <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
-            <Text style={styles.infoLabel}>Invoice Status</Text>
-            <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
-              {row.invoiceStatus}
-            </Text>
-          </View>
-          <View style={[styles.infoColumn, { backgroundColor: getApprovalStatusStyles(row.approvalStatus).bg }]}>
-            <Text style={styles.infoLabel}>Approval Status</Text>
-            <Text style={[styles.infoValue, { color: getApprovalStatusStyles(row.approvalStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
-              {row.approvalStatus}
-            </Text>
-          </View>
-          <View style={[styles.infoColumn, { backgroundColor: getAdminStatusStyles(row.adminStatus).bg }]}>
-            <Text style={styles.infoLabel}>Admin Status</Text>
-            <Text style={[styles.infoValue, { color: getAdminStatusStyles(row.adminStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
-              {row.adminStatus}
-            </Text>
-          </View>
+          {isAnchorChecker ? (
+            <>
+              {/* Anchor-Checker Order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Date → Due Date → Upload Date → Invoice Amount → Invoice Status → Approval Status → Admin Status */}
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice No</Text>
+                {onInvoiceNoPress ? (
+                  <TouchableOpacity
+                    onPress={() => onInvoiceNoPress(row.id, row.invoiceNo || row.id)}
+                    activeOpacity={0.7}>
+                    <Text style={[styles.infoValue, styles.invoiceNoLink]}>{row.invoiceNo}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+                )}
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Bank Name</Text>
+                <Text style={styles.infoValue}>{row.bankName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Product Name</Text>
+                <Text style={styles.infoValue}>{row.productName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Program Name</Text>
+                <Text style={styles.infoValue}>{row.programName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Counter Party</Text>
+                <Text style={styles.infoValue}>{row.counterParty}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Date</Text>
+                <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Due Date</Text>
+                <Text style={styles.infoValue}>{row.dueDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Upload Date</Text>
+                <Text style={styles.infoValue}>{row.requestDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
+                <Text style={styles.infoLabel}>Invoice Status</Text>
+                <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.invoiceStatus}
+                </Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getApprovalStatusStyles(row.approvalStatus).bg }]}>
+                <Text style={styles.infoLabel}>Approval Status</Text>
+                <Text style={[styles.infoValue, { color: getApprovalStatusStyles(row.approvalStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.approvalStatus}
+                </Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getAdminStatusStyles(row.adminStatus).bg }]}>
+                <Text style={styles.infoLabel}>Admin Status</Text>
+                <Text style={[styles.infoValue, { color: getAdminStatusStyles(row.adminStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.adminStatus}
+                </Text>
+              </View>
+            </>
+          ) : isDealerMaker ? (
+            <>
+              {/* Dealer Maker Order: Invoice No → Bank Name → Product Name → Program Name → Primary Party → Invoice Date → Due Date → Upload Date → Invoice Amount (₹) → Invoice Status → Approval Status → Admin Status */}
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice No</Text>
+                {onInvoiceNoPress ? (
+                  <TouchableOpacity
+                    onPress={() => onInvoiceNoPress(row.id, row.invoiceNo || row.id)}
+                    activeOpacity={0.7}>
+                    <Text style={[styles.infoValue, styles.invoiceNoLink]}>{row.invoiceNo}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+                )}
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Bank Name</Text>
+                <Text style={styles.infoValue}>{row.bankName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Product Name</Text>
+                <Text style={styles.infoValue}>{row.productName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Program Name</Text>
+                <Text style={styles.infoValue}>{row.programName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Primary Party</Text>
+                <Text style={styles.infoValue}>{row.primaryParty || '-'}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Date</Text>
+                <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Due Date</Text>
+                <Text style={styles.infoValue}>{row.dueDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Upload Date</Text>
+                <Text style={styles.infoValue}>{row.requestDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
+                <Text style={styles.infoLabel}>Invoice Status</Text>
+                <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.invoiceStatus}
+                </Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getApprovalStatusStyles(row.approvalStatus).bg }]}>
+                <Text style={styles.infoLabel}>Approval Status</Text>
+                <Text style={[styles.infoValue, { color: getApprovalStatusStyles(row.approvalStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.approvalStatus}
+                </Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getAdminStatusStyles(row.adminStatus).bg }]}>
+                <Text style={styles.infoLabel}>Admin Status</Text>
+                <Text style={[styles.infoValue, { color: getAdminStatusStyles(row.adminStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.adminStatus}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
+              {/* Default Order: Invoice No → Loan Ref No → Bank Name → Product Name → Program Name → Counter Party → Invoice Amount → Invoice Date → Upload Date → Due Date → Invoice Status → Approval Status → Admin Status */}
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice No</Text>
+                {onInvoiceNoPress ? (
+                  <TouchableOpacity
+                    onPress={() => onInvoiceNoPress(row.id, row.invoiceNo || row.id)}
+                    activeOpacity={0.7}>
+                    <Text style={[styles.infoValue, styles.invoiceNoLink]}>{row.invoiceNo}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+                )}
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Loan Ref No</Text>
+                <Text style={styles.infoValue}>{row.loanRefNo || '-'}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Bank Name</Text>
+                <Text style={styles.infoValue}>{row.bankName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Product Name</Text>
+                <Text style={styles.infoValue}>{row.productName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Program Name</Text>
+                <Text style={styles.infoValue}>{row.programName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Counter Party</Text>
+                <Text style={styles.infoValue}>{row.counterParty}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Amount</Text>
+                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Date</Text>
+                <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Upload Date</Text>
+                <Text style={styles.infoValue}>{row.requestDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Due Date</Text>
+                <Text style={styles.infoValue}>{row.dueDate}</Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
+                <Text style={styles.infoLabel}>Invoice Status</Text>
+                <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.invoiceStatus}
+                </Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getApprovalStatusStyles(row.approvalStatus).bg }]}>
+                <Text style={styles.infoLabel}>Approval Status</Text>
+                <Text style={[styles.infoValue, { color: getApprovalStatusStyles(row.approvalStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.approvalStatus}
+                </Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getAdminStatusStyles(row.adminStatus).bg }]}>
+                <Text style={styles.infoLabel}>Admin Status</Text>
+                <Text style={[styles.infoValue, { color: getAdminStatusStyles(row.adminStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.adminStatus}
+                </Text>
+              </View>
+            </>
+          )}
         </View>
       </View>
     </View>

@@ -41,16 +41,16 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
   //const [passwordValue, setPassword] = useState('santram@123');
 
   //2.Anchor-maker
-  const [email, setEmail] = useState('sm_maker@yopmail.com');
-  const [passwordValue, setPassword] = useState('Welcome@123');
+  //const [email, setEmail] = useState('sm_maker@yopmail.com');
+  //const [passwordValue, setPassword] = useState('Welcome@123');
 
   //3.Anchor-checker
   //const [email, setEmail] = useState('dms_checker@yopmail.com');
   //const [passwordValue, setPassword] = useState('Welcome@123');
 
   //4.Dealer-mkaer
-  //const [email, setEmail] = useState('maheshkmaker@yopmail.com');
-  //const [passwordValue, setPassword] = useState('Welcome@123');
+  const [email, setEmail] = useState('maheshkmaker@yopmail.com');
+  const [passwordValue, setPassword] = useState('Welcome@123');
 
   //5.Dealer-cheker
   //const [email, setEmail] = useState('dl_chcker21@yopmail.com');
