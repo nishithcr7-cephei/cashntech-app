@@ -1,6 +1,6 @@
 import * as React from 'react';
 import {useState, useEffect, useCallback} from 'react';
-import {View, Alert, Dimensions} from 'react-native';
+import {View, Dimensions} from 'react-native';
 import Toast from 'react-native-toast-message';
 import {scaleWidth, scaleHeight} from '@utils/Scale';
 import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
@@ -68,7 +68,12 @@ export function useInvoiceDetails() {
   const isDealerChecker = userRole === 'dealer_checker';
   const isCashnTechUser = userRole === 'cashntech_user';
 
-  const dealerListTitle = isCashnTechUser ? 'Invoice' : isDealerMaker ? 'Anchor Wise Invoice Details' : 'Dealer Wise Invoice Details';
+  const dealerListTitle =
+    isCashnTechUser
+      ? 'Invoice'
+      : isDealerMaker || isDealerChecker
+        ? 'Anchor Wise Invoice Details'
+        : 'Dealer Wise Invoice Details';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -166,7 +171,7 @@ export function useInvoiceDetails() {
   useFocusEffect(
     useCallback(() => {
       dispatch(fetchPermissionsRequest());
-      setSearchText('');
+      // setSearchText(''); // REMOVED: Search should persist when returning from detail view
     }, [dispatch]),
   );
 
@@ -196,9 +201,31 @@ export function useInvoiceDetails() {
           totalAmount != null
             ? `Rs. ${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /-`
             : 'Rs. 0 /-';
+        const programName = data?.program?.program_name || '';
+
+        // getInvoiceDetails API only returns {id, program_name} — no bank_details.
+        // Fall back to the raw invoice list (already in Redux) to get bank_details.
+        const rawInvoice = invoiceListRaw.find((inv: any) => inv.id === selectedInvoiceId);
+        const bankDetails =
+          rawInvoice?.program?.bank_details?.[0] ??
+          data?.program?.bank_details?.[0];
+
+        const rawAccNumber = bankDetails?.account_number ?? '';
+        const decryptedAcc = rawAccNumber ? decryptValue(rawAccNumber) : '';
+
+        let creditAccountNumber = '-';
+        if (decryptedAcc && decryptedAcc !== rawAccNumber && programName) {
+          creditAccountNumber = `(${decryptedAcc}) ${programName}`;
+        } else if (decryptedAcc && decryptedAcc !== rawAccNumber) {
+          creditAccountNumber = decryptedAcc;
+        } else if (programName) {
+          creditAccountNumber = programName;
+        }
+
         setAnchorCheckerInvoiceDetails({
           dealerName,
           anchorName,
+          creditAccountNumber,
           invoiceDate,
           invoiceDueDate,
           invoiceAmount,
@@ -250,7 +277,10 @@ export function useInvoiceDetails() {
     };
   }, [showCheckerApprovalModal, selectedInvoiceId]);
 
-  const invoiceData = invoiceListRaw.map(mapApiToRow);
+  const invoiceData = invoiceListRaw.map((api, idx) => ({
+    ...mapApiToRow(api),
+    absoluteIndex: idx,
+  }));
 
   const banks = [...new Set(invoiceData.map(r => r.bankName).filter(Boolean))].sort();
   const products = [...new Set(invoiceData.map(r => r.productName).filter(Boolean))].sort();
@@ -398,10 +428,18 @@ export function useInvoiceDetails() {
                     });
                     refreshInvoiceList();
                   } else {
-                    Alert.alert('Error', res?.message || 'Failed to delete invoice');
+                    Toast.show({
+                      type: 'error',
+                      text1: 'Delete Failed',
+                      text2: res?.message || 'Failed to delete invoice',
+                    });
                   }
                 } catch (e: any) {
-                  Alert.alert('Error', e?.message || 'An error occurred during deletion');
+                  Toast.show({
+                    type: 'error',
+                    text1: 'Error',
+                    text2: (e as Error)?.message || 'An error occurred during deletion',
+                  });
                 }
               },
             },
@@ -571,7 +609,7 @@ export function useInvoiceDetails() {
     }
   };
 
-  const getMenuPosition = useCallback(
+  const getMenuPosition = React.useCallback(
     (anchor: {x: number; y: number; width: number; height: number} | null) => {
       const screen = Dimensions.get('window');
       const menuWidth = scaleWidth(210);
@@ -595,12 +633,27 @@ export function useInvoiceDetails() {
     [],
   );
 
-  const onCreateInvoicePress = useCallback(() => {
+  const onCreateInvoicePress = React.useCallback(() => {
     (navigation as any).navigate('CreateInvoice');
   }, [navigation]);
 
   const isCreateInvoiceEnabled =
     !isAllProgramScope && !!concreteProgramId;
+
+  const {pendingCount, draftCount} = React.useMemo(() => {
+    let pending = 0;
+    let draft = 0;
+    invoiceData.forEach(row => {
+      const adminStatus = (row.rawAdminStatus || '').trim().toUpperCase();
+      const status = (row.rawInvoiceStatus || '').trim().toLowerCase();
+      if (adminStatus === 'PENDING_VERIFICATION' || adminStatus === 'PENDING VERIFICATION') {
+        pending++;
+      } else if (status === 'draft') {
+        draft++;
+      }
+    });
+    return {pendingCount: pending, draftCount: draft};
+  }, [invoiceData]);
 
   return {
     programId,
@@ -685,5 +738,7 @@ export function useInvoiceDetails() {
     userDepartment,
     storedUserRole,
     userInfoFull,
+    pendingCount,
+    draftCount,
   };
 }

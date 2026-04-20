@@ -114,7 +114,7 @@ export type UpdateInvoiceStatusRequest = {
 /** CashnTech admin verification (PATCH /invoice/admin/:invoiceId) */
 export type UpdateInvoiceVerificationRequest = {
   invoiceId: string;
-  action: 'Approve' | 'Reject' | 'Verify';
+  action: 'Verify' | 'Reject';
   remark?: string;
   programId?: string;
   filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]};

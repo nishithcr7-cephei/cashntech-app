@@ -338,40 +338,29 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                       )}
 
                       {/* 4. Interest Accruals */}
-                      {isAnchorChecker ? (
-                        <TouchableOpacity
-                          style={[styles.button, styles.disabledMenuItem]}
-                          onPress={() => {}}
-                          activeOpacity={1}>
-                          <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                            Interest Accruals
-                          </Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <TouchableOpacity
+                      <TouchableOpacity
+                        style={[
+                          styles.button,
+                          currentRoute === 'InterestAccrualsScreen' && styles.activeButton,
+                          permissionsLoading && styles.disabledMenuItem,
+                        ]}
+                        disabled={permissionsLoading || !canViewInterestAccruals}
+                        onPress={() => {
+                          navigation.navigate('InterestAccrualsScreen');
+                          navigation.closeDrawer();
+                        }}>
+                        <Text
                           style={[
-                            styles.button,
-                            currentRoute === 'InterestAccrualsScreen' && styles.activeButton,
-                            permissionsLoading && styles.disabledMenuItem,
-                          ]}
-                          disabled={permissionsLoading || !canViewInterestAccruals}
-                          onPress={() => {
-                            navigation.navigate('InterestAccrualsScreen');
-                            navigation.closeDrawer();
-                          }}>
-                          <Text
-                            style={[
-                              styles.buttonText,
-                              currentRoute === 'InterestAccrualsScreen' && styles.activeButtonText,
-                              (permissionsLoading || !canViewInterestAccruals) && styles.disabledMenuItemText,
-                            ]}>
-                            Interest Accruals
-                          </Text>
-                        </TouchableOpacity>
-                      )}
+                            styles.buttonText,
+                            currentRoute === 'InterestAccrualsScreen' && styles.activeButtonText,
+                            (permissionsLoading || !canViewInterestAccruals) && styles.disabledMenuItemText,
+                          ]}>
+                          Interest Accruals
+                        </Text>
+                      </TouchableOpacity>
 
                       {/* 5. Repayment & Settlement */}
-                      {(isCashnTechUser) ? (
+                      {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) ? (
                         <TouchableOpacity
                           style={[
                             styles.button,
@@ -404,7 +393,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                       )}
 
                       {/* 6. DPD / Penal Interest / NPA */}
-                      {(isCashnTechUser) ? (
+                      {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) ? (
                         <TouchableOpacity
                           style={[
                             styles.button,
@@ -437,7 +426,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                       )}
 
                       {/* 7. Statement of Account (SOA) */}
-                      {(isAnchorMaker || isDealerMaker || isCashnTechUser) ? (
+                      {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) ? (
                         <TouchableOpacity
                           style={[
                             styles.button,

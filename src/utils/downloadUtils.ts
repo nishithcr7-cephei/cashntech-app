@@ -1,5 +1,6 @@
 import RNFS from 'react-native-fs';
-import {Alert, Platform} from 'react-native';
+import {Platform} from 'react-native';
+import Toast from 'react-native-toast-message';
 
 export interface DownloadResult {
   success: boolean;
@@ -56,27 +57,17 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 };
 
 export const showDownloadSuccessAlert = (filePath: string) => {
-  Alert.alert(
-    'Download Complete',
-    `KYC documents have been downloaded successfully.\n\nFile saved to: ${filePath}`,
-    [
-      {
-        text: 'OK',
-        style: 'default',
-      },
-    ],
-  );
+  Toast.show({
+    type: 'success',
+    text1: 'Download Complete',
+    text2: `KYC documents saved to: ${filePath}`,
+  });
 };
 
 export const showDownloadErrorAlert = (error: string) => {
-  Alert.alert(
-    'Download Failed',
-    `Failed to download KYC documents.\n\nError: ${error}`,
-    [
-      {
-        text: 'OK',
-        style: 'default',
-      },
-    ],
-  );
+  Toast.show({
+    type: 'error',
+    text1: 'Download Failed',
+    text2: `Failed to download KYC documents. ${error}`,
+  });
 };

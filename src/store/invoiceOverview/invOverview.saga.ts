@@ -70,6 +70,8 @@ function* fetchInvoiceKpisSaga(
       invoiceApi.getInvoiceKpis,
       action.payload.programIds,
     );
+    // eslint-disable-next-line no-console
+    console.log('[fetchInvoiceKpisSaga] Final KPI Data for Store:', kpis);
     yield put(fetchInvoiceKpisSuccess(kpis));
   } catch (error: any) {
     const msg =

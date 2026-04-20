@@ -101,6 +101,8 @@ export const InvoiceDetails: React.FC = () => {
     userDepartment,
     storedUserRole,
     userInfoFull,
+    pendingCount,
+    draftCount,
   } = useInvoiceDetails();
 
   const registerMenuRef = (id: string, ref: View | null) => {
@@ -117,7 +119,7 @@ export const InvoiceDetails: React.FC = () => {
         onPressLeftIcon={fromInvoiceDashboard ? () => navigation.goBack() : undefined}
       />
       <ProgramBreadcrumb />
-      {hasAnyProgramContext && (
+      {hasAnyProgramContext && !isAnchorMaker && (
         <View style={styles.selectedProgramRow}>
           <Text style={styles.selectedProgramText}>
             {programName || '-'}
@@ -166,6 +168,9 @@ export const InvoiceDetails: React.FC = () => {
                 onCreateInvoicePress={onCreateInvoicePress}
                 isCreateInvoiceEnabled={isCreateInvoiceEnabled}
                 user={userInfoFull}
+                actionRequiredCount={invoiceData.filter(r => r.rawInvoiceStatus?.toLowerCase() === 'rejected').length}
+                pendingCount={pendingCount}
+                draftCount={draftCount}
               />
               <View style={styles.listTopSeparator} />
               {invoiceListLoading && (

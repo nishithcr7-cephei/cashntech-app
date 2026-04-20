@@ -10,7 +10,6 @@ import {
   Modal,
   TouchableWithoutFeedback,
   ActivityIndicator,
-  Alert,
   FlatList,
   Linking,
 } from 'react-native';
@@ -1229,7 +1228,7 @@ export const InvoiceForm: React.FC<Props> = ({
                     try {
                       await Linking.openURL(fullUrl);
                     } catch (e: any) {
-                      Alert.alert('Error', e?.message || 'Failed to open attachment');
+                      Toast.show({ type: 'error', text1: 'Error', text2: (e as any)?.message || 'Failed to open attachment' });
                     }
                   }}
                   activeOpacity={0.7}>
@@ -1246,18 +1245,7 @@ export const InvoiceForm: React.FC<Props> = ({
                 <TouchableOpacity
                   style={styles.deleteAttachmentButton}
                   onPress={() => {
-                    Alert.alert(
-                      'Delete Attachment',
-                      'Are you sure you want to delete this attachment?',
-                      [
-                        { text: 'No', style: 'cancel' },
-                        { 
-                          text: 'Yes', 
-                          style: 'destructive', 
-                          onPress: () => onDeleteAttachment?.(att.id) 
-                        },
-                      ]
-                    );
+                      onDeleteAttachment?.(att.id);
                   }}>
                   <FontAwesome6 name="trash" iconStyle="solid" size={16} color="#DC3545" />
                 </TouchableOpacity>

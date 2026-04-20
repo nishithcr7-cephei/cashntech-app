@@ -2,6 +2,7 @@ import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {UserState} from './user.types';
 import { decodeJWT } from '@utils/Utils';
 import {AppRole} from '@constants/roles';
+import {decryptValue} from '@utils/decrypt';
 
 const initialState: UserState = {
   id: 0,
@@ -24,9 +25,9 @@ const userSlice = createSlice({
     setUserInfo: (state, action: PayloadAction<Partial<UserState> & Pick<UserState, 'id' | 'email' | 'first_name' | 'last_name' | 'mobile_number'>>) => {
       state.id = action.payload.id;
       state.email = action.payload.email;
-      state.first_name = action.payload.first_name;
-      state.last_name = action.payload.last_name;
-      state.mobile_number = action.payload.mobile_number;
+      state.first_name = decryptValue(action.payload.first_name || '');
+      state.last_name = decryptValue(action.payload.last_name || '');
+      state.mobile_number = decryptValue(action.payload.mobile_number || '');
       state.is_client = action.payload.is_client ?? state.is_client;
       state.is_internal = action.payload.is_internal ?? state.is_internal;
       state.role = action.payload.role ?? state.role;
@@ -43,9 +44,9 @@ const userSlice = createSlice({
       if (data) {
         state.id = data.id;
         state.email = data.email;
-        state.first_name = data.first_name;
-        state.last_name = data.last_name;
-        state.mobile_number = data.mobile_number;
+        state.first_name = decryptValue(data.first_name || '');
+        state.last_name = decryptValue(data.last_name || '');
+        state.mobile_number = decryptValue(data.mobile_number || '');
       }
     },
     clearUserInfo: (state) => {

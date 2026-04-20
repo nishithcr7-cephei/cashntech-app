@@ -98,6 +98,7 @@ export type InvoiceRow = {
   primaryParty: string;
   counterParty: string;
   approvalLogsCount: number;
+  absoluteIndex?: number;
 };
 
 export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {

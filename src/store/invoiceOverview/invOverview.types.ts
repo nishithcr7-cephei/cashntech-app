@@ -13,6 +13,8 @@ export type InvoiceOverviewSummaryItem = {
   pipeline_requests?: number | null;
   available_limit?: number | null;
   overdue_amount?: number | null;
+  principal_overdue?: number | null;
+  interest_overdue?: number | null;
   dpd_days?: number | null;
 };
 
@@ -48,6 +50,8 @@ export type InvoiceOverviewState = {
     active_dealer_ratio: string;
     available_limit: string;
     overdue_amount: string;
+    principal_overdue: string;
+    interest_overdue: string;
     dpd_days: string;
   } | null;
   kpisLoading: boolean;

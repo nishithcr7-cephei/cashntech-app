@@ -72,11 +72,11 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
-project.ext.react = [
-    enableHermes: false,  // Hermes disabled by default (debug)
+/*project.ext.react = [
+    enableHermes: true,  // Hermes disabled by default (debug)
     entryFile: "index.js"
     
-]
+]*/
 
 project.ext.envConfigFiles = [
     debug: ".env",
@@ -121,14 +121,18 @@ android {
             signingConfig signingConfigs.debug
             ext.enableHermes = true // Hermes enabled in release
             minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
     }
-    splits {
-        abi {
-            enable false
-        }
+   /* splits {
+    abi {
+        enable true
+        reset()
+        include "arm64-v8a", "armeabi-v7a" // In do architectures se kaam chal jayega
+        universalApk false  // Isse alag-alag choti APKs banengi
     }
+   }*/
 }
 
 dependencies {

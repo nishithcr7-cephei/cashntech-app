@@ -37,6 +37,9 @@ type Props = {
   onCreateInvoicePress?: () => void;
   isCreateInvoiceEnabled?: boolean;
   user?: any;
+  actionRequiredCount?: number;
+  pendingCount?: number;
+  draftCount?: number;
 };
 
 export const InvoiceDetailsControls: React.FC<Props> = ({
@@ -59,6 +62,9 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   onCreateInvoicePress,
   isCreateInvoiceEnabled = true,
   user,
+  actionRequiredCount = 0,
+  pendingCount = 0,
+  draftCount = 0,
 }) => {
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canCreateInvoice = useHasPermission(PERMISSIONS.INVOICE_LIST_CREATE);
@@ -118,7 +124,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
           <Search width={scaleWidth(18)} height={scaleHeight(18)} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search Entity"
+            placeholder="Search Invoice / Program / Party"
             placeholderTextColor={Colors.graybase}
             value={searchText}
             onChangeText={setSearchText}
@@ -140,14 +146,22 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
         </TouchableOpacity>
       </View>
 
-      {(isAnchorMaker || isAnchorChecker) && (
-        <View style={styles.blueDotLegendRow}>
-          <View style={styles.blueDotLegendContent}>
-            <View style={styles.pendingDot} />
-            <Text style={styles.blueDotLegendText}>
-               Pending Invoice Approval
-            </Text>
+      {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) && (
+        <View style={styles.legendStackRow}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, styles.draftDot]} />
+            <Text style={styles.legendText}>Draft ({draftCount})</Text>
           </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, styles.pendingDot]} />
+            <Text style={styles.legendText}>Pending Invoice Approval ({pendingCount})</Text>
+          </View>
+          {isAnchorMaker && (
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, styles.actionDot]} />
+              <Text style={styles.legendText}>Action required ({actionRequiredCount})</Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -272,6 +286,37 @@ const styles = StyleSheet.create({
     borderRadius: scaleWidth(4),
     backgroundColor: Colors.tertiaryBlue,
   },
+  legendStackRow: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: scaleHeight(8),
+    gap: scaleWidth(12),
+    paddingRight: scaleWidth(2),
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(5),
+  },
+  legendDot: {
+    width: scaleWidth(8),
+    height: scaleWidth(8),
+    borderRadius: scaleWidth(4),
+  },
+  draftDot: {
+    backgroundColor: '#F97316',
+  },
+  actionDot: {
+    backgroundColor: '#EF4444',
+  },
+  legendText: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
   dmSelectAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -309,9 +354,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: scaleWidth(12),
-    paddingHorizontal: scaleWidth(14),
+    paddingHorizontal: scaleWidth(10),
     paddingVertical: scaleHeight(12),
-    gap: scaleWidth(8),
+    gap: scaleWidth(6),
   },
   searchInput: {
     flex: 1,
@@ -329,12 +374,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primaryColor,
-    paddingHorizontal: scaleWidth(18),
+    paddingHorizontal: scaleWidth(12),
     paddingVertical: scaleHeight(12),
     borderRadius: scaleWidth(12),
     gap: scaleWidth(6),
     justifyContent: 'center',
-    minWidth: scaleWidth(100),
+    minWidth: scaleWidth(90),
   },
   filterButtonText: {
     color: Colors.white,

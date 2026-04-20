@@ -121,6 +121,7 @@ export type HomeNavigatorType = {
   StatementOfAccount: undefined;
   SOADealerList: {
     programId?: string;
+    programIds?: string[];
     programName?: string;
   };
   OcrInvoice: undefined;

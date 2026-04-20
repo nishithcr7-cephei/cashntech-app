@@ -18,7 +18,7 @@ import {AppBar, Container, ProgramBreadcrumb, FilterModal} from '@components/ind
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
-import {Search} from '@assets/Icons';
+import {Search, Filter} from '@assets/Icons';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
@@ -128,7 +128,8 @@ export const InterestAccrualsScreen: React.FC = () => {
           (item.counterParty?.toLowerCase() || '').includes(term) ||
           (item.loanRefNo?.toLowerCase() || '').includes(term) ||
           (item.invoiceNo?.toLowerCase() || '').includes(term) ||
-          (item.bankName?.toLowerCase() || '').includes(term)
+          (item.bankName?.toLowerCase() || '').includes(term) ||
+          (item.programName?.toLowerCase() || '').includes(term)
         );
       });
 
@@ -280,42 +281,20 @@ export const InterestAccrualsScreen: React.FC = () => {
               </View>
             ) : null}
             <View style={styles.cardGrid}>
-              <View style={styles.card}>
-                <Text style={styles.cardLabel}>Total Dis. Invoices</Text>
-                <Text style={styles.cardValue}>{totalDisInvoices}</Text>
-              </View>
-              <View style={styles.card}>
-                <Text style={styles.cardLabel}>Total Dis. Amount</Text>
-                <Text style={styles.cardValue}>
-                  {`₹ ${totalDisAmount.toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                  })}`}
-                </Text>
-              </View>
-              <View style={styles.card}>
-                <Text style={styles.cardLabel}>Total Accrual interest</Text>
-                <Text style={styles.cardValue}>
-                  {`₹ ${totalAccrualInterest.toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                  })}`}
-                </Text>
-              </View>
-              <View style={styles.card}>
-                <Text style={styles.cardLabel}>Overdue Interest</Text>
-                <Text style={styles.cardValue}>
-                  {`₹ ${overdueInterest.toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                  })}`}
-                </Text>
-              </View>
-              <View style={styles.card}>
-                <Text style={styles.cardLabel}>Total Outstanding Amount</Text>
-                <Text style={styles.cardValue}>
-                  {totalOutstandingAmount.toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                  })}
-                </Text>
-              </View>
+              {[
+                { label: 'Total Interest Accrued Daily', value: '₹ 1,28,764.35' },
+                { label: 'Accrual vs Expected', value: '96.82%' },
+                { label: 'Overdue Interest', value: '₹ 8,74,932.55' },
+                { label: 'Loans Not Accruing Interest', value: '₹ 12,67,450.20' },
+                { label: 'Days Accrued vs Days Elapsed', value: '1' },
+              ].map((m, i) => (
+                <View key={i} style={styles.card}>
+                  <Text style={styles.cardLabel}>{m.label}</Text>
+                  <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
+                    {m.value}
+                  </Text>
+                </View>
+              ))}
             </View>
             {loading ? (
               <View style={styles.loadingContainer}>
@@ -340,7 +319,7 @@ export const InterestAccrualsScreen: React.FC = () => {
                     <Search width={scaleWidth(18)} height={scaleHeight(18)} />
                     <TextInput
                       style={styles.searchInput}
-                      placeholder="Search Entity"
+                      placeholder="Search by Program / Invoice No."
                       placeholderTextColor={Colors.graybase}
                       value={searchText}
                       onChangeText={setSearchText}
@@ -349,7 +328,8 @@ export const InterestAccrualsScreen: React.FC = () => {
                   <TouchableOpacity
                     style={styles.filterButton}
                     onPress={() => setShowFilterModal(true)}>
-                    <Text style={styles.filterButtonText}>Filter</Text>
+                    <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
+                    <Text style={styles.filterButtonText}>Filters</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -534,9 +514,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: scaleWidth(12),
-    paddingHorizontal: scaleWidth(14),
+    paddingHorizontal: scaleWidth(10),
     paddingVertical: scaleHeight(12),
-    gap: scaleWidth(8),
+    gap: scaleWidth(6),
   },
   searchInput: {
     flex: 1,
@@ -548,7 +528,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primaryColor,
-    paddingHorizontal: scaleWidth(18),
+    paddingHorizontal: scaleWidth(16),
     paddingVertical: scaleHeight(12),
     borderRadius: scaleWidth(12),
     gap: scaleWidth(6),

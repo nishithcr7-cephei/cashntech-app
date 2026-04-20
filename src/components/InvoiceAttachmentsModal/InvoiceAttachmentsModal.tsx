@@ -1,7 +1,6 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   StyleSheet,
@@ -114,40 +113,27 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
     setPendingFile(file);
   };
 
-  const handleDelete = (row: InvoiceAttachmentRow) => {
+  const handleDelete = async (row: InvoiceAttachmentRow) => {
     if (row.id == null || Number.isNaN(row.id)) {
       Toast.show({type: 'error', text1: 'Invalid attachment'});
       return;
     }
-    Alert.alert(
-      'Delete attachment',
-      `Remove "${fileNameFromUrl(row.attachment_url)}"?`,
-      [
-        {text: 'Cancel', style: 'cancel'},
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setDeletingId(row.id);
-            const {error} = await tryCatch(
-              invoiceApi.deleteInvoiceAttachment(row.id),
-            );
-            setDeletingId(null);
-            if (error) {
-              Toast.show({
-                type: 'error',
-                text1: 'Delete failed',
-                text2: (error as Error)?.message ?? '',
-              });
-              return;
-            }
-            Toast.show({type: 'success', text1: 'Attachment deleted'});
-            await loadAttachments();
-            onListChanged?.();
-          },
-        },
-      ],
+    setDeletingId(row.id);
+    const {error} = await tryCatch(
+      invoiceApi.deleteInvoiceAttachment(row.id),
     );
+    setDeletingId(null);
+    if (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Delete failed',
+        text2: (error as Error)?.message ?? '',
+      });
+      return;
+    }
+    Toast.show({type: 'success', text1: 'Attachment deleted'});
+    await loadAttachments();
+    onListChanged?.();
   };
 
   const handleSubmit = async () => {

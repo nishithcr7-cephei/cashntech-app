@@ -25,9 +25,21 @@ const permissionsSlice = createSlice({
       state.error = null;
     },
     fetchPermissionsSuccess: (state, action: PayloadAction<string[]>) => {
-      state.permissions = action.payload;
-      state.canSendMailToBank = action.payload.includes('lms.transactions.disbursement.action.send_mail_to_bank');
-      state.canMarkAsDisbursed = action.payload.includes('lms.transactions.disbursement.action.mark_as_disbursed');
+      const rawPermissions = action.payload || [];
+      
+      // Normalize permissions: Both standard and dealer-finance variants should work
+      // Standard: lms.transactions.xyz
+      // Dealer: lms.products.dealer_finance.transactions.xyz
+      const normalizedPermissions = rawPermissions.map(p => 
+        p.replace('lms.products.dealer_finance.', 'lms.')
+      );
+      
+      // Combine unique permissions
+      const allPermissions = Array.from(new Set([...rawPermissions, ...normalizedPermissions]));
+      
+      state.permissions = allPermissions;
+      state.canSendMailToBank = allPermissions.includes('lms.transactions.disbursement.action.send_mail_to_bank');
+      state.canMarkAsDisbursed = allPermissions.includes('lms.transactions.disbursement.action.mark_as_disbursed');
       state.loading = false;
       state.error = null;
     },

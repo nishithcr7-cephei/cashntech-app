@@ -36,6 +36,6 @@ export const PERMISSIONS = {
   DISBURSEMENT_EXPORT: 'lms.transactions.disbursement.action.export',
   DISBURSEMENT_FILTER: 'lms.transactions.disbursement.action.filter',
   REPAYMENT_SETTLEMENT: 'lms.transactions.repayment_settlement',
-  DPD_PENAL_NPA: 'lms.transactions.dpd_penal_npa',
+  DPD_PENAL_NPA: 'lms.transactions.dpd',
   SOA: 'lms.transactions.soa',
 } as const;

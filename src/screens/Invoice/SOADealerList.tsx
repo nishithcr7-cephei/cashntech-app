@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {
   View,
   Text,
@@ -24,14 +24,30 @@ import {
   totalDealersSelector,
   dealerErrorSelector,
 } from '@store/soa/dealer/dealer.selector';
+import {userSelector} from '@store/user';
+import {AppRole} from '@constants/roles';
 
 export const SOADealerList: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const dispatch = useDispatch();
-  
-  const programId = (route.params as any)?.programId || '';
+
+  const routeProgramId = (route.params as any)?.programId || '';
+  const routeProgramIds = (route.params as any)?.programIds;
   const programName = (route.params as any)?.programName || 'Program name';
+  const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const isDealerChecker = userRole === 'dealer_checker';
+
+  const selectedProgramIds = useMemo(
+    () =>
+      Array.isArray(routeProgramIds) && routeProgramIds.length > 0
+        ? routeProgramIds.filter(Boolean)
+        : routeProgramId
+          ? [routeProgramId]
+          : [],
+    [routeProgramId, routeProgramIds],
+  );
+  const programId = selectedProgramIds[0] || routeProgramId;
 
   const dealerList = useSelector(dealerListSelector);
   const loading = useSelector(dealerLoadingSelector);
@@ -55,15 +71,20 @@ export const SOADealerList: React.FC = () => {
     }
   }, [dealerError]);
 
-  // Fetch dealer list when programId changes
+  // Fetch dealer list when selected program changes
   useEffect(() => {
-    if (programId) {
-      dispatch(fetchDealerListRequest({programIds: [programId], isInitialLoad: true}));
+    if (selectedProgramIds.length > 0) {
+      dispatch(
+        fetchDealerListRequest({
+          programIds: selectedProgramIds,
+          isInitialLoad: true,
+        }),
+      );
     }
     return () => {
       dispatch(resetDealerState());
     };
-  }, [dispatch, programId]);
+  }, [dispatch, selectedProgramIds]);
 
   const renderDealerItem = ({item, index}: {item: any; index: number}) => {
     const isStatusActive = item.status?.toLowerCase() === 'active';
@@ -75,22 +96,31 @@ export const SOADealerList: React.FC = () => {
             <View style={styles.indexBadge}>
               <Text style={styles.indexText}>{index + 1}</Text>
             </View>
-            <View style={styles.cardHeaderTextContent}>
-              <Text style={styles.cardTitle}>{item.counterPartyName}</Text>
-            </View>
+            {!isDealerChecker && (
+              <View style={styles.cardHeaderTextContent}>
+                <Text style={styles.cardTitle}>{item.counterPartyName}</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.infoGrid}>
             <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Counter Party Name</Text>
+              <Text style={styles.infoValue}>{item.counterPartyName}</Text>
+            </View>
+            <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>OD Account</Text>
               <TouchableOpacity
-                onPress={() => (navigation as any).navigate('CreditAccountDetails', {
-                  id: item.id,
-                  programId: programId, // Added to fix program-summary fetch
-                  dealerName: item.counterPartyName,
-                  creditAccount: item.odAccount,
-                  anchor: programName, // Passing program name as anchor
-                })}>
+                disabled={!programId}
+                onPress={() =>
+                  (navigation as any).navigate('CreditAccountDetails', {
+                    id: item.id,
+                    programId,
+                    dealerName: item.counterPartyName,
+                    creditAccount: item.odAccount,
+                    anchor: programName,
+                  })
+                }>
                 <Text style={[styles.infoValue, styles.linkText]}>{item.odAccount}</Text>
               </TouchableOpacity>
             </View>
@@ -107,8 +137,8 @@ export const SOADealerList: React.FC = () => {
               <Text style={styles.infoValue}>{item.drawingPower}</Text>
             </View>
             <View style={styles.infoColumn}>
-              <Text style={styles.infoLabel}>Utilized Limit</Text>
-              <Text style={styles.infoValue}>{item.utilizedLimit}</Text>
+              <Text style={styles.infoLabel}>Utilized Amount (₹)</Text>
+              <Text style={styles.infoValue}>{item.utilizedAmount}</Text>
             </View>
             <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>Pipeline Requests</Text>
@@ -128,7 +158,11 @@ export const SOADealerList: React.FC = () => {
             </View>
             <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>Status</Text>
-              <Text style={[styles.infoValue, isStatusActive ? styles.statusGreen : styles.statusRed]}>
+              <Text
+                style={[
+                  styles.infoValue,
+                  isStatusActive ? styles.statusGreen : styles.statusRed,
+                ]}>
                 {item.status}
               </Text>
             </View>

@@ -25,6 +25,7 @@ export type ApproveRejectInvoiceDetails = {
   invoiceDate?: string;
   invoiceDueDate?: string;
   invoiceAmount?: string;
+  creditAccountNumber?: string;
 };
 
 type ApproveRejectModalProps = {
@@ -92,6 +93,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
     finalDueDate: 'dd-mm-yyyy',
     dealerName: 'Dealer Name',
     anchorName: 'Anchor Name',
+    creditAccountNumber: '-',
     invoiceDate: 'DD / MM / YYYY',
     invoiceDueDate: 'DD / MM / YYYY',
     invoiceAmount: 'Rs. 0 /-',
@@ -182,6 +184,10 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                       <View style={styles.tableRow}>
                         <Text style={styles.tableLabel}>Anchor Name:</Text>
                         <Text style={styles.tableValue}>{details.anchorName || '-'}</Text>
+                      </View>
+                      <View style={styles.tableRow}>
+                        <Text style={styles.tableLabel}>Credit Account Number:</Text>
+                        <Text style={styles.tableValue}>{details.creditAccountNumber || '-'}</Text>
                       </View>
                       <View style={styles.tableRow}>
                         <Text style={styles.tableLabel}>Dealer Name:</Text>

@@ -20,10 +20,11 @@ import {userSelector} from '@store/user';
 /**
  * Visibility and Actionability Logic for "Manage Attachment"
  * VISIBLE: Super Users OR Anchor Makers (with status restrictions)
- * HIDDEN: Dealers, Checkers, and finalized statuses for Anchor Makers
+ * HIDDEN: Dealers (Maker), and finalized statuses
  */
 export const shouldShowAttachmentOption = (
   invoiceStatus: string,
+  adminStatus: string | undefined,
   user: any,
   canAttachment: boolean,
 ) => {
@@ -32,6 +33,7 @@ export const shouldShowAttachmentOption = (
   const fRole = pg?.functional_role;
 
   const s = invoiceStatus?.toLowerCase() || '';
+  const adminS = adminStatus?.toLowerCase() || '';
   const isAllowedStatus = ['created', 'rejected', 'attachment pending'].includes(s);
 
   // 1. Super User (Internal CashnTech): All roles null - must be in allowed status
@@ -41,6 +43,7 @@ export const shouldShowAttachmentOption = (
   // 2. Regular Anchor Maker
   const isAnchorMaker = bRole === 'Anchor' && fRole === 'Maker';
   const isAnchorChecker = bRole === 'Anchor' && fRole === 'Checker';
+  const isDealerChecker = bRole === 'Dealer' && fRole === 'Checker';
 
   // Anchor Maker must be in a specific status to view/edit attachments
   if (isAnchorMaker && canAttachment && isAllowedStatus) {
@@ -49,6 +52,14 @@ export const shouldShowAttachmentOption = (
 
   // Anchor Checker must also be in a specific status to view attachments for review
   if (isAnchorChecker && canAttachment && isAllowedStatus) {
+    return true;
+  }
+
+  // Dealer Checker can view attachments for review purposes, except when invoice is rejected
+  // or admin verification has reached a terminal status.
+  const isRejectedStatus = s.includes('reject');
+  const isAdminTerminalStatus = ['verified', 'rejected'].includes(adminS);
+  if (isDealerChecker && canAttachment && !isRejectedStatus && !isAdminTerminalStatus) {
     return true;
   }
 
@@ -107,6 +118,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
 
   const showAttachmentOption = shouldShowAttachmentOption(
     rawInvoiceStatus || '',
+    rawAdminStatus,
     userInfo,
     canAttachment,
   );
@@ -153,11 +165,6 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
     return !isDraftState && !isTerminalState;
   };
 
-  const isInvoiceDeletableState = (logsCount: number = 0) => {
-    // Backend allows delete if no action taken beyond creation (logs <= 1)
-    return logsCount <= 1;
-  };
-
   const isEditable = canEdit 
     && (isAnchorMaker || isDealerMaker || isCashnTechUser) 
     && isInvoiceInEditableState(
@@ -167,7 +174,9 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
       approvalLogsCount,
     );
 
-  const isDeletable = canDelete && isInvoiceDeletableState(approvalLogsCount);
+  // Show Delete for all invoices when permission exists — matches web view.
+  // Backend enforces actual authorization (returns 401 when not allowed).
+  const isDeletable = canDelete;
 
   const isActionable = isInvoiceInActionableState(rawInvoiceStatus, rawAdminStatus);
   const canShowApproveReject = (canApprove || canReject) && isActionable;
@@ -185,7 +194,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
           style={[styles.menu, getMenuPosition(menuAnchor)]}
           onPress={() => {}}>
           {/* Maker actions: Anchor/Dealer Makers OR CashnTech Users with edit permission can edit (Checkers excluded) */}
-          {(isAnchorMaker || isDealerMaker || (isCashnTechUser && canEdit)) && !isAnchorChecker && !isDealerChecker && (
+          {(isAnchorMaker || isDealerMaker) && !isAnchorChecker && !isDealerChecker && (
             <>
               {/* Edit – ONLY visible if isEditable */}
               {isEditable && (
@@ -277,7 +286,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
               )}
             </>
           )}
-          {/* Dealer checker: keep full row actions incl. View details */}
+          {/* Dealer checker: Invoice Verification, Approval History, Attachments */}
           {isDealerChecker && !isAnchorChecker && !isCashnTechUser && (
             <>
               {canShowApproveReject && (
@@ -286,71 +295,104 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   onPress={() => onMenuAction('approveReject', openMenuId)}
                   style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
                   <FontAwesome6 name="check" iconStyle="solid" color={Colors.darkblack} size={16} />
-                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Invoice Verification</Text>
+                  <View style={styles.menuItemTextBlock}>
+                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Invoice Verification</Text>
+                    <Text style={styles.menuSubText}>Approval / Reject</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+
+              {canViewHistory && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('approvalHistory', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#0085FF" size={18} />
+                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
+                </TouchableOpacity>
+              )}
+
+              {showAttachmentOption && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('attachment', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="paperclip" iconStyle="solid" color={Colors.darkblack} size={16} />
+                  <View style={styles.menuItemTextBlock}>
+                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Attachments</Text>
+                    <Text style={styles.menuSubText}>View Supporting Docs</Text>
+                  </View>
                 </TouchableOpacity>
               )}
             </>
           )}
-            {isCashnTechUser && (
-              <>
-                {/* Edit – ONLY visible if isEditable (including permission and status) */}
-                {isEditable && (
-                  <TouchableOpacity
-                    disabled={permissionsLoading}
-                    onPress={() => onMenuAction('edit', openMenuId)}
-                    style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                    <FontAwesome6 name="pen-to-square" iconStyle="regular" color="#858594" size={18} />
-                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Edit</Text>
-                  </TouchableOpacity>
-                )}
+          {isCashnTechUser && (
+            <>
+              {/*
+               * CashnTech User — Admin Status Action Matrix:
+               *  ┌─────────────────────┬──────────────┬──────────────────┬─────────────┬────────┐
+               *  │ Admin Status        │ Verification │ Approval History │ Attachments │ Delete │
+               *  ├─────────────────────┼──────────────┼──────────────────┼─────────────┼────────┤
+               *  │ Pending Verification│     ✅       │       ✅         │     ✅      │   ✅   │
+               *  │ Verified            │     ❌       │       ✅         │     ✅      │   ✅   │
+               *  │ onHold              │     ❌       │       ✅         │     ✅      │   ✅   │
+               *  │ Rejected            │     ❌       │       ✅         │     ✅      │   ✅   │
+               *  │ (no status)         │     ❌       │       ✅         │     ✅      │   ✅   │
+               *  └─────────────────────┴──────────────┴──────────────────┴─────────────┴────────┘
+               */}
 
-                {/* Invoice Verification - Conditional Visibility for Admin/Compliance department users */}
-                {((rawAdminStatus === 'PENDING_VERIFICATION' || rawAdminStatus === 'Pending Verification')) &&
-                  ((rawApprovalStatus === 'APPROVAL_COMPLETE' || rawApprovalStatus === 'Completed' || rawApprovalStatus === 'Approval Complete')) &&
-                  ((rawInvoiceStatus === 'IN_PROGRESS' || rawInvoiceStatus === 'In Progress')) &&
-                  !!userDepartment && canShowApproveReject && (
-                    <TouchableOpacity
-                      disabled={permissionsLoading}
-                      onPress={() => onMenuAction('invoiceVerification', openMenuId)}
-                      style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                      <FontAwesome6 name="circle-check" iconStyle="solid" color={Colors.darkblack} size={16} />
-                      <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Invoice Verification</Text>
-                    </TouchableOpacity>
-                  )}
+              {/* Invoice Verification — Only for Pending Verification */}
+              {(
+                (rawAdminStatus || '').trim().toUpperCase() === 'PENDING_VERIFICATION' ||
+                (rawAdminStatus || '').trim().toUpperCase() === 'PENDING VERIFICATION'
+              ) && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('invoiceVerification', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="circle-check" iconStyle="solid" color={Colors.darkblack} size={16} />
+                  <View style={styles.menuItemTextBlock}>
+                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Invoice Verification</Text>
+                    <Text style={styles.menuSubText}>Approval / Reject</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
 
-                {/* Approval History */}
-                {canViewHistory && (
-                  <TouchableOpacity
-                    disabled={permissionsLoading}
-                    onPress={() => onMenuAction('approvalHistory', openMenuId)}
-                    style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                    <FontAwesome6 name="calendar-check" iconStyle="regular" color="#0085FF" size={18} />
-                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
-                  </TouchableOpacity>
-                )}
+              {/* Approval History — Shown for all admin statuses */}
+              {canViewHistory && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('approvalHistory', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#0085FF" size={18} />
+                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
+                </TouchableOpacity>
+              )}
 
-                {showAttachmentOption && (
-                  <TouchableOpacity
-                    disabled={permissionsLoading}
-                    onPress={() => onMenuAction('attachment', openMenuId)}
-                    style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                    <FontAwesome6 name="paperclip" iconStyle="solid" color={Colors.darkblack} size={16} />
-                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Attachments</Text>
-                  </TouchableOpacity>
-                )}
+              {/* Attachments — Shown for all admin statuses.
+                  CashnTech is a super-user role; bypass role/status gating in shouldShowAttachmentOption. */}
+              {canAttachment && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('attachment', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="paperclip" iconStyle="solid" color={Colors.darkblack} size={16} />
+                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Attachments</Text>
+                </TouchableOpacity>
+              )}
 
-                {/* Delete – ONLY visible if isDeletable */}
-                {isDeletable && (
-                  <TouchableOpacity
-                    disabled={permissionsLoading}
-                    onPress={() => onMenuAction('delete', openMenuId)}
-                    style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                    <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
-                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Delete</Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            )}
+              {/* Delete — Shown for all admin statuses */}
+              {isDeletable && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('delete', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
+                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Delete</Text>
+                </TouchableOpacity>
+              )}
+            </>
+          )}
         </Pressable>
       </Pressable>
     </Modal>

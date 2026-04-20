@@ -89,10 +89,13 @@ export const StatementOfAccount: React.FC = () => {
             <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>Bank Name</Text>
               <TouchableOpacity
-                onPress={() => (navigation as any).navigate('SOADealerList', {
-                  programId: item.programId,
-                  programName: item.programName
-                })}>
+                onPress={() =>
+                  (navigation as any).navigate('SOADealerList', {
+                    programId: item.programId,
+                    programIds: item.programId ? [item.programId] : [],
+                    programName: item.programName,
+                  })
+                }>
                 <Text style={[styles.infoValue, styles.linkText]}>{item.bankName || '-'}</Text>
               </TouchableOpacity>
             </View>
@@ -116,7 +119,18 @@ export const StatementOfAccount: React.FC = () => {
             </View>
             <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>Total Outstanding</Text>
-              <Text style={styles.infoValue}>{item.totaloutstanding || '₹0.00'}</Text>
+              <Text
+                style={[
+                  styles.infoValue,
+                  {fontFamily: Fonts.GilroySemiBold, color: Colors.darkblack},
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit>
+                {`₹ ${Number(item.totalOutstanding || 0).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`}
+              </Text>
             </View>
             <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>Status</Text>

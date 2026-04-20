@@ -178,6 +178,10 @@ export const CreditAccountDetails: React.FC = () => {
             <Text style={styles.infoLabel}>Particulars</Text>
             <Text style={styles.infoValue}>{item.particulars || '-'}</Text>
           </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Number</Text>
+            <Text style={styles.infoValue}>{item.invoice_no || 'N/A'}</Text>
+          </View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Txn Date</Text><Text style={styles.infoValue}>{item.txn_date || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Payment Date</Text><Text style={styles.infoValue}>{item.payment_date || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Debit</Text><Text style={styles.infoValue}>{item.debit || '-'}</Text></View>
@@ -200,6 +204,10 @@ export const CreditAccountDetails: React.FC = () => {
           <View style={[styles.infoColumn, {width: '100%', marginBottom: scaleHeight(8)}]}>
             <Text style={styles.infoLabel}>Tranch/Loan No</Text>
             <Text style={styles.infoValue}>{item.tranch_loan_no || '-'}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Number</Text>
+            <Text style={styles.infoValue}>{item.invoice_no || 'N/A'}</Text>
           </View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Loan Amount</Text><Text style={styles.infoValue}>{item.loan_amount || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Loan Date</Text><Text style={styles.infoValue}>{item.loan_date || '-'}</Text></View>
@@ -230,6 +238,10 @@ export const CreditAccountDetails: React.FC = () => {
             <Text style={styles.infoLabel}>Tranch/Loan No</Text>
             <Text style={styles.infoValue}>{item.tranch_loan_no || '-'}</Text>
           </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Number</Text>
+            <Text style={styles.infoValue}>{item.invoice_no || 'N/A'}</Text>
+          </View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Loan Amount</Text><Text style={styles.infoValue}>{item.loan_amount || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Loan Date</Text><Text style={styles.infoValue}>{item.loan_date || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Principal O/S Amo.</Text><Text style={styles.infoValue}>{item.principal_os || '-'}</Text></View>
@@ -255,6 +267,10 @@ export const CreditAccountDetails: React.FC = () => {
           <View style={[styles.infoColumn, {width: '100%', marginBottom: scaleHeight(8)}]}>
             <Text style={styles.infoLabel}>Transaction No.</Text>
             <Text style={styles.infoValue}>{item.transaction_no || '-'}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Number</Text>
+            <Text style={styles.infoValue}>{item.invoice_no || 'N/A'}</Text>
           </View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Date</Text><Text style={styles.infoValue}>{item.date || '-'}</Text></View>
           <View style={[styles.infoColumn, {width: '100%'}]}><Text style={styles.infoLabel}>Particulars</Text><Text style={styles.infoValue}>{item.particulars || '-'}</Text></View>
@@ -410,7 +426,7 @@ export const CreditAccountDetails: React.FC = () => {
               <Search width={scaleWidth(18)} height={scaleHeight(18)} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search by account no."
+                placeholder="Search by invoice no"
                 placeholderTextColor={Colors.graybase}
                 value={searchText}
                 onChangeText={setSearchText}
@@ -535,10 +551,11 @@ const styles = StyleSheet.create({
   },
   invoiceBadgeContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: scaleWidth(8),
   },
   invoiceLabel: {
+    flex: 1,
     fontSize: scaleFont(16),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,

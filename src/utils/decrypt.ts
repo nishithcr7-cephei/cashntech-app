@@ -32,7 +32,7 @@ export function decryptValue(encryptedText: string): string {
   }
 
   const isLikelyEncrypted =
-    /^[A-Za-z0-9+/=]+$/.test(encryptedText) && encryptedText.length > 20;
+    /^[A-Za-z0-9+/=_\- ]+$/.test(encryptedText) && encryptedText.length >= 16;
   if (!isLikelyEncrypted) return encryptedText;
 
   try {
@@ -42,8 +42,13 @@ export function decryptValue(encryptedText: string): string {
     const key = CryptoJS.enc.Base64.parse(keyStr);
     const iv = CryptoJS.enc.Base64.parse(ivStr);
 
+    // Normalize URL-safe base64: spaces (from URL-decoded +) back to +, _ → /
+    const normalizedText = encryptedText
+      .replace(/ /g, '+')
+      .replace(/_/g, '/');
+
     // Method 1: Pass ciphertext as {ciphertext: WordArray} - for raw base64 ciphertext
-    const ciphertext = CryptoJS.enc.Base64.parse(encryptedText);
+    const ciphertext = CryptoJS.enc.Base64.parse(normalizedText);
     let decrypted = CryptoJS.AES.decrypt(
       {ciphertext} as CryptoJS.lib.CipherParams,
       key,
@@ -51,9 +56,9 @@ export function decryptValue(encryptedText: string): string {
     );
     let result = decrypted.toString(CryptoJS.enc.Utf8);
 
-    // Method 2: If empty, try passing string directly (backend style)
+    // Method 2: If empty, try passing normalizedText directly (backend style)
     if (!result) {
-      decrypted = CryptoJS.AES.decrypt(encryptedText, key, {
+      decrypted = CryptoJS.AES.decrypt(normalizedText, key, {
         iv,
         mode: CryptoJS.mode.CBC,
         padding: CryptoJS.pad.Pkcs7,

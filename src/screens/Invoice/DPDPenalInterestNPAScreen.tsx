@@ -37,11 +37,33 @@ import {PaymentHistoryModal} from './DPDPenalInterestNPAScreen/PaymentHistoryMod
 import {RequestWaiverModal} from './DPDPenalInterestNPAScreen/RequestWaiverModal';
 
 const dpdMetrics = [
-  {label: 'Total DPD Records', value: '₹20,000,000.00'},
-  {label: 'Total Outstanding Amount', value: '₹1,20,000'},
-  {label: 'Total Penal Interest', value: '₹1,20,000'},
-  {label: '90+ DPD', value: '₹8,20,000'},
-  {label: '', value: '12'},
+  {
+    label: 'DPD Bucket Movement',
+    subValues: [
+      { label: '0-30 Days', value: '₹ 9,86,452.35' },
+      { label: '31-60 Days', value: '₹ 4,72,190.80' },
+      { label: '61-90 Days', value: '₹ 2,18,764.55' },
+    ],
+  },
+  {
+    label: 'Top 10 Overdue Accounts',
+    subValues: [
+      { label: 'By Amount', value: '₹ 6,84,920.25' },
+      { label: 'By DPD', value: '87 Days' },
+    ],
+  },
+  {
+    label: 'Gross NPA % (DPD > 90 D)',
+    value: '4.38%',
+  },
+  {
+    label: 'Total Outstanding Amount',
+    value: '₹ 22,64,718.40',
+  },
+  {
+    label: 'Total Overdue Amount',
+    value: '₹ 6,77,407.70',
+  },
 ];
 
 
@@ -117,14 +139,31 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
         </View>
 
         <View style={styles.cardGrid}>
-          {dpdMetrics.map((metric, index) => (
-            <View key={index} style={styles.card}>
-              {metric.label ? <Text style={styles.cardLabel}>{metric.label}</Text> : null}
-              <Text style={[styles.cardValue, !metric.label && styles.cardValueBlack]} numberOfLines={1} adjustsFontSizeToFit>
-                {metric.value}
-              </Text>
-            </View>
-          ))}
+          {dpdMetrics.map((metric, index) => {
+            const hasSubValues = (metric as any).subValues;
+            return (
+              <View key={index} style={styles.card}>
+                <Text style={[styles.cardLabel, styles.centerText]}>{metric.label}</Text>
+                {metric.value ? (
+                  <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
+                    {metric.value}
+                  </Text>
+                ) : null}
+                {hasSubValues ? (
+                  <View style={styles.subValuesContainer}>
+                    {(metric as any).subValues.map((sub: any, sIdx: number) => (
+                      <View key={sIdx} style={styles.subValueRow}>
+                        <Text style={styles.subLabel} numberOfLines={1}>{sub.label.replace(' Amount', '')}</Text>
+                        <Text style={styles.subValue} numberOfLines={1} adjustsFontSizeToFit>
+                          {sub.value}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
 
         <View style={styles.invoicesHeader}>
@@ -139,7 +178,7 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
             <Search width={scaleWidth(18)} height={scaleHeight(18)} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search Entity"
+              placeholder="Search by Program / Invoice No."
               placeholderTextColor={Colors.graybase}
               value={searchText}
               onChangeText={setSearchText}
@@ -244,27 +283,33 @@ const styles = StyleSheet.create({
     marginHorizontal: -scaleWidth(16),
   },
   pageTitleText: { fontSize: scaleFont(16), fontFamily: Fonts.GilroySemiBold, color: Colors.darkblack },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: scaleWidth(12), marginTop: scaleHeight(8), marginBottom: scaleHeight(16) },
+  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: scaleWidth(10), marginTop: scaleHeight(8), marginBottom: scaleHeight(16) },
   card: {
-    flexBasis: '47%',
+    width: '48%',
     backgroundColor: '#FFF5F5',
     borderRadius: scaleWidth(12),
-    padding: scaleWidth(16),
+    padding: scaleWidth(12),
     borderWidth: 1,
     borderColor: '#FFD9D9',
-    minWidth: 0,
+    minHeight: scaleHeight(100),
+    justifyContent: 'center',
   },
-  cardLabel: { fontSize: scaleFont(13), color: Colors.graybase, marginBottom: scaleHeight(6) },
-  cardValue: { fontSize: scaleFont(16), fontFamily: Fonts.GilroySemiBold, color: Colors.primaryColor, flexShrink: 1, minWidth: 0 },
+  cardLabel: { fontSize: scaleFont(14), color: Colors.graybase, marginBottom: scaleHeight(8), textAlign: 'center', fontFamily: Fonts.GilroyMedium },
+  cardValue: { fontSize: scaleFont(18), fontFamily: Fonts.GilroyBold, color: Colors.primaryColor, textAlign: 'center' },
   cardValueBlack: { color: Colors.darkblack },
+  centerText: { textAlign: 'center' },
+  subValuesContainer: { marginTop: scaleHeight(8), gap: scaleHeight(4) },
+  subValueRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: scaleHeight(2) },
+  subLabel: { fontSize: scaleFont(11), color: Colors.graybase, fontFamily: Fonts.GilroyMedium },
+  subValue: { fontSize: scaleFont(11), fontFamily: Fonts.GilroyBold, color: Colors.primaryColor },
   invoicesHeader: { flexDirection: 'row', alignItems: 'center', gap: scaleWidth(8), marginBottom: scaleHeight(12) },
   invoicesLabel: { fontSize: scaleFont(16), fontFamily: Fonts.GilroySemiBold, color: Colors.darkblack },
   badge: { backgroundColor: Colors.primaryColor, borderRadius: scaleWidth(12), paddingHorizontal: scaleWidth(10), paddingVertical: scaleHeight(4), minWidth: scaleWidth(40), alignItems: 'center' },
   badgeText: { color: Colors.white, fontSize: scaleFont(14), fontFamily: Fonts.GilroySemiBold },
   searchFilterRow: { flexDirection: 'row', alignItems: 'center', gap: scaleWidth(12), marginBottom: scaleHeight(12) },
-  searchContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white, borderWidth: 1, borderColor: '#E0E0E0', borderRadius: scaleWidth(12), paddingHorizontal: scaleWidth(14), paddingVertical: scaleHeight(12), gap: scaleWidth(8) },
+  searchContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white, borderWidth: 1, borderColor: '#E0E0E0', borderRadius: scaleWidth(12), paddingHorizontal: scaleWidth(10), paddingVertical: scaleHeight(12), gap: scaleWidth(6) },
   searchInput: { flex: 1, fontSize: scaleFont(14), color: Colors.darkblack, padding: 0 },
-  filterButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primaryColor, paddingHorizontal: scaleWidth(18), paddingVertical: scaleHeight(12), borderRadius: scaleWidth(12), gap: scaleWidth(6) },
+  filterButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primaryColor, paddingHorizontal: scaleWidth(16), paddingVertical: scaleHeight(12), borderRadius: scaleWidth(12), gap: scaleWidth(6) },
   filterButtonText: { color: Colors.white, fontSize: scaleFont(14), fontFamily: Fonts.GilroySemiBold },
   verticalList: { gap: scaleHeight(12) },
   cardWrapper: { position: 'relative' },

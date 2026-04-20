@@ -281,6 +281,8 @@ export const invoiceApi = {
     );
     // Extract nested data structure: response.data.data contains the actual array
     const data = response?.data?.data ?? response?.data ?? [];
+    // eslint-disable-next-line no-console
+    console.log('[InvoiceSummary] API Response Count:', data.length);
     return {data};
   },
 
@@ -314,6 +316,8 @@ export const invoiceApi = {
       {authRequired: true} as any,
     );
     const raw = response?.data?.data ?? {};
+    // eslint-disable-next-line no-console
+    console.log('[InvoiceKpis] API Response Data:', JSON.stringify(raw, null, 2));
     return {
       total_program_limit: raw.total_program_limit ?? '0',
       utilized_amount: raw.utilized_amount ?? '0',
@@ -321,6 +325,8 @@ export const invoiceApi = {
       active_dealer_ratio: raw.active_dealer_ratio ?? '0',
       available_limit: raw.available_limit ?? '0',
       overdue_amount: raw.overdue_amount ?? '0',
+      principal_overdue: raw.principal_overdue ?? '0',
+      interest_overdue: raw.interest_overdue ?? '0',
       dpd_days: raw.dpd_days ?? '0',
     };
   },

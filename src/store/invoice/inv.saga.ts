@@ -44,7 +44,7 @@ function showActionToast(
   });
 }
 
-function* fetchDealerInfoSaga(action: PayloadAction<string>) {
+function* fetchDealerInfoSaga(action: PayloadAction<string>): Generator {
   try {
     const response = yield call(invoiceApi.getDealerInfo, action.payload);
     if (response?.data) {
@@ -63,7 +63,7 @@ function* fetchDealerInfoSaga(action: PayloadAction<string>) {
   }
 }
 
-function* fetchBankListSaga() {
+function* fetchBankListSaga(): Generator {
   try {
     const response = yield call(invoiceApi.getBankProductList);
     if (response?.data?.partnerBankList) {
@@ -96,7 +96,7 @@ function getErrorMessage(response: any, defaultMsg: string): string {
   return defaultMsg;
 }
 
-function* createInvoiceSaga(action: PayloadAction<CreateInvoicePayloadInput>) {
+function* createInvoiceSaga(action: PayloadAction<CreateInvoicePayloadInput>): Generator {
   console.log('[inv.saga] createInvoiceSaga started', action.payload);
   try {
     const response = yield call(invoiceApi.createInvoice, action.payload);
@@ -125,7 +125,7 @@ function* createInvoiceSaga(action: PayloadAction<CreateInvoicePayloadInput>) {
   }
 }
 
-function* updateInvoiceSaga(action: PayloadAction<UpdateInvoicePayload>) {
+function* updateInvoiceSaga(action: PayloadAction<UpdateInvoicePayload>): Generator {
   try {
     const response = yield call(invoiceApi.updateInvoice, action.payload);
     const statusCode = response?.statusCode;
@@ -154,7 +154,7 @@ function* updateInvoiceSaga(action: PayloadAction<UpdateInvoicePayload>) {
 
 function* fetchInvoiceListSaga(
   action: PayloadAction<{programId: string; filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]}}>,
-) {
+): Generator {
   try {
     const {programId, filters} = action.payload;
     const data = yield call(invoiceApi.getInvoiceList, programId, filters);
@@ -170,7 +170,7 @@ function* fetchInvoiceListSaga(
 
 function* updateInvoiceStatusSaga(
   action: PayloadAction<UpdateInvoiceStatusRequest>,
-) {
+): Generator {
   try {
     const {
       invoiceId,
@@ -214,7 +214,7 @@ function* updateInvoiceStatusSaga(
 
 function* updateInvoiceVerificationSaga(
   action: PayloadAction<UpdateInvoiceVerificationRequest>,
-) {
+): Generator {
   try {
     const {invoiceId, action: act, remark, programId, filters, onSuccess} = action.payload;
     const response = yield call(invoiceApi.updateInvoiceVerification, {
@@ -246,7 +246,7 @@ function* updateInvoiceVerificationSaga(
   }
 }
 
-export default function* invoiceSaga() {
+export default function* invoiceSaga(): Generator {
   yield takeLatest(fetchDealerInfoRequest.type, fetchDealerInfoSaga);
   yield takeLatest(fetchBankListRequest.type, fetchBankListSaga);
   yield takeLatest(createInvoiceRequest.type, createInvoiceSaga);

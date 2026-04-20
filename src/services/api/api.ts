@@ -12,7 +12,7 @@ import axios, {
   AxiosResponse,
   InternalAxiosRequestConfig,
 } from 'axios';
-import {Alert} from 'react-native';
+import Toast from 'react-native-toast-message';
 
 const GENERAL_TIMEOUT = 10000;
 
@@ -66,21 +66,10 @@ const AUTH_ENDPOINTS_WHITELIST = [
  */
 const isAuthEndpoint = (url: string): boolean => {
   if (!url) return false;
-  
-  try {
-    // Extract the path from the full URL
-    const urlPath = new URL(url).pathname;
-    
-    // Check if the path matches any whitelisted auth endpoint
-    return AUTH_ENDPOINTS_WHITELIST.some(endpoint => 
-      urlPath === endpoint || urlPath.startsWith(endpoint + '/')
-    );
-  } catch (error) {
-    // If URL parsing fails, fall back to simple string matching for safety
-    // This ensures we don't accidentally allow logout on malformed URLs
-    console.warn('Failed to parse URL for auth endpoint check:', url, error);
-    return false;
-  }
+  // Use simple string matching — new URL().pathname is not available in React Native
+  return AUTH_ENDPOINTS_WHITELIST.some(endpoint =>
+    url.includes(endpoint),
+  );
 };
 
 
@@ -105,7 +94,11 @@ axiosInstance.interceptors.request.use(
         if (isTokenExpired(token)) {
           const url = config.url || '';
           if (!isAuthEndpoint(url)) {
-            Alert.alert('Session Expired', 'Your session has expired. Please log in again.');
+            Toast.show({
+              type: 'error',
+              text1: 'Session Expired',
+              text2: 'Your session has expired. Please log in again.',
+            });
             logoutUser();
             return Promise.reject(new Error('Token expired'));
           }
@@ -121,12 +114,20 @@ axiosInstance.interceptors.request.use(
       config.headers['Content-Type'] = 'application/json';
     }
     if (__DEV__) {
-      console.group('=========== API REQUEST CONFIG ===========');
-      console.log('URL: ', config.url);
-      console.log('Method: ', config.method);
-      console.log('Headers: ', config.headers);
-      console.log('Data: ', config.data);
-      console.groupEnd();
+      const url = config.url || '';
+      const skipLogging = 
+        url.includes('user/permissions') || 
+        url.includes('invoice/summary') || 
+        url.includes('invoice/latest');
+
+      if (!skipLogging) {
+        console.group('=========== API REQUEST CONFIG ===========');
+        console.log('URL: ', config.url);
+        console.log('Method: ', config.method);
+        console.log('Headers: ', config.headers);
+        console.log('Data: ', config.data);
+        console.groupEnd();
+      }
     }
     return config;
   },
@@ -142,10 +143,18 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
     if (__DEV__) {
-      console.group('=========== API REQUEST RESPONSE ===========');
-      console.log('request: ', response.request.responseURL);
-      console.log('response: ', response.data);
-      console.groupEnd();
+      const url = response.config.url || '';
+      const skipLogging = 
+        url.includes('user/permissions') || 
+        url.includes('invoice/summary') || 
+        url.includes('invoice/latest');
+
+      if (!skipLogging) {
+        console.group('=========== API REQUEST RESPONSE ===========');
+        console.log('request: ', response.request.responseURL);
+        console.log('response: ', response.data);
+        console.groupEnd();
+      }
     }
     return response;
   },
@@ -169,11 +178,17 @@ axiosInstance.interceptors.response.use(
       console.groupEnd();
     }
 
-    // Check if the error is a token expiration error
-    const url = error.request?.responseURL ?? error.config?.url ?? '';
-    if (error.response?.status === 401 && !isAuthEndpoint(url)) {
-      Alert.alert('Error', 'Token expired..');
-      logoutUser();
+    // 401 from a response means the action was unauthorised (e.g. "Action not allowed").
+    // The request interceptor already handles real token expiry before the request fires,
+    // so we must NOT logout here — just surface the API error message to the user.
+    if (error.response?.status === 401) {
+      const data = error.response.data as any;
+      const msg = data?.message || 'You are not authorised to perform this action.';
+      Toast.show({
+        type: 'error',
+        text1: 'Action Not Allowed',
+        text2: msg,
+      });
     }
     return Promise.reject(error);
   },

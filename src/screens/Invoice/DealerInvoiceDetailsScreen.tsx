@@ -301,10 +301,10 @@ export const DealerInvoiceDetailsScreen: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        {/* Dealer Wise Invoice Details Badge Header */}
+        {/* Anchor Wise Invoice Details Badge Header */}
         <View style={styles.dealersHeader}>
           <View style={styles.dealersBadgeContainer}>
-            <Text style={styles.dealersLabel}>Dealer Wise Invoice Details</Text>
+            <Text style={styles.dealersLabel}>Anchor Wise Invoice Details</Text>
             <View style={styles.dealersBadge}>
               <Text style={styles.dealersBadgeText}>100</Text>
             </View>

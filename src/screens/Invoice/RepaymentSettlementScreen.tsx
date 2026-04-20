@@ -39,11 +39,50 @@ import {RequestWaiverModal} from './DPDPenalInterestNPAScreen/RequestWaiverModal
 
 // Summary metrics for Repayment & Settlement
 const repaymentMetrics = [
-  {label: 'Total Dis. Amount', value: '₹20,000,000.00'},
-  {label: 'Total Recovered Amount', value: '₹1,20,000'},
-  {label: 'Total Outstanding Amount', value: '₹1,20,000'},
-  {label: 'Overdue Amount', value: '₹8,20,000'},
-  {label: 'Total Closed Invoices', value: '12'},
+  {
+    label: 'Total Disbursed Amount',
+    value: '₹ 48,27,564.05',
+  },
+  {
+    label: 'Total Collections',
+    subValues: [
+      { label: 'Principal Amount', value: '₹ 25,83,411.02' },
+      { label: 'Interest Amount', value: '₹ 5,49,248.04' },
+      { label: 'Penal Interest Amount', value: '₹ 1,32,233.01' },
+    ],
+  },
+  {
+    label: 'Total Outstanding Amount',
+    subValues: [
+      { label: 'Principal Amount', value: '₹ 11,89,254.03' },
+      { label: 'Interest Amount', value: '₹ 2,84,789.03' },
+      { label: 'Penal Interest Amount', value: '₹ 88,628.92' },
+    ],
+  },
+  {
+    label: 'Collection Efficiency(%)',
+    value: '67.63%',
+  },
+  {
+    label: 'Overdue Amount',
+    subValues: [
+      { label: 'Principal Amount', value: '₹ 1,86,421.05' },
+      { label: 'Interest Amount', value: '₹ 49,278.02' },
+      { label: 'Penal Interest Amount', value: '₹ 11,657.21' },
+    ],
+  },
+  {
+    label: 'Allocation Completeness',
+    value: '96.48%',
+  },
+  {
+    label: 'Total Closed Invoices',
+    value: '19',
+  },
+  {
+    label: 'Average Settlement TAT',
+    value: '2.74 Days',
+  },
 ];
 
 const repaymentFilterData = {
@@ -164,7 +203,8 @@ export const RepaymentSettlementScreen: React.FC = () => {
           (item.counterParty?.toLowerCase() || '').includes(term) ||
           (item.loanRefNo?.toLowerCase() || '').includes(term) ||
           (item.invoiceNo?.toLowerCase() || '').includes(term) ||
-          (item.bankName?.toLowerCase() || '').includes(term),
+          (item.bankName?.toLowerCase() || '').includes(term) ||
+          (item.programName?.toLowerCase() || '').includes(term)
       );
     }
     return data;
@@ -185,14 +225,31 @@ export const RepaymentSettlementScreen: React.FC = () => {
         </View>
 
         <View style={styles.cardGrid}>
-          {repaymentMetrics.map((metric, index) => (
-            <View key={index} style={styles.card}>
-              <Text style={styles.cardLabel}>{metric.label}</Text>
-              <Text style={[styles.cardValue, index === 4 && styles.cardValueBlack]} numberOfLines={1} adjustsFontSizeToFit>
-                {metric.value}
-              </Text>
-            </View>
-          ))}
+          {repaymentMetrics.map((metric, index) => {
+            const hasSubValues = (metric as any).subValues;
+            return (
+              <View key={index} style={styles.card}>
+                <Text style={[styles.cardLabel, styles.centerText]}>{metric.label}</Text>
+                {metric.value ? (
+                  <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
+                    {metric.value}
+                  </Text>
+                ) : null}
+                {hasSubValues ? (
+                  <View style={styles.subValuesContainer}>
+                    {(metric as any).subValues.map((sub: any, sIdx: number) => (
+                      <View key={sIdx} style={styles.subValueRow}>
+                        <Text style={styles.subLabel} numberOfLines={1}>{sub.label.replace(' Amount', '')}</Text>
+                        <Text style={styles.subValue} numberOfLines={1} adjustsFontSizeToFit>
+                          {sub.value}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
 
         <View style={styles.invoicesHeader}>
@@ -207,7 +264,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
             <Search width={scaleWidth(18)} height={scaleHeight(18)} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search Entity"
+              placeholder="Search by Program / Invoice No."
               placeholderTextColor={Colors.graybase}
               value={searchText}
               onChangeText={setSearchText}
@@ -216,9 +273,6 @@ export const RepaymentSettlementScreen: React.FC = () => {
           <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilterModal(true)}>
             <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
             <Text style={styles.filterButtonText}>Filters</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.exportButton}>
-            <Text style={styles.exportButtonText}>Export</Text>
           </TouchableOpacity>
         </View>
 
@@ -364,19 +418,25 @@ const styles = StyleSheet.create({
     marginHorizontal: -scaleWidth(16),
   },
   pageTitleText: { fontSize: scaleFont(16), fontFamily: Fonts.GilroySemiBold, color: Colors.darkblack },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: scaleWidth(12), marginTop: scaleHeight(8), marginBottom: scaleHeight(16) },
+  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: scaleWidth(10), marginTop: scaleHeight(8), marginBottom: scaleHeight(16) },
   card: {
-    flexBasis: '47%',
+    width: '48%',
     backgroundColor: '#FFF5F5',
     borderRadius: scaleWidth(12),
-    padding: scaleWidth(16),
+    padding: scaleWidth(12),
     borderWidth: 1,
     borderColor: '#FFD9D9',
-    minWidth: 0,
+    minHeight: scaleHeight(100),
+    justifyContent: 'center',
   },
-  cardLabel: { fontSize: scaleFont(13), color: Colors.graybase, marginBottom: scaleHeight(6) },
-  cardValue: { fontSize: scaleFont(16), fontFamily: Fonts.GilroySemiBold, color: Colors.primaryColor, flexShrink: 1, minWidth: 0 },
+  cardLabel: { fontSize: scaleFont(14), color: Colors.graybase, marginBottom: scaleHeight(8), textAlign: 'center', fontFamily: Fonts.GilroyMedium },
+  cardValue: { fontSize: scaleFont(18), fontFamily: Fonts.GilroyBold, color: Colors.primaryColor, textAlign: 'center' },
   cardValueBlack: { color: Colors.darkblack },
+  centerText: { textAlign: 'center' },
+  subValuesContainer: { marginTop: scaleHeight(8), gap: scaleHeight(4) },
+  subValueRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: scaleHeight(2) },
+  subLabel: { fontSize: scaleFont(11), color: Colors.graybase, fontFamily: Fonts.GilroyMedium },
+  subValue: { fontSize: scaleFont(11), fontFamily: Fonts.GilroyBold, color: Colors.primaryColor },
   invoicesHeader: { flexDirection: 'row', alignItems: 'center', gap: scaleWidth(8), marginBottom: scaleHeight(12) },
   invoicesLabel: { fontSize: scaleFont(16), fontFamily: Fonts.GilroySemiBold, color: Colors.darkblack },
   badge: {
@@ -397,23 +457,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: scaleWidth(12),
-    paddingHorizontal: scaleWidth(14),
+    paddingHorizontal: scaleWidth(10),
     paddingVertical: scaleHeight(12),
-    gap: scaleWidth(8),
+    gap: scaleWidth(6),
   },
   searchInput: { flex: 1, fontSize: scaleFont(14), color: Colors.darkblack, padding: 0 },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primaryColor,
-    paddingHorizontal: scaleWidth(18),
+    paddingHorizontal: scaleWidth(16),
     paddingVertical: scaleHeight(12),
     borderRadius: scaleWidth(12),
     gap: scaleWidth(6),
   },
   filterButtonText: { color: Colors.white, fontSize: scaleFont(14), fontFamily: Fonts.GilroySemiBold },
-  exportButton: { paddingHorizontal: scaleWidth(16), paddingVertical: scaleHeight(12), borderRadius: scaleWidth(12), backgroundColor: '#E0E0E0', justifyContent: 'center' },
-  exportButtonText: { fontSize: scaleFont(14), fontFamily: Fonts.GilroySemiBold, color: Colors.darkblack },
   verticalList: { gap: scaleHeight(12) },
   cardWrapper: { position: 'relative' },
   listCard: {

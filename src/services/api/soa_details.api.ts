@@ -43,6 +43,7 @@ export interface TransactionDetailsApi {
   paid_other_charges: string;
   utr_number: string;
   loan_ref_no: string;
+  invoice_no?: string;
 }
 
 export interface OpenInvoiceApi {
@@ -59,6 +60,7 @@ export interface OpenInvoiceApi {
   paid_other_charges: string;
   due_date: string;
   status: string;
+  invoice_no?: string;
 }
 
 export interface ClosedInvoiceApi {
@@ -75,6 +77,7 @@ export interface ClosedInvoiceApi {
   paid_other_charges: string;
   no_of_days: string | number;
   closed_date: string;
+  invoice_no?: string;
 }
 
 export interface RepaymentApi {
@@ -86,6 +89,7 @@ export interface RepaymentApi {
   debit: string;
   credit: string;
   remark: string;
+  invoice_no?: string;
 }
 
 const BASE_URL = API_URL || 'https://losapidev.cashntech.com';

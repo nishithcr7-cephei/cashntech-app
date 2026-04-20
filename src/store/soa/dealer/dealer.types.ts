@@ -5,7 +5,7 @@ export interface DealerListItem {
   odExpiryDate: string;
   sanctionLimit: string;
   drawingPower: string;
-  utilizedLimit: string;
+  utilizedAmount: string;
   pipelineRequests: string;
   excessCredit: string;
   availableLimit: string;

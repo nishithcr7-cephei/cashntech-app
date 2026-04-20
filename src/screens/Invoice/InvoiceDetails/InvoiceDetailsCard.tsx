@@ -101,7 +101,11 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   const rawApprovalStatusLower = (row.rawApprovalStatus || '').toLowerCase();
   const isNotCompletedOrRejected = rawApprovalStatusLower !== 'approval_complete' && rawApprovalStatusLower !== 'completed' && !approvalStatusLower.includes('completed') && !approvalStatusLower.includes('rejected');
 
-  const showPendingBlueDot = !!storedUserRole && isPendingMyRole && isNotVerified && isNotCompletedOrRejected;
+  const statusLower = (row.rawInvoiceStatus || '').toLowerCase();
+  const rawAdminStatusUpper = (row.rawAdminStatus || '').trim().toUpperCase();
+  const showPendingBlueDot = rawAdminStatusUpper === 'PENDING_VERIFICATION' || rawAdminStatusUpper === 'PENDING VERIFICATION';
+  const showDraftGrayDot = statusLower === 'draft';
+  const showActionRequiredRedDot = statusLower === 'rejected' && isAnchorMaker;
 
   const partyTitle = isDealerMaker || isDealerChecker
     ? row.counterParty || row.dealerName
@@ -133,7 +137,9 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
 
         <View style={styles.cardHeaderArea}>
           <View style={styles.indexBadge}>
-            <Text style={styles.indexText}>{index + 1}</Text>
+            <Text style={styles.indexText}>
+              {(row.absoluteIndex ?? index) + 1}
+            </Text>
           </View>
           <View style={styles.cardHeaderContainer}>
             {(isDealerChecker || isAnchorChecker) ? (
@@ -149,7 +155,11 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
                   {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
                 </View>
                 <View style={styles.dmCardHeaderTextWrap}>
-                  {showPendingBlueDot && <View style={styles.pendingDotInline} />}
+                  <View style={styles.dotsContainer}>
+                    {showPendingBlueDot && <View style={styles.pendingDotInline} />}
+                    {showDraftGrayDot && <View style={[styles.pendingDotInline, {backgroundColor: '#9CA3AF'}]} />}
+                    {showActionRequiredRedDot && <View style={styles.actionDotInline} />}
+                  </View>
                   {!!partyTitle && (
                     <Text style={styles.cardTitle}>{partyTitle}</Text>
                   )}
@@ -157,7 +167,11 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
               </TouchableOpacity>
             ) : (
               <View style={styles.makerHeaderRow}>
-                {showPendingBlueDot && <View style={styles.pendingDotStandalone} />}
+                <View style={styles.dotsContainer}>
+                  {showPendingBlueDot && <View style={styles.pendingDotStandalone} />}
+                  {showDraftGrayDot && <View style={[styles.pendingDotStandalone, {backgroundColor: '#9CA3AF'}]} />}
+                  {showActionRequiredRedDot && <View style={styles.actionDotStandalone} />}
+                </View>
                 {!!partyTitle && (
                   <Text style={[styles.cardTitle, styles.cardTitleSpacing]}>
                     {partyTitle}
@@ -418,7 +432,19 @@ const styles = StyleSheet.create({
     height: scaleWidth(8),
     borderRadius: scaleWidth(4),
     backgroundColor: Colors.tertiaryBlue,
-    marginBottom: scaleHeight(6),
+    // marginBottom: scaleHeight(6),
+  },
+  actionDotInline: {
+    width: scaleWidth(8),
+    height: scaleHeight(8),
+    borderRadius: scaleWidth(4),
+    backgroundColor: '#EF4444',
+  },
+  actionDotStandalone: {
+    width: scaleWidth(8),
+    height: scaleHeight(8),
+    borderRadius: scaleWidth(4),
+    backgroundColor: '#EF4444',
   },
   cardTitleSpacing: {
     marginBottom: scaleHeight(4),
@@ -426,6 +452,12 @@ const styles = StyleSheet.create({
   dmCardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    marginBottom: scaleHeight(4),
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(4),
     marginBottom: scaleHeight(4),
   },
   dmCardHeaderTextWrap: {

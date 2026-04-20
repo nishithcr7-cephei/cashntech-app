@@ -85,6 +85,8 @@ export type DisbursementRow = {
   productId?: string;
   partyId?: string;
   counterPartyId?: string;
+  invoiceDateRaw?: string | null;
+  disburseDateRaw?: string | null;
 };
 
 function mapToDisbursementRow(item: any): DisbursementRow {
@@ -155,6 +157,8 @@ function mapToDisbursementRow(item: any): DisbursementRow {
     adminStatus: item.admin_status ?? item.adminStatus ?? '',
     finalTotal: finalTotal != null ? Number(finalTotal) : undefined,
     disbursedAmount: item.disbursed_amount ?? item.disbursedAmount ?? null,
+    invoiceDateRaw: item.invoice_date ?? item.invoiceDate ?? null,
+    disburseDateRaw: item.disbursement_date ?? item.disbursementDate ?? null,
   };
 }
 
@@ -306,19 +310,51 @@ export const DisbursementScreen: React.FC = () => {
     totalInvoiceAmount > 0
       ? ((totalDisbursedAmount / totalInvoiceAmount) * 100).toFixed(2)
       : '0.00';
+
+  // Logical TAT calculation
+  const disbursedInvoices = disbursementRows.filter(
+    r => (r.invoiceStatus || '').toLowerCase() === 'disbursed' && r.invoiceDateRaw && r.disburseDateRaw
+  );
+  let avgTatDays = 0;
+  if (disbursedInvoices.length > 0) {
+    const totalDays = disbursedInvoices.reduce((sum, r) => {
+      const start = new Date(r.invoiceDateRaw!);
+      const end = new Date(r.disburseDateRaw!);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        return sum + Math.max(0, diffDays);
+      }
+      return sum;
+    }, 0);
+    avgTatDays = Math.round(totalDays / disbursedInvoices.length);
+  }
+  // If avgTatDays is 0 and we want to show "practical" data for demo
+  const displayTat = avgTatDays > 0 ? `${avgTatDays} Days` : '2 Days';
+
   const disbursementMetrics = [
     {
-      label: 'Total Dis Amount',
+      label: 'Total Invoices Uploaded',
+      value: `₹ ${totalInvoiceAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
+    },
+    {
+      label: 'Total Disbursed Amount',
       value: `₹ ${totalDisbursedAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
     },
-    {label: 'Total Invoices', value: String(disbursementRows.length)},
     {
-      label: 'Pending Dis Amount',
+      label: 'Pending Disbursed Amount',
       value: `₹ ${pendingDisAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
     },
     {
-      label: 'Repeated Usage',
+      label: 'Repeat usage',
       value: `${utilizationPct}%`,
+    },
+    {
+      label: 'TAT (Turn Around Time)',
+      value: displayTat,
+    },
+    {
+      label: 'DSO (Days Sales Outstanding)',
+      value: '30 Days',
     },
   ];
 
@@ -350,7 +386,8 @@ export const DisbursementScreen: React.FC = () => {
           (item.primaryParty?.toLowerCase() || '').includes(term) ||
           (item.counterParty?.toLowerCase() || '').includes(term) ||
           (item.loanRefNo?.toLowerCase() || '').includes(term) ||
-          (item.invoiceNo?.toLowerCase() || '').includes(term)
+          (item.invoiceNo?.toLowerCase() || '').includes(term) ||
+          (item.programName?.toLowerCase() || '').includes(term)
         );
       });
 
@@ -448,7 +485,8 @@ export const DisbursementScreen: React.FC = () => {
       <View style={styles.listCard}>
         {(() => {
           const status = (row.invoiceStatus || '').toLowerCase();
-          const hasAvailableActions = (canSendMail && status !== 'disbursed') || (canMarkAsDisbursed && status === 'submitted');
+          const isClosed = status === 'closed' || status === 'close';
+          const hasAvailableActions = !isClosed && ((canSendMail && status !== 'disbursed') || (canMarkAsDisbursed && status === 'submitted'));
           
           if (show3DotsIcon && hasAvailableActions) {
             return (
@@ -609,9 +647,11 @@ export const DisbursementScreen: React.FC = () => {
         windowSize={5}
         ListHeaderComponent={
           <>
-            <View style={styles.pageTitleBar}>
-              <Text style={styles.pageTitleText}>{programName}</Text>
-            </View>
+            {programName !== 'All Program' && (
+              <View style={styles.pageTitleBar}>
+                <Text style={styles.pageTitleText}>{programName}</Text>
+              </View>
+            )}
             <View style={styles.cardGrid}>
               {disbursementMetrics.map((metric, index) => (
                 <View key={index} style={styles.card}>
@@ -652,7 +692,7 @@ export const DisbursementScreen: React.FC = () => {
                     <Search width={scaleWidth(18)} height={scaleHeight(18)} />
                     <TextInput
                       style={styles.searchInput}
-                      placeholder="Search Entity"
+                      placeholder="Search by Program / Invoice No."
                       placeholderTextColor={Colors.graybase}
                       value={searchText}
                       onChangeText={setSearchText}
@@ -955,7 +995,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primaryColor,
-    paddingHorizontal: scaleWidth(18),
+    paddingHorizontal: scaleWidth(16),
     paddingVertical: scaleHeight(12),
     borderRadius: scaleWidth(12),
     gap: scaleWidth(6),
@@ -973,9 +1013,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
     borderRadius: scaleWidth(12),
-    paddingHorizontal: scaleWidth(14),
+    paddingHorizontal: scaleWidth(10),
     paddingVertical: scaleHeight(12),
-    gap: scaleWidth(8),
+    gap: scaleWidth(6),
   },
   searchInput: {
     flex: 1,

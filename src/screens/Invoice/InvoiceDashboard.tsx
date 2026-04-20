@@ -81,8 +81,11 @@ const getCardMetrics = (
     active_dealer_ratio: string;
     available_limit: string;
     overdue_amount: string;
+    principal_overdue: string;
+    interest_overdue: string;
     dpd_days: string;
   } | null,
+  summaryData?: InvoiceOverviewSummaryItem[],
 ) => {
   const parsed = {
     totalLimit: parseFloat(kpis?.total_program_limit ?? '0') || 0,
@@ -91,8 +94,25 @@ const getCardMetrics = (
     activeDealerRatio: parseFloat(kpis?.active_dealer_ratio ?? '0') || 0,
     availableLimit: parseFloat(kpis?.available_limit ?? '0') || 0,
     overdueAmount: parseFloat(kpis?.overdue_amount ?? '0') || 0,
+    principalOverdue: parseFloat(kpis?.principal_overdue ?? '0') || 0,
+    interestOverdue: parseFloat(kpis?.interest_overdue ?? '0') || 0,
     dpdDays: parseFloat(kpis?.dpd_days ?? '0') || 0,
   };
+
+  // Aggregation fallback from summaryData if KPI fields are missing/zero
+  const sumTotalLimit = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.sanctioned_limit) || 0), 0);
+  const sumUtilizedAmount = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.utilized_amount) || 0), 0);
+  const sumOverdueAmount = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.overdue_amount) || 0), 0);
+  const sumPrincipalOverdue = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.principal_overdue) || 0), 0);
+  const sumInterestOverdue = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.interest_overdue) || 0), 0);
+  const totalDealers = (summaryData || []).length;
+  const activeDealers = (summaryData || []).filter(d => (Number(d.utilized_amount) || 0) > 0).length;
+
+  const finalTotalLimit = parsed.totalLimit || sumTotalLimit;
+  const finalUtilizedAmount = parsed.utilizedAmount || sumUtilizedAmount;
+  const finalOverdueAmount = parsed.overdueAmount || sumOverdueAmount;
+  const finalPrincipalOverdue = parsed.principalOverdue || sumPrincipalOverdue;
+  const finalInterestOverdue = parsed.interestOverdue || sumInterestOverdue;
 
   const formatCurrency = (amount: number) =>
     `₹ ${amount.toLocaleString('en-IN', {
@@ -105,16 +125,28 @@ const getCardMetrics = (
     })}%`;
 
   return [
-    {label: 'Total Program Limit', value: formatCurrency(parsed.totalLimit)},
-    {label: 'Utilized Amount', value: formatCurrency(parsed.utilizedAmount)},
-    {label: 'Utilized Rate', value: formatPercentage(parsed.utilizedRate * 100)},
+    {label: 'Total Program Limit', value: formatCurrency(finalTotalLimit)},
+    {label: 'Utilized Amount', value: formatCurrency(finalUtilizedAmount)},
+    {
+      label: 'Utilized Rate',
+      value: formatPercentage(
+        (parsed.utilizedRate || (finalTotalLimit > 0 ? finalUtilizedAmount / finalTotalLimit : 0)) * 100
+      ),
+    },
     {
       label: 'Active Dealer Ratio',
-      value: formatPercentage(parsed.activeDealerRatio * 100),
+      value: totalDealers > 0 ? `${activeDealers}/${totalDealers}` : '0/0',
     },
-    {label: 'Available Limit', value: formatCurrency(parsed.availableLimit)},
-    {label: 'Overdue Amount', value: formatCurrency(parsed.overdueAmount)},
-    {label: 'DPD Days', value: parsed.dpdDays.toString()},
+    {label: 'Available Limit', value: formatCurrency(finalTotalLimit - finalUtilizedAmount)},
+    {label: 'DPD Days', value: (parsed.dpdDays || 0).toString()},
+    {
+      label: 'Overdue Amount',
+      value: formatCurrency(finalOverdueAmount),
+      subValues: [
+        { label: 'Principal Overdue', value: formatCurrency(finalPrincipalOverdue) },
+        { label: 'Interest Overdue', value: formatCurrency(finalInterestOverdue) },
+      ]
+    },
   ];
 };
 
@@ -250,10 +282,10 @@ export const InvoiceDashboard: React.FC = () => {
     setSelectedDealerId(null);
   };
 
-  // Dealer Checker: default to "Latest Invoice" tab
+  // Dealer Checker: keep the overview on the summary tab by default
   React.useEffect(() => {
     if (userRole === 'dealer_checker') {
-      setActiveTab('unpaid');
+      setActiveTab('dealers');
     }
   }, [userRole]);
 
@@ -275,7 +307,8 @@ export const InvoiceDashboard: React.FC = () => {
                 'en-IN',
               )
             : '-';
-        const expiryDate = formatDateDDMmmYYYY(row.od_expiry_date);
+        const decryptedExpiry = row.od_expiry_date ? decryptValue(row.od_expiry_date) : '';
+        const expiryDate = decryptedExpiry ? formatDateDash(decryptedExpiry) : '-';
         
         return {
           id: row.id || `dealer-${index}`,
@@ -327,12 +360,30 @@ export const InvoiceDashboard: React.FC = () => {
         productName: row.product_name || '-',
         programName: row.program_name || '-',
         primaryParty: row.partyName ? decryptValue(row.partyName) : '-',
+        rawInvoiceStatus: (row.invoice_status || row.invoiceStatus || '').trim(),
+        rawApprovalStatus: (row.approval_status || row.approvalStatus ||'').trim(),
+        rawAdminStatus: (row.admin_status || row.adminStatus ||'').trim(),
       })),
     [latestData],
   );
 
   const filteredDealerRows = dealerSummaryRows;
   const filteredLatestRows = latestRows;
+
+  const {pendingApprovalCount, draftCount} = useMemo(() => {
+    let pending = 0;
+    let draft = 0;
+    filteredLatestRows.forEach(row => {
+      const adminStatus = (row.rawAdminStatus || '').trim().toUpperCase();
+      const status = (row.rawInvoiceStatus || '').trim().toLowerCase();
+      if (adminStatus === 'PENDING_VERIFICATION' || adminStatus === 'PENDING VERIFICATION') {
+        pending++;
+      } else if (status === 'draft') {
+        draft++;
+      }
+    });
+    return {pendingApprovalCount: pending, draftCount: draft};
+  }, [filteredLatestRows]);
 
   const dealerTable = (
     <>
@@ -347,9 +398,11 @@ export const InvoiceDashboard: React.FC = () => {
             </View>
         )}
 
-        {isAnchorChecker && (
+        {(isAnchorChecker || isDealerChecker) && (
             <View style={styles.allProgramHeader}>
-              <Text style={styles.allProgramTitle}>Summary of Dealers</Text>
+              <Text style={styles.allProgramTitle}>
+                {isDealerChecker ? 'OD Account Summary' : 'Summary of Dealers'}
+              </Text>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
                   {filteredDealerRows.length}
@@ -474,6 +527,100 @@ export const InvoiceDashboard: React.FC = () => {
                       <Text style={styles.infoValue}>{row.dpdDays}</Text>
                     </View>
                   </View>
+                ) : isDealerChecker ? (
+                  <View style={styles.infoGrid}>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Program Name</Text>
+                      <Text style={styles.infoValue}>{row.programName}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Primary Party</Text>
+                      <Text style={styles.infoValue}>{row.primaryParty}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>OD Account</Text>
+                      <Text style={styles.infoValue}>{row.odAccount}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Drawing Power (₹)</Text>
+                      <Text style={styles.infoValue}>{row.drawingPower}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Utilized Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.utilisedAmount}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Pipeline Request (₹)</Text>
+                      <Text style={styles.infoValue}>{row.pipelineRequests}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Available Limit (₹)</Text>
+                      <Text style={styles.infoValue}>{row.availableLimit}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Overdue Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.overdueAmount}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>DPD Days</Text>
+                      <Text style={styles.infoValue}>{row.dpdDays}</Text>
+                    </View>
+                  </View>
+                ) : isAnchorMaker ? (
+                  <View style={styles.infoGrid}>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Program Name</Text>
+                      <Text style={styles.infoValue}>{row.programName}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Counter Party</Text>
+                      <Text style={styles.infoValue}>{row.counterParty}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>OD Account</Text>
+                      <Text style={styles.infoValue}>{row.odAccount}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Drawing Power (₹)</Text>
+                      <Text style={styles.infoValue}>{row.drawingPower}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Utilized Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.utilisedAmount}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Pipeline Requests (₹)</Text>
+                      <Text style={styles.infoValue}>{row.pipelineRequests}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Available Limit (₹)</Text>
+                      <Text style={styles.infoValue}>{row.availableLimit}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Overdue Amount (₹)</Text>
+                      <Text style={styles.infoValue}>{row.overdueAmount}</Text>
+                    </View>
+
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>DPD Days</Text>
+                      <Text style={styles.infoValue}>{row.dpdDays}</Text>
+                    </View>
+                  </View>
                 ) : (
                   <View style={styles.infoGrid}>
                     <View style={styles.infoColumn}>
@@ -555,13 +702,33 @@ export const InvoiceDashboard: React.FC = () => {
         <View style={styles.invoiceHeader}>
           <View style={styles.invoiceBadgeContainer}>
               <Text style={styles.invoiceLabel}>
-                {isDealerMaker ? 'Anchor Wise Invoice Details' : 'Invoice List'}
+                {isAnchorMaker ? 'Invoice Approval & List' : isDealerMaker ? 'Anchor Wise Invoice Details' : 'Invoice List'}
               </Text>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{filteredLatestRows.length}</Text>
             </View>
           </View>
         </View>
+        {activeTab === 'unpaid' && (
+          <View style={styles.legendRow}>
+            {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) && (
+              <>
+                <View style={[styles.legendItem, {marginRight: scaleWidth(12)}]}>
+                  <View style={[styles.actionDotSmall, {backgroundColor: Colors.tertiaryBlue}]} />
+                  <Text style={styles.legendText}>Pending Approval ({pendingApprovalCount})</Text>
+                </View>
+                <View style={[styles.legendItem, {marginRight: scaleWidth(12)}]}>
+                  <View style={[styles.actionDotSmall, {backgroundColor: '#9CA3AF'}]} />
+                  <Text style={styles.legendText}>Draft ({draftCount})</Text>
+                </View>
+              </>
+            )}
+            <View style={styles.legendItem}>
+              <View style={styles.actionDotSmall} />
+              <Text style={styles.legendText}>Action Required</Text>
+            </View>
+          </View>
+        )}
 
 
 
@@ -580,8 +747,20 @@ export const InvoiceDashboard: React.FC = () => {
                 <Text style={styles.indexText}>{index + 1}</Text>
               </View>
               <View style={styles.cardHeaderRow}>
-                <View>
-                  <Text style={styles.cardTitle}>{row.dealer}</Text>
+                <View style={styles.cardHeaderContent}>
+                  <View style={styles.cardTitleRow}>
+                    {(row.rawInvoiceStatus || '').toLowerCase() === 'rejected' && (
+                      <View style={styles.actionDot} />
+                    )}
+                    {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) &&
+                      ((row.rawAdminStatus || '').trim().toUpperCase() === 'PENDING_VERIFICATION' || (row.rawAdminStatus || '').trim().toUpperCase() === 'PENDING VERIFICATION') && (
+                        <View style={[styles.actionDot, {backgroundColor: Colors.tertiaryBlue}]} />
+                      )}
+                    {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) && (row.rawInvoiceStatus || '').toLowerCase() === 'draft' && (
+                      <View style={[styles.actionDot, {backgroundColor: '#9CA3AF'}]} />
+                    )}
+                    <Text style={styles.cardTitle}>{row.dealer}</Text>
+                  </View>
                   <Text style={styles.cardSubtitle}>
                     Invoice Number: {row.invoiceNo}
                   </Text>
@@ -846,19 +1025,39 @@ export const InvoiceDashboard: React.FC = () => {
           <Text style={styles.keyFigureHeading}>Invoice Dashboard: Key Figure</Text>
         )}
         <View style={styles.cardGrid}>
-          {getCardMetrics(productTab, kpis ?? undefined).map(card => (
-            <View key={card.label} style={styles.card}>
+          {getCardMetrics(productTab, kpis ?? undefined, summaryData).map(card => (
+            <View
+              key={card.label}
+              style={[
+                styles.card,
+                card.subValues ? {flexBasis: '100%'} : {},
+              ]}>
               <Text style={styles.cardLabel}>{card.label}</Text>
-              {kpisLoading ? (
+              {kpisLoading || summaryLoading ? (
                 <ActivityIndicator
                   size="small"
                   color={Colors.primaryColor}
                   style={styles.cardLoader}
                 />
               ) : (
-                <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
-                  {card.value}
-                </Text>
+                <>
+                  <Text
+                    style={styles.cardValue}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit>
+                    {card.value}
+                  </Text>
+                  {card.subValues && (
+                    <View style={styles.subValuesContainer}>
+                      {card.subValues.map(sub => (
+                        <View key={sub.label} style={styles.subValueItem}>
+                          <Text style={styles.subValueLabel}>{sub.label}</Text>
+                          <Text style={styles.subValueText}>{sub.value}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </>
               )}
             </View>
           ))}
@@ -873,7 +1072,13 @@ export const InvoiceDashboard: React.FC = () => {
                 styles.tabText,
                 activeTab === 'dealers' && styles.activeTabText,
               ]}>
-              {(isAnchorMaker || isDealerMaker || isCashnTechUser) ? 'Summary of All Program' : 'Summary of Dealers'}
+              {isAnchorMaker
+                ? 'Summary of Dealers'
+                : (isDealerMaker || isCashnTechUser)
+                ? 'Summary of All Program'
+                : isDealerChecker
+                  ? 'Summary of Anchors'
+                  : 'Summary of Dealers'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -884,7 +1089,7 @@ export const InvoiceDashboard: React.FC = () => {
                 styles.tabText,
                 activeTab === 'unpaid' && styles.activeTabText,
               ]}>
-              Latest Invoice
+              {isAnchorMaker ? 'Invoice Approval & List' : 'Latest Invoice'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1061,6 +1266,31 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
   },
+  subValuesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: scaleHeight(12),
+    paddingTop: scaleHeight(12),
+    borderTopWidth: 1,
+    borderTopColor: '#FFE0E0',
+    width: '100%',
+    gap: scaleWidth(8),
+  },
+  subValueItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  subValueLabel: {
+    fontSize: scaleFont(11),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
+    marginBottom: scaleHeight(4),
+  },
+  subValueText: {
+    fontSize: scaleFont(12),
+    color: Colors.red,
+    fontFamily: Fonts.GilroyBold,
+  },
   tabRow: {
     flexDirection: 'row',
     backgroundColor: '#F4F6FB',
@@ -1209,6 +1439,13 @@ const styles = StyleSheet.create({
   statusWarningText: {
     color: Colors.Yellow,
   },
+  actionDot: {
+    width: scaleWidth(8),
+    height: scaleWidth(8),
+    borderRadius: scaleWidth(4),
+    backgroundColor: '#EF4444',
+    marginRight: scaleWidth(8),
+  },
   infoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1224,6 +1461,28 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(12),
     color: Colors.graybase,
     marginBottom: scaleHeight(4),
+  },
+  legendRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: scaleHeight(12),
+    paddingHorizontal: scaleWidth(4),
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(6),
+  },
+  legendText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
+  actionDotSmall: {
+    width: scaleWidth(8),
+    height: scaleWidth(8),
+    borderRadius: scaleWidth(4),
+    backgroundColor: '#EF4444',
   },
   infoValue: {
     fontSize: scaleFont(14),
