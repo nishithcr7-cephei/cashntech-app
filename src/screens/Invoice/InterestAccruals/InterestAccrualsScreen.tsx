@@ -22,7 +22,7 @@ import {Search, Filter} from '@assets/Icons';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
-import {formatDateDash} from './InvoiceDetails/types';
+import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 
 type InterestAccrualInvoiceRow = {

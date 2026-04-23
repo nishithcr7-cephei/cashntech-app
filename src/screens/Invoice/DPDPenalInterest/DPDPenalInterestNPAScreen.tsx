@@ -32,9 +32,9 @@ import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import Endpoints from '@constants/ApiEndPoints';
-import {RecordRepaymentModal} from './DPDPenalInterestNPAScreen/RecordRepaymentModal';
-import {PaymentHistoryModal} from './DPDPenalInterestNPAScreen/PaymentHistoryModal';
-import {RequestWaiverModal} from './DPDPenalInterestNPAScreen/RequestWaiverModal';
+import {RecordRepaymentModal} from './components/RecordRepaymentModal';
+import {PaymentHistoryModal} from './components/PaymentHistoryModal';
+import {RequestWaiverModal} from './components/RequestWaiverModal';
 
 const dpdMetrics = [
   {

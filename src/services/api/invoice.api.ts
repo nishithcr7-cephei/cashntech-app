@@ -418,6 +418,27 @@ export const invoiceApi = {
     return response.data;
   },
 
+  /**
+   * CashnTech admin bulk verification: PATCH /invoice/admin/bulk-status
+   * Payload: { action: 'Verify' | 'Reject' | 'On Hold', invoices: [{ invoiceId, action, remark, approvalRemark }] }
+   */
+  bulkUpdateInvoiceVerification: async (payload: {
+    action: 'Verify' | 'Reject' | 'On Hold';
+    invoices: {
+      invoiceId: string;
+      action: string;
+      remark: string;
+      approvalRemark?: string;
+    }[];
+  }): Promise<any> => {
+    const response = await axiosInstance.patch(
+      ApiEndPoints.apiBulkUpdateInvoiceVerification,
+      payload,
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
   /** Verified invoices (admin_status=Verified). Supports filter payload for API-side filtering. */
   getVerifiedList: async (
     programIds?: string[],

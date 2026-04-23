@@ -1,5 +1,6 @@
 // Core components
 export * from './Button/Button';
+export * from './SafeText';
 export * from './Header/Header';
 export * from './Header/AppBar';
 export * from './Container/Container';
@@ -18,6 +19,7 @@ export * from './DateNTimePicker/DateNTimePicker';
 export * from './UploadModelComponent/UploadModel';
 export * from './CheckerApprovalModal/CheckerApprovalModal';
 export * from './ApproveRejectModal/ApproveRejectModal';
+export * from './BulkReviewModal/BulkReviewModal';
 export * from './AddFundModal/AddFundModal';
 export * from './FilterModal/FilterModal';
 export * from './InvoiceAttachmentsModal/InvoiceAttachmentsModal';

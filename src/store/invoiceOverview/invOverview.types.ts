@@ -16,6 +16,8 @@ export type InvoiceOverviewSummaryItem = {
   principal_overdue?: number | null;
   interest_overdue?: number | null;
   dpd_days?: number | null;
+  dealer_name?: string;
+  dealer_no?: string;
 };
 
 export type InvoiceOverviewLatestItem = {
@@ -27,13 +29,21 @@ export type InvoiceOverviewLatestItem = {
   invoice_due_date?: string;
   grn_date?: string;
   invoice_status?: string;
+  invoiceStatus?: string;
   approval_status?: string;
+  approvalStatus?: string;
   admin_status?: string;
+  adminStatus?: string;
   final_total?: string;
   disbursement_date?: string;
   disbursed_amount?: string;
   utr_no?: string;
   loan_ref_no?: string;
+  bank_name?: string;
+  product_name?: string;
+  program_name?: string;
+  created_at?: string;
+  party?: { entity_name?: string };
 };
 
 export type InvoiceOverviewState = {

@@ -7,6 +7,7 @@ import {userActions} from '@store/user';
 import {clearProgramSelection} from '@store/programSelection/programSelection.slice';
 import {clearPermissions} from '@store/permissions';
 import {decodeJWT, isTokenExpired} from '@utils/Utils';
+import {transformApiResponse} from '@utils/apiTransformer';
 import axios, {
   AxiosError,
   AxiosResponse,
@@ -135,13 +136,19 @@ axiosInstance.interceptors.request.use(
 
 // Response Interceptor
 /**
- * Logs the request and response data to the console.
+ * Logs the request and response data to the console and transforms the response
+ * by decrypting any encrypted strings.
  *
  * @param {AxiosResponse} response - The response object.
- * @returns {Promise<AxiosResponse>} The response object.
+ * @returns {AxiosResponse} The response object with transformed data.
  */
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
+    if (response.data) {
+      // Transform the response data recursively to decrypt any encrypted strings
+      response.data = transformApiResponse(response.data);
+    }
+
     if (__DEV__) {
       const url = response.config.url || '';
       const skipLogging = 
@@ -152,7 +159,7 @@ axiosInstance.interceptors.response.use(
       if (!skipLogging) {
         console.group('=========== API REQUEST RESPONSE ===========');
         console.log('request: ', response.request.responseURL);
-        console.log('response: ', response.data);
+        console.log('transformed response: ', response.data);
         console.groupEnd();
       }
     }
@@ -165,6 +172,10 @@ axiosInstance.interceptors.response.use(
    * @returns {Promise<never>} The error object.
    */
   async (error: AxiosError): Promise<never> => {
+    if (error.response?.data) {
+      error.response.data = transformApiResponse(error.response.data);
+    }
+
     if (__DEV__) {
       console.group('=========== API REQUEST ERROR ===========');
       console.log(

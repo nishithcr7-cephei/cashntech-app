@@ -59,6 +59,7 @@ export type InvoiceListItemApi = {
   /** Nested from API when flat fields not present */
   program?: {
     program_name?: string;
+    bank_details?: PartyBankDetail[];
     productConfig?: {
       partnerBank?: { bank_name?: string };
       product?: { name?: string };

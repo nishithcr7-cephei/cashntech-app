@@ -5,6 +5,7 @@ import {
   ScrollView,
   FlatList,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import {
   AppBar,
@@ -14,16 +15,21 @@ import {
   FilterModal,
   InvoiceAttachmentsModal,
   ProgramBreadcrumb,
+  BulkReviewModal,
 } from '@components/index';
+import {BulkActionSheet} from './BulkActionSheet';
 import {Colors} from '@constants/index';
 import {LeftChevron} from '@assets/Icons';
 import {scaleWidth, scaleHeight} from '@utils/Scale';
+import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {useInvoiceDetails} from './useInvoiceDetails';
 import {InvoiceDetailsControls} from './InvoiceDetailsControls';
 import {InvoiceDetailsCard} from './InvoiceDetailsCard';
 import {SendForApprovalModal} from './SendForApprovalModal';
 import {InvoiceActionMenuModal} from './InvoiceActionMenuModal';
 import {styles} from './InvoiceDetails.styles';
+import {invoiceApi} from '@services/api/invoice.api';
+import Toast from 'react-native-toast-message';
 
 export const InvoiceDetails: React.FC = () => {
   const {
@@ -103,7 +109,28 @@ export const InvoiceDetails: React.FC = () => {
     userInfoFull,
     pendingCount,
     draftCount,
+    selectedInvoices,
+    setSelectedInvoices,
+    bulkAction,
+    setBulkAction,
+    showBulkReviewModal,
+    setShowBulkReviewModal,
+    handleBulkAction,
+    bulkLoading,
+    setBulkLoading,
+    setSelectedInvoiceIds,
   } = useInvoiceDetails();
+
+  const [showBulkActionSheet, setShowBulkActionSheet] = React.useState(false);
+
+  // Automatically trigger action sheet when invoices are selected (CashnTech only)
+  const prevCount = React.useRef(selectedInvoiceIds.length);
+  React.useEffect(() => {
+    if (isCashnTechUser && selectedInvoiceIds.length > prevCount.current && selectedInvoiceIds.length > 0) {
+      setShowBulkActionSheet(true);
+    }
+    prevCount.current = selectedInvoiceIds.length;
+  }, [selectedInvoiceIds.length, isCashnTechUser]);
 
   const registerMenuRef = (id: string, ref: View | null) => {
     menuButtonRefs.current[id] = ref;
@@ -117,15 +144,10 @@ export const InvoiceDetails: React.FC = () => {
         hideHamburger={(isAnchorMaker || isDealerMaker || isCashnTechUser) && fromInvoiceDashboard}
         renderLeftIcon={fromInvoiceDashboard ? <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} /> : undefined}
         onPressLeftIcon={fromInvoiceDashboard ? () => navigation.goBack() : undefined}
+        style={{zIndex: 10}}
       />
       <ProgramBreadcrumb />
-      {hasAnyProgramContext && !isAnchorMaker && (
-        <View style={styles.selectedProgramRow}>
-          <Text style={styles.selectedProgramText}>
-            {programName || '-'}
-          </Text>
-        </View>
-      )}
+      {/* Removed Selected Program Row as requested */}
       {!hasAnyProgramContext ? (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <View style={styles.emptyState}>
@@ -141,90 +163,96 @@ export const InvoiceDetails: React.FC = () => {
           </View>
         </ScrollView>
       ) : (
-        <FlatList
-          style={styles.scroll}
-          contentContainerStyle={styles.content}
-          data={invoiceListLoading ? [] : paginatedData}
-          keyExtractor={row => row.id}
-          ListHeaderComponent={
-            <>
-              <InvoiceDetailsControls
-                dealerListTitle={dealerListTitle}
-                invoiceCount={invoiceData.length}
-                isDealerMaker={isDealerMaker}
+        <>
+          <FlatList
+            style={styles.scroll}
+            contentContainerStyle={styles.content}
+            data={paginatedData}
+            keyExtractor={row => row.id}
+            ListHeaderComponent={
+              <>
+                <InvoiceDetailsControls
+                  dealerListTitle={dealerListTitle}
+                  invoiceCount={invoiceData.length}
+                  isDealerMaker={isDealerMaker}
+                  isAnchorMaker={isAnchorMaker}
+                  isAnchorChecker={isAnchorChecker}
+                  isDealerChecker={isDealerChecker}
+                  isCashnTechUser={isCashnTechUser}
+                  filteredDataLength={filteredData.length}
+                  searchText={searchText}
+                  setSearchText={setSearchText}
+                  onOpenFilterModal={() => setShowFilterModal(true)}
+                  navigation={navigation}
+                  allSelectedOnScreen={allSelectedOnScreen}
+                  onToggleSelectAllVisible={toggleSelectAllVisible}
+                  selectedInvoiceIdsLength={selectedInvoiceIds.length}
+                  onOpenSendForApprovalModal={() => setShowSendForApprovalModal(true)}
+                  onCreateInvoicePress={onCreateInvoicePress}
+                  isCreateInvoiceEnabled={isCreateInvoiceEnabled}
+                  user={userInfoFull}
+                  actionRequiredCount={invoiceData.filter(r => r.rawInvoiceStatus?.toLowerCase() === 'rejected').length}
+                  pendingCount={pendingCount}
+                  draftCount={draftCount}
+                  onBulkAction={handleBulkAction}
+                />
+                <View style={styles.listTopSeparator} />
+              </>
+            }
+            ItemSeparatorComponent={() => <View style={{height: scaleHeight(12)}} />}
+            renderItem={({item: row, index}) => (
+              <InvoiceDetailsCard
+                row={row}
+                index={index}
                 isAnchorMaker={isAnchorMaker}
-                isAnchorChecker={isAnchorChecker}
+                isDealerMaker={isDealerMaker}
                 isDealerChecker={isDealerChecker}
+                isAnchorChecker={isAnchorChecker}
                 isCashnTechUser={isCashnTechUser}
-                filteredDataLength={filteredData.length}
-                searchText={searchText}
-                setSearchText={setSearchText}
-                onOpenFilterModal={() => setShowFilterModal(true)}
-                navigation={navigation}
-                allSelectedOnScreen={allSelectedOnScreen}
-                onToggleSelectAllVisible={toggleSelectAllVisible}
-                selectedInvoiceIdsLength={selectedInvoiceIds.length}
-                onOpenSendForApprovalModal={() => setShowSendForApprovalModal(true)}
-                onCreateInvoicePress={onCreateInvoicePress}
-                isCreateInvoiceEnabled={isCreateInvoiceEnabled}
-                user={userInfoFull}
-                actionRequiredCount={invoiceData.filter(r => r.rawInvoiceStatus?.toLowerCase() === 'rejected').length}
-                pendingCount={pendingCount}
-                draftCount={draftCount}
+                storedUserRole={storedUserRole}
+                transparency={invoiceListLoading ? 0.6 : 1}
+                isSelected={(isDealerChecker || isAnchorChecker || isCashnTechUser) && selectedInvoiceIds.includes(row.id)}
+                onMenuToggle={handleMenuToggle}
+                onToggleSelection={toggleInvoiceSelection}
+                onInvoiceNoPress={handleInvoiceNoPress}
+                registerMenuRef={registerMenuRef}
               />
-              <View style={styles.listTopSeparator} />
-              {invoiceListLoading && (
+            )}
+            ListEmptyComponent={
+              !invoiceListLoading && filteredData.length === 0 ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={Colors.primaryColor} />
-                  <Text style={styles.loadingText}>Loading invoices...</Text>
+                  <Text style={styles.loadingText}>
+                    {selectedDealerName
+                      ? `No invoices found for ${selectedDealerName}`
+                      : 'No invoices found'}
+                  </Text>
                 </View>
-              )}
-            </>
-          }
-          ItemSeparatorComponent={() => <View style={{height: scaleHeight(12)}} />}
-          renderItem={({item: row, index}) => (
-            <InvoiceDetailsCard
-              row={row}
-              index={index}
-              isAnchorMaker={isAnchorMaker}
-              isDealerMaker={isDealerMaker}
-              isDealerChecker={isDealerChecker}
-              isAnchorChecker={isAnchorChecker}
-              isCashnTechUser={isCashnTechUser}
-              storedUserRole={storedUserRole}
-              isSelected={(isDealerChecker || isAnchorChecker) && selectedInvoiceIds.includes(row.id)}
-              onMenuToggle={handleMenuToggle}
-              onToggleSelection={toggleInvoiceSelection}
-              onInvoiceNoPress={handleInvoiceNoPress}
-              registerMenuRef={registerMenuRef}
-            />
+              ) : null
+            }
+            onEndReached={hasMore ? loadMore : undefined}
+            onEndReachedThreshold={0.3}
+            onScrollBeginDrag={() => {
+              setOpenMenuId(null);
+              setMenuAnchor(null);
+            }}
+            ListFooterComponent={
+              hasMore && !invoiceListLoading ? (
+                <View style={styles.loadMoreFooter}>
+                  <ActivityIndicator size="small" color={Colors.primaryColor} />
+                  <Text style={styles.loadMoreText}>Loading more...</Text>
+                </View>
+              ) : null
+            }
+          />
+          {invoiceListLoading && (
+            <View style={styles.loadingOverlay}>
+              <View style={styles.overlaySpinnerContainer}>
+                <ActivityIndicator size="large" color={Colors.primaryColor} />
+                <Text style={styles.overlayLoadingText}>Loading Invoices...</Text>
+              </View>
+            </View>
           )}
-          ListEmptyComponent={
-            !invoiceListLoading && filteredData.length === 0 ? (
-              <View style={styles.loadingContainer}>
-                <Text style={styles.loadingText}>
-                  {selectedDealerName
-                    ? `No invoices found for ${selectedDealerName}`
-                    : 'No invoices found'}
-                </Text>
-              </View>
-            ) : null
-          }
-          onEndReached={hasMore ? loadMore : undefined}
-          onEndReachedThreshold={0.3}
-          onScrollBeginDrag={() => {
-            setOpenMenuId(null);
-            setMenuAnchor(null);
-          }}
-          ListFooterComponent={
-            hasMore && !invoiceListLoading ? (
-              <View style={styles.loadMoreFooter}>
-                <ActivityIndicator size="small" color={Colors.primaryColor} />
-                <Text style={styles.loadMoreText}>Loading more...</Text>
-              </View>
-            ) : null
-          }
-        />
+        </>
       )}
 
       <FilterModal
@@ -328,7 +356,65 @@ export const InvoiceDetails: React.FC = () => {
         userDepartment={userDepartment}
         approvalLogsCount={selectedInvoiceApprovalLogsCount}
       />
+      {/* Floating trigger removed as requested */}
 
+      <BulkActionSheet
+        visible={showBulkActionSheet}
+        onClose={() => {
+          setShowBulkActionSheet(false);
+        }}
+        selectedCount={selectedInvoiceIds.length}
+        onAction={(action) => {
+          setShowBulkActionSheet(false);
+          setTimeout(() => {
+            handleBulkAction(action);
+          }, 300);
+        }}
+      />
+
+      <BulkReviewModal
+        visible={showBulkReviewModal}
+        onClose={() => {
+          setShowBulkReviewModal(false);
+          setSelectedInvoices([]);
+          setSelectedInvoiceIds([]);
+        }}
+        selectedInvoices={selectedInvoices}
+        action={bulkAction}
+        onSubmit={(payload) => {
+          setBulkLoading(true);
+          invoiceApi.bulkUpdateInvoiceVerification(payload)
+            .then(res => {
+              console.log('Bulk Action API Response:', JSON.stringify(res, null, 2));
+              if (res.statusCode === 200 || res.status === 200) {
+                Toast.show({
+                  type: 'success',
+                  text1: 'Success',
+                  text2: `Bulk ${bulkAction} completed successfully`,
+                });
+                setSelectedInvoices([]);
+                setSelectedInvoiceIds([]);
+                setShowBulkReviewModal(false);
+                refreshInvoiceList();
+              } else {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Action Failed',
+                  text2: res.message || 'Something went wrong',
+                });
+              }
+            })
+            .catch(err => {
+              Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: err.message || 'An error occurred',
+              });
+            })
+            .finally(() => setBulkLoading(false));
+        }}
+        loading={bulkLoading}
+      />
     </Container>
   );
 };

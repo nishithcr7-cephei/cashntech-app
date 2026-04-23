@@ -23,7 +23,7 @@ import {
   FilterModal,
   ProgramBreadcrumb,
 } from '@components/index';
-import {MarkAsDisbursedModal} from './DisbursementScreen/MarkAsDisbursedModal';
+import {MarkAsDisbursedModal} from './components/MarkAsDisbursedModal';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -33,7 +33,7 @@ import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {invoiceApi} from '@services/api/invoice.api';
-import {formatDateDash} from './InvoiceDetails/types';
+import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import Toast from 'react-native-toast-message';
 import {decryptValue} from '@utils/decrypt';
 import {useHasPermission} from '@hooks/index';

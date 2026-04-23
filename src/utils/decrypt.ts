@@ -15,6 +15,11 @@ function getEncryptionKeys(): {key: string; iv: string} {
     Config.RK_ENCRYPTION_IV ||
     AppConfig.RK_ENCRYPTION_IV ||
     (__DEV__ ? FALLBACK_IV : '');
+  
+  if (__DEV__ && (!key || !iv)) {
+    console.warn('[crypto] RK_ENCRYPTION_KEY or RK_ENCRYPTION_IV is missing in .env! Using fallbacks for development.');
+  }
+  
   return {key, iv};
 }
 
@@ -67,17 +72,8 @@ export function decryptValue(encryptedText: string): string {
     }
 
     const final = result && result.length > 0 ? result : encryptedText;
-    if (__DEV__ && final === encryptedText && result === '') {
-      console.warn(
-        '[decrypt] Decryption produced empty result for:',
-        encryptedText.substring(0, 30) + '...',
-      );
-    }
     return final;
   } catch (e) {
-    if (__DEV__) {
-      console.warn('[decrypt] Decryption error:', e);
-    }
     return encryptedText;
   }
 }

@@ -1,0 +1,460 @@
+import {StyleSheet} from 'react-native';
+import {Colors, Fonts} from '@constants/index';
+import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+
+export const styles = StyleSheet.create({
+  loader: {
+    marginTop: scaleHeight(40),
+  },
+  cardLoader: {
+    marginTop: scaleHeight(8),
+    alignSelf: 'flex-start',
+  },
+  pageTitleBar: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
+    backgroundColor: Colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E6E6E6',
+  },
+  pageTitleText: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  content: {
+    paddingHorizontal: scaleWidth(16),
+    paddingBottom: scaleHeight(24),
+    gap: scaleHeight(12),
+  },
+  sectionSubtitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+    marginBottom: scaleHeight(8),
+    marginTop: scaleHeight(12),
+  },
+  productTabsScroll: {
+    marginTop: scaleHeight(6),
+    marginBottom: scaleHeight(4),
+  },
+  productTabsRow: {
+    flexDirection: 'row',
+    gap: scaleWidth(18),
+    paddingRight: scaleWidth(24),
+  },
+  productTabBtn: {
+    paddingVertical: scaleHeight(8),
+  },
+  productTabBtnActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.primaryColor,
+  },
+  productTabText: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
+  productTabTextActive: {
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+  },
+  keyFigureHeading: {
+    fontSize: scaleFont(15),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(10),
+    marginTop: scaleHeight(4),
+  },
+  cardGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: scaleWidth(12),
+  },
+  card: {
+    flexBasis: '47%',
+    backgroundColor: '#FFF5F5',
+    borderRadius: scaleWidth(12),
+    padding: scaleWidth(16),
+    borderWidth: 1,
+    borderColor: '#FFD9D9',
+    minWidth: 0,
+  },
+  cardLabel: {
+    fontSize: scaleFont(13),
+    color: Colors.graybase,
+    marginBottom: scaleHeight(6),
+    flexWrap: 'wrap',
+  },
+  cardValue: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  subValuesContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: scaleHeight(12),
+    paddingTop: scaleHeight(12),
+    borderTopWidth: 1,
+    borderTopColor: '#FFE0E0',
+    width: '100%',
+    gap: scaleWidth(8),
+  },
+  subValueItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  subValueLabel: {
+    fontSize: scaleFont(11),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
+    marginBottom: scaleHeight(4),
+  },
+  subValueText: {
+    fontSize: scaleFont(12),
+    color: Colors.red,
+    fontFamily: Fonts.GilroyBold,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F4F6FB',
+    borderRadius: scaleWidth(20),
+    padding: scaleWidth(4),
+    marginTop: scaleHeight(16),
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: scaleHeight(10),
+    borderRadius: scaleWidth(16),
+    alignItems: 'center',
+  },
+  tabText: {
+    fontSize: scaleFont(14),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  activeTab: {
+    backgroundColor: Colors.white,
+    elevation: 2,
+    shadowColor: '#00000022',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  activeTabText: {
+    color: Colors.primaryColor,
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  tabContent: {
+    marginTop: scaleHeight(18),
+  },
+  allProgramHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(8),
+    marginBottom: scaleHeight(12),
+  },
+  allProgramTitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  listToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(12),
+    marginBottom: scaleHeight(12),
+  },
+  searchBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: scaleWidth(12),
+    paddingVertical: scaleHeight(12),
+    paddingHorizontal: scaleWidth(14),
+    backgroundColor: Colors.white,
+  },
+  searchPlaceholder: {
+    color: Colors.graybase,
+    fontSize: scaleFont(14),
+  },
+  filterBtn: {
+    backgroundColor: Colors.primaryColor,
+    paddingHorizontal: scaleWidth(18),
+    paddingVertical: scaleHeight(12),
+    borderRadius: scaleWidth(12),
+  },
+  filterText: {
+    color: Colors.white,
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  verticalList: {
+    gap: scaleHeight(12),
+  },
+  cardWrapper: {
+    position: 'relative',
+  },
+  listCard: {
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(12),
+    padding: scaleWidth(16),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E6E6E6',
+    shadowColor: '#00000035',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: scaleHeight(12),
+    paddingRight: scaleWidth(50),
+  },
+  cardHeaderContent: {
+    flex: 1,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  cardTitleChevron: {
+    marginLeft: scaleWidth(6),
+  },
+  cardSubtitle: {
+    fontSize: scaleFont(13),
+    color: Colors.graybase,
+    marginTop: scaleHeight(4),
+  },
+  statusChip: {
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(4),
+    borderRadius: scaleWidth(12),
+    backgroundColor: '#E6F7EF',
+  },
+  statusChipText: {
+    color: Colors.green,
+    fontFamily: Fonts.GilroySemiBold,
+    fontSize: scaleFont(12),
+  },
+  statusGreenText: {
+    color: Colors.green,
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  statusOrangeText: {
+    color: '#E86C00',
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  statusRedText: {
+    color: Colors.red,
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  statusWarningChip: {
+    backgroundColor: '#FFF4E0',
+  },
+  statusWarningText: {
+    color: '#FF8C00', // Adjusted from Colors.Yellow for visibility
+  },
+  actionDot: {
+    width: scaleWidth(8),
+    height: scaleWidth(8),
+    borderRadius: scaleWidth(4),
+    backgroundColor: '#EF4444',
+    marginRight: scaleWidth(8),
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: scaleWidth(12),
+  },
+  infoColumn: {
+    width: '47%',
+    backgroundColor: '#F7F8FB',
+    borderRadius: scaleWidth(10),
+    padding: scaleWidth(12),
+  },
+  infoLabel: {
+    fontSize: scaleFont(12),
+    color: Colors.graybase,
+    marginBottom: scaleHeight(4),
+  },
+  legendRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: scaleHeight(12),
+    paddingHorizontal: scaleWidth(4),
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(6),
+  },
+  legendText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.primaryColor,
+  },
+  selectAllContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(8),
+  },
+  selectAllText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+  },
+  cardMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(10),
+    marginBottom: scaleHeight(10),
+  },
+  checkboxWrapper: {
+    padding: scaleWidth(5),
+  },
+  checkbox: {
+    width: scaleWidth(18),
+    height: scaleWidth(18),
+    borderWidth: 1.5,
+    borderColor: Colors.primaryColor,
+    borderRadius: scaleWidth(4),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.white,
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.primaryColor,
+  },
+  checkboxDisabled: {
+    borderColor: '#E0E0E0',
+    backgroundColor: '#F5F5F5',
+  },
+  bulkActionBar: {
+    position: 'absolute',
+    bottom: scaleHeight(20),
+    left: scaleWidth(20),
+    right: scaleWidth(20),
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(12),
+    padding: scaleWidth(16),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 12,
+    zIndex: 9999,
+  },
+  bulkActionInfo: {
+    flex: 1,
+  },
+  bulkActionCount: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyBold,
+    color: Colors.darkblack,
+  },
+  clearText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.red,
+    marginTop: scaleHeight(2),
+  },
+  bulkButtons: {
+    flexDirection: 'row',
+    gap: scaleWidth(8),
+  },
+  bulkBtn: {
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(8),
+    borderRadius: scaleWidth(6),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bulkBtnVerify: {
+    backgroundColor: Colors.green,
+  },
+  bulkBtnReject: {
+    backgroundColor: Colors.red,
+  },
+  bulkBtnHold: {
+    backgroundColor: '#FF9800',
+  },
+  bulkBtnText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
+    color: Colors.white,
+  },
+  actionDotSmall: {
+    width: scaleWidth(8),
+    height: scaleWidth(8),
+    borderRadius: scaleWidth(4),
+    backgroundColor: '#EF4444',
+  },
+  infoValue: {
+    fontSize: scaleFont(14),
+    color: Colors.darkblack,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  invoiceHeader: {
+    marginBottom: scaleHeight(12),
+  },
+  invoiceBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(8),
+  },
+  invoiceLabel: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  badge: {
+    backgroundColor: Colors.primaryColor,
+    borderRadius: scaleWidth(12),
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(4),
+    minWidth: scaleWidth(40),
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: Colors.white,
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  indexBadge: {
+    backgroundColor: '#F7F8FB',
+    width: scaleWidth(28),
+    height: scaleWidth(28),
+    borderRadius: scaleWidth(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: scaleHeight(12),
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+  },
+  indexText: {
+    color: Colors.graybase,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
+  },
+  noDataText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+    textAlign: 'center',
+  },
+});

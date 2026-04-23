@@ -189,4 +189,30 @@ export const styles = StyleSheet.create({
     fontFamily: Fonts.GilroyMedium,
     textAlign: 'center',
   },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    zIndex: 1000,
+    justifyContent: 'center',
+    alignItems: 'center',
+    top: scaleHeight(120), // Positioned to cover the list area
+  },
+  overlaySpinnerContainer: {
+    backgroundColor: Colors.white,
+    padding: scaleWidth(20),
+    borderRadius: scaleWidth(16),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 10,
+  },
+  overlayLoadingText: {
+    marginTop: scaleHeight(12),
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+  },
 });
+

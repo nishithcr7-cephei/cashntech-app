@@ -21,9 +21,10 @@ import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {invoiceApi} from '@services/api/invoice.api';
-import {formatDateDash} from '@screens/Invoice/InvoiceDetails/types';
+import {formatDateDash} from './components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 import {FILE_DOWNLOAD_URL} from '@config/config';
+import {DocumentPickerResponse} from '@react-native-documents/picker';
 
 const fmtAmount = (n: number) =>
   n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});

@@ -16,7 +16,7 @@ import {HomeNavigatorType} from '@type/NavigatorTypes';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector, useDispatch} from 'react-redux';
 import {interestAccrualActions, interestAccrualSelectors} from '@store/interestAccrual';
-import {formatDateDash} from './InvoiceDetails/types';
+import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 
 
 
@@ -268,4 +268,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-

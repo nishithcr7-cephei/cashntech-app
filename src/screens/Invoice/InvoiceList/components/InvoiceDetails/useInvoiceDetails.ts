@@ -1,16 +1,16 @@
 import * as React from 'react';
-import {useState, useEffect, useCallback} from 'react';
-import {View, Dimensions} from 'react-native';
+import { useState, useEffect, useCallback } from 'react';
+import { View, Dimensions, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
 import Toast from 'react-native-toast-message';
-import {scaleWidth, scaleHeight} from '@utils/Scale';
-import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
-import {useDispatch, useSelector} from 'react-redux';
+import { scaleWidth, scaleHeight } from '@utils/Scale';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchInvoiceListRequest,
   updateInvoiceStatusRequest,
   updateInvoiceVerificationRequest,
 } from '@store/invoice/inv.slice';
-import {fetchPermissionsRequest} from '@store/permissions';
+import { fetchPermissionsRequest } from '@store/permissions';
 import {
   setProgramSelection,
   toggleProgramSelection,
@@ -24,15 +24,15 @@ import {
   selectProgramSelection,
   selectScopeData,
 } from '@store/programSelection/programSelection.selector';
-import {ProgramSelectionState} from '@store/programSelection/programSelection.types';
-import {userSelector} from '@store/user';
-import {AppRole} from '@constants/roles';
-import {mapApiToRow, formatDateDash, mapApprovalLogToEntry} from './types';
-import {InvoiceListItemApi} from '@store/invoice/inv.types';
-import {invoiceApi} from '@services/api/invoice.api';
-import {decryptValue} from '@utils/decrypt';
-import type {CheckerApprovalEntry} from '@components/CheckerApprovalModal/CheckerApprovalModal';
-import type {ApproveRejectInvoiceDetails} from '@components/ApproveRejectModal/ApproveRejectModal';
+import { ProgramSelectionState } from '@store/programSelection/programSelection.types';
+import { userSelector } from '@store/user';
+import { AppRole, ROLE_LABELS } from '@constants/roles';
+import { mapApiToRow, formatDateDash, mapApprovalLogToEntry } from './types';
+import { InvoiceListItemApi } from '@store/invoice/inv.types';
+import { invoiceApi } from '@services/api/invoice.api';
+import { decryptValue } from '@utils/decrypt';
+import type { CheckerApprovalEntry } from '@components/CheckerApprovalModal/CheckerApprovalModal';
+import type { ApproveRejectInvoiceDetails } from '@components/ApproveRejectModal/ApproveRejectModal';
 
 export function useInvoiceDetails() {
   const navigation = useNavigation();
@@ -44,6 +44,18 @@ export function useInvoiceDetails() {
   const invoiceListLoading = useSelector(selectInvoiceListLoading);
   const invoiceListError = useSelector(selectInvoiceListError);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+
+  // Enable LayoutAnimation for Android
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
+  // Smooth transition when loading state changes
+  useEffect(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+  }, [invoiceListLoading]);
 
   const routeParams = route.params as {
     fromInvoiceDashboard?: boolean;
@@ -66,7 +78,9 @@ export function useInvoiceDetails() {
   const isAnchorChecker = userRole === 'anchor_checker';
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
-  const isCashnTechUser = userRole === 'cashntech_user';
+  const isCashnTechUser =
+    userRole === 'cashntech_user' ||
+    !!(userRole && ROLE_LABELS[userRole] === 'CashnTech User');
 
   const dealerListTitle =
     isCashnTechUser
@@ -91,6 +105,10 @@ export function useInvoiceDetails() {
   } | null>(null);
   const menuButtonRefs = React.useRef<Record<string, View | null>>({});
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
+  const [selectedInvoices, setSelectedInvoices] = useState<any[]>([]); // Full items for modal
+  const [bulkAction, setBulkAction] = useState<'Verify' | 'Reject' | 'On Hold'>('Verify');
+  const [showBulkReviewModal, setShowBulkReviewModal] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
   const [showSendForApprovalModal, setShowSendForApprovalModal] = useState(false);
   const [visibleCount, setVisibleCount] = useState(30);
   const [anchorCheckerInvoiceDetails, setAnchorCheckerInvoiceDetails] = useState<ApproveRejectInvoiceDetails | null>(null);
@@ -140,8 +158,8 @@ export function useInvoiceDetails() {
 
   const inv = appliedFilters['Invoice Status'];
   const appr = appliedFilters['Approval Status'];
-  const apiFilters: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]} | undefined = (() => {
-    const body: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]} = {};
+  const apiFilters: { byInvoiceStatus?: string[]; byApprovalStatus?: string[] } | undefined = (() => {
+    const body: { byInvoiceStatus?: string[]; byApprovalStatus?: string[] } = {};
     if (inv?.length) body.byInvoiceStatus = inv;
     if (appr?.length) body.byApprovalStatus = appr;
     return Object.keys(body).length ? body : undefined;
@@ -151,19 +169,19 @@ export function useInvoiceDetails() {
 
   const refreshInvoiceList = useCallback(() => {
     if (!hasAnyProgramContext) return;
-    dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
+    dispatch(fetchInvoiceListRequest({ programId, filters: apiFilters }));
   }, [hasAnyProgramContext, programId, apiFilters, dispatch]);
 
   useEffect(() => {
     if (!hasAnyProgramContext) return;
-    dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
+    dispatch(fetchInvoiceListRequest({ programId, filters: apiFilters }));
   }, [hasAnyProgramContext, programId, apiFilters, dispatch]);
 
   useFocusEffect(
     useCallback(() => {
       if (!hasAnyProgramContext || routeParams?.refreshList !== true) return;
-      dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
-      (navigation as any).setParams({refreshList: false});
+      dispatch(fetchInvoiceListRequest({ programId, filters: apiFilters }));
+      (navigation as any).setParams({ refreshList: false });
     }, [hasAnyProgramContext, programId, apiFilters, dispatch, navigation, routeParams?.refreshList]),
   );
 
@@ -345,7 +363,7 @@ export function useInvoiceDetails() {
     const ref = menuButtonRefs.current[invoiceId] as any;
     if (ref?.measureInWindow) {
       ref.measureInWindow((x: number, y: number, width: number, height: number) => {
-        setMenuAnchor({x, y, width, height});
+        setMenuAnchor({ x, y, width, height });
         setOpenMenuId(invoiceId);
       });
     } else {
@@ -413,7 +431,7 @@ export function useInvoiceDetails() {
           'Delete Invoice',
           'Are you sure you want to delete this invoice? This action cannot be undone.',
           [
-            {text: 'Cancel', style: 'cancel'},
+            { text: 'Cancel', style: 'cancel' },
             {
               text: 'Delete',
               style: 'destructive',
@@ -468,14 +486,42 @@ export function useInvoiceDetails() {
   };
 
   const toggleInvoiceSelection = (invoiceId: string) => {
-    setSelectedInvoiceIds(prev =>
-      prev.includes(invoiceId)
-        ? prev.filter(id => id !== invoiceId)
-        : [...prev, invoiceId],
-    );
+    const item = filteredData.find(r => r.id === invoiceId) || invoiceData.find(r => r.id === invoiceId);
+    if (!item) return;
+
+    // Restriction for CashnTech User
+    if (isCashnTechUser) {
+      const rawAdminStatus = (item.rawAdminStatus || '').trim().toUpperCase();
+      if (rawAdminStatus !== 'PENDING_VERIFICATION' && rawAdminStatus !== 'PENDING VERIFICATION') {
+        Toast.show({
+          type: 'info',
+          text1: 'Restricted',
+          text2: 'Only Pending Verification invoices can be selected.',
+        });
+        return;
+      }
+    }
+
+    const isSelected = selectedInvoiceIds.includes(invoiceId);
+    if (isSelected) {
+      setSelectedInvoiceIds(prev => prev.filter(id => id !== invoiceId));
+      setSelectedInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+    } else {
+      setSelectedInvoiceIds(prev => [...prev, invoiceId]);
+      setSelectedInvoices(prev => [
+        ...prev,
+        {
+          id: item.id,
+          invoiceNo: item.invoiceNo,
+          dealerName: item.dealerName || item.counterParty,
+          amount: item.invoiceAmount,
+          dueDate: item.dueDate,
+        },
+      ]);
+    }
   };
 
-  const selectedRowForMenu = openMenuId 
+  const selectedRowForMenu = openMenuId
     ? (filteredData.find(r => r.id === openMenuId) ?? invoiceData.find(r => r.id === openMenuId))
     : undefined;
 
@@ -493,36 +539,75 @@ export function useInvoiceDetails() {
 
   const selectedInvoiceDetails = selectedRow
     ? {
-        subTotal: selectedRow.invoiceAmount,
-        withholdingTaxesPercent: '0.00/-',
-        withholdingAmount: '0.00/-',
-        finalPayableAmount: selectedRow.invoiceAmount,
-        finalDueDate: selectedRow.dueDate,
-      }
+      subTotal: selectedRow.invoiceAmount,
+      withholdingTaxesPercent: '0.00/-',
+      withholdingAmount: '0.00/-',
+      finalPayableAmount: selectedRow.invoiceAmount,
+      finalDueDate: selectedRow.dueDate,
+    }
     : undefined;
 
-  const allSelectedOnScreen =
-    (isDealerChecker || isAnchorChecker) &&
-    filteredData.length > 0 &&
-    filteredData.every(row => selectedInvoiceIds.includes(row.id));
+  const allSelectedOnScreen = (() => {
+    if (isCashnTechUser) {
+      const pendingItems = filteredData.filter(
+        row =>
+          (row.rawAdminStatus || '').trim().toUpperCase() === 'PENDING_VERIFICATION' ||
+          (row.rawAdminStatus || '').trim().toUpperCase() === 'PENDING VERIFICATION',
+      );
+      return pendingItems.length > 0 && pendingItems.every(row => selectedInvoiceIds.includes(row.id));
+    }
+    return (
+      (isDealerChecker || isAnchorChecker) &&
+      filteredData.length > 0 &&
+      filteredData.every(row => selectedInvoiceIds.includes(row.id))
+    );
+  })();
 
   const approvalLevel = isAnchorChecker
     ? 1
     : isDealerMaker
-    ? 2
-    : isDealerChecker
-    ? 3
-    : 1;
+      ? 2
+      : isDealerChecker
+        ? 3
+        : 1;
 
   const toggleSelectAllVisible = () => {
-    if (!isDealerChecker && !isAnchorChecker) return;
-    const visibleIds = filteredData.map(row => row.id);
-    if (allSelectedOnScreen) {
-      setSelectedInvoiceIds(prev => prev.filter(id => !visibleIds.includes(id)));
-    } else {
-      setSelectedInvoiceIds(prev =>
-        Array.from(new Set([...prev, ...visibleIds])),
+    if (!isDealerChecker && !isAnchorChecker && !isCashnTechUser) return;
+
+    let visibleItems = filteredData;
+    if (isCashnTechUser) {
+      visibleItems = filteredData.filter(
+        row =>
+          (row.rawAdminStatus || '').trim().toUpperCase() === 'PENDING_VERIFICATION' ||
+          (row.rawAdminStatus || '').trim().toUpperCase() === 'PENDING VERIFICATION',
       );
+      if (visibleItems.length === 0 && filteredData.length > 0) {
+        Toast.show({
+          type: 'info',
+          text1: 'No Eligible Invoices',
+          text2: 'There are no "Pending Verification" invoices on this screen to select.',
+        });
+        return;
+      }
+    }
+
+    const visibleIds = visibleItems.map(row => row.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedInvoiceIds.includes(id));
+
+    if (allVisibleSelected) {
+      setSelectedInvoiceIds(prev => prev.filter(id => !visibleIds.includes(id)));
+      setSelectedInvoices(prev => prev.filter(inv => !visibleIds.includes(inv.id)));
+    } else {
+      setSelectedInvoiceIds(prev => Array.from(new Set([...prev, ...visibleIds])));
+
+      const newItems = visibleItems.filter(row => !selectedInvoiceIds.includes(row.id)).map(row => ({
+        id: row.id,
+        invoiceNo: row.invoiceNo,
+        dealerName: row.dealerName || row.counterParty,
+        amount: row.invoiceAmount,
+        dueDate: row.dueDate,
+      }));
+      setSelectedInvoices(prev => [...prev, ...newItems]);
     }
   };
 
@@ -565,7 +650,7 @@ export function useInvoiceDetails() {
     dispatch(
       updateInvoiceVerificationRequest({
         invoiceId,
-        action: 'Approve',
+        action: 'Verify',
         remark: remarks,
         programId,
         filters: apiFilters,
@@ -604,13 +689,27 @@ export function useInvoiceDetails() {
     void action;
     setShowSendForApprovalModal(false);
     setSelectedInvoiceIds([]);
+    setSelectedInvoices([]);
     if (programId) {
-      dispatch(fetchInvoiceListRequest({programId, filters: apiFilters}));
+      dispatch(fetchInvoiceListRequest({ programId, filters: apiFilters }));
     }
   };
 
+  const handleBulkAction = (action: 'Verify' | 'Reject' | 'On Hold') => {
+    if (selectedInvoices.length === 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'No Selection',
+        text2: 'Please select at least one Pending Verification invoice to proceed.',
+      });
+      return;
+    }
+    setBulkAction(action);
+    setShowBulkReviewModal(true);
+  };
+
   const getMenuPosition = React.useCallback(
-    (anchor: {x: number; y: number; width: number; height: number} | null) => {
+    (anchor: { x: number; y: number; width: number; height: number } | null) => {
       const screen = Dimensions.get('window');
       const menuWidth = scaleWidth(210);
       const horizontalPadding = scaleWidth(12);
@@ -628,7 +727,7 @@ export function useInvoiceDetails() {
         Math.min(desiredLeft, screen.width - menuWidth - horizontalPadding),
       );
       const top = Math.max(topPadding, anchor.y + anchor.height + scaleHeight(6));
-      return {position: 'absolute' as const, top, left};
+      return { position: 'absolute' as const, top, left };
     },
     [],
   );
@@ -640,7 +739,7 @@ export function useInvoiceDetails() {
   const isCreateInvoiceEnabled =
     !isAllProgramScope && !!concreteProgramId;
 
-  const {pendingCount, draftCount} = React.useMemo(() => {
+  const { pendingCount, draftCount } = React.useMemo(() => {
     let pending = 0;
     let draft = 0;
     invoiceData.forEach(row => {
@@ -652,7 +751,7 @@ export function useInvoiceDetails() {
         draft++;
       }
     });
-    return {pendingCount: pending, draftCount: draft};
+    return { pendingCount: pending, draftCount: draft };
   }, [invoiceData]);
 
   return {
@@ -740,5 +839,14 @@ export function useInvoiceDetails() {
     userInfoFull,
     pendingCount,
     draftCount,
+    selectedInvoices,
+    setSelectedInvoices,
+    bulkAction,
+    setBulkAction,
+    showBulkReviewModal,
+    setShowBulkReviewModal,
+    handleBulkAction,
+    bulkLoading,
+    setBulkLoading,
   };
 }

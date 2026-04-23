@@ -1,5 +1,6 @@
 import * as React from 'react';
-import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {StyleSheet, TouchableOpacity, View} from 'react-native';
+import {SafeText as Text} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Dots} from '@assets/Icons';
@@ -56,6 +57,7 @@ type Props = {
   onInvoiceNoPress?: (invoiceId: string, invoiceNo: string) => void;
   registerMenuRef: (id: string, ref: View | null) => void;
   index: number;
+  transparency?: number;
 };
 
 export const InvoiceDetailsCard: React.FC<Props> = ({
@@ -72,6 +74,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   onInvoiceNoPress,
   registerMenuRef,
   index,
+  transparency = 1,
 }) => {
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canEdit = useHasPermission(PERMISSIONS.INVOICE_LIST_EDIT);
@@ -112,7 +115,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
     : row.dealerName;
 
   return (
-    <View style={styles.cardWrapper}>
+    <View style={[styles.cardWrapper, {opacity: transparency}]}>
       <View style={styles.listCard}>
         {hasAnyActionPermission && (
           <View
@@ -142,7 +145,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
             </Text>
           </View>
           <View style={styles.cardHeaderContainer}>
-            {(isDealerChecker || isAnchorChecker) ? (
+            {(isDealerChecker || isAnchorChecker || (isCashnTechUser && showPendingBlueDot)) ? (
               <TouchableOpacity
                 activeOpacity={0.8}
                 style={styles.dmCardHeaderRow}

@@ -33,9 +33,9 @@ import {AppRole} from '@constants/roles';
 import {selectProgramSelection, selectAllProgramIds} from '@store/programSelection/programSelection.selector';
 import {decryptValue} from '@utils/decrypt';
 import Endpoints from '@constants/ApiEndPoints';
-import {formatDateDash} from '@screens/Invoice/InvoiceDetails/types';
-import {PaymentHistoryModal} from './DPDPenalInterestNPAScreen/PaymentHistoryModal';
-import {RequestWaiverModal} from './DPDPenalInterestNPAScreen/RequestWaiverModal';
+import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
+import {PaymentHistoryModal} from '../DPDPenalInterest/components/PaymentHistoryModal';
+import {RequestWaiverModal} from '../DPDPenalInterest/components/RequestWaiverModal';
 
 // Summary metrics for Repayment & Settlement
 const repaymentMetrics = [
