@@ -2,19 +2,22 @@ import CryptoJS from 'crypto-js';
 import Config from 'react-native-config';
 import {Config as AppConfig} from '@config/index';
 
-// Fallback when .env not loaded (e.g. before rebuild) - must match backend .env
+// Fallback when react-native-config native module is not linked or .env not loaded.
+// react-native-config is excluded from Android autolinking (react-native.config.js),
+// so Config.* values are undefined at JS runtime in bundled APKs.
+// These must match backend .env values.
 const FALLBACK_KEY = 'u/Gu5posvwDsXUnV5Zaq4g==';
 const FALLBACK_IV = '5D9r9ZVzEYYgha93/aUK2w==';
 
 function getEncryptionKeys(): {key: string; iv: string} {
   const key =
-    Config.RK_ENCRYPTION_KEY ||
-    AppConfig.RK_ENCRYPTION_KEY ||
-    (__DEV__ ? FALLBACK_KEY : '');
+    Config?.RK_ENCRYPTION_KEY ||
+    AppConfig?.RK_ENCRYPTION_KEY ||
+    FALLBACK_KEY;
   const iv =
-    Config.RK_ENCRYPTION_IV ||
-    AppConfig.RK_ENCRYPTION_IV ||
-    (__DEV__ ? FALLBACK_IV : '');
+    Config?.RK_ENCRYPTION_IV ||
+    AppConfig?.RK_ENCRYPTION_IV ||
+    FALLBACK_IV;
   
   if (__DEV__ && (!key || !iv)) {
     console.warn('[crypto] RK_ENCRYPTION_KEY or RK_ENCRYPTION_IV is missing in .env! Using fallbacks for development.');

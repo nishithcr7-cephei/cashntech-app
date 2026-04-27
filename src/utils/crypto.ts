@@ -1,6 +1,18 @@
 import {Config} from '@config/index';
 import CryptoJS from 'crypto-js';
 
+// Fallback keys for when react-native-config native module is not linked
+// (excluded from Android autolinking in react-native.config.js)
+const FALLBACK_KEY = 'u/Gu5posvwDsXUnV5Zaq4g==';
+const FALLBACK_IV = '5D9r9ZVzEYYgha93/aUK2w==';
+
+function getKey(): string {
+  return Config?.RK_ENCRYPTION_KEY || FALLBACK_KEY;
+}
+function getIV(): string {
+  return Config?.RK_ENCRYPTION_IV || FALLBACK_IV;
+}
+
 export class DecryptionError extends Error {
   constructor(message: string, public readonly originalError?: Error) {
     super(message);
@@ -24,8 +36,8 @@ export function decryptUtility(
   parse?: boolean,
 ): Record<string, any> | string {
   try {
-    const key = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_KEY);
-    const iv = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_IV);
+    const key = CryptoJS.enc.Base64.parse(getKey());
+    const iv = CryptoJS.enc.Base64.parse(getIV());
     const cipherParams = CryptoJS.lib.CipherParams.create({
       ciphertext: CryptoJS.enc.Base64.parse(encryptedString),
     });
@@ -55,8 +67,8 @@ export function decryptUtility(
 export function encryptUtility(
   value: Record<string, any> | string | null,
 ): string {
-  const key = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_KEY);
-  const iv = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_IV);
+  const key = CryptoJS.enc.Base64.parse(getKey());
+  const iv = CryptoJS.enc.Base64.parse(getIV());
   let plainText;
   if (typeof value === 'string') {
     plainText = value;
@@ -77,8 +89,8 @@ export function encryptUtility(
 export function decryptLocation(encrypted: string): string {
   if (!encrypted) return '';
   try {
-    const key = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_KEY);
-    const iv = CryptoJS.enc.Base64.parse(Config.RK_ENCRYPTION_IV);
+    const key = CryptoJS.enc.Base64.parse(getKey());
+    const iv = CryptoJS.enc.Base64.parse(getIV());
     const cipherParams = CryptoJS.lib.CipherParams.create({
       ciphertext: CryptoJS.enc.Base64.parse(encrypted),
     });
@@ -113,8 +125,8 @@ export function decryptConditionally(value: string): string {
 
   // Try to decrypt it (backend sends raw ciphertext in Base64, not OpenSSL format)
   try {
-    const keyStr = Config.RK_ENCRYPTION_KEY || '';
-    const ivStr = Config.RK_ENCRYPTION_IV || '';
+    const keyStr = getKey();
+    const ivStr = getIV();
     if (!keyStr || !ivStr) return value;
 
     const key = CryptoJS.enc.Base64.parse(keyStr);
