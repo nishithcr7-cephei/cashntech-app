@@ -284,6 +284,18 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   </View>
                 </TouchableOpacity>
               )}
+              {canViewHistory && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('approvalHistory', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#0085FF" size={18} />
+                  <View style={styles.menuItemTextBlock}>
+                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
+                    <Text style={styles.menuSubText}>Track Verification</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
             </>
           )}
           {/* Dealer checker: Invoice Verification, Approval History, Attachments */}

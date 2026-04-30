@@ -35,37 +35,9 @@ import Endpoints from '@constants/ApiEndPoints';
 import {RecordRepaymentModal} from './components/RecordRepaymentModal';
 import {PaymentHistoryModal} from './components/PaymentHistoryModal';
 import {RequestWaiverModal} from './components/RequestWaiverModal';
+import {invoiceApi} from '@services/api/invoice.api';
 
-const dpdMetrics = [
-  {
-    label: 'DPD Bucket Movement',
-    subValues: [
-      { label: '0-30 Days', value: '₹ 9,86,452.35' },
-      { label: '31-60 Days', value: '₹ 4,72,190.80' },
-      { label: '61-90 Days', value: '₹ 2,18,764.55' },
-    ],
-  },
-  {
-    label: 'Top 10 Overdue Accounts',
-    subValues: [
-      { label: 'By Amount', value: '₹ 6,84,920.25' },
-      { label: 'By DPD', value: '87 Days' },
-    ],
-  },
-  {
-    label: 'Gross NPA % (DPD > 90 D)',
-    value: '4.38%',
-  },
-  {
-    label: 'Total Outstanding Amount',
-    value: '₹ 22,64,718.40',
-  },
-  {
-    label: 'Total Overdue Amount',
-    value: '₹ 6,77,407.70',
-  },
-];
-
+// DPD Metrics will be dynamically populated in the component
 
 
 const dpdFilterData = {
@@ -100,15 +72,56 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
   const dpdRows = useSelector(dpdSelectors.selectDPDList);
   const loading = useSelector(dpdSelectors.selectDPDLoading);
 
+  const [apiKpis, setApiKpis] = useState<any>(null);
+
   useEffect(() => {
     let payload = {};
+    let pIds: string[] | undefined = undefined;
     if (programSelection?.programScope === 'all') {
       payload = {};
+      // For all programs, if allProgramIds exist, you might pass them, but keeping it empty works too based on existing logic
     } else if (programSelection?.programId) {
       payload = {programIds: [programSelection.programId]};
+      pIds = [programSelection.programId];
     }
     dispatch(dpdActions.fetchDPDListRequest(payload));
+
+    invoiceApi.getDpdKpis(pIds).then(res => {
+      setApiKpis(res);
+    }).catch(e => console.log('Error fetching dpd kpis', e));
   }, [programSelection, dispatch]);
+
+  const getVal = (val: string | undefined | null) => val ? `₹ ${Number(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}` : '-';
+
+  const dpdMetrics = useMemo(() => [
+    {
+      label: 'DPD Bucket Movement',
+      subValues: [
+        { label: '0-30 Days', value: getVal(apiKpis?.dpd_bucket_movement?.['0_30_days']) },
+        { label: '31-60 Days', value: getVal(apiKpis?.dpd_bucket_movement?.['31_60_days']) },
+        { label: '61-90 Days', value: getVal(apiKpis?.dpd_bucket_movement?.['61_90_days']) },
+      ],
+    },
+    {
+      label: 'Top 10 Overdue Accounts',
+      subValues: [
+        { label: 'By Amount', value: getVal(apiKpis?.top_10_overdue_accounts?.by_amount) },
+        { label: 'By DPD', value: apiKpis?.top_10_overdue_accounts?.by_dpd ?? '-' },
+      ],
+    },
+    {
+      label: 'Gross NPA % (DPD > 90 D)',
+      value: apiKpis?.gross_npa_percent ?? '-',
+    },
+    {
+      label: 'Total Outstanding Amount',
+      value: getVal(apiKpis?.total_outstanding_amount),
+    },
+    {
+      label: 'Total Overdue Amount',
+      value: getVal(apiKpis?.total_overdue_amount),
+    },
+  ], [apiKpis]);
 
   const filteredData = useMemo(() => {
     let data = dpdRows;
@@ -133,6 +146,11 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
         navigation={navigation as any}
       />
       <ProgramBreadcrumb />
+      <View style={styles.navPathContainer}>
+        <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
+          Products {'>'} Dealer Finance {'>'} Transactions
+        </Text>
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.pageTitleBar}>
           <Text style={styles.pageTitleText}>DPD / Penal Interest / NPA</Text>
@@ -248,8 +266,8 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>NPA Status</Text>
-                    <Text style={[styles.infoValue, {color: row.npa_status ? Colors.red : Colors.green}]}>
-                      {row.npa_status !== undefined ? String(row.npa_status) : ''}
+                    <Text style={[styles.infoValue, {color: row.npa_status === true ? Colors.red : row.npa_status === false ? Colors.green : Colors.darkblack}]}>
+                      {row.npa_status === true ? 'Yes' : row.npa_status === false ? 'No' : '-'}
                     </Text>
                   </View>
                 </View>
@@ -353,4 +371,16 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroyBold,
   },
   statusGreen: { color: Colors.green, fontFamily: Fonts.GilroySemiBold },
+  navPathContainer: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(8),
+    backgroundColor: '#F8F9FA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  navPathText: {
+    fontSize: scaleFont(12),
+    color: '#666666',
+    fontFamily: Fonts.GilroyMedium,
+  },
 });

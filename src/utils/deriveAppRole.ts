@@ -12,8 +12,11 @@ type PermissionItem = {
  */
 export function deriveAppRoleFromUser(user: {
   first_name?: string;
+  user_type?: string;
   permission_group?: PermissionItem[] | { getItems?: () => PermissionItem[] };
 }): AppRole {
+  const userType = (user?.user_type || '').toLowerCase();
+  if (userType === 'cashntech') return 'cashntech_user';
   const fn = (user?.first_name || '').toLowerCase();
   const perms = Array.isArray(user?.permission_group)
     ? user.permission_group

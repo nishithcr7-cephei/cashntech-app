@@ -178,6 +178,7 @@ export const DisbursementScreen: React.FC = () => {
       : programSelection?.programName ?? 'Sun Pharma PGM';
   const isCashnTechUser = userRole === 'cashntech_user';
   const isAnchorChecker = userRole === 'anchor_checker';
+  const isAnchorMaker = userRole === 'anchor_maker';
   
   // Permissions
   const permissionsLoading = useSelector(selectPermissionsLoading);
@@ -197,6 +198,7 @@ export const DisbursementScreen: React.FC = () => {
   const [disbursementRows, setDisbursementRows] = useState<DisbursementRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [apiKpis, setApiKpis] = useState<any>(null);
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
@@ -240,9 +242,16 @@ export const DisbursementScreen: React.FC = () => {
           };
         }
       }
-      const verifiedList = await invoiceApi.getVerifiedList(programIds, apiFilters);
+      const [verifiedList, kpisResponse] = await Promise.all([
+        invoiceApi.getVerifiedList(programIds, apiFilters),
+        invoiceApi.getDisbursementKpis(programIds).catch(() => null)
+      ]);
       
       if (requestId !== fetchRequestId.current) return;
+
+      if (kpisResponse) {
+        setApiKpis(kpisResponse);
+      }
 
       let verifiedItems = (verifiedList || []).filter(
         (item: any) => {
@@ -293,43 +302,20 @@ export const DisbursementScreen: React.FC = () => {
     fetchDisbursementData();
   }, [fetchDisbursementData]);
 
-  // Client-side metrics from /invoice/verified/list data (backend returns final_total, disbursed_amount)
-  const totalDisbursedAmount = disbursementRows.reduce(
-    (sum, r) => sum + (r.disbursedAmount ?? 0),
-    0,
-  );
-  const totalInvoiceAmount = disbursementRows.reduce(
-    (sum, r) => sum + (r.finalTotal ?? 0),
-    0,
-  );
-  const pendingDisAmount = disbursementRows.reduce(
-    (sum, r) => sum + Math.max(0, (r.finalTotal ?? 0) - (r.disbursedAmount ?? 0)),
-    0,
-  );
-  const utilizationPct =
-    totalInvoiceAmount > 0
-      ? ((totalDisbursedAmount / totalInvoiceAmount) * 100).toFixed(2)
-      : '0.00';
+  // Use API KPIs if available, otherwise fallback to client-side reductions
+  const totalDisbursedAmount = apiKpis?.total_disbursed_amount !== undefined 
+    ? Number(apiKpis.total_disbursed_amount)
+    : disbursementRows.reduce((sum, r) => sum + (r.disbursedAmount ?? 0), 0);
+    
+  const totalInvoiceAmount = apiKpis?.total_uploaded_amount !== undefined
+    ? Number(apiKpis.total_uploaded_amount)
+    : disbursementRows.reduce((sum, r) => sum + (r.finalTotal ?? 0), 0);
+    
+  const pendingDisAmount = apiKpis?.pending_disbursed_amount !== undefined
+    ? Number(apiKpis.pending_disbursed_amount)
+    : disbursementRows.reduce((sum, r) => sum + Math.max(0, (r.finalTotal ?? 0) - (r.disbursedAmount ?? 0)), 0);
 
-  // Logical TAT calculation
-  const disbursedInvoices = disbursementRows.filter(
-    r => (r.invoiceStatus || '').toLowerCase() === 'disbursed' && r.invoiceDateRaw && r.disburseDateRaw
-  );
-  let avgTatDays = 0;
-  if (disbursedInvoices.length > 0) {
-    const totalDays = disbursedInvoices.reduce((sum, r) => {
-      const start = new Date(r.invoiceDateRaw!);
-      const end = new Date(r.disburseDateRaw!);
-      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-        const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-        return sum + Math.max(0, diffDays);
-      }
-      return sum;
-    }, 0);
-    avgTatDays = Math.round(totalDays / disbursedInvoices.length);
-  }
-  // If avgTatDays is 0 and we want to show "practical" data for demo
-  const displayTat = avgTatDays > 0 ? `${avgTatDays} Days` : '2 Days';
+
 
   const disbursementMetrics = [
     {
@@ -346,15 +332,15 @@ export const DisbursementScreen: React.FC = () => {
     },
     {
       label: 'Repeat usage',
-      value: `${utilizationPct}%`,
+      value: '-',
     },
     {
       label: 'TAT (Turn Around Time)',
-      value: displayTat,
+      value: '-',
     },
     {
       label: 'DSO (Days Sales Outstanding)',
-      value: '30 Days',
+      value: '-',
     },
   ];
 
@@ -517,7 +503,57 @@ export const DisbursementScreen: React.FC = () => {
           <Text style={styles.indexText}>{index + 1}</Text>
         </View>
         <View style={styles.infoGrid}>
-          {isAnchorChecker ? (
+          {isAnchorMaker ? (
+            <>
+              {/* Anchor Maker Order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Date → Due Date → Disbursement Date → Invoice Amount (₹) → UTR No. → Invoice Status */}
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice No.</Text>
+                <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Bank Name</Text>
+                <Text style={styles.infoValue}>{row.bankName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Product Name</Text>
+                <Text style={styles.infoValue}>{row.productName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Program Name</Text>
+                <Text style={styles.infoValue}>{row.programName}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Counter Party</Text>
+                <Text style={styles.infoValue}>{row.counterParty}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Date</Text>
+                <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Due Date</Text>
+                <Text style={styles.infoValue}>{row.dueDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Disbursement Date</Text>
+                <Text style={styles.infoValue}>{row.disburseDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>UTR No.</Text>
+                <Text style={styles.infoValue}>{row.utrNo}</Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
+                <Text style={styles.infoLabel}>Invoice Status</Text>
+                <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.invoiceStatus}
+                </Text>
+              </View>
+            </>
+          ) : isAnchorChecker ? (
             <>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Invoice No.</Text>
@@ -636,6 +672,11 @@ export const DisbursementScreen: React.FC = () => {
         navigation={navigation as any}
       />
       <ProgramBreadcrumb />
+      <View style={styles.navPathContainer}>
+        <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
+          Products {'>'} Dealer Finance {'>'} Transactions
+        </Text>
+      </View>
       <FlatList
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -1175,5 +1216,17 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.white,
+  },
+  navPathContainer: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(8),
+    backgroundColor: '#F8F9FA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  navPathText: {
+    fontSize: scaleFont(12),
+    color: '#666666',
+    fontFamily: Fonts.GilroyMedium,
   },
 });

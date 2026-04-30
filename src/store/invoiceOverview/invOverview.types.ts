@@ -15,6 +15,7 @@ export type InvoiceOverviewSummaryItem = {
   overdue_amount?: number | null;
   principal_overdue?: number | null;
   interest_overdue?: number | null;
+  penal_overdue?: number | null;
   dpd_days?: number | null;
   dealer_name?: string;
   dealer_no?: string;
@@ -62,6 +63,7 @@ export type InvoiceOverviewState = {
     overdue_amount: string;
     principal_overdue: string;
     interest_overdue: string;
+    penal_overdue: string;
     dpd_days: string;
   } | null;
   kpisLoading: boolean;

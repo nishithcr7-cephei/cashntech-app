@@ -225,6 +225,40 @@ export type InvoiceKpisResponse = {
   dpd_days: string;
 };
 
+export type DisbursementKpisResponse = {
+  total_uploaded_amount: string;
+  total_disbursed_amount: string;
+  pending_disbursed_amount: string;
+};
+
+export type InterestAccrualKpisResponse = {
+  total_interest_accrued_daily: string;
+  accrual_vs_expected: number;
+};
+
+export type RepaymentKpisResponse = {
+  total_dsibursed_amount: string;
+  principal_repaid: string;
+  interest_repaid: string;
+  penal_repaid: string;
+  totalClosedInvoices: string;
+};
+
+export type DpdKpisResponse = {
+  dpd_bucket_movement: {
+    "0_30_days": string;
+    "31_60_days": string;
+    "61_90_days": string;
+  };
+  top_10_overdue_accounts: {
+    by_amount: string;
+    by_dpd: string;
+  };
+  gross_npa_percent: string;
+  total_outstanding_amount: string;
+  total_overdue_amount: string;
+};
+
 export const invoiceApi = {
   getInvoiceList: async (
     programId: string,
@@ -267,22 +301,15 @@ export const invoiceApi = {
   },
 
   getInvoiceSummary: async (
-    programIds?: string[],
+    _programIds?: string[],
   ): Promise<any> => {
-    const body: any = {
-      programIds: (programIds && programIds.length === 1) ? programIds[0] : (programIds ?? []),
-    };
-    // eslint-disable-next-line no-console
-    console.log('[InvoiceSummary] POST Body:', JSON.stringify(body));
     const response = await axiosInstance.post(
       ApiEndPoints.apiInvoiceSummary,
-      body,
+      {},
       {authRequired: true} as any,
     );
     // Extract nested data structure: response.data.data contains the actual array
     const data = response?.data?.data ?? response?.data ?? [];
-    // eslint-disable-next-line no-console
-    console.log('[InvoiceSummary] API Response Count:', data.length);
     return {data};
   },
 
@@ -290,7 +317,7 @@ export const invoiceApi = {
     programIds?: string[],
   ): Promise<any> => {
     const body: any = {
-      programIds: (programIds && programIds.length === 1) ? programIds[0] : (programIds ?? []),
+      programIds: programIds ?? [],
     };
     // eslint-disable-next-line no-console
     console.log('[InvoiceLatest] POST Body:', JSON.stringify(body));
@@ -306,7 +333,7 @@ export const invoiceApi = {
 
   getInvoiceKpis: async (programIds?: string[]): Promise<InvoiceKpisResponse> => {
     const body: any = {
-      programIds: (programIds && programIds.length === 1) ? programIds[0] : (programIds ?? []),
+      programIds: programIds ?? [],
     };
     // eslint-disable-next-line no-console
     console.log('[InvoiceKpis] POST Body:', JSON.stringify(body));
@@ -327,7 +354,102 @@ export const invoiceApi = {
       overdue_amount: raw.overdue_amount ?? '0',
       principal_overdue: raw.principal_overdue ?? '0',
       interest_overdue: raw.interest_overdue ?? '0',
+      penal_overdue: raw.penal_overdue ?? '0',
       dpd_days: raw.dpd_days ?? '0',
+    };
+  },
+
+  getDisbursementKpis: async (programIds?: string[]): Promise<DisbursementKpisResponse> => {
+    const body: any = {
+      programIds: programIds ?? [],
+    };
+    // eslint-disable-next-line no-console
+    console.log('[DisbursementKpis] POST Body:', JSON.stringify(body));
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiDisbursementKpis,
+      body,
+      {authRequired: true} as any,
+    );
+    const raw = response?.data?.data ?? {};
+    // eslint-disable-next-line no-console
+    console.log('[DisbursementKpis] API Response Data:', JSON.stringify(raw, null, 2));
+    return {
+      total_uploaded_amount: raw.total_uploaded_amount ?? '0.00',
+      total_disbursed_amount: raw.total_disbursed_amount ?? '0.00',
+      pending_disbursed_amount: raw.pending_disbursed_amount ?? '0.00',
+    };
+  },
+
+  getInterestAccrualKpis: async (programIds?: string[]): Promise<InterestAccrualKpisResponse> => {
+    const body: any = {
+      programIds: programIds ?? [],
+    };
+    // eslint-disable-next-line no-console
+    console.log('[InterestAccrualKpis] POST Body:', JSON.stringify(body));
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiInterestAccrualKpis,
+      body,
+      {authRequired: true} as any,
+    );
+    const raw = response?.data?.data ?? {};
+    // eslint-disable-next-line no-console
+    console.log('[InterestAccrualKpis] API Response Data:', JSON.stringify(raw, null, 2));
+    return {
+      total_interest_accrued_daily: raw.total_interest_accrued_daily ?? '0.00',
+      accrual_vs_expected: raw.accrual_vs_expected ?? 0,
+    };
+  },
+
+  getRepaymentKpis: async (programIds?: string[]): Promise<RepaymentKpisResponse> => {
+    const body: any = {
+      programIds: programIds ?? [],
+    };
+    // eslint-disable-next-line no-console
+    console.log('[RepaymentKpis] POST Body:', JSON.stringify(body));
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiRepaymentKpis,
+      body,
+      {authRequired: true} as any,
+    );
+    const raw = response?.data?.data ?? {};
+    // eslint-disable-next-line no-console
+    console.log('[RepaymentKpis] API Response Data:', JSON.stringify(raw, null, 2));
+    return {
+      total_dsibursed_amount: raw.total_dsibursed_amount ?? '0.00',
+      principal_repaid: raw.principal_repaid ?? '0.00',
+      interest_repaid: raw.interest_repaid ?? '0.00',
+      penal_repaid: raw.penal_repaid ?? '0.00',
+      totalClosedInvoices: raw.totalClosedInvoices ?? '0',
+    };
+  },
+
+  getDpdKpis: async (programIds?: string[]): Promise<DpdKpisResponse> => {
+    const body: any = {
+      programIds: programIds ?? [],
+    };
+    // eslint-disable-next-line no-console
+    console.log('[DpdKpis] POST Body:', JSON.stringify(body));
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiDpdKpis,
+      body,
+      {authRequired: true} as any,
+    );
+    const raw = response?.data?.data ?? {};
+    // eslint-disable-next-line no-console
+    console.log('[DpdKpis] API Response Data:', JSON.stringify(raw, null, 2));
+    return {
+      dpd_bucket_movement: raw.dpd_bucket_movement ?? {
+        "0_30_days": "0.00",
+        "31_60_days": "0.00",
+        "61_90_days": "0.00"
+      },
+      top_10_overdue_accounts: raw.top_10_overdue_accounts ?? {
+        by_amount: "0.00",
+        by_dpd: "0 Days"
+      },
+      gross_npa_percent: raw.gross_npa_percent ?? "0.00%",
+      total_outstanding_amount: raw.total_outstanding_amount ?? "0.00",
+      total_overdue_amount: raw.total_overdue_amount ?? "0.00",
     };
   },
 

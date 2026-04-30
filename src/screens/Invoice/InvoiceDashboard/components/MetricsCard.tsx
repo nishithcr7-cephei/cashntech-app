@@ -18,7 +18,9 @@ export const MetricsCard: React.FC<MetricsCardProps> = ({metrics, loading}) => {
           key={idx}
           style={[
             styles.card,
-            metric.label === 'Overdue Amount' && {flexBasis: '100%'},
+            metric.label === 'Overdue Amount' && {
+              flexBasis: '100%',
+            },
           ]}>
           <Text style={styles.cardLabel}>{metric.label}</Text>
           {loading ? (
@@ -28,14 +30,19 @@ export const MetricsCard: React.FC<MetricsCardProps> = ({metrics, loading}) => {
               style={styles.cardLoader}
             />
           ) : (
-            <Text style={styles.cardValue}>{metric.value}</Text>
+            metric.value ? <Text style={styles.cardValue}>{metric.value}</Text> : null
           )}
 
           {metric.subValues && metric.subValues.length > 0 && (
             <View style={styles.subValuesContainer}>
               {metric.subValues.map((sub, sIdx) => (
                 <View key={sIdx} style={styles.subValueItem}>
-                  <Text style={styles.subValueLabel}>{sub.label}</Text>
+                  <Text 
+                    style={styles.subValueLabel}
+                    numberOfLines={1}>
+                    {sub.label}
+                  </Text>
+
                   <Text style={styles.subValueText}>{sub.value}</Text>
                 </View>
               ))}

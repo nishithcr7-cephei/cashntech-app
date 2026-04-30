@@ -23,5 +23,6 @@ export interface DashboardKpis {
   overdue_amount: string;
   principal_overdue: string;
   interest_overdue: string;
+  penal_overdue: string;
   dpd_days: string;
 }

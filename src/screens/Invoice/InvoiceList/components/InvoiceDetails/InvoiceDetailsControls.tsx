@@ -94,17 +94,27 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
     <View style={styles.controlsSection}>
       <View style={styles.summaryRow}>
         <View style={[styles.summaryCard, styles.pendingCard]}>
+          <View style={styles.pendingDotSmall} />
           <Text style={[styles.summaryCount, styles.pendingText]}>{pendingCount}</Text>
           <Text style={styles.summaryLabel}>PENDING FOR APPROVAL</Text>
         </View>
         <View style={[styles.summaryCard, styles.draftCard]}>
+          <View style={styles.draftDotSmall} />
           <Text style={[styles.summaryCount, styles.draftText]}>{draftCount}</Text>
           <Text style={styles.summaryLabel}>DRAFT</Text>
         </View>
-        <View style={[styles.summaryCard, styles.totalCard]}>
-          <Text style={[styles.summaryCount, styles.totalText]}>{invoiceCount}</Text>
-          <Text style={styles.summaryLabel}>TOTAL</Text>
-        </View>
+        {(isAnchorMaker || isAnchorChecker) ? (
+          <View style={[styles.summaryCard, styles.actionRequiredCard]}>
+            <View style={styles.actionDotSmall} />
+            <Text style={[styles.summaryCount, styles.actionRequiredText]}>{actionRequiredCount}</Text>
+            <Text style={styles.summaryLabel}>ACTION REQUIRED</Text>
+          </View>
+        ) : (
+          <View style={[styles.summaryCard, styles.totalCard]}>
+            <Text style={[styles.summaryCount, styles.totalText]}>{invoiceCount}</Text>
+            <Text style={styles.summaryLabel}>TOTAL</Text>
+          </View>
+        )}
       </View>
 
 
@@ -180,13 +190,6 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
         </View>
       </View>
 
-      <View style={styles.listHeader}>
-        <Text style={styles.listHeaderLabel}>Invoices</Text>
-        <View style={styles.countBadge}>
-          <Text style={styles.countBadgeText}>{invoiceCount}</Text>
-        </View>
-      </View>
-
       <View style={styles.searchFilterRow}>
         <View style={styles.searchContainer}>
           <Search width={scaleWidth(18)} height={scaleHeight(18)} />
@@ -212,6 +215,15 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
           <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
           <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.listHeader}>
+        <Text style={styles.listHeaderLabel}>
+          {(isAnchorMaker || isAnchorChecker) ? 'Dealer Wise Invoice Details' : 'Invoices'}
+        </Text>
+        <View style={styles.countBadge}>
+          <Text style={styles.countBadgeText}>{invoiceCount}</Text>
+        </View>
       </View>
 
       {(isAnchorMaker || isDealerMaker) &&
@@ -478,6 +490,8 @@ const styles = StyleSheet.create({
     paddingVertical: scaleHeight(12),
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
   },
   pendingCard: {
     backgroundColor: '#FEF3CD',
@@ -503,6 +517,14 @@ const styles = StyleSheet.create({
   },
   totalText: {
     color: '#17160F',
+  },
+  actionRequiredCard: {
+    backgroundColor: '#FFE4E6', // Soft red
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  actionRequiredText: {
+    color: Colors.red,
   },
   summaryLabel: {
     fontSize: scaleFont(8.5),
@@ -537,6 +559,33 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.white,
+  },
+  pendingDotSmall: {
+    width: scaleWidth(10),
+    height: scaleWidth(10),
+    borderRadius: scaleWidth(5),
+    backgroundColor: Colors.tertiaryBlue,
+    position: 'absolute',
+    top: scaleHeight(8),
+    right: scaleWidth(8),
+  },
+  draftDotSmall: {
+    width: scaleWidth(10),
+    height: scaleWidth(10),
+    borderRadius: scaleWidth(5),
+    backgroundColor: '#F59E0B',
+    position: 'absolute',
+    top: scaleHeight(8),
+    right: scaleWidth(8),
+  },
+  actionDotSmall: {
+    width: scaleWidth(10),
+    height: scaleWidth(10),
+    borderRadius: scaleWidth(5),
+    backgroundColor: Colors.red,
+    position: 'absolute',
+    top: scaleHeight(8),
+    right: scaleWidth(8),
   },
 });
 

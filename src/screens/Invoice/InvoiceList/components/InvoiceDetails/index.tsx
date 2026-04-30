@@ -141,12 +141,17 @@ export const InvoiceDetails: React.FC = () => {
       <AppBar
         title="Transactions > Invoice List & Approval"
         navigation={navigation as any}
-        hideHamburger={(isAnchorMaker || isDealerMaker || isCashnTechUser) && fromInvoiceDashboard}
+        hideHamburger={(isAnchorMaker || isAnchorChecker || isDealerMaker || isCashnTechUser) && fromInvoiceDashboard}
         renderLeftIcon={fromInvoiceDashboard ? <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} /> : undefined}
         onPressLeftIcon={fromInvoiceDashboard ? () => navigation.goBack() : undefined}
         style={{zIndex: 10}}
       />
       <ProgramBreadcrumb />
+      <View style={styles.navPathContainer}>
+        <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
+          Products {'>'} Dealer Finance {'>'} Transactions
+        </Text>
+      </View>
       {/* Removed Selected Program Row as requested */}
       {!hasAnyProgramContext ? (
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>

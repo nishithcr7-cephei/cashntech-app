@@ -36,54 +36,9 @@ import Endpoints from '@constants/ApiEndPoints';
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import {PaymentHistoryModal} from '../DPDPenalInterest/components/PaymentHistoryModal';
 import {RequestWaiverModal} from '../DPDPenalInterest/components/RequestWaiverModal';
+import {invoiceApi} from '@services/api/invoice.api';
 
-// Summary metrics for Repayment & Settlement
-const repaymentMetrics = [
-  {
-    label: 'Total Disbursed Amount',
-    value: '₹ 48,27,564.05',
-  },
-  {
-    label: 'Total Collections',
-    subValues: [
-      { label: 'Principal Amount', value: '₹ 25,83,411.02' },
-      { label: 'Interest Amount', value: '₹ 5,49,248.04' },
-      { label: 'Penal Interest Amount', value: '₹ 1,32,233.01' },
-    ],
-  },
-  {
-    label: 'Total Outstanding Amount',
-    subValues: [
-      { label: 'Principal Amount', value: '₹ 11,89,254.03' },
-      { label: 'Interest Amount', value: '₹ 2,84,789.03' },
-      { label: 'Penal Interest Amount', value: '₹ 88,628.92' },
-    ],
-  },
-  {
-    label: 'Collection Efficiency(%)',
-    value: '67.63%',
-  },
-  {
-    label: 'Overdue Amount',
-    subValues: [
-      { label: 'Principal Amount', value: '₹ 1,86,421.05' },
-      { label: 'Interest Amount', value: '₹ 49,278.02' },
-      { label: 'Penal Interest Amount', value: '₹ 11,657.21' },
-    ],
-  },
-  {
-    label: 'Allocation Completeness',
-    value: '96.48%',
-  },
-  {
-    label: 'Total Closed Invoices',
-    value: '19',
-  },
-  {
-    label: 'Average Settlement TAT',
-    value: '2.74 Days',
-  },
-];
+// Summary metrics for Repayment & Settlement will be dynamically built inside the component
 
 const repaymentFilterData = {
   'Primary Party': ['Sun Pharma', 'Hero Finanace', 'ABC Finance'],
@@ -162,6 +117,8 @@ export const RepaymentSettlementScreen: React.FC = () => {
     return {position: 'absolute' as const, top: anchor.y + anchor.height + topPadding, left};
   };
 
+  const [apiKpis, setApiKpis] = useState<any>(null);
+
   useEffect(() => {
     const programIds = programSelection?.programScope === 'all'
       ? allProgramIds || undefined
@@ -174,7 +131,60 @@ export const RepaymentSettlementScreen: React.FC = () => {
       : {programIds};
 
     dispatch(repaymentActions.fetchRepaymentListRequest(payload));
+    
+    invoiceApi.getRepaymentKpis(programIds).then(res => {
+      setApiKpis(res);
+    }).catch(e => console.log('Error fetching repayment kpis', e));
   }, [programSelection?.programScope, programSelection?.programId, allProgramIds, dispatch]);
+
+  const getVal = (val: string | undefined | null) => val ? `₹ ${Number(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}` : '-';
+
+  const repaymentMetrics = useMemo(() => [
+    {
+      label: 'Total Disbursed Amount',
+      value: getVal(apiKpis?.total_dsibursed_amount),
+    },
+    {
+      label: 'Total Collections',
+      subValues: [
+        { label: 'Principal Amount', value: getVal(apiKpis?.principal_repaid) },
+        { label: 'Interest Amount', value: getVal(apiKpis?.interest_repaid) },
+        { label: 'Penal Interest Amount', value: getVal(apiKpis?.penal_repaid) },
+      ],
+    },
+    {
+      label: 'Total Outstanding Amount',
+      subValues: [
+        { label: 'Principal Amount', value: '-' },
+        { label: 'Interest Amount', value: '-' },
+        { label: 'Penal Interest Amount', value: '-' },
+      ],
+    },
+    {
+      label: 'Collection Efficiency(%)',
+      value: '-',
+    },
+    {
+      label: 'Overdue Amount',
+      subValues: [
+        { label: 'Principal Amount', value: '-' },
+        { label: 'Interest Amount', value: '-' },
+        { label: 'Penal Interest Amount', value: '-' },
+      ],
+    },
+    {
+      label: 'Allocation Completeness',
+      value: '-',
+    },
+    {
+      label: 'Total Closed Invoices',
+      value: apiKpis?.totalClosedInvoices ?? '-',
+    },
+    {
+      label: 'Average Settlement TAT',
+      value: '-',
+    },
+  ], [apiKpis]);
 
   const filteredData = useMemo(() => {
     let data = repaymentData.map((item: any) => ({
@@ -217,6 +227,11 @@ export const RepaymentSettlementScreen: React.FC = () => {
         navigation={navigation as any}
       />
       <ProgramBreadcrumb />
+      <View style={styles.navPathContainer}>
+        <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
+          Products {'>'} Dealer Finance {'>'} Transactions
+        </Text>
+      </View>
       <ScrollView 
         contentContainerStyle={styles.content}
         onScrollBeginDrag={() => { setOpenMenuId(null); setMenuAnchor(null); }}>
@@ -511,5 +526,17 @@ const styles = StyleSheet.create({
     color: Colors.graybase,
     fontSize: scaleFont(12),
     fontFamily: Fonts.GilroyBold,
+  },
+  navPathContainer: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(8),
+    backgroundColor: '#F8F9FA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  navPathText: {
+    fontSize: scaleFont(12),
+    color: '#666666',
+    fontFamily: Fonts.GilroyMedium,
   },
 });

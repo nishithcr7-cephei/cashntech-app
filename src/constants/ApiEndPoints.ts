@@ -9,7 +9,7 @@ const Endpoints = {
   apiSignin: '/auth/login',
 
   // TODO
-  apiResendOtp: '/auth/resend-otp',
+  apiResendOtp: '/auth/resend-link',
 
   // Bank List
   apiGetMasterBank: '/client-info-master/bankmaster-list',
@@ -143,16 +143,20 @@ const Endpoints = {
   apiCreateInvoice: '/invoice',
   apiInvoiceList: '/invoice/list',
   apiInvoiceKpis: '/invoice/kpis',
+  apiDisbursementKpis: '/invoice/disbursement/kpis',
+  apiInterestAccrualKpis: '/invoice/interest-accrual/kpis',
+  apiRepaymentKpis: '/invoice/repayment/kpis',
+  apiDpdKpis: '/invoice/dpd/kpis',
   apiInvoiceSummary: '/invoice/summary',
   apiInvoiceLatest: '/invoice/latest',
-  apiUpdateInvoiceStatus: (invoiceId: string) => `/invoice/${invoiceId}`,
+  apiUpdateInvoiceStatus: (invoiceId: string) => `/invoice/status/${invoiceId}`,
   apiUpdateInvoiceVerification: (invoiceId: string) => `/invoice/admin/${invoiceId}`,
   apiBulkUpdateInvoiceVerification: '/invoice/admin/bulk-status',
   apiGetInvoiceDetails: (invoiceId: string) => `/invoice/details/${invoiceId}`,
   /** POST multipart: add attachment to invoice (body: file field, same as create invoice) */
   apiUploadInvoiceAttachment: (invoiceId: string) => `/invoice/attachment/${invoiceId}`,
   /** DELETE attachment row by attachment id (numeric id from details `attachment[].id`) */
-  apiDeleteInvoiceAttachment: (attachmentId: number | string) => `/invoice/${attachmentId}`,
+  apiDeleteInvoiceAttachment: (attachmentId: number | string) => `/invoice/attachment/${attachmentId}`,
   apiGetInvoiceApprovalLogs: (invoiceId: string) => `/invoice/logs/${invoiceId}`,
   apiVerifiedList: '/invoice/verified/list',
   apiDisbursedList: '/invoice/disbursed/list',

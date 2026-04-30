@@ -1,6 +1,6 @@
-import {StyleSheet} from 'react-native';
-import {Colors, Fonts} from '@constants/index';
-import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+import { StyleSheet } from 'react-native';
+import { Colors, Fonts } from '@constants/index';
+import { scaleFont, scaleHeight, scaleWidth } from '@utils/Scale';
 
 export const styles = StyleSheet.create({
   breadcrumbContainer: {
@@ -203,7 +203,7 @@ export const styles = StyleSheet.create({
     borderRadius: scaleWidth(16),
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 5,
     elevation: 10,
@@ -213,6 +213,18 @@ export const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.primaryColor,
+  },
+  navPathContainer: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(8),
+    backgroundColor: '#F8F9FA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  navPathText: {
+    fontSize: scaleFont(12),
+    color: '#666666',
+    fontFamily: Fonts.GilroyMedium,
   },
 });
 

@@ -1,6 +1,6 @@
-import {StyleSheet} from 'react-native';
-import {Colors, Fonts} from '@constants/index';
-import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+import { StyleSheet } from 'react-native';
+import { Colors, Fonts } from '@constants/index';
+import { scaleFont, scaleHeight, scaleWidth } from '@utils/Scale';
 
 export const styles = StyleSheet.create({
   loader: {
@@ -69,7 +69,8 @@ export const styles = StyleSheet.create({
   cardGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scaleWidth(12),
+    columnGap: scaleWidth(12),
+    rowGap: scaleHeight(16),
   },
   card: {
     flexBasis: '47%',
@@ -94,8 +95,8 @@ export const styles = StyleSheet.create({
     minWidth: 0,
   },
   subValuesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
+    gap: scaleHeight(12),
     marginTop: scaleHeight(12),
     paddingTop: scaleHeight(12),
     borderTopWidth: 1,
@@ -104,17 +105,17 @@ export const styles = StyleSheet.create({
     gap: scaleWidth(8),
   },
   subValueItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    flex: 1,
   },
   subValueLabel: {
-    fontSize: scaleFont(11),
+    fontSize: scaleFont(13),
     color: Colors.graybase,
     fontFamily: Fonts.GilroyMedium,
-    marginBottom: scaleHeight(4),
   },
   subValueText: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(15),
     color: Colors.red,
     fontFamily: Fonts.GilroyBold,
   },
@@ -140,7 +141,7 @@ export const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     elevation: 2,
     shadowColor: '#00000022',
-    shadowOffset: {width: 0, height: 2},
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
@@ -205,7 +206,7 @@ export const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E6E6E6',
     shadowColor: '#00000035',
-    shadowOffset: {width: 0, height: 6},
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.18,
     shadowRadius: 10,
     elevation: 8,
@@ -353,7 +354,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 12,
@@ -456,5 +457,15 @@ export const styles = StyleSheet.create({
     fontFamily: Fonts.GilroyMedium,
     color: Colors.graybase,
     textAlign: 'center',
+  },
+  breadcrumb: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(10),
+    backgroundColor: Colors.white,
+  },
+  breadcrumbText: {
+    fontSize: scaleFont(12.5),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
   },
 });

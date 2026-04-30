@@ -107,7 +107,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   const statusLower = (row.rawInvoiceStatus || '').toLowerCase();
   const rawAdminStatusUpper = (row.rawAdminStatus || '').trim().toUpperCase();
   const showPendingBlueDot = rawAdminStatusUpper === 'PENDING_VERIFICATION' || rawAdminStatusUpper === 'PENDING VERIFICATION';
-  const showDraftGrayDot = statusLower === 'draft';
+  const showDraftOrangeDot = statusLower === 'draft';
   const showActionRequiredRedDot = statusLower === 'rejected' && isAnchorMaker;
 
   const partyTitle = isDealerMaker || isDealerChecker
@@ -138,117 +138,179 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
           </View>
         )}
 
+        <View style={styles.absoluteDotsContainer}>
+          {showPendingBlueDot && <View style={styles.pendingDotStandalone} />}
+          {showDraftOrangeDot && <View style={styles.draftDotStandalone} />}
+          {showActionRequiredRedDot && <View style={styles.actionDotStandalone} />}
+        </View>
+
         <View style={styles.cardHeaderArea}>
           <View style={styles.indexBadge}>
             <Text style={styles.indexText}>
               {(row.absoluteIndex ?? index) + 1}
             </Text>
           </View>
-          <View style={styles.cardHeaderContainer}>
-            {(isDealerChecker || isAnchorChecker || (isCashnTechUser && showPendingBlueDot)) ? (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={styles.dmCardHeaderRow}
-                onPress={() => onToggleSelection(row.id)}>
-                <View
-                  style={[
-                    styles.checkboxBox,
-                    isSelected && styles.checkboxBoxSelected,
-                  ]}>
-                  {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
-                </View>
-                <View style={styles.dmCardHeaderTextWrap}>
-                  <View style={styles.dotsContainer}>
-                    {showPendingBlueDot && <View style={styles.pendingDotInline} />}
-                    {showDraftGrayDot && <View style={[styles.pendingDotInline, {backgroundColor: '#9CA3AF'}]} />}
-                    {showActionRequiredRedDot && <View style={styles.actionDotInline} />}
+          {!isCashnTechUser && (
+            <View style={styles.cardHeaderContainer}>
+              {(isDealerChecker || isAnchorChecker || (isCashnTechUser && showPendingBlueDot)) ? (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={styles.dmCardHeaderRow}
+                  onPress={() => onToggleSelection(row.id)}>
+                  <View
+                    style={[
+                      styles.checkboxBox,
+                      isSelected && styles.checkboxBoxSelected,
+                    ]}>
+                    {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
                   </View>
-                  {!!partyTitle && (
-                    <Text style={styles.cardTitle}>{partyTitle}</Text>
-                  )}
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.makerHeaderRow}>
                 </View>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.makerHeaderRow}>
-                <View style={styles.dotsContainer}>
-                  {showPendingBlueDot && <View style={styles.pendingDotStandalone} />}
-                  {showDraftGrayDot && <View style={[styles.pendingDotStandalone, {backgroundColor: '#9CA3AF'}]} />}
-                  {showActionRequiredRedDot && <View style={styles.actionDotStandalone} />}
-                </View>
-                {!!partyTitle && (
-                  <Text style={[styles.cardTitle, styles.cardTitleSpacing]}>
-                    {partyTitle}
-                  </Text>
-                )}
-              </View>
-            )}
-          </View>
+              )}
+            </View>
+          )}
         </View>
 
         <View style={styles.infoGrid}>
-          {isAnchorChecker ? (
+          {isCashnTechUser ? (
             <>
-              {/* Anchor-Checker Order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Date → Due Date → Upload Date → Invoice Amount → Invoice Status → Approval Status → Admin Status */}
+              {/* CashnTech Order: Loan Ref No → Invoice No → Bank Name → Product Name → Program Name → Primary Party → Counter Party → Invoice Date → Due Date → Upload Date → Invoice Amount → Invoice Status → Approval Status → Admin Status */}
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Loan Ref No.</Text>
+                <Text style={styles.infoValue}>{row.loanRefNo || '-'}</Text>
+              </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Invoice No</Text>
                 {onInvoiceNoPress ? (
                   <TouchableOpacity
                     onPress={() => onInvoiceNoPress(row.id, row.invoiceNo || row.id)}
                     activeOpacity={0.7}>
-                    <Text style={[styles.infoValue, styles.invoiceNoLink]}>{row.invoiceNo}</Text>
+                    <Text style={[styles.infoValue, styles.invoiceNoLink]}>{row.invoiceNo || '-'}</Text>
                   </TouchableOpacity>
                 ) : (
-                  <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+                  <Text style={styles.infoValue}>{row.invoiceNo || '-'}</Text>
                 )}
               </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Bank Name</Text>
-                <Text style={styles.infoValue}>{row.bankName}</Text>
+                <Text style={styles.infoValue}>{row.bankName || '-'}</Text>
               </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Product Name</Text>
-                <Text style={styles.infoValue}>{row.productName}</Text>
+                <Text style={styles.infoValue}>{row.productName || '-'}</Text>
               </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Program Name</Text>
-                <Text style={styles.infoValue}>{row.programName}</Text>
+                <Text style={styles.infoValue}>{row.programName || '-'}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Primary Party</Text>
+                <Text style={styles.infoValue}>{row.primaryParty || '-'}</Text>
               </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Counter Party</Text>
-                <Text style={styles.infoValue}>{row.counterParty}</Text>
+                <Text style={styles.infoValue}>{row.counterParty || '-'}</Text>
               </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Invoice Date</Text>
-                <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+                <Text style={styles.infoValue}>{row.invoiceDate || '-'}</Text>
               </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Due Date</Text>
-                <Text style={styles.infoValue}>{row.dueDate}</Text>
+                <Text style={styles.infoValue}>{row.dueDate || '-'}</Text>
               </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Upload Date</Text>
-                <Text style={styles.infoValue}>{row.requestDate}</Text>
+                <Text style={styles.infoValue}>{row.requestDate || '-'}</Text>
               </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+                <Text style={styles.infoValue}>{row.invoiceAmount || '-'}</Text>
               </View>
               <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
                 <Text style={styles.infoLabel}>Invoice Status</Text>
                 <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
-                  {row.invoiceStatus}
+                  {row.invoiceStatus || '-'}
                 </Text>
               </View>
               <View style={[styles.infoColumn, { backgroundColor: getApprovalStatusStyles(row.approvalStatus).bg }]}>
                 <Text style={styles.infoLabel}>Approval Status</Text>
                 <Text style={[styles.infoValue, { color: getApprovalStatusStyles(row.approvalStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
-                  {row.approvalStatus}
+                  {row.approvalStatus || '-'}
                 </Text>
               </View>
               <View style={[styles.infoColumn, { backgroundColor: getAdminStatusStyles(row.adminStatus).bg }]}>
                 <Text style={styles.infoLabel}>Admin Status</Text>
                 <Text style={[styles.infoValue, { color: getAdminStatusStyles(row.adminStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
-                  {row.adminStatus}
+                  {row.adminStatus || '-'}
+                </Text>
+              </View>
+            </>
+          ) : (isAnchorMaker || isAnchorChecker) ? (
+            <>
+              {/* Anchor Maker & Checker Order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Date → Due Date → Upload Date → Invoice Amount (₹) → Invoice Status → Approval Status → Admin Status */}
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice No</Text>
+                {onInvoiceNoPress ? (
+                  <TouchableOpacity
+                    onPress={() => onInvoiceNoPress(row.id, row.invoiceNo || row.id)}
+                    activeOpacity={0.7}>
+                    <Text style={[styles.infoValue, styles.invoiceNoLink]}>{row.invoiceNo || '-'}</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.infoValue}>{row.invoiceNo || '-'}</Text>
+                )}
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Bank Name</Text>
+                <Text style={styles.infoValue}>{row.bankName || '-'}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Product Name</Text>
+                <Text style={styles.infoValue}>{row.productName || '-'}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Program Name</Text>
+                <Text style={styles.infoValue}>{row.programName || '-'}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Counter Party</Text>
+                <Text style={styles.infoValue}>{row.counterParty || '-'}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Date</Text>
+                <Text style={styles.infoValue}>{row.invoiceDate || '-'}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Due Date</Text>
+                <Text style={styles.infoValue}>{row.dueDate || '-'}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Upload Date</Text>
+                <Text style={styles.infoValue}>{row.requestDate || '-'}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                <Text style={styles.infoValue}>{row.invoiceAmount || '-'}</Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
+                <Text style={styles.infoLabel}>Invoice Status</Text>
+                <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.invoiceStatus || '-'}
+                </Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getApprovalStatusStyles(row.approvalStatus).bg }]}>
+                <Text style={styles.infoLabel}>Approval Status</Text>
+                <Text style={[styles.infoValue, { color: getApprovalStatusStyles(row.approvalStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.approvalStatus || '-'}
+                </Text>
+              </View>
+              <View style={[styles.infoColumn, { backgroundColor: getAdminStatusStyles(row.adminStatus).bg }]}>
+                <Text style={styles.infoLabel}>Admin Status</Text>
+                <Text style={[styles.infoValue, { color: getAdminStatusStyles(row.adminStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
+                  {row.adminStatus || '-'}
                 </Text>
               </View>
             </>
@@ -437,6 +499,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.tertiaryBlue,
     // marginBottom: scaleHeight(6),
   },
+  draftDotInline: {
+    width: scaleWidth(8),
+    height: scaleWidth(8),
+    borderRadius: scaleWidth(4),
+    backgroundColor: '#F59E0B', // Orange
+    marginBottom: scaleHeight(6),
+  },
+  draftDotStandalone: {
+    width: scaleWidth(8),
+    height: scaleWidth(8),
+    borderRadius: scaleWidth(4),
+    backgroundColor: '#F59E0B', // Orange
+  },
   actionDotInline: {
     width: scaleWidth(8),
     height: scaleHeight(8),
@@ -529,6 +604,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
+  },
+  absoluteDotsContainer: {
+    position: 'absolute',
+    top: scaleHeight(20),
+    right: scaleWidth(52), // Left of the menu button
+    flexDirection: 'row',
+    gap: scaleWidth(4),
+    zIndex: 11,
   },
   threeDotsTouchable: {
     width: '100%',

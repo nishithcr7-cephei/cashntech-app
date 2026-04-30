@@ -65,6 +65,9 @@ const invoiceOverviewSlice = createSlice({
         active_dealer_ratio: string;
         available_limit: string;
         overdue_amount: string;
+        principal_overdue: string;
+        interest_overdue: string;
+        penal_overdue: string;
         dpd_days: string;
       }>,
     ) => {
@@ -79,6 +82,9 @@ const invoiceOverviewSlice = createSlice({
         active_dealer_ratio: '0',
         available_limit: '0',
         overdue_amount: '0',
+        principal_overdue: '0',
+        interest_overdue: '0',
+        penal_overdue: '0',
         dpd_days: '0',
       };
       state.kpisLoading = false;

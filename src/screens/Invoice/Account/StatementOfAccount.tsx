@@ -153,6 +153,11 @@ export const StatementOfAccount: React.FC = () => {
   return (
     <Container>
       <AppBar title="Transactions > Statement of Account (SOA)" navigation={navigation as any} />
+      <View style={styles.navPathContainer}>
+        <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
+          Products {'>'} Dealer Finance {'>'} Transactions
+        </Text>
+      </View>
       
       
       <View style={styles.headerTitleContainer}>
@@ -364,6 +369,18 @@ const styles = StyleSheet.create({
     marginTop: scaleHeight(12),
     fontSize: scaleFont(14),
     color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  navPathContainer: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(8),
+    backgroundColor: '#F8F9FA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  navPathText: {
+    fontSize: scaleFont(12),
+    color: '#666666',
     fontFamily: Fonts.GilroyMedium,
   },
 });

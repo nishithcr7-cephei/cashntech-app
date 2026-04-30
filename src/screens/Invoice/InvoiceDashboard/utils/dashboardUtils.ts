@@ -65,6 +65,7 @@ export const getCardMetrics = (
     overdueAmount: parseFloat(kpis?.overdue_amount ?? '0') || 0,
     principalOverdue: parseFloat(kpis?.principal_overdue ?? '0') || 0,
     interestOverdue: parseFloat(kpis?.interest_overdue ?? '0') || 0,
+    penalOverdue: parseFloat(kpis?.penal_overdue ?? '0') || 0,
     dpdDays: parseFloat(kpis?.dpd_days ?? '0') || 0,
   };
 
@@ -73,6 +74,7 @@ export const getCardMetrics = (
   const sumOverdueAmount = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.overdue_amount) || 0), 0);
   const sumPrincipalOverdue = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.principal_overdue) || 0), 0);
   const sumInterestOverdue = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.interest_overdue) || 0), 0);
+  const sumPenalOverdue = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.penal_overdue) || 0), 0);
   const totalDealers = (summaryData || []).length;
   const activeDealers = (summaryData || []).filter(d => (Number(d.utilized_amount) || 0) > 0).length;
 
@@ -81,6 +83,7 @@ export const getCardMetrics = (
   const finalOverdueAmount = parsed.overdueAmount || sumOverdueAmount;
   const finalPrincipalOverdue = parsed.principalOverdue || sumPrincipalOverdue;
   const finalInterestOverdue = parsed.interestOverdue || sumInterestOverdue;
+  const finalPenalOverdue = parsed.penalOverdue || sumPenalOverdue;
 
   const formatCurrency = (amount: number) =>
     `₹ ${amount.toLocaleString('en-IN', {
@@ -92,28 +95,37 @@ export const getCardMetrics = (
       maximumFractionDigits: 2,
     })}%`;
 
-  return [
-    {label: 'Total Program Limit', value: formatCurrency(finalTotalLimit)},
-    {label: 'Utilized Amount', value: formatCurrency(finalUtilizedAmount)},
-    {
-      label: 'Utilized Rate',
-      value: formatPercentage(
-        (parsed.utilizedRate || (finalTotalLimit > 0 ? finalUtilizedAmount / finalTotalLimit : 0)) * 100
-      ),
-    },
-    {
-      label: 'Active Dealer Ratio',
-      value: totalDealers > 0 ? `${activeDealers}/${totalDealers}` : '0/0',
-    },
-    {label: 'Available Limit', value: formatCurrency(finalTotalLimit - finalUtilizedAmount)},
-    {label: 'DPD Days', value: (parsed.dpdDays || 0).toString()},
+  const totalLimitVal = kpis?.total_program_limit ? formatCurrency(parseFloat(kpis.total_program_limit)) : (sumTotalLimit > 0 ? formatCurrency(sumTotalLimit) : '-');
+  const utilizedAmountVal = kpis?.utilized_amount ? formatCurrency(parseFloat(kpis.utilized_amount)) : (sumUtilizedAmount > 0 ? formatCurrency(sumUtilizedAmount) : '-');
+  const availableLimitVal = kpis?.available_limit ? formatCurrency(parseFloat(kpis.available_limit)) : (finalTotalLimit > 0 ? formatCurrency(finalTotalLimit - finalUtilizedAmount) : '-');
+  const activeDealerRatioVal = kpis?.active_dealer_ratio ? `${parseFloat(kpis.active_dealer_ratio).toFixed(2)}%` : (totalDealers > 0 ? `${activeDealers}/${totalDealers}` : '-');
+
+  const utilizedRateVal = kpis?.utilized_rate ? `${parseFloat(kpis.utilized_rate).toFixed(2)}%` : (finalTotalLimit > 0 ? formatPercentage((finalUtilizedAmount / finalTotalLimit) * 100) : '-');
+  
+  // Always show these, default to '-' if not present or 0
+  const overdueAmountVal = (parseFloat(kpis?.overdue_amount ?? '0') > 0) ? formatCurrency(parseFloat(kpis!.overdue_amount)) : (sumOverdueAmount > 0 ? formatCurrency(sumOverdueAmount) : '-');
+  const principalOverdueVal = (parseFloat(kpis?.principal_overdue ?? '0') > 0) ? formatCurrency(parseFloat(kpis!.principal_overdue)) : (sumPrincipalOverdue > 0 ? formatCurrency(sumPrincipalOverdue) : '-');
+  const interestOverdueVal = (parseFloat(kpis?.interest_overdue ?? '0') > 0) ? formatCurrency(parseFloat(kpis!.interest_overdue)) : (sumInterestOverdue > 0 ? formatCurrency(sumInterestOverdue) : '-');
+  const penalOverdueVal = (parseFloat(kpis?.penal_overdue ?? '0') > 0) ? formatCurrency(parseFloat(kpis!.penal_overdue)) : (sumPenalOverdue > 0 ? formatCurrency(sumPenalOverdue) : '-');
+  
+  const dpdDaysVal = kpis?.dpd_days ? kpis.dpd_days : '-';
+
+  const metrics: MetricItem[] = [
+    {label: 'Total Program Limit', value: totalLimitVal},
+    {label: 'Utilized Amount', value: utilizedAmountVal},
+    {label: 'Utilized Rate', value: utilizedRateVal},
+    {label: 'Active Dealer Ratio', value: activeDealerRatioVal},
+    {label: 'Available Limit', value: availableLimitVal},
     {
       label: 'Overdue Amount',
-      value: formatCurrency(finalOverdueAmount),
+      value: '',
       subValues: [
-        { label: 'Principal Overdue', value: formatCurrency(finalPrincipalOverdue) },
-        { label: 'Interest Overdue', value: formatCurrency(finalInterestOverdue) },
+        { label: 'Principal Amount', value: principalOverdueVal },
+        { label: 'Interest Amount', value: interestOverdueVal },
+        { label: 'Penal Interest Amount', value: penalOverdueVal },
       ]
-    },
+    }
   ];
+
+  return metrics;
 };

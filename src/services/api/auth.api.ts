@@ -176,4 +176,11 @@ export default {
   apiSendResetLink,
   apiResetPassword,
   apiSignin,
+  apiResendOtp: async (payload: {email: string}) => {
+    const {data, error} = await tryCatch<AxiosResponse<any>>(
+      Api.post(Endpoints.apiResendOtp, payload),
+    );
+    if (error) return {data: null, error};
+    return {data: data.data, error: null};
+  },
 };

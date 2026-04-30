@@ -216,6 +216,11 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                   `${userInfo.first_name} ${userInfo.last_name}`.trim() ||
                   'User Name'}
               </Text>
+              {!!userInfo.party_name && (
+                <Text style={styles.partyText} numberOfLines={1}>
+                  ({userInfo.party_name})
+                </Text>
+              )}
               <Text style={styles.subTitle} numberOfLines={1}>
                 {userInfo.mobile_number || '9814756321'}
               </Text>
@@ -740,6 +745,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Gilroy-SemiBold',
     color: Colors.primaryColor,
     lineHeight: scaleHeight(20),
+    textTransform: 'capitalize',
+  },
+  partyText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: '#95969C',
+    marginTop: scaleHeight(2),
   },
   subTitle: {
     fontSize: scaleFont(11),

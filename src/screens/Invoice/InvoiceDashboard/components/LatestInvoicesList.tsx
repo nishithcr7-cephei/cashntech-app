@@ -16,6 +16,8 @@ interface LatestInvoicesListProps {
   onSelectInvoice: (invoice: BulkInvoiceItem) => void;
   onSelectAll: () => void;
   isCashnTechUser: boolean;
+  isAnchorMaker?: boolean;
+  isAnchorChecker?: boolean;
 }
 
 export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
@@ -25,7 +27,11 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
   onSelectInvoice,
   onSelectAll,
   isCashnTechUser,
+  isAnchorMaker = false,
+  isAnchorChecker = false,
 }) => {
+  const showCashnTechLayout = isCashnTechUser || isAnchorMaker || isAnchorChecker;
+
   if (loading) {
     return (
       <View style={[styles.verticalList, {justifyContent: 'center', alignItems: 'center', paddingVertical: scaleHeight(40)}]}>
@@ -46,18 +52,7 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
 
   return (
     <View style={styles.verticalList}>
-      {isCashnTechUser && (
-        <View style={styles.legendRow}>
-          <TouchableOpacity 
-            style={styles.selectAllContainer}
-            onPress={onSelectAll}>
-            <View style={[styles.checkbox, allSelected && styles.checkboxChecked]}>
-              {allSelected && <Tick width={scaleWidth(10)} height={scaleWidth(10)} fill={Colors.white} />}
-            </View>
-            <Text style={styles.selectAllText}>Select All</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+
 
       {data.map((row, index) => {
         const isSelected = selectedInvoices.some(inv => inv.id === row.id);
@@ -67,7 +62,7 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
-                if (isCashnTechUser) {
+                if (showCashnTechLayout) {
                   onSelectInvoice({
                     id: row.id,
                     invoiceNo: row.invoice_ref_no,
@@ -77,61 +72,106 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
                 }
               }}>
               <View style={[styles.listCard, isSelected && {borderColor: Colors.primaryColor, borderWidth: 1}]}>
-                <View style={styles.cardMainRow}>
-                  {isCashnTechUser && (
-                    <View style={styles.checkboxWrapper}>
-                      <View style={[styles.checkbox, isSelected && styles.checkboxChecked]}>
-                        {isSelected && <Tick width={scaleWidth(10)} height={scaleWidth(10)} fill={Colors.white} />}
+                {!showCashnTechLayout && (
+                  <View style={styles.cardMainRow}>
+                    <View style={styles.cardHeaderContent}>
+                      <View style={styles.cardTitleRow}>
+                        <Text style={styles.cardTitle}>{row.invoice_ref_no}</Text>
                       </View>
+                      <Text style={styles.cardSubtitle}>
+                        {row.partyName || row.party?.entity_name || 'N/A'}
+                      </Text>
                     </View>
-                  )}
-                  <View style={styles.cardHeaderContent}>
-                    <View style={styles.cardTitleRow}>
-                      <Text style={styles.cardTitle}>{row.invoice_ref_no}</Text>
-                    </View>
-                    <Text style={styles.cardSubtitle}>
-                      {row.partyName || row.party?.entity_name || 'N/A'}
-                    </Text>
-                  </View>
-                  <View style={[
-                    styles.statusChip, 
-                    (row.invoice_status === 'OVERDUE' || row.invoice_status === 'REJECTED') && styles.statusWarningChip
-                  ]}>
-                    <Text style={[
-                      styles.statusChipText,
-                      row.invoice_status === 'OVERDUE' && styles.statusRedText,
-                      row.invoice_status === 'PAID' && styles.statusGreenText,
-                      row.invoice_status === 'SUBMITTED' && styles.statusOrangeText,
+                    <View style={[
+                      styles.statusChip, 
+                      (row.invoice_status === 'OVERDUE' || row.invoice_status === 'REJECTED') && styles.statusWarningChip
                     ]}>
-                      {row.invoice_status || 'N/A'}
-                    </Text>
+                      <Text style={[
+                        styles.statusChipText,
+                        row.invoice_status === 'OVERDUE' && styles.statusRedText,
+                        row.invoice_status === 'PAID' && styles.statusGreenText,
+                        row.invoice_status === 'SUBMITTED' && styles.statusOrangeText,
+                      ]}>
+                        {row.invoice_status || 'N/A'}
+                      </Text>
+                    </View>
                   </View>
-                </View>
+                )}
 
-                <View style={styles.infoGrid}>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice Amount</Text>
-                    <Text style={styles.infoValue}>
-                      ₹ {(Number(row.final_total) || 0).toLocaleString('en-IN')}
-                    </Text>
+                {showCashnTechLayout ? (
+                  <>
+                    <View style={styles.indexBadge}>
+                      <Text style={styles.indexText}>{index + 1}</Text>
+                    </View>
+                    <View style={styles.infoGrid}>
+                    <View style={[styles.infoColumn, {width: '100%', marginBottom: scaleHeight(6)}]}>
+                      <Text style={styles.infoLabel}>Dealer</Text>
+                      <Text style={styles.infoValue}>{row.counterPartyName || '-'}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice No.</Text>
+                      <Text style={styles.infoValue}>{row.invoice_ref_no || '-'}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Date</Text>
+                      <Text style={styles.infoValue}>{formatDateDDMmmYYYY(row.invoice_date) || '-'}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Disbursed Date</Text>
+                      <Text style={styles.infoValue}>{formatDateDDMmmYYYY(row.disbursement_date) || '-'}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                      <Text style={styles.infoValue}>₹ {(Number(row.final_total) || 0).toLocaleString('en-IN')}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Disb. Amount (₹)</Text>
+                      <Text style={styles.infoValue}>₹ {(Number(row.disbursed_amount) || 0).toLocaleString('en-IN')}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>UTR No.</Text>
+                      <Text style={styles.infoValue}>{row.utr_no || '-'}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Status</Text>
+                      <Text style={[styles.infoValue, {color: Colors.green}]}>{row.invoice_status || '-'}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Approval Status</Text>
+                      <Text style={styles.infoValue}>{row.approval_status || '-'}</Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Admin Status</Text>
+                      <Text style={styles.infoValue}>{row.admin_status || '-'}</Text>
+                    </View>
                   </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Due Date</Text>
-                    <Text style={styles.infoValue}>
-                      {formatDateDDMmmYYYY(row.invoice_due_date)}
-                    </Text>
+                  </>
+                ) : (
+                  <View style={styles.infoGrid}>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Invoice Amount</Text>
+                      <Text style={styles.infoValue}>
+                        ₹ {(Number(row.final_total) || 0).toLocaleString('en-IN')}
+                      </Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Due Date</Text>
+                      <Text style={styles.infoValue}>
+                        {formatDateDDMmmYYYY(row.invoice_due_date)}
+                      </Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Program</Text>
+                      <Text style={styles.infoValue} numberOfLines={1}>
+                        {row.program_name || 'N/A'}
+                      </Text>
+                    </View>
+                    <View style={styles.infoColumn}>
+                      <Text style={styles.infoLabel}>Bank</Text>
+                      <Text style={styles.infoValue}>{row.bank_name || 'N/A'}</Text>
+                    </View>
                   </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Program</Text>
-                    <Text style={styles.infoValue} numberOfLines={1}>
-                      {row.program_name || 'N/A'}
-                    </Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Bank</Text>
-                    <Text style={styles.infoValue}>{row.bank_name || 'N/A'}</Text>
-                  </View>
-                </View>
+                )}
               </View>
             </TouchableOpacity>
           </View>

@@ -11,8 +11,8 @@ import {
   ProgramBreadcrumb,
   BulkReviewModal,
 } from '@components/index';
-import {Colors} from '@constants/index';
-import {scaleWidth} from '@utils/Scale';
+import {Colors, Fonts} from '@constants/index';
+import {scaleWidth, scaleHeight, scaleFont} from '@utils/Scale';
 import {BankBuilding} from '@assets/Icons';
 
 import {styles} from './InvoiceDashboard.styles';
@@ -32,6 +32,8 @@ export const InvoiceDashboard: React.FC = () => {
     latestLoading,
     kpis,
     kpisLoading,
+    isAnchorMaker,
+    isAnchorChecker,
     isDealerMaker,
     isCashnTechUser,
     activeTab,
@@ -79,17 +81,20 @@ export const InvoiceDashboard: React.FC = () => {
     <Container>
       <AppBar title="Invoice Overview" navigation={navigation as any} />
       <ProgramBreadcrumb />
-
-      <View style={styles.pageTitleBar}>
-        <Text style={styles.pageTitleText}>Overview</Text>
-        <ProductTabs activeTab={productTab} onTabChange={setProductTab} />
+      <View style={styles.breadcrumb}>
+        <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">
+          Products {'>'} Dealer Finance {'>'} Transactions
+        </Text>
       </View>
+
+      {/* Removed Overview label and ProductTabs as per request */}
+
 
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         
-        <Text style={styles.keyFigureHeading}>Key Figures</Text>
+        <Text style={styles.keyFigureHeading}>Invoice Dashboard : Key Figures</Text>
         <MetricsCard metrics={metrics} loading={kpisLoading} />
 
         <View style={styles.tabRow}>
@@ -97,14 +102,18 @@ export const InvoiceDashboard: React.FC = () => {
             style={[styles.tabBtn, activeTab === 'dealers' && styles.activeTab]}
             onPress={() => setActiveTab('dealers')}>
             <Text style={[styles.tabText, activeTab === 'dealers' && styles.activeTabText]}>
-              Dealers Summary
+              {(isAnchorMaker || isAnchorChecker)
+                ? 'Summary of Dealers' 
+                : isCashnTechUser 
+                  ? 'Summary of All Program' 
+                  : 'Dealers Summary'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'unpaid' && styles.activeTab]}
             onPress={() => setActiveTab('unpaid')}>
             <Text style={[styles.tabText, activeTab === 'unpaid' && styles.activeTabText]}>
-              Latest/Unpaid Invoices
+              {(isCashnTechUser || isAnchorMaker || isAnchorChecker) ? 'Latest Invoice' : 'Latest/Unpaid Invoices'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -113,12 +122,25 @@ export const InvoiceDashboard: React.FC = () => {
           {activeTab === 'dealers' ? (
             <>
               <View style={styles.allProgramHeader}>
-                <BankBuilding width={scaleWidth(18)} height={scaleWidth(18)} />
-                <Text style={styles.allProgramTitle}>All Program</Text>
+                {!(isCashnTechUser || isAnchorMaker || isAnchorChecker) && (
+                  <BankBuilding width={scaleWidth(18)} height={scaleWidth(18)} />
+                )}
+                {(isCashnTechUser || isAnchorMaker || isAnchorChecker) ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: scaleWidth(8) }}>
+                    <Text style={styles.allProgramTitle}>OD Accounts Summary</Text>
+                    <View style={{ backgroundColor: '#FFF0F0', borderRadius: scaleWidth(12), paddingHorizontal: scaleWidth(10), paddingVertical: scaleHeight(2), borderWidth: 1, borderColor: '#FFD9D9' }}>
+                      <Text style={{ color: Colors.primaryColor, fontSize: scaleFont(12), fontFamily: Fonts.GilroySemiBold }}>{summaryData.length}</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <Text style={styles.allProgramTitle}>All Program</Text>
+                )}
               </View>
               <DealerSummaryList
                 loading={summaryLoading}
                 data={summaryData}
+                isCashnTechUser={isCashnTechUser}
+                isAnchorMaker={isAnchorMaker || isAnchorChecker}
                 onDealerPress={(id, no) => {
                   navigation.navigate('InvoiceDetails', {
                     dealerId: id,
@@ -128,14 +150,28 @@ export const InvoiceDashboard: React.FC = () => {
               />
             </>
           ) : (
-            <LatestInvoicesList
-              loading={latestLoading}
-              data={latestData}
-              selectedInvoices={selectedInvoices}
-              onSelectInvoice={toggleSelectInvoice}
-              onSelectAll={handleSelectAll}
-              isCashnTechUser={isCashnTechUser}
-            />
+            <>
+              {(isCashnTechUser || isAnchorMaker || isAnchorChecker) && (
+                <View style={styles.allProgramHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: scaleWidth(8) }}>
+                    <Text style={styles.allProgramTitle}>Invoice List</Text>
+                    <View style={{ backgroundColor: '#FFF0F0', borderRadius: scaleWidth(12), paddingHorizontal: scaleWidth(10), paddingVertical: scaleHeight(2), borderWidth: 1, borderColor: '#FFD9D9' }}>
+                      <Text style={{ color: Colors.primaryColor, fontSize: scaleFont(12), fontFamily: Fonts.GilroySemiBold }}>{latestData.length}</Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+              <LatestInvoicesList
+                loading={latestLoading}
+                data={latestData}
+                selectedInvoices={selectedInvoices}
+                onSelectInvoice={toggleSelectInvoice}
+                onSelectAll={handleSelectAll}
+                isCashnTechUser={isCashnTechUser}
+                isAnchorMaker={isAnchorMaker}
+                isAnchorChecker={isAnchorChecker}
+              />
+            </>
           )}
         </View>
       </ScrollView>

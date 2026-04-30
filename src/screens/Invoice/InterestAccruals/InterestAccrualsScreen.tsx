@@ -24,6 +24,7 @@ import {AppRole} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
+import {invoiceApi} from '@services/api/invoice.api';
 
 type InterestAccrualInvoiceRow = {
   id: string;
@@ -76,8 +77,15 @@ export const InterestAccrualsScreen: React.FC = () => {
   // Stable dependency key so useEffect doesn't loop due to new array instances
   const programIdsKey = JSON.stringify(programIds ?? []);
 
+  const [apiKpis, setApiKpis] = useState<any>(null);
+
   useEffect(() => {
     dispatch(interestAccrualActions.fetchInterestAccrualListRequest({programIds}));
+    
+    // Fetch real KPIs
+    invoiceApi.getInterestAccrualKpis(programIds).then(res => {
+      setApiKpis(res);
+    }).catch(e => console.log('Error fetching interest kpis', e));
   }, [programIdsKey, dispatch]);
 
   const rows = useMemo(() => {
@@ -192,10 +200,6 @@ export const InterestAccrualsScreen: React.FC = () => {
         </View>
         <View style={styles.infoGrid}>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Loan Ref No.</Text>
-            <Text style={styles.infoValue}>{row.loanRefNo}</Text>
-          </View>
-          <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Invoice No</Text>
             <TouchableOpacity
               activeOpacity={0.7}
@@ -221,16 +225,8 @@ export const InterestAccrualsScreen: React.FC = () => {
             <Text style={styles.infoValue}>{row.programName}</Text>
           </View>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Primary Party</Text>
-            <Text style={styles.infoValue}>{row.primaryParty}</Text>
-          </View>
-          <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Counter Party</Text>
             <Text style={styles.infoValue}>{row.counterParty}</Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-            <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
           </View>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Invoice Date</Text>
@@ -241,15 +237,19 @@ export const InterestAccrualsScreen: React.FC = () => {
             <Text style={styles.infoValue}>{row.dueDate}</Text>
           </View>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Disburse Date</Text>
+            <Text style={styles.infoLabel}>Disbursement Date</Text>
             <Text style={styles.infoValue}>{row.disburseDate}</Text>
           </View>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Disburse Amount (₹)</Text>
+            <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+            <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Disbursed Amount (₹)</Text>
             <Text style={styles.infoValue}>{row.disburseAmount}</Text>
           </View>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Total Acc Interest (₹)</Text>
+            <Text style={styles.infoLabel}>Total Accrual Interest (₹)</Text>
             <Text style={styles.infoValue}>{row.totalAccInterest}</Text>
           </View>
           <View style={styles.infoColumn}>
@@ -268,6 +268,11 @@ export const InterestAccrualsScreen: React.FC = () => {
         navigation={navigation as any}
       />
       <ProgramBreadcrumb />
+      <View style={styles.navPathContainer}>
+        <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
+          Products {'>'} Dealer Finance {'>'} Transactions
+        </Text>
+      </View>
       <FlatList
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -282,11 +287,21 @@ export const InterestAccrualsScreen: React.FC = () => {
             ) : null}
             <View style={styles.cardGrid}>
               {[
-                { label: 'Total Interest Accrued Daily', value: '₹ 1,28,764.35' },
-                { label: 'Accrual vs Expected', value: '96.82%' },
-                { label: 'Overdue Interest', value: '₹ 8,74,932.55' },
-                { label: 'Loans Not Accruing Interest', value: '₹ 12,67,450.20' },
-                { label: 'Days Accrued vs Days Elapsed', value: '1' },
+                { 
+                  label: 'Total Interest Accrued Daily', 
+                  value: apiKpis?.total_interest_accrued_daily 
+                    ? `₹ ${Number(apiKpis.total_interest_accrued_daily).toLocaleString('en-IN', {minimumFractionDigits: 2})}` 
+                    : '-' 
+                },
+                { 
+                  label: 'Accrual vs Expected', 
+                  value: apiKpis?.accrual_vs_expected != null 
+                    ? `${Number(apiKpis.accrual_vs_expected).toFixed(2)}%` 
+                    : '-' 
+                },
+                { label: 'Overdue Interest', value: '-' },
+                { label: 'Loans Not Accruing Interest', value: '-' },
+                { label: 'Days Accrued vs Days Elapsed', value: '-' },
               ].map((m, i) => (
                 <View key={i} style={styles.card}>
                   <Text style={styles.cardLabel}>{m.label}</Text>
@@ -608,5 +623,17 @@ const styles = StyleSheet.create({
   linkText: {
     color: Colors.primaryColor,
     textDecorationLine: 'underline',
+  },
+  navPathContainer: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(8),
+    backgroundColor: '#F8F9FA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  navPathText: {
+    fontSize: scaleFont(12),
+    color: '#666666',
+    fontFamily: Fonts.GilroyMedium,
   },
 });
