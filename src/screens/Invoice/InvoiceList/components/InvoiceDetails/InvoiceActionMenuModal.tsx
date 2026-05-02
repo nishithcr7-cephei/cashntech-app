@@ -179,7 +179,15 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   const isDeletable = canDelete;
 
   const isActionable = isInvoiceInActionableState(rawInvoiceStatus, rawAdminStatus);
-  const canShowApproveReject = (canApprove || canReject) && isActionable;
+  
+  // Status Awareness Logic: Check if it's actually the user's turn
+  const approvalS = (rawApprovalStatus || '').trim().toUpperCase().replace(/_/g, ' ');
+  const roleLabel = (userInfo?.permission_group?.[0]?.business_role || userInfo?.permission_group?.[0]?.functional_role || '').trim().toUpperCase();
+  const isMyTurn = isCashnTechUser 
+    ? (rawAdminStatus || '').trim().toUpperCase().includes('PENDING') 
+    : !!roleLabel && approvalS.includes(`PENDING ${roleLabel}`);
+
+  const canShowApproveReject = (canApprove || canReject) && isActionable && isMyTurn;
 
   if (!openMenuId) return null;
 
@@ -296,6 +304,19 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   </View>
                 </TouchableOpacity>
               )}
+
+              {/* Delete – visible if isDeletable */}
+              {isDeletable && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('delete', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
+                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
           {/* Dealer checker: Invoice Verification, Approval History, Attachments */}
@@ -334,6 +355,19 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                     <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Attachments</Text>
                     <Text style={styles.menuSubText}>View Supporting Docs</Text>
                   </View>
+                </TouchableOpacity>
+              )}
+
+              {/* Delete – visible if isDeletable */}
+              {isDeletable && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('delete', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
+                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>
+                    Delete
+                  </Text>
                 </TouchableOpacity>
               )}
             </>

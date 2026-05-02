@@ -24,12 +24,20 @@ import {
   updateInvoiceVerificationRequest,
   updateInvoiceVerificationSuccess,
   updateInvoiceVerificationFailure,
+  bulkUpdateInvoiceRequest,
+  bulkUpdateInvoiceSuccess,
+  bulkUpdateInvoiceFailure,
 } from './inv.slice';
 import {
   invoiceApi,
   CreateInvoicePayloadInput,
 } from '@services/api/invoice.api';
-import type {UpdateInvoiceStatusRequest, UpdateInvoiceVerificationRequest, UpdateInvoicePayload} from './inv.types';
+import type {
+  UpdateInvoiceStatusRequest,
+  UpdateInvoiceVerificationRequest,
+  UpdateInvoicePayload,
+  BulkUpdateInvoiceRequest,
+} from './inv.types';
 
 function showActionToast(
   type: 'success' | 'error',
@@ -246,6 +254,65 @@ function* updateInvoiceVerificationSaga(
   }
 }
 
+function* bulkUpdateInvoiceSaga(
+  action: PayloadAction<BulkUpdateInvoiceRequest>,
+): Generator {
+  try {
+    const {
+      action: act,
+      invoices,
+      programId,
+      filters,
+      onSuccess,
+      isVerification,
+    } = action.payload;
+
+    let response: any;
+    if (isVerification) {
+      // Admin Bulk Verification API
+      response = yield call(invoiceApi.bulkUpdateInvoiceVerification, {
+        action: act as any,
+        invoices: invoices.map(inv => ({
+          invoiceId: inv.invoiceId,
+          action: inv.action,
+          remark: inv.remark,
+          approvalRemark: inv.approvalRemark,
+        })),
+      });
+    } else {
+      // Regular User Bulk Approval API
+      response = yield call(invoiceApi.bulkUpdateInvoiceStatus, {
+        action: act as 'Approve' | 'Reject',
+        invoices: invoices.map(inv => ({
+          invoiceId: inv.invoiceId,
+          action: inv.action,
+          approval_level: inv.approval_level || 1,
+          remark: inv.remark,
+        })),
+      });
+    }
+
+    showActionToast(
+      'success',
+      response?.message || `Bulk ${act.toLowerCase()} successful`,
+    );
+    yield put(bulkUpdateInvoiceSuccess());
+    if (onSuccess) {
+      yield call(onSuccess);
+    }
+    if (programId) {
+      yield put(fetchInvoiceListRequest({programId, filters}));
+    }
+  } catch (error: any) {
+    const msg =
+      error?.response?.data?.message ||
+      error?.message ||
+      'Failed to perform bulk action';
+    showActionToast('error', msg);
+    yield put(bulkUpdateInvoiceFailure(msg));
+  }
+}
+
 export default function* invoiceSaga(): Generator {
   yield takeLatest(fetchDealerInfoRequest.type, fetchDealerInfoSaga);
   yield takeLatest(fetchBankListRequest.type, fetchBankListSaga);
@@ -254,4 +321,5 @@ export default function* invoiceSaga(): Generator {
   yield takeLatest(fetchInvoiceListRequest.type, fetchInvoiceListSaga);
   yield takeLatest(updateInvoiceStatusRequest.type, updateInvoiceStatusSaga);
   yield takeLatest(updateInvoiceVerificationRequest.type, updateInvoiceVerificationSaga);
+  yield takeLatest(bulkUpdateInvoiceRequest.type, bulkUpdateInvoiceSaga);
 }

@@ -15,7 +15,9 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   selectedCount: number;
-  onAction: (action: 'Verify' | 'Reject' | 'On Hold') => void;
+  onAction: (action: 'Verify' | 'Reject' | 'On Hold' | 'Approve') => void;
+  isAnchorChecker?: boolean;
+  isDealerChecker?: boolean;
 };
 
 const {height: SCREEN_HEIGHT} = Dimensions.get('window');
@@ -25,6 +27,8 @@ export const BulkActionSheet: React.FC<Props> = ({
   onClose,
   selectedCount,
   onAction,
+  isAnchorChecker = false,
+  isDealerChecker = false,
 }) => {
   if (!visible) return null;
 
@@ -47,41 +51,71 @@ export const BulkActionSheet: React.FC<Props> = ({
         <Text style={styles.subtitle}>Choose a bulk action to apply</Text>
 
         <View style={styles.optionsContainer}>
-          <TouchableOpacity
-            style={[styles.optionCard, styles.verifyCard]}
-            onPress={() => onAction('Verify')}>
-            <View style={styles.iconCircle}>
-              <FontAwesome6 name="check" iconStyle="solid" size={16} color="#10B981" />
-            </View>
-            <View style={styles.textContainer}>
-              <Text style={styles.optionTitle}>Bulk Verify</Text>
-              <Text style={styles.optionSubtitle}>Mark selected as verified</Text>
-            </View>
-          </TouchableOpacity>
+          {(isAnchorChecker || isDealerChecker) ? (
+            <>
+              <TouchableOpacity
+                style={[styles.optionCard, styles.verifyCard]}
+                onPress={() => onAction('Approve')}>
+                <View style={styles.iconCircle}>
+                  <FontAwesome6 name="check" iconStyle="solid" size={16} color="#10B981" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.optionTitle}>Bulk Approve</Text>
+                  <Text style={styles.optionSubtitle}>Approve selected invoices</Text>
+                </View>
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.optionCard, styles.holdCard]}
-            onPress={() => onAction('On Hold')}>
-            <View style={styles.iconCircle}>
-              <FontAwesome6 name="pause" iconStyle="solid" size={16} color="#3B82F6" />
-            </View>
-            <View style={styles.textContainer}>
-              <Text style={styles.optionTitle}>Bulk On Hold</Text>
-              <Text style={styles.optionSubtitle}>Pause selected invoices</Text>
-            </View>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.optionCard, styles.rejectCard]}
+                onPress={() => onAction('Reject')}>
+                <View style={styles.iconCircle}>
+                  <FontAwesome6 name="xmark" iconStyle="solid" size={16} color="#EF4444" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.optionTitle}>Bulk Reject</Text>
+                  <Text style={styles.optionSubtitle}>Reject selected invoices</Text>
+                </View>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={[styles.optionCard, styles.verifyCard]}
+                onPress={() => onAction('Verify')}>
+                <View style={styles.iconCircle}>
+                  <FontAwesome6 name="check" iconStyle="solid" size={16} color="#10B981" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.optionTitle}>Bulk Verify</Text>
+                  <Text style={styles.optionSubtitle}>Mark selected as verified</Text>
+                </View>
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.optionCard, styles.rejectCard]}
-            onPress={() => onAction('Reject')}>
-            <View style={styles.iconCircle}>
-              <FontAwesome6 name="xmark" iconStyle="solid" size={16} color="#EF4444" />
-            </View>
-            <View style={styles.textContainer}>
-              <Text style={styles.optionTitle}>Bulk Reject</Text>
-              <Text style={styles.optionSubtitle}>Reject selected invoices</Text>
-            </View>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.optionCard, styles.holdCard]}
+                onPress={() => onAction('On Hold')}>
+                <View style={styles.iconCircle}>
+                  <FontAwesome6 name="pause" iconStyle="solid" size={16} color="#3B82F6" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.optionTitle}>Bulk On Hold</Text>
+                  <Text style={styles.optionSubtitle}>Pause selected invoices</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.optionCard, styles.rejectCard]}
+                onPress={() => onAction('Reject')}>
+                <View style={styles.iconCircle}>
+                  <FontAwesome6 name="xmark" iconStyle="solid" size={16} color="#EF4444" />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.optionTitle}>Bulk Reject</Text>
+                  <Text style={styles.optionSubtitle}>Reject selected invoices</Text>
+                </View>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
     </View>

@@ -737,7 +737,7 @@ export const InvoiceForm: React.FC<Props> = ({
             
             {/* Item-level Discount */}
             <View style={styles.itemDiscountTaxContainer}>
-              <Text style={styles.itemDiscountTaxLabelText}>Discount</Text>
+              <Text style={styles.itemDiscountTaxLabelText}>Discount (Optional)</Text>
               <View style={styles.itemDiscountTaxVertical}>
                 <View style={styles.discountTaxDropdownVertical}>
                   <CustomDropdown

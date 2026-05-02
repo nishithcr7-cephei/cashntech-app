@@ -27,9 +27,9 @@ type BulkReviewModalProps = {
   visible: boolean;
   onClose: () => void;
   selectedInvoices: BulkInvoiceItem[];
-  action: 'Verify' | 'Reject' | 'On Hold';
+  action: 'Verify' | 'Approve' | 'Reject' | 'On Hold';
   onSubmit: (payload: {
-    action: 'Verify' | 'Reject' | 'On Hold';
+    action: 'Verify' | 'Approve' | 'Reject' | 'On Hold';
     invoices: {
       invoiceId: string;
       action: string;
@@ -89,7 +89,7 @@ export const BulkReviewModal: React.FC<BulkReviewModalProps> = ({
         invoiceId: inv.id,
         action: action,
         remark: (action === 'Reject' || action === 'On Hold') ? remark : '-',
-        approvalRemark: action === 'Verify' ? remark : undefined,
+        approvalRemark: (action === 'Verify' || action === 'Approve') ? remark : undefined,
       };
     });
 
@@ -136,7 +136,7 @@ export const BulkReviewModal: React.FC<BulkReviewModalProps> = ({
                 <TouchableOpacity 
                   style={[
                     styles.actionButton, 
-                    action === 'Verify' ? styles.verifyButton : action === 'Reject' ? styles.rejectButton : styles.holdButton,
+                    (action === 'Verify' || action === 'Approve') ? styles.verifyButton : action === 'Reject' ? styles.rejectButton : styles.holdButton,
                     {flex: 1.2}
                   ]}
                   onPress={handleFinalSubmit}>
@@ -222,7 +222,7 @@ export const BulkReviewModal: React.FC<BulkReviewModalProps> = ({
                 <TouchableOpacity
                   style={[
                     styles.actionButton, 
-                    action === 'Verify' ? styles.verifyButton : action === 'Reject' ? styles.rejectButton : styles.holdButton,
+                    (action === 'Verify' || action === 'Approve') ? styles.verifyButton : action === 'Reject' ? styles.rejectButton : styles.holdButton,
                     (loading || activeInvoices.size === 0) && styles.disabledButton
                   ]}
                   onPress={() => setShowConfirmUI(true)}

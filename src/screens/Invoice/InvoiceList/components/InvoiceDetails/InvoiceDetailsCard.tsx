@@ -58,6 +58,7 @@ type Props = {
   registerMenuRef: (id: string, ref: View | null) => void;
   index: number;
   transparency?: number;
+  isSelectable?: boolean;
 };
 
 export const InvoiceDetailsCard: React.FC<Props> = ({
@@ -75,6 +76,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   registerMenuRef,
   index,
   transparency = 1,
+  isSelectable = false,
 }) => {
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canEdit = useHasPermission(PERMISSIONS.INVOICE_LIST_EDIT);
@@ -104,11 +106,21 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   const rawApprovalStatusLower = (row.rawApprovalStatus || '').toLowerCase();
   const isNotCompletedOrRejected = rawApprovalStatusLower !== 'approval_complete' && rawApprovalStatusLower !== 'completed' && !approvalStatusLower.includes('completed') && !approvalStatusLower.includes('rejected');
 
-  const statusLower = (row.rawInvoiceStatus || '').toLowerCase();
   const rawAdminStatusUpper = (row.rawAdminStatus || '').trim().toUpperCase();
-  const showPendingBlueDot = rawAdminStatusUpper === 'PENDING_VERIFICATION' || rawAdminStatusUpper === 'PENDING VERIFICATION';
+  const statusLower = (row.rawInvoiceStatus || '').toLowerCase();
+  const approvalSUpper = (row.rawApprovalStatus || '').trim().toUpperCase().replace(/_/g, ' ');
+
+  // Robust Blue Dot Logic (Sync with isInvoiceSelectable)
+  let showPendingBlueDot = false;
+  if (isCashnTechUser) {
+    showPendingBlueDot = rawAdminStatusUpper === 'PENDING_VERIFICATION' || rawAdminStatusUpper === 'PENDING VERIFICATION';
+  } else if (storedUserRole) {
+    const expected = `PENDING ${(storedUserRole || '').trim().toUpperCase()}`;
+    showPendingBlueDot = approvalSUpper.includes(expected);
+  }
+
   const showDraftOrangeDot = statusLower === 'draft';
-  const showActionRequiredRedDot = statusLower === 'rejected' && isAnchorMaker;
+  const showActionRequiredRedDot = statusLower === 'rejected';
 
   const partyTitle = isDealerMaker || isDealerChecker
     ? row.counterParty || row.dealerName
@@ -150,27 +162,25 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
               {(row.absoluteIndex ?? index) + 1}
             </Text>
           </View>
-          {!isCashnTechUser && (
-            <View style={styles.cardHeaderContainer}>
-              {(isDealerChecker || isAnchorChecker || (isCashnTechUser && showPendingBlueDot)) ? (
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  style={styles.dmCardHeaderRow}
-                  onPress={() => onToggleSelection(row.id)}>
-                  <View
-                    style={[
-                      styles.checkboxBox,
-                      isSelected && styles.checkboxBoxSelected,
-                    ]}>
-                    {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
-                  </View>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.makerHeaderRow}>
+          <View style={styles.cardHeaderContainer}>
+            {isSelectable && !isDealerMaker ? (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.dmCardHeaderRow}
+                onPress={() => onToggleSelection(row.id)}>
+                <View
+                  style={[
+                    styles.checkboxBox,
+                    isSelected && styles.checkboxBoxSelected,
+                  ]}>
+                  {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
                 </View>
-              )}
-            </View>
-          )}
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.makerHeaderRow}>
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={styles.infoGrid}>
@@ -607,8 +617,8 @@ const styles = StyleSheet.create({
   },
   absoluteDotsContainer: {
     position: 'absolute',
-    top: scaleHeight(20),
-    right: scaleWidth(52), // Left of the menu button
+    top: scaleHeight(5),
+    left: scaleWidth(5), // More towards the edge to avoid overlap with Sr No circle
     flexDirection: 'row',
     gap: scaleWidth(4),
     zIndex: 11,

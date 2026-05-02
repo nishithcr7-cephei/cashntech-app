@@ -18,6 +18,8 @@ interface LatestInvoicesListProps {
   isCashnTechUser: boolean;
   isAnchorMaker?: boolean;
   isAnchorChecker?: boolean;
+  isDealerMaker?: boolean;
+  isDealerChecker?: boolean;
 }
 
 export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
@@ -29,8 +31,10 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
   isCashnTechUser,
   isAnchorMaker = false,
   isAnchorChecker = false,
+  isDealerMaker = false,
+  isDealerChecker = false,
 }) => {
-  const showCashnTechLayout = isCashnTechUser || isAnchorMaker || isAnchorChecker;
+  const showCashnTechLayout = isCashnTechUser || isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker;
 
   if (loading) {
     return (
@@ -104,10 +108,10 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
                       <Text style={styles.indexText}>{index + 1}</Text>
                     </View>
                     <View style={styles.infoGrid}>
-                    <View style={[styles.infoColumn, {width: '100%', marginBottom: scaleHeight(6)}]}>
-                      <Text style={styles.infoLabel}>Dealer</Text>
-                      <Text style={styles.infoValue}>{row.counterPartyName || '-'}</Text>
-                    </View>
+                      <View style={[styles.infoColumn, {width: '100%', marginBottom: scaleHeight(6)}]}>
+                        <Text style={styles.infoLabel}>Dealer</Text>
+                        <Text style={styles.infoValue}>{row.counterPartyName || '-'}</Text>
+                      </View>
                     <View style={styles.infoColumn}>
                       <Text style={styles.infoLabel}>Invoice No.</Text>
                       <Text style={styles.infoValue}>{row.invoice_ref_no || '-'}</Text>

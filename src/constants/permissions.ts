@@ -27,6 +27,7 @@ export const PERMISSIONS = {
   INVOICE_LIST_REJECT: 'lms.transactions.invoice_list.action.reject',
   INVOICE_LIST_FILTER: 'lms.transactions.invoice_list.action.filter',
   INVOICE_LIST_CREATE: 'lms.transactions.invoice_list.action.create_invoice',
+  INVOICE_LIST_ADMIN_VERIFICATION: 'lms.transactions.invoice_list.action.invoice_verification',
   INTEREST_ACCRUALS: 'lms.transactions.interest_accruals',
   INTEREST_ACCRUALS_VIEW_DAILY: 'lms.transactions.interest_accruals.action.view_daily_interest',
   DISBURSEMENT: 'lms.transactions.disbursement',

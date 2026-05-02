@@ -41,9 +41,21 @@ import {invoiceApi} from '@services/api/invoice.api';
 
 
 const dpdFilterData = {
-  'Primary Party': ['Sun Pharma', 'Hero Finanace', 'ABC Finance'],
+  'DPD Buckets': [
+    'Bucket 1 (1 to 30 Days)',
+    'Bucket 2 (31 to 60 Days)',
+    'Bucket 3 (61 to 90 Days)',
+    'NPA (More than 90 Days)',
+  ],
   'Bank Name': ['UGRO', 'TCL'],
   'Invoice Status': ['Closed', 'Open'],
+};
+
+const BUCKET_VALUE_MAP: Record<string, string> = {
+  'Bucket 1 (1 to 30 Days)': 'Bucket1',
+  'Bucket 2 (31 to 60 Days)': 'Bucket2',
+  'Bucket 3 (61 to 90 Days)': 'Bucket3',
+  'NPA (More than 90 Days)': 'NPA',
 };
 
 const formatDate = (dateStr?: string) => {
@@ -62,6 +74,7 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
   const programSelection = useSelector(selectProgramSelection);
   const programName = programSelection?.programName ?? 'Sun Pharma PGM';
   const isDealerMaker = userRole === 'dealer_maker';
+  const isDealerChecker = userRole === 'dealer_checker';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -75,21 +88,26 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
   const [apiKpis, setApiKpis] = useState<any>(null);
 
   useEffect(() => {
-    let payload = {};
+    let payload: any = {};
     let pIds: string[] | undefined = undefined;
-    if (programSelection?.programScope === 'all') {
-      payload = {};
-      // For all programs, if allProgramIds exist, you might pass them, but keeping it empty works too based on existing logic
-    } else if (programSelection?.programId) {
-      payload = {programIds: [programSelection.programId]};
+
+    if (programSelection?.programScope !== 'all' && programSelection?.programId) {
+      payload.programIds = [programSelection.programId];
       pIds = [programSelection.programId];
     }
+
+    // Map selected UI bucket labels to backend values
+    const selectedBuckets = appliedFilters['DPD Buckets'] || [];
+    if (selectedBuckets.length > 0) {
+      payload.buckets = selectedBuckets.map(label => BUCKET_VALUE_MAP[label]);
+    }
+
     dispatch(dpdActions.fetchDPDListRequest(payload));
 
     invoiceApi.getDpdKpis(pIds).then(res => {
       setApiKpis(res);
     }).catch(e => console.log('Error fetching dpd kpis', e));
-  }, [programSelection, dispatch]);
+  }, [programSelection, appliedFilters, dispatch]);
 
   const getVal = (val: string | undefined | null) => val ? `₹ ${Number(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}` : '-';
 
@@ -184,12 +202,14 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
           })}
         </View>
 
-        <View style={styles.invoicesHeader}>
-          <Text style={styles.invoicesLabel}>Invoices</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{filteredData.length}</Text>
+        {!(isDealerMaker || isDealerChecker) && (
+          <View style={styles.invoicesHeader}>
+            <Text style={styles.invoicesLabel}>Invoices</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{filteredData.length}</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={styles.searchFilterRow}>
           <View style={styles.searchContainer}>
@@ -207,6 +227,15 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
             <Text style={styles.filterButtonText}>Filters</Text>
           </TouchableOpacity>
         </View>
+
+        {(isDealerMaker || isDealerChecker) && (
+          <View style={[styles.invoicesHeader, {marginTop: scaleHeight(12)}]}>
+            <Text style={styles.invoicesLabel}>Invoices</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{filteredData.length}</Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.verticalList}>
           {filteredData.map((row, index) => (

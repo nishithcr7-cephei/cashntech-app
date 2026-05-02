@@ -57,6 +57,7 @@ export const InterestAccrualsScreen: React.FC = () => {
   const programSelection = useSelector(selectProgramSelection);
   const programName = programSelection?.programName ?? '';
   const isDealerMaker = userRole === 'dealer_maker';
+  const isDealerChecker = userRole === 'dealer_checker';
 
   const dispatch = useDispatch();
   const rawInterestData = useSelector(interestAccrualSelectors.selectInterestAccrualList);
@@ -323,12 +324,14 @@ export const InterestAccrualsScreen: React.FC = () => {
             ) : null}
             {!loading && (
               <>
-                <View style={styles.invoicesHeader}>
-                  <Text style={styles.invoicesLabel}>Interest Accruals</Text>
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{filteredData.length}</Text>
+                {!(isDealerMaker || isDealerChecker) && (
+                  <View style={styles.invoicesHeader}>
+                    <Text style={styles.invoicesLabel}>Interest Accruals</Text>
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{filteredData.length}</Text>
+                    </View>
                   </View>
-                </View>
+                )}
                 <View style={styles.searchFilterRow}>
                   <View style={styles.searchContainer}>
                     <Search width={scaleWidth(18)} height={scaleHeight(18)} />
@@ -347,6 +350,14 @@ export const InterestAccrualsScreen: React.FC = () => {
                     <Text style={styles.filterButtonText}>Filters</Text>
                   </TouchableOpacity>
                 </View>
+                {(isDealerMaker || isDealerChecker) && (
+                  <View style={[styles.invoicesHeader, {marginTop: scaleHeight(12)}]}>
+                    <Text style={styles.invoicesLabel}>Interest Accruals</Text>
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{filteredData.length}</Text>
+                    </View>
+                  </View>
+                )}
               </>
             )}
           </>

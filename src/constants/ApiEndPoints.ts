@@ -152,6 +152,7 @@ const Endpoints = {
   apiUpdateInvoiceStatus: (invoiceId: string) => `/invoice/status/${invoiceId}`,
   apiUpdateInvoiceVerification: (invoiceId: string) => `/invoice/admin/${invoiceId}`,
   apiBulkUpdateInvoiceVerification: '/invoice/admin/bulk-status',
+  apiBulkUpdateInvoiceStatus: '/invoice/bulk/status',
   apiGetInvoiceDetails: (invoiceId: string) => `/invoice/details/${invoiceId}`,
   /** POST multipart: add attachment to invoice (body: file field, same as create invoice) */
   apiUploadInvoiceAttachment: (invoiceId: string) => `/invoice/attachment/${invoiceId}`,

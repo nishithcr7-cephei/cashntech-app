@@ -592,12 +592,15 @@ export const CreateInvoice: React.FC = () => {
           if (!item.pricePerQuantity?.trim() || parseFloat(item.pricePerQuantity) <= 0) {
             return `Item ${i + 1}: Valid Price is required`;
           }
+          // Discount is now optional
+          /*
           if (!item.discountType?.trim()) {
             return `Item ${i + 1}: Discount Type is required`;
           }
           if (!item.discountValue?.trim()) {
             return `Item ${i + 1}: Discount Value is required`;
           }
+          */
           const hasValidTaxInArray = Array.isArray(item.taxes)
             ? item.taxes.some(
                 (t: any) =>

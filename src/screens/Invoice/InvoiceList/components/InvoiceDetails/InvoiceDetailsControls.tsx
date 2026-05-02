@@ -71,6 +71,11 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canCreateInvoice = useHasPermission(PERMISSIONS.INVOICE_LIST_CREATE);
   const canUploadInvoice = useHasPermission(PERMISSIONS.INVOICE_LIST_IMPORT);
+  const canApprove = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVE);
+  const canReject = useHasPermission(PERMISSIONS.INVOICE_LIST_REJECT);
+  const canVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_ADMIN_VERIFICATION);
+  
+  const hasFunctionalPermission = canApprove || canReject || canVerify;
 
   // Composite Role-based visibility check for "Create Invoice"
   const showCreateButton = shouldShowCreateInvoice(user, canCreateInvoice);
@@ -103,16 +108,11 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
           <Text style={[styles.summaryCount, styles.draftText]}>{draftCount}</Text>
           <Text style={styles.summaryLabel}>DRAFT</Text>
         </View>
-        {(isAnchorMaker || isAnchorChecker) ? (
+        {(isAnchorMaker || isAnchorChecker) && (
           <View style={[styles.summaryCard, styles.actionRequiredCard]}>
             <View style={styles.actionDotSmall} />
             <Text style={[styles.summaryCount, styles.actionRequiredText]}>{actionRequiredCount}</Text>
             <Text style={styles.summaryLabel}>ACTION REQUIRED</Text>
-          </View>
-        ) : (
-          <View style={[styles.summaryCard, styles.totalCard]}>
-            <Text style={[styles.summaryCount, styles.totalText]}>{invoiceCount}</Text>
-            <Text style={styles.summaryLabel}>TOTAL</Text>
           </View>
         )}
       </View>
@@ -124,7 +124,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
 
       <View style={styles.selectAllCreateRow}>
         <View style={styles.dmSelectAllWrapper}>
-          {(isDealerChecker || isAnchorChecker || isCashnTechUser) && (
+          {(isDealerChecker || isAnchorChecker || isCashnTechUser) && hasFunctionalPermission && (
             <TouchableOpacity
               activeOpacity={0.8}
               style={[
@@ -143,7 +143,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
                 )}
               </View>
               <Text style={styles.dmSelectAllText}>Select all</Text>
-              {isCashnTechUser && (
+              {(isCashnTechUser || isAnchorChecker || isDealerChecker) && (
                 <View style={styles.bulkBadge}>
                   <Text style={styles.bulkBadgeText}>Bulk Actions</Text>
                 </View>
@@ -219,7 +219,11 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
 
       <View style={styles.listHeader}>
         <Text style={styles.listHeaderLabel}>
-          {(isAnchorMaker || isAnchorChecker) ? 'Dealer Wise Invoice Details' : 'Invoices'}
+          {(isAnchorMaker || isAnchorChecker) 
+            ? 'Dealer Wise Invoice Details' 
+            : (isDealerMaker || isDealerChecker)
+              ? 'Anchor Wise Invoice Details'
+              : 'Invoices'}
         </Text>
         <View style={styles.countBadge}>
           <Text style={styles.countBadgeText}>{invoiceCount}</Text>
@@ -236,7 +240,9 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
           </View>
         )}
 
-      {(isDealerChecker || isAnchorChecker) && selectedInvoiceIdsLength > 0 && (
+      {(isDealerChecker || isAnchorChecker || isCashnTechUser) && 
+        hasFunctionalPermission && 
+        selectedInvoiceIdsLength > 0 && (
         <TouchableOpacity
           style={styles.proceedButton}
           onPress={onOpenSendForApprovalModal}>
@@ -479,25 +485,30 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: scaleWidth(16),
-    paddingBottom: scaleHeight(8),
-    gap: scaleWidth(10),
+    paddingBottom: scaleHeight(4),
+    gap: scaleWidth(12),
   },
   summaryCard: {
-    flex: 1,
-    borderRadius: scaleWidth(12),
-    paddingVertical: scaleHeight(12),
+    width: scaleWidth(145),
+    height: scaleHeight(45),
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(6),
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
+    elevation: 0,
+    shadowOpacity: 0,
   },
   pendingCard: {
-    backgroundColor: '#FEF3CD',
+    borderColor: '#E2E8F0',
   },
   draftCard: {
-    backgroundColor: '#FCEAE6',
+    borderColor: '#E2E8F0',
   },
   totalCard: {
     backgroundColor: Colors.white,
@@ -505,33 +516,31 @@ const styles = StyleSheet.create({
     borderColor: '#E6E4DC',
   },
   summaryCount: {
-    fontSize: scaleFont(24),
+    fontSize: scaleFont(18),
     fontFamily: Fonts.GilroyBold,
-    lineHeight: scaleHeight(28),
+    lineHeight: scaleHeight(22),
   },
   pendingText: {
-    color: '#D97706',
+    color: Colors.tertiaryBlue,
   },
   draftText: {
-    color: '#D0331A',
+    color: '#F59E0B',
   },
   totalText: {
     color: '#17160F',
   },
   actionRequiredCard: {
-    backgroundColor: '#FFE4E6', // Soft red
-    borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#E2E8F0',
   },
   actionRequiredText: {
     color: Colors.red,
   },
   summaryLabel: {
-    fontSize: scaleFont(8.5),
-    fontFamily: Fonts.GilroyBold,
+    fontSize: scaleFont(8),
+    fontFamily: Fonts.GilroySemiBold,
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    marginTop: scaleHeight(4),
+    color: '#64748B',
+    marginTop: scaleHeight(2),
     textAlign: 'center',
   },
   listHeader: {
@@ -561,31 +570,31 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   pendingDotSmall: {
-    width: scaleWidth(10),
-    height: scaleWidth(10),
-    borderRadius: scaleWidth(5),
+    width: scaleWidth(6),
+    height: scaleWidth(6),
+    borderRadius: scaleWidth(3),
     backgroundColor: Colors.tertiaryBlue,
     position: 'absolute',
-    top: scaleHeight(8),
-    right: scaleWidth(8),
+    top: scaleHeight(6),
+    right: scaleWidth(6),
   },
   draftDotSmall: {
-    width: scaleWidth(10),
-    height: scaleWidth(10),
-    borderRadius: scaleWidth(5),
+    width: scaleWidth(6),
+    height: scaleWidth(6),
+    borderRadius: scaleWidth(3),
     backgroundColor: '#F59E0B',
     position: 'absolute',
-    top: scaleHeight(8),
-    right: scaleWidth(8),
+    top: scaleHeight(6),
+    right: scaleWidth(6),
   },
   actionDotSmall: {
-    width: scaleWidth(10),
-    height: scaleWidth(10),
-    borderRadius: scaleWidth(5),
+    width: scaleWidth(6),
+    height: scaleWidth(6),
+    borderRadius: scaleWidth(3),
     backgroundColor: Colors.red,
     position: 'absolute',
-    top: scaleHeight(8),
-    right: scaleWidth(8),
+    top: scaleHeight(6),
+    right: scaleWidth(6),
   },
 });
 

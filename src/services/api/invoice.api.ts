@@ -542,10 +542,10 @@ export const invoiceApi = {
 
   /**
    * CashnTech admin bulk verification: PATCH /invoice/admin/bulk-status
-   * Payload: { action: 'Verify' | 'Reject' | 'On Hold', invoices: [{ invoiceId, action, remark, approvalRemark }] }
+   * Payload: { action: 'Verify' | 'Approve' | 'Reject' | 'On Hold', invoices: [{ invoiceId, action, remark, approvalRemark }] }
    */
   bulkUpdateInvoiceVerification: async (payload: {
-    action: 'Verify' | 'Reject' | 'On Hold';
+    action: 'Verify' | 'Approve' | 'Reject' | 'On Hold';
     invoices: {
       invoiceId: string;
       action: string;
@@ -555,6 +555,27 @@ export const invoiceApi = {
   }): Promise<any> => {
     const response = await axiosInstance.patch(
       ApiEndPoints.apiBulkUpdateInvoiceVerification,
+      payload,
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
+  /**
+   * Regular user bulk approval: PATCH /invoice/bulk-update-status
+   * Payload: { action: 'Approve' | 'Reject', invoices: [{ invoiceId, action, approval_level, remark }] }
+   */
+  bulkUpdateInvoiceStatus: async (payload: {
+    action: 'Approve' | 'Reject';
+    invoices: {
+      invoiceId: string;
+      action: string;
+      approval_level: number;
+      remark: string;
+    }[];
+  }): Promise<any> => {
+    const response = await axiosInstance.patch(
+      ApiEndPoints.apiBulkUpdateInvoiceStatus,
       payload,
       {authRequired: true} as any,
     );

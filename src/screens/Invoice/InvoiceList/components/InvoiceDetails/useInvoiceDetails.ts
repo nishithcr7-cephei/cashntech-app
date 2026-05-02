@@ -9,6 +9,7 @@ import {
   fetchInvoiceListRequest,
   updateInvoiceStatusRequest,
   updateInvoiceVerificationRequest,
+  bulkUpdateInvoiceRequest,
 } from '@store/invoice/inv.slice';
 import { fetchPermissionsRequest } from '@store/permissions';
 import {
@@ -30,6 +31,8 @@ import { AppRole, ROLE_LABELS } from '@constants/roles';
 import { mapApiToRow, formatDateDash, mapApprovalLogToEntry } from './types';
 import { InvoiceListItemApi } from '@store/invoice/inv.types';
 import { invoiceApi } from '@services/api/invoice.api';
+import { useHasPermission } from '@hooks/useHasPermission';
+import { PERMISSIONS } from '@constants/permissions';
 import { decryptValue } from '@utils/decrypt';
 import type { CheckerApprovalEntry } from '@components/CheckerApprovalModal/CheckerApprovalModal';
 import type { ApproveRejectInvoiceDetails } from '@components/ApproveRejectModal/ApproveRejectModal';
@@ -44,6 +47,8 @@ export function useInvoiceDetails() {
   const invoiceListLoading = useSelector(selectInvoiceListLoading);
   const invoiceListError = useSelector(selectInvoiceListError);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const userInfoFull = useSelector(userSelector.getUserInfo);
+  const userDepartment = (userInfoFull as any)?.department || '';
 
   // Enable LayoutAnimation for Android
   useEffect(() => {
@@ -81,6 +86,8 @@ export function useInvoiceDetails() {
   const isCashnTechUser =
     userRole === 'cashntech_user' ||
     !!(userRole && ROLE_LABELS[userRole] === 'CashnTech User');
+  
+  const storedUserRole = userRole ? ROLE_LABELS[userRole] : '';
 
   const dealerListTitle =
     isCashnTechUser
@@ -97,6 +104,14 @@ export function useInvoiceDetails() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [selectedInvoiceNo, setSelectedInvoiceNo] = useState<string | null>(null);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  
+  // Permission Checks
+  const canApprove = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVE);
+  const canReject = useHasPermission(PERMISSIONS.INVOICE_LIST_REJECT);
+  const canVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_ADMIN_VERIFICATION);
+  
+  const hasFunctionalPermission = canApprove || canReject || canVerify;
+
   const [menuAnchor, setMenuAnchor] = useState<{
     x: number;
     y: number;
@@ -104,11 +119,45 @@ export function useInvoiceDetails() {
     height: number;
   } | null>(null);
   const menuButtonRefs = React.useRef<Record<string, View | null>>({});
+  
+  const invoiceData = (invoiceListRaw || []).map((api, idx) => ({
+    ...mapApiToRow(api),
+    absoluteIndex: idx,
+  }));
+
+  let filteredData = invoiceData;
+  if (selectedDealerName && invoiceData.length > 0) {
+    const dealerNameLower = selectedDealerName.toLowerCase().trim();
+    const filteredByDealer = filteredData.filter(item => {
+      const itemDealerName = item.dealerName?.toLowerCase().trim() || '';
+      const itemDealerCode = item.dealerCode?.toLowerCase().trim() || '';
+      return (
+        itemDealerName.includes(dealerNameLower) ||
+        dealerNameLower.includes(itemDealerName) ||
+        itemDealerCode.includes(dealerNameLower) ||
+        dealerNameLower.includes(itemDealerCode)
+      );
+    });
+    if (filteredByDealer.length > 0) {
+      filteredData = filteredByDealer;
+    }
+  }
+  if (searchText.trim()) {
+    const term = searchText.toLowerCase();
+    filteredData = filteredData.filter(
+      item =>
+        (item.dealerName?.toLowerCase() || '').includes(term) ||
+        (item.dealerCode?.toLowerCase() || '').includes(term) ||
+        (item.invoiceNo?.toLowerCase() || '').includes(term),
+    );
+  }
+
+  const selectedRowForMenu = openMenuId 
+    ? filteredData.find(r => r.id === openMenuId) || invoiceData.find(r => r.id === openMenuId)
+    : null;
+
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<string[]>([]);
   const [selectedInvoices, setSelectedInvoices] = useState<any[]>([]); // Full items for modal
-  const [bulkAction, setBulkAction] = useState<'Verify' | 'Reject' | 'On Hold'>('Verify');
-  const [showBulkReviewModal, setShowBulkReviewModal] = useState(false);
-  const [bulkLoading, setBulkLoading] = useState(false);
   const [showSendForApprovalModal, setShowSendForApprovalModal] = useState(false);
   const [visibleCount, setVisibleCount] = useState(30);
   const [anchorCheckerInvoiceDetails, setAnchorCheckerInvoiceDetails] = useState<ApproveRejectInvoiceDetails | null>(null);
@@ -295,11 +344,6 @@ export function useInvoiceDetails() {
     };
   }, [showCheckerApprovalModal, selectedInvoiceId]);
 
-  const invoiceData = invoiceListRaw.map((api, idx) => ({
-    ...mapApiToRow(api),
-    absoluteIndex: idx,
-  }));
-
   const banks = [...new Set(invoiceData.map(r => r.bankName).filter(Boolean))].sort();
   const products = [...new Set(invoiceData.map(r => r.productName).filter(Boolean))].sort();
   const programs = [...new Set(invoiceData.map(r => r.programName).filter(Boolean))].sort();
@@ -316,33 +360,6 @@ export function useInvoiceDetails() {
     'Invoice Status': invoiceStatuses.length ? invoiceStatuses : ['No data'],
     'Approval Status': approvalStatuses.length ? approvalStatuses : ['No data'],
   };
-
-  let filteredData = invoiceData;
-  if (selectedDealerName && invoiceData.length > 0) {
-    const dealerNameLower = selectedDealerName.toLowerCase().trim();
-    const filteredByDealer = filteredData.filter(item => {
-      const itemDealerName = item.dealerName?.toLowerCase().trim() || '';
-      const itemDealerCode = item.dealerCode?.toLowerCase().trim() || '';
-      return (
-        itemDealerName.includes(dealerNameLower) ||
-        dealerNameLower.includes(itemDealerName) ||
-        itemDealerCode.includes(dealerNameLower) ||
-        dealerNameLower.includes(itemDealerCode)
-      );
-    });
-    if (filteredByDealer.length > 0) {
-      filteredData = filteredByDealer;
-    }
-  }
-  if (searchText.trim()) {
-    const term = searchText.toLowerCase();
-    filteredData = filteredData.filter(
-      item =>
-        (item.dealerName?.toLowerCase() || '').includes(term) ||
-        (item.dealerCode?.toLowerCase() || '').includes(term) ||
-        (item.invoiceNo?.toLowerCase() || '').includes(term),
-    );
-  }
 
   useEffect(() => {
     setVisibleCount(30);
@@ -485,21 +502,45 @@ export function useInvoiceDetails() {
     }
   };
 
+  const isInvoiceSelectable = useCallback((item: any) => {
+    const iStatus = (item.rawInvoiceStatus || '').toLowerCase();
+    const aStatus = (item.rawAdminStatus || '').toLowerCase();
+    const approvalS = (item.rawApprovalStatus || '').trim().toUpperCase().replace(/_/g, ' ');
+
+    // 1. Basic Backend Blocks
+    if (iStatus === 'draft') return false;
+    if (approvalS.includes('PENDING ATTACHMENT') || iStatus === 'attachment pending') return false;
+    if (aStatus === 'verified') return false;
+
+    // 2. Status Awareness (Matching 3-dots/Web logic)
+    if (isCashnTechUser) {
+      return aStatus === 'pending verification' || aStatus === 'pending_verification';
+    }
+
+    // 3. Functional Permission Check (Sync with 3-dots)
+    if (!hasFunctionalPermission) return false;
+
+    // For regular roles, check if approval_status contains "PENDING [ROLE]"
+    const roleLabel = (storedUserRole || '').trim().toUpperCase();
+    if (roleLabel) {
+      const expected = `PENDING ${roleLabel}`;
+      return approvalS.includes(expected);
+    }
+
+    return false;
+  }, [isCashnTechUser, storedUserRole, hasFunctionalPermission]);
+
   const toggleInvoiceSelection = (invoiceId: string) => {
     const item = filteredData.find(r => r.id === invoiceId) || invoiceData.find(r => r.id === invoiceId);
     if (!item) return;
 
-    // Restriction for CashnTech User
-    if (isCashnTechUser) {
-      const rawAdminStatus = (item.rawAdminStatus || '').trim().toUpperCase();
-      if (rawAdminStatus !== 'PENDING_VERIFICATION' && rawAdminStatus !== 'PENDING VERIFICATION') {
-        Toast.show({
-          type: 'info',
-          text1: 'Restricted',
-          text2: 'Only Pending Verification invoices can be selected.',
-        });
-        return;
-      }
+    if (!isInvoiceSelectable(item)) {
+      Toast.show({
+        type: 'info',
+        text1: 'Restricted',
+        text2: 'This invoice is not in an actionable state for your role.',
+      });
+      return;
     }
 
     const isSelected = selectedInvoiceIds.includes(invoiceId);
@@ -520,14 +561,6 @@ export function useInvoiceDetails() {
       ]);
     }
   };
-
-  const selectedRowForMenu = openMenuId
-    ? (filteredData.find(r => r.id === openMenuId) ?? invoiceData.find(r => r.id === openMenuId))
-    : undefined;
-
-  const userInfoFull = useSelector(userSelector.getUserInfo);
-  const userDepartment = userInfoFull?.permission_group?.[0]?.department;
-  const storedUserRole = userInfoFull?.permission_group?.[0]?.business_role || userInfoFull?.permission_group?.[0]?.functional_role;
 
   const selectedRowsForModal = invoiceData.filter(row =>
     selectedInvoiceIds.includes(row.id),
@@ -559,7 +592,7 @@ export function useInvoiceDetails() {
     return (
       (isDealerChecker || isAnchorChecker) &&
       filteredData.length > 0 &&
-      filteredData.every(row => selectedInvoiceIds.includes(row.id))
+      filteredData.every(row => !isInvoiceSelectable(row) || selectedInvoiceIds.includes(row.id))
     );
   })();
 
@@ -574,21 +607,14 @@ export function useInvoiceDetails() {
   const toggleSelectAllVisible = () => {
     if (!isDealerChecker && !isAnchorChecker && !isCashnTechUser) return;
 
-    let visibleItems = filteredData;
-    if (isCashnTechUser) {
-      visibleItems = filteredData.filter(
-        row =>
-          (row.rawAdminStatus || '').trim().toUpperCase() === 'PENDING_VERIFICATION' ||
-          (row.rawAdminStatus || '').trim().toUpperCase() === 'PENDING VERIFICATION',
-      );
-      if (visibleItems.length === 0 && filteredData.length > 0) {
-        Toast.show({
-          type: 'info',
-          text1: 'No Eligible Invoices',
-          text2: 'There are no "Pending Verification" invoices on this screen to select.',
-        });
-        return;
-      }
+    let visibleItems = filteredData.filter(row => isInvoiceSelectable(row));
+    if (visibleItems.length === 0 && filteredData.length > 0) {
+      Toast.show({
+        type: 'info',
+        text1: 'No Eligible Invoices',
+        text2: `There are no invoices in an actionable state for your role on this screen.`,
+      });
+      return;
     }
 
     const visibleIds = visibleItems.map(row => row.id);
@@ -685,22 +711,41 @@ export function useInvoiceDetails() {
     setAnchorCheckerInvoiceDetails(null);
   };
 
-  const onBulkApply = (action: 'approve' | 'reject' | 'verify' | 'cancel') => {
-    void action;
-    setShowSendForApprovalModal(false);
-    setSelectedInvoiceIds([]);
-    setSelectedInvoices([]);
-    if (programId) {
-      dispatch(fetchInvoiceListRequest({ programId, filters: apiFilters }));
-    }
+  const onBulkApply = (payload: {
+    action: 'Verify' | 'Approve' | 'Reject' | 'On Hold';
+    invoices: {
+      invoiceId: string;
+      action: string;
+      remark: string;
+      approvalRemark?: string;
+    }[];
+  }) => {
+    dispatch(
+      bulkUpdateInvoiceRequest({
+        action: payload.action,
+        invoices: payload.invoices,
+        programId: programId || '',
+        filters: apiFilters,
+        isVerification: isCashnTechUser, // Admin users use verification API
+        onSuccess: () => {
+          setShowBulkReviewModal(false);
+          setSelectedInvoiceIds([]);
+          setSelectedInvoices([]);
+        },
+      }),
+    );
   };
 
-  const handleBulkAction = (action: 'Verify' | 'Reject' | 'On Hold') => {
+  const [bulkAction, setBulkAction] = useState<'Verify' | 'Reject' | 'On Hold' | 'Approve'>('Verify');
+  const [showBulkReviewModal, setShowBulkReviewModal] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  const handleBulkAction = (action: 'Verify' | 'Reject' | 'On Hold' | 'Approve') => {
     if (selectedInvoices.length === 0) {
       Toast.show({
         type: 'error',
         text1: 'No Selection',
-        text2: 'Please select at least one Pending Verification invoice to proceed.',
+        text2: `Please select at least one ${isCashnTechUser ? 'Pending Verification' : ''} invoice to proceed.`,
       });
       return;
     }
@@ -739,20 +784,42 @@ export function useInvoiceDetails() {
   const isCreateInvoiceEnabled =
     !isAllProgramScope && !!concreteProgramId;
 
-  const { pendingCount, draftCount } = React.useMemo(() => {
+  const { pendingCount, draftCount, actionRequiredCount } = React.useMemo(() => {
     let pending = 0;
     let draft = 0;
+    let actionRequired = 0;
+    
+    const roleLabel = (storedUserRole || '').trim().toUpperCase();
+
     invoiceData.forEach(row => {
       const adminStatus = (row.rawAdminStatus || '').trim().toUpperCase();
-      const status = (row.rawInvoiceStatus || '').trim().toLowerCase();
-      if (adminStatus === 'PENDING_VERIFICATION' || adminStatus === 'PENDING VERIFICATION') {
-        pending++;
-      } else if (status === 'draft') {
+      const iStatus = (row.rawInvoiceStatus || '').trim().toLowerCase();
+      const approvalS = (row.rawApprovalStatus || '').trim().toUpperCase().replace(/_/g, ' ');
+
+      // 1. Draft check
+      if (iStatus === 'draft') {
         draft++;
+      } 
+      // 2. Action Required (Rejected) check
+      else if (iStatus === 'rejected') {
+        actionRequired++;
+      }
+      // 3. Pending (My Turn) check
+      else {
+        if (isCashnTechUser) {
+          if (adminStatus === 'PENDING_VERIFICATION' || adminStatus === 'PENDING VERIFICATION') {
+            pending++;
+          }
+        } else if (roleLabel) {
+          const expected = `PENDING ${roleLabel}`;
+          if (approvalS.includes(expected)) {
+            pending++;
+          }
+        }
       }
     });
-    return { pendingCount: pending, draftCount: draft };
-  }, [invoiceData]);
+    return { pendingCount: pending, draftCount: draft, actionRequiredCount: actionRequired };
+  }, [invoiceData, isCashnTechUser, storedUserRole]);
 
   return {
     programId,
@@ -839,6 +906,7 @@ export function useInvoiceDetails() {
     userInfoFull,
     pendingCount,
     draftCount,
+    actionRequiredCount,
     selectedInvoices,
     setSelectedInvoices,
     bulkAction,
@@ -848,5 +916,6 @@ export function useInvoiceDetails() {
     handleBulkAction,
     bulkLoading,
     setBulkLoading,
+    isInvoiceSelectable,
   };
 }

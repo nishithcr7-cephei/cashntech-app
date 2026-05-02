@@ -109,6 +109,7 @@ export const InvoiceDetails: React.FC = () => {
     userInfoFull,
     pendingCount,
     draftCount,
+    actionRequiredCount,
     selectedInvoices,
     setSelectedInvoices,
     bulkAction,
@@ -119,18 +120,19 @@ export const InvoiceDetails: React.FC = () => {
     bulkLoading,
     setBulkLoading,
     setSelectedInvoiceIds,
+    isInvoiceSelectable,
   } = useInvoiceDetails();
 
   const [showBulkActionSheet, setShowBulkActionSheet] = React.useState(false);
 
-  // Automatically trigger action sheet when invoices are selected (CashnTech only)
+  // Automatically trigger action sheet when invoices are selected (CashnTech and Anchor Checker)
   const prevCount = React.useRef(selectedInvoiceIds.length);
   React.useEffect(() => {
-    if (isCashnTechUser && selectedInvoiceIds.length > prevCount.current && selectedInvoiceIds.length > 0) {
+    if ((isCashnTechUser || isAnchorChecker || isDealerChecker) && selectedInvoiceIds.length > prevCount.current && selectedInvoiceIds.length > 0) {
       setShowBulkActionSheet(true);
     }
     prevCount.current = selectedInvoiceIds.length;
-  }, [selectedInvoiceIds.length, isCashnTechUser]);
+  }, [selectedInvoiceIds.length, isCashnTechUser, isAnchorChecker, isDealerChecker]);
 
   const registerMenuRef = (id: string, ref: View | null) => {
     menuButtonRefs.current[id] = ref;
@@ -192,11 +194,11 @@ export const InvoiceDetails: React.FC = () => {
                   allSelectedOnScreen={allSelectedOnScreen}
                   onToggleSelectAllVisible={toggleSelectAllVisible}
                   selectedInvoiceIdsLength={selectedInvoiceIds.length}
-                  onOpenSendForApprovalModal={() => setShowSendForApprovalModal(true)}
+                  onOpenSendForApprovalModal={() => setShowBulkActionSheet(true)}
                   onCreateInvoicePress={onCreateInvoicePress}
                   isCreateInvoiceEnabled={isCreateInvoiceEnabled}
                   user={userInfoFull}
-                  actionRequiredCount={invoiceData.filter(r => r.rawInvoiceStatus?.toLowerCase() === 'rejected').length}
+                  actionRequiredCount={actionRequiredCount}
                   pendingCount={pendingCount}
                   draftCount={draftCount}
                   onBulkAction={handleBulkAction}
@@ -221,6 +223,7 @@ export const InvoiceDetails: React.FC = () => {
                 onToggleSelection={toggleInvoiceSelection}
                 onInvoiceNoPress={handleInvoiceNoPress}
                 registerMenuRef={registerMenuRef}
+                isSelectable={isInvoiceSelectable(row)}
               />
             )}
             ListEmptyComponent={
@@ -375,6 +378,8 @@ export const InvoiceDetails: React.FC = () => {
             handleBulkAction(action);
           }, 300);
         }}
+        isAnchorChecker={isAnchorChecker}
+        isDealerChecker={isDealerChecker}
       />
 
       <BulkReviewModal
@@ -386,9 +391,22 @@ export const InvoiceDetails: React.FC = () => {
         }}
         selectedInvoices={selectedInvoices}
         action={bulkAction}
-        onSubmit={(payload) => {
+         onSubmit={(payload) => {
           setBulkLoading(true);
-          invoiceApi.bulkUpdateInvoiceVerification(payload)
+          const isChecker = isAnchorChecker || isDealerChecker;
+          const apiCall = isChecker 
+            ? invoiceApi.bulkUpdateInvoiceStatus({
+                action: (payload.action === 'Verify' || payload.action === 'Approve') ? 'Approve' : 'Reject',
+                invoices: payload.invoices.map(inv => ({
+                  invoiceId: inv.invoiceId,
+                  action: (inv.action === 'Verify' || inv.action === 'Approve') ? 'Approve' : 'Reject',
+                  approval_level: 1, // Defaulting to level 1
+                  remark: inv.remark,
+                }))
+              })
+            : invoiceApi.bulkUpdateInvoiceVerification(payload);
+
+          apiCall
             .then(res => {
               console.log('Bulk Action API Response:', JSON.stringify(res, null, 2));
               if (res.statusCode === 200 || res.status === 200) {

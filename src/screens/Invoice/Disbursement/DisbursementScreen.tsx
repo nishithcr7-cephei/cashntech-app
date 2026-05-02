@@ -179,6 +179,8 @@ export const DisbursementScreen: React.FC = () => {
   const isCashnTechUser = userRole === 'cashntech_user';
   const isAnchorChecker = userRole === 'anchor_checker';
   const isAnchorMaker = userRole === 'anchor_maker';
+  const isDealerMaker = userRole === 'dealer_maker';
+  const isDealerChecker = userRole === 'dealer_checker';
   
   // Permissions
   const permissionsLoading = useSelector(selectPermissionsLoading);
@@ -604,10 +606,12 @@ export const DisbursementScreen: React.FC = () => {
             </>
           ) : (
             <>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Loan Ref No.</Text>
-                <Text style={styles.infoValue}>{row.loanRefNo}</Text>
-              </View>
+              {!(isDealerMaker || isDealerChecker) && (
+                <View style={styles.infoColumn}>
+                  <Text style={styles.infoLabel}>Loan Ref No.</Text>
+                  <Text style={styles.infoValue}>{row.loanRefNo}</Text>
+                </View>
+              )}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Invoice No.</Text>
                 <Text style={styles.infoValue}>{row.invoiceNo}</Text>
@@ -722,12 +726,14 @@ export const DisbursementScreen: React.FC = () => {
             ) : null}
             {!loading && (
               <>
-                <View style={styles.invoicesHeader}>
-                  <Text style={styles.invoicesLabel}>Verified Invoices</Text>
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{filteredData.length}</Text>
+                {!(isDealerMaker || isDealerChecker) && (
+                  <View style={styles.invoicesHeader}>
+                    <Text style={styles.invoicesLabel}>Verified Invoices</Text>
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{filteredData.length}</Text>
+                    </View>
                   </View>
-                </View>
+                )}
                 <View style={styles.searchFilterRow}>
                   <View style={styles.searchContainer}>
                     <Search width={scaleWidth(18)} height={scaleHeight(18)} />
@@ -746,6 +752,14 @@ export const DisbursementScreen: React.FC = () => {
                     <Text style={styles.filterButtonText}>Filters</Text>
                   </TouchableOpacity>
                 </View>
+                {(isDealerMaker || isDealerChecker) && (
+                  <View style={[styles.invoicesHeader, {marginTop: scaleHeight(12)}]}>
+                    <Text style={styles.invoicesLabel}>Verified Invoices</Text>
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{filteredData.length}</Text>
+                    </View>
+                  </View>
+                )}
               </>
             )}
           </>

@@ -74,7 +74,7 @@ export const useInvoiceDashboard = () => {
   // Bulk Action states
   const [selectedInvoices, setSelectedInvoices] = useState<BulkInvoiceItem[]>([]);
   const [showBulkReviewModal, setShowBulkReviewModal] = useState(false);
-  const [bulkAction, setBulkAction] = useState<'Verify' | 'Reject' | 'On Hold'>('Verify');
+  const [bulkAction, setBulkAction] = useState<'Verify' | 'Approve' | 'Reject' | 'On Hold'>('Verify');
   const [bulkLoading, setBulkLoading] = useState(false);
 
   // Permissions
@@ -135,13 +135,13 @@ export const useInvoiceDashboard = () => {
     dispatch(fetchInvoiceKpisRequest({programIds: programIds}));
   }, [dispatch, programIds, scopeData, programSelection?.programScope, productTab]);
 
-  const handleBulkAction = useCallback((action: 'Verify' | 'Reject' | 'On Hold') => {
+  const handleBulkAction = useCallback((action: 'Verify' | 'Approve' | 'Reject' | 'On Hold') => {
     setBulkAction(action);
     setShowBulkReviewModal(true);
   }, []);
 
   const onBulkSubmit = async (payload: {
-    action: 'Verify' | 'Reject' | 'On Hold';
+    action: 'Verify' | 'Approve' | 'Reject' | 'On Hold';
     invoices: {
       invoiceId: string;
       action: string;
@@ -153,7 +153,25 @@ export const useInvoiceDashboard = () => {
     
     setBulkLoading(true);
     try {
-      const response = await invoiceApi.bulkUpdateInvoiceVerification(payload);
+      const isChecker = isAnchorChecker || isDealerChecker;
+      let response: any;
+
+      if (isChecker) {
+        // Regular User Bulk Status API (Approve/Reject)
+        const checkerPayload = {
+          action: (payload.action === 'Approve' ? 'Approve' : 'Reject') as 'Approve' | 'Reject',
+          invoices: payload.invoices.map(inv => ({
+            invoiceId: inv.invoiceId,
+            action: inv.action === 'Approve' ? 'Approve' : 'Reject',
+            approval_level: 1, // Defaulting to level 1 for now
+            remark: inv.remark,
+          })),
+        };
+        response = await invoiceApi.bulkUpdateInvoiceStatus(checkerPayload);
+      } else {
+        // Admin Bulk Verification API (Verify/Reject/Hold)
+        response = await invoiceApi.bulkUpdateInvoiceVerification(payload as any);
+      }
       
       if (response) {
         Toast.show({

@@ -128,3 +128,18 @@ export type UpdateInvoicePayload = {
   attachment?: any;
   approval_level?: number;
 };
+
+export type BulkUpdateInvoiceRequest = {
+  action: 'Approve' | 'Reject' | 'Verify' | 'On Hold';
+  invoices: {
+    invoiceId: string;
+    action: string;
+    remark: string;
+    approval_level?: number;
+    approvalRemark?: string;
+  }[];
+  programId?: string;
+  filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]};
+  onSuccess?: () => void;
+  isVerification?: boolean;
+};

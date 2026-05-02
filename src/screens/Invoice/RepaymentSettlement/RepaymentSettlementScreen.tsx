@@ -55,6 +55,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
   const programSelection = useSelector(selectProgramSelection);
   const allProgramIds = useSelector(selectAllProgramIds);
   const isDealerMaker = userRole === 'dealer_maker';
+  const isDealerChecker = userRole === 'dealer_checker';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -267,12 +268,14 @@ export const RepaymentSettlementScreen: React.FC = () => {
           })}
         </View>
 
-        <View style={styles.invoicesHeader}>
-          <Text style={styles.invoicesLabel}>Invoices</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{filteredData.length}</Text>
+        {!(isDealerMaker || isDealerChecker) && (
+          <View style={styles.invoicesHeader}>
+            <Text style={styles.invoicesLabel}>Invoices</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{filteredData.length}</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={styles.searchFilterRow}>
           <View style={styles.searchContainer}>
@@ -290,6 +293,15 @@ export const RepaymentSettlementScreen: React.FC = () => {
             <Text style={styles.filterButtonText}>Filters</Text>
           </TouchableOpacity>
         </View>
+
+        {(isDealerMaker || isDealerChecker) && (
+          <View style={[styles.invoicesHeader, {marginTop: scaleHeight(12)}]}>
+            <Text style={styles.invoicesLabel}>Invoices</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{filteredData.length}</Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.verticalList}>
           {loading ? (

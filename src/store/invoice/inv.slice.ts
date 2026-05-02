@@ -8,6 +8,7 @@ import {
   UpdateInvoiceStatusRequest,
   UpdateInvoiceVerificationRequest,
   UpdateInvoicePayload,
+  BulkUpdateInvoiceRequest,
 } from './inv.types';
 
 const invoiceSlice = createSlice({
@@ -120,6 +121,16 @@ const invoiceSlice = createSlice({
       // Action-level failures are surfaced via toast; keep list screen intact.
       state.invoiceListError = null;
     },
+    bulkUpdateInvoiceRequest: (
+      _state,
+      _action: PayloadAction<BulkUpdateInvoiceRequest>,
+    ) => {},
+    bulkUpdateInvoiceSuccess: state => {
+      state.invoiceListError = null;
+    },
+    bulkUpdateInvoiceFailure: (state, _action: PayloadAction<string>) => {
+      state.invoiceListError = null;
+    },
   },
 });
 
@@ -146,6 +157,9 @@ export const {
   updateInvoiceVerificationRequest,
   updateInvoiceVerificationSuccess,
   updateInvoiceVerificationFailure,
+  bulkUpdateInvoiceRequest,
+  bulkUpdateInvoiceSuccess,
+  bulkUpdateInvoiceFailure,
 } = invoiceSlice.actions;
 
 export default invoiceSlice.reducer;
