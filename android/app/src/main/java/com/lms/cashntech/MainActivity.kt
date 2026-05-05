@@ -1,4 +1,4 @@
-package com.webcashntech.app
+package com.lms.cashntech
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

@@ -1,4 +1,4 @@
-package com.webcashntech.app
+package com.lms.cashntech
 
 import android.app.Application
 import com.facebook.react.PackageList

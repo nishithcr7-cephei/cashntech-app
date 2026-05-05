@@ -486,13 +486,13 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingHorizontal: scaleWidth(16),
+    paddingHorizontal: scaleWidth(12),
     paddingBottom: scaleHeight(4),
-    gap: scaleWidth(12),
+    gap: scaleWidth(8),
   },
   summaryCard: {
-    width: scaleWidth(145),
-    height: scaleHeight(45),
+    flex: 1,
+    minHeight: scaleHeight(50),
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(6),
     borderWidth: 1,
@@ -536,12 +536,13 @@ const styles = StyleSheet.create({
     color: Colors.red,
   },
   summaryLabel: {
-    fontSize: scaleFont(8),
+    fontSize: scaleFont(9),
     fontFamily: Fonts.GilroySemiBold,
     textTransform: 'uppercase',
     color: '#64748B',
     marginTop: scaleHeight(2),
     textAlign: 'center',
+    paddingHorizontal: scaleWidth(4),
   },
   listHeader: {
     flexDirection: 'row',
