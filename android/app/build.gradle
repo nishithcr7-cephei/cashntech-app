@@ -96,8 +96,8 @@ android {
         applicationId "com.lms.cashntech"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1"
+        versionCode 4
+        versionName "1.3"
         resValue "string", "build_config_package", "com.lms.cashntech"
     }
     signingConfigs {

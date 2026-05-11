@@ -222,6 +222,9 @@ export type InvoiceKpisResponse = {
   active_dealer_ratio?: string;
   available_limit: string;
   overdue_amount?: string;
+  principal_overdue?: string;
+  interest_overdue?: string;
+  penal_overdue?: string;
   dpd_days: string;
 };
 
@@ -268,11 +271,8 @@ export const invoiceApi = {
       ...(filters ?? {}),
     };
 
-    // Mikro-ORM filter 'programIds' expects args in the shape:
-    // { program_id: string[] }
-    // so we must wrap the programId accordingly.
     if (programId) {
-      (body as any).programIds = { program_id: [programId] };
+      (body as any).programIds = [programId];
     }
 
     const response = await axiosInstance.post(
@@ -301,16 +301,23 @@ export const invoiceApi = {
   },
 
   getInvoiceSummary: async (
-    _programIds?: string[],
+    _programIds?: string[], // Kept in signature to avoid refactoring callers, but ignored to bypass backend bug
   ): Promise<any> => {
-    const response = await axiosInstance.post(
-      ApiEndPoints.apiInvoiceSummary,
-      {},
-      {authRequired: true} as any,
-    );
-    // Extract nested data structure: response.data.data contains the actual array
-    const data = response?.data?.data ?? response?.data ?? [];
-    return {data};
+    try {
+      const response = await axiosInstance.post(
+        ApiEndPoints.apiInvoiceSummary,
+        {}, // INTENTIONALLY EMPTY: Bypasses the regressed backend bug at Line 1980 (where.program)
+        {authRequired: true} as any,
+      );
+      // Extract nested data structure: response.data.data contains the actual array
+      const data = response?.data?.data ?? response?.data ?? [];
+      return {data};
+    } catch (error) {
+      // FALLBACK: Prevent dashboard lock-up if the Summary API is unstable
+      // eslint-disable-next-line no-console
+      console.warn('[invoiceApi] getInvoiceSummary failed (Workaround active):', error);
+      return {data: []};
+    }
   },
 
   getLatestInvoices: async (
@@ -348,13 +355,13 @@ export const invoiceApi = {
     return {
       total_program_limit: raw.total_program_limit ?? '0',
       utilized_amount: raw.utilized_amount ?? '0',
-      utilized_rate: raw.utilized_rate ?? '0',
+      utilized_rate: raw.utilisation_rate ?? '0',
       active_dealer_ratio: raw.active_dealer_ratio ?? '0',
       available_limit: raw.available_limit ?? '0',
-      overdue_amount: raw.overdue_amount ?? '0',
-      principal_overdue: raw.principal_overdue ?? '0',
-      interest_overdue: raw.interest_overdue ?? '0',
-      penal_overdue: raw.penal_overdue ?? '0',
+      overdue_amount: raw.overduePrincipalAmount ?? '0',
+      principal_overdue: raw.overduePrincipalAmount ?? '0',
+      interest_overdue: raw.overdueInterestAmount ?? '0',
+      penal_overdue: raw.overduePenalAmount ?? '0',
       dpd_days: raw.dpd_days ?? '0',
     };
   },
@@ -453,13 +460,50 @@ export const invoiceApi = {
     };
   },
 
-  getInvoiceDetails: async (invoiceId: string): Promise<any> => {
+  getInvoiceDetails: async (invoiceId: string): Promise<Partial<InvoiceFields>> => {
     const response = await axiosInstance.get(
       ApiEndPoints.apiGetInvoiceDetails(invoiceId),
       {authRequired: true} as any,
     );
-    const data = response?.data;
-    return data?.data ?? data;
+    const data = response?.data?.data ?? response?.data;
+    if (!data) return {};
+
+    // Map backend snake_case to frontend camelCase InvoiceFields
+    return {
+      invoiceNumber: data.invoice_ref_no,
+      invoiceDate: data.invoice_date,
+      invoiceDueDate: data.invoice_due_date,
+      grnDate: data.grn_date,
+      paymentDate: data.payment_date,
+      currency: data.currency,
+      remark: data.remark,
+      subtotal: String(data.sub_total ?? ''),
+      taxTotal: String(data.tax_total ?? ''),
+      discountTotal: String(data.discount_total ?? ''),
+      grandTotal: String(data.final_total ?? ''),
+      dealer: data.anchorParticipantMapping?.party?.entity_name,
+      odAccountNumber: data.anchorParticipantMapping?.od_account_no,
+      dealerCode: data.anchorParticipantMapping?.company_code_given_by_party,
+      creditTo: data.credit_to,
+      items: (data.invoiceItems || []).map((item: any) => ({
+        id: item.id,
+        itemName: item.name,
+        description: item.description,
+        quantity: String(item.quantity ?? ''),
+        unit: item.unit,
+        pricePerQuantity: String(item.price_per_quantity ?? ''),
+        total: String(item.total ?? ''),
+        discountType: item.discount_type,
+        discountValue: String(item.discount_value ?? ''),
+        discountAmount: String(item.discount_amount ?? ''),
+        taxes: (item.taxes || []).map((t: any) => ({
+          taxType: t.tax_type,
+          taxPercentage: String(t.tax_percentage ?? ''),
+          taxAmount: String(t.tax_amount ?? ''),
+        })),
+      })),
+      attachments: data.attachment,
+    };
   },
 
   /** POST multipart file to `/invoice/attachment/:invoiceId` */
@@ -596,12 +640,12 @@ export const invoiceApi = {
   ): Promise<any[]> => {
     const body: Record<string, unknown> = {};
     const progIds = filters?.programIds?.length ? filters.programIds : programIds;
-    if (progIds?.length) (body as any).programIds = { program_id: progIds };
-    if (filters?.bankIds?.length) (body as any).bankIds = { bank_id: filters.bankIds };
-    if (filters?.productIds?.length) (body as any).productIds = { product_id: filters.productIds };
-    if (filters?.partyIds?.length) (body as any).partyIds = { party_id: filters.partyIds };
+    if (progIds?.length) (body as any).programIds = progIds;
+    if (filters?.bankIds?.length) (body as any).bankIds = filters.bankIds;
+    if (filters?.productIds?.length) (body as any).productIds = filters.productIds;
+    if (filters?.partyIds?.length) (body as any).partyIds = filters.partyIds;
     if (filters?.counterPartyIds?.length)
-      (body as any).counterPartyIds = { counter_party_id: filters.counterPartyIds };
+      (body as any).counterPartyIds = filters.counterPartyIds;
     if (filters?.byInvoiceStatus?.length)
       (body as any).byInvoiceStatus = filters.byInvoiceStatus;
     const response = await axiosInstance.post(
@@ -695,16 +739,16 @@ export const invoiceApi = {
       
       // Append items with array notation
       items.forEach((item, index) => {
-        formData.append(`items[${index}][name]`, item.name);
-        formData.append(`items[${index}][description]`, item.description);
-        formData.append(`items[${index}][created_by]`, item.created_by);
-        formData.append(`items[${index}][quantity]`, String(item.quantity));
-        formData.append(`items[${index}][unit]`, String(item.unit));
-        formData.append(`items[${index}][price_per_quantity]`, String(item.price_per_quantity));
-        formData.append(`items[${index}][total]`, String(item.total));
+        formData.append(`items[${index}][name]`, String(item.name || ''));
+        formData.append(`items[${index}][description]`, String(item.description || ''));
+        formData.append(`items[${index}][created_by]`, String(item.created_by || ''));
+        formData.append(`items[${index}][quantity]`, String(item.quantity || 0));
+        formData.append(`items[${index}][unit]`, String(item.unit || '1'));
+        formData.append(`items[${index}][price_per_quantity]`, String(item.price_per_quantity || 0));
+        formData.append(`items[${index}][total]`, String(item.total || 0));
         
         if (item.discount_type) {
-          formData.append(`items[${index}][discount_type]`, item.discount_type);
+          formData.append(`items[${index}][discount_type]`, String(item.discount_type));
         }
         if (item.discount_value !== undefined && item.discount_value !== null) {
           formData.append(`items[${index}][discount_value]`, String(item.discount_value));
@@ -715,9 +759,9 @@ export const invoiceApi = {
         
         if (item.taxes && item.taxes.length > 0) {
           item.taxes.forEach((tax: any, taxIndex: number) => {
-            formData.append(`items[${index}][taxes][${taxIndex}][tax_type]`, tax.tax_type);
-            formData.append(`items[${index}][taxes][${taxIndex}][tax_percentage]`, String(tax.tax_percentage));
-            formData.append(`items[${index}][taxes][${taxIndex}][tax_amount]`, String(tax.tax_amount));
+            formData.append(`items[${index}][taxes][${taxIndex}][tax_type]`, String(tax.tax_type || ''));
+            formData.append(`items[${index}][taxes][${taxIndex}][tax_percentage]`, String(tax.tax_percentage || 0));
+            formData.append(`items[${index}][taxes][${taxIndex}][tax_amount]`, String(tax.tax_amount || 0));
           });
         }
       });

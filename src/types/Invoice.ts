@@ -52,6 +52,9 @@ export type InvoiceFields = {
   discountValue: string; // Discount amount or percentage
 
   // Tax Summary (Footer)
+  subtotal?: string;
+  taxTotal?: string;
+  discountTotal?: string;
   cgst: string; // Central GST
   sgst: string; // State GST
   grandTotal: string; // Grand Total (Final Amount + CGST + SGST)

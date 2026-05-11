@@ -126,7 +126,7 @@ export type UpdateInvoicePayload = {
   fields: any;
   createdBy: string;
   attachment?: any;
-  approval_level?: number;
+  approval_level: number;
 };
 
 export type BulkUpdateInvoiceRequest = {

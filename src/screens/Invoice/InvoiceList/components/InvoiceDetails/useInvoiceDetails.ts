@@ -109,6 +109,7 @@ export function useInvoiceDetails() {
   const canApprove = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVE);
   const canReject = useHasPermission(PERMISSIONS.INVOICE_LIST_REJECT);
   const canVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_ADMIN_VERIFICATION);
+  const canCreate = useHasPermission(PERMISSIONS.INVOICE_LIST_CREATE);
   
   const hasFunctionalPermission = canApprove || canReject || canVerify;
 
@@ -638,6 +639,14 @@ export function useInvoiceDetails() {
   };
 
   const onApproveRejectApprove = (invoiceId: string, remarks?: string) => {
+    if (!canApprove) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission to approve invoices.',
+      });
+      return;
+    }
     dispatch(
       updateInvoiceStatusRequest({
         invoiceId,
@@ -655,6 +664,14 @@ export function useInvoiceDetails() {
   };
 
   const onApproveRejectReject = (invoiceId: string, remarks?: string) => {
+    if (!canReject) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission to reject invoices.',
+      });
+      return;
+    }
     dispatch(
       updateInvoiceStatusRequest({
         invoiceId,
@@ -672,6 +689,14 @@ export function useInvoiceDetails() {
   };
 
   const onVerifyApprove = (invoiceId: string, remarks?: string) => {
+    if (!canVerify) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission to verify invoices.',
+      });
+      return;
+    }
     const invNo = selectedInvoiceNo;
     dispatch(
       updateInvoiceVerificationRequest({
@@ -696,6 +721,14 @@ export function useInvoiceDetails() {
   };
 
   const onVerifyReject = (invoiceId: string, remarks?: string) => {
+    if (!canVerify) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission to reject verification.',
+      });
+      return;
+    }
     dispatch(
       updateInvoiceVerificationRequest({
         invoiceId,
@@ -720,6 +753,22 @@ export function useInvoiceDetails() {
       approvalRemark?: string;
     }[];
   }) => {
+    // 1. Functional Permission Guard for Bulk
+    const hasPermission = 
+      (payload.action === 'Verify' && canVerify) ||
+      (payload.action === 'Approve' && canApprove) ||
+      (payload.action === 'Reject' && canReject) ||
+      (payload.action === 'On Hold' && (canVerify || canApprove));
+
+    if (!hasPermission) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: `You do not have permission to perform bulk ${payload.action.toLowerCase()}.`,
+      });
+      return;
+    }
+
     dispatch(
       bulkUpdateInvoiceRequest({
         action: payload.action,
@@ -778,48 +827,50 @@ export function useInvoiceDetails() {
   );
 
   const onCreateInvoicePress = React.useCallback(() => {
+    if (!canCreate) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission to create invoices.',
+      });
+      return;
+    }
     (navigation as any).navigate('CreateInvoice');
-  }, [navigation]);
+  }, [navigation, canCreate]);
 
   const isCreateInvoiceEnabled =
-    !isAllProgramScope && !!concreteProgramId;
+    canCreate && !isAllProgramScope && !!concreteProgramId;
 
   const { pendingCount, draftCount, actionRequiredCount } = React.useMemo(() => {
     let pending = 0;
     let draft = 0;
     let actionRequired = 0;
     
-    const roleLabel = (storedUserRole || '').trim().toUpperCase();
-
     invoiceData.forEach(row => {
-      const adminStatus = (row.rawAdminStatus || '').trim().toUpperCase();
       const iStatus = (row.rawInvoiceStatus || '').trim().toLowerCase();
       const approvalS = (row.rawApprovalStatus || '').trim().toUpperCase().replace(/_/g, ' ');
 
-      // 1. Draft check
-      if (iStatus === 'draft') {
+      // 1. Draft Logic (Sync with Web/Backend: includes missing attachments)
+      const isDraftState = ['draft', 'pending attachment', 'attachment pending'].includes(iStatus);
+      if (isDraftState) {
         draft++;
       } 
-      // 2. Action Required (Rejected) check
-      else if (iStatus === 'rejected') {
+      // 2. Action Required Logic (Sync with Web: Rejected, Sent Back, Query)
+      else if (
+        ['rejected', 'sent back', 'sent_back', 'query'].includes(iStatus) || 
+        approvalS.includes('REJECTED') || 
+        approvalS.includes('SENT BACK') || 
+        approvalS.includes('QUERY')
+      ) {
         actionRequired++;
       }
-      // 3. Pending (My Turn) check
-      else {
-        if (isCashnTechUser) {
-          if (adminStatus === 'PENDING_VERIFICATION' || adminStatus === 'PENDING VERIFICATION') {
-            pending++;
-          }
-        } else if (roleLabel) {
-          const expected = `PENDING ${roleLabel}`;
-          if (approvalS.includes(expected)) {
-            pending++;
-          }
-        }
+      // 3. Pending (My Turn) Logic: Uses existing selectable logic for permission parity
+      else if (isInvoiceSelectable(row)) {
+        pending++;
       }
     });
     return { pendingCount: pending, draftCount: draft, actionRequiredCount: actionRequired };
-  }, [invoiceData, isCashnTechUser, storedUserRole]);
+  }, [invoiceData, isInvoiceSelectable]);
 
   return {
     programId,
