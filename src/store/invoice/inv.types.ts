@@ -4,6 +4,8 @@ export type DealerInfoParticipant = {
   company_code_given_by_party: string;
   od_account_no: string;
   party: {id: string; entity_name: string};
+  sanctioned_limit?: number | string;
+  utilized_amount?: number | string;
 };
 
 export type PartyBankDetail = {
@@ -49,7 +51,7 @@ export type InvoiceListItemApi = {
   invoice_due_date: string;
   invoice_status: string;
   approval_status: string;
-  admin_status?: string;
+  admin_status?: string | null;
   /** Web columns: Loan Ref No., Bank Name, Product Name, Program Name, Primary Party, Counter Party */
   loan_ref_no?: string;
   bank_name?: string;
@@ -84,6 +86,8 @@ export type InvoiceState = {
   invoiceList: InvoiceListItemApi[];
   invoiceListLoading: boolean;
   invoiceListError: string | null;
+  bulkDisbursementLoading: boolean;
+  bulkDisbursementSuccess: boolean;
 };
 
 export const initialInvoiceState: InvoiceState = {
@@ -100,6 +104,8 @@ export const initialInvoiceState: InvoiceState = {
   invoiceList: [],
   invoiceListLoading: false,
   invoiceListError: null,
+  bulkDisbursementLoading: false,
+  bulkDisbursementSuccess: false,
 };
 
 export type UpdateInvoiceStatusRequest = {
@@ -142,4 +148,20 @@ export type BulkUpdateInvoiceRequest = {
   filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]};
   onSuccess?: () => void;
   isVerification?: boolean;
+};
+
+export type BulkDisbursementRequest = {
+  invoices: {
+    invoiceId: string;
+    status: string;
+    utr_no?: string;
+    transaction_no?: string;
+    disbursed_amount: number;
+    disbursement_date?: string;
+    hold_category?: string;
+    expected_release_date?: string;
+    remark?: string;
+    rejection_reason?: string;
+  }[];
+  onSuccess?: (message?: string) => void | Promise<void>;
 };

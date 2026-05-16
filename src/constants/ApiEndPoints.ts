@@ -168,6 +168,9 @@ const Endpoints = {
   apiDisbursement: (invoiceId: string) => `/invoice/disbursement/${invoiceId}`,
   apiInvoiceDailyInterest: (invoiceId: string) => `/invoice/daily-interest/${invoiceId}`,
   apiUpdateInvoice: (invoiceId: string) => `/invoice/${invoiceId}`,
+  apiInvoiceById: (invoiceId: string) => `/invoice/${invoiceId}`,
+  apiDeleteInvoiceItem: (itemId: string) => `/invoice/item/${itemId}`,
+  apiDeleteInvoiceItemTax: (itemTaxId: string) => `/invoice/item/tax/${itemTaxId}`,
 
   // User Scope (Program Selection)
   apiUserScope: '/user/scope',
@@ -178,6 +181,8 @@ const Endpoints = {
   apiProgramDealers: (programId: string) => `transactions/program/dealers/${programId}`,
   apiProgramSummary: (id: string) => `transactions/program-summary/${id}`,
   apiProgramDealersDetails: (id: string) => `transactions/dealers/${id}`,
+  apiBulkDisbursement: '/invoice/bulk-disbursement',
+  apiBulkEmail: '/invoice/bulk-email',
 } as const;
 
 export default Endpoints;

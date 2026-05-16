@@ -15,8 +15,11 @@ export function deriveAppRoleFromUser(user: {
   user_type?: string;
   permission_group?: PermissionItem[] | { getItems?: () => PermissionItem[] };
 }): AppRole {
-  const userType = (user?.user_type || '').toLowerCase();
-  if (userType === 'cashntech') return 'cashntech_user';
+  const userType = (user?.user_type || '').toLowerCase().trim();
+  const email = ((user as any)?.email || '').toLowerCase().trim();
+  if (userType === 'cashntech' || email.includes('cashntech.com')) {
+    return 'cashntech_user';
+  }
   const fn = (user?.first_name || '').toLowerCase();
   const perms = Array.isArray(user?.permission_group)
     ? user.permission_group
@@ -28,8 +31,12 @@ export function deriveAppRoleFromUser(user: {
     const funcRole = (p?.functional_role || '').toLowerCase();
     const isAnchor = dept.includes('anchor') || bizRole.includes('anchor');
     const isDealer = dept.includes('dealer') || bizRole.includes('dealer');
+    const isAllAccess = funcRole.includes('all access');
+
+    if (isAnchor && isAllAccess) return 'anchor_all_access';
     if (isAnchor && funcRole.includes('maker')) return 'anchor_maker';
     if (isAnchor && funcRole.includes('checker')) return 'anchor_checker';
+    if (isDealer && isAllAccess) return 'dealer_all_access';
     if (isDealer && funcRole.includes('maker')) return 'dealer_maker';
     if (isDealer && funcRole.includes('checker')) return 'dealer_checker';
   }

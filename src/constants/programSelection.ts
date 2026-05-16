@@ -10,6 +10,9 @@ export type Program = {
   id: string;
   name: string;
   userType: UserType; // 'dealer' or 'vendor'
+  method: string;
+  role: string;
+  status: string;
 };
 
 export type BankProgram = {
@@ -40,16 +43,25 @@ export const BANKS_DATA: Bank[] = [
             id: 'DF_FY25',
             name: 'DF Program FY25',
             userType: 'dealer',
+            method: 'Push',
+            role: 'Dealer Maker',
+            status: 'Active',
           },
           {
             id: 'DF_FY26',
             name: 'DF Program FY26',
             userType: 'dealer',
+            method: 'Push',
+            role: 'Dealer Maker',
+            status: 'Active',
           },
           {
             id: 'DF_FY27',
             name: 'DF Program FY27',
             userType: 'dealer',
+            method: 'Push',
+            role: 'Dealer Maker',
+            status: 'Active',
           },
         ],
       },
@@ -68,16 +80,25 @@ export const BANKS_DATA: Bank[] = [
             id: 'TCL_DF_SUNPHARMA',
             name: 'DF Program Sun Pharma',
             userType: 'dealer',
+            method: 'Push',
+            role: 'Dealer Maker',
+            status: 'Active',
           },
           {
             id: 'TCL_DF_ERISPHARMA',
             name: 'DF Program Eris Pharma',
             userType: 'dealer',
+            method: 'Push',
+            role: 'Dealer Maker',
+            status: 'Active',
           },
           {
             id: 'TCL_DF_CIPLA',
             name: 'DF Program Cipla',
             userType: 'dealer',
+            method: 'Push',
+            role: 'Dealer Maker',
+            status: 'Active',
           },
         ],
       },

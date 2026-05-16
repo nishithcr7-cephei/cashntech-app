@@ -24,15 +24,19 @@ import {
   ProgramBreadcrumb,
 } from '@components/index';
 import {MarkAsDisbursedModal} from './components/MarkAsDisbursedModal';
+import {BulkMarkAsDisbursedModal} from './components/BulkMarkAsDisbursedModal';
+import {BulkInvoiceEmailModal} from './components/BulkInvoiceEmailModal';
+import {DisbursementBulkActionSheet} from './components/DisbursementBulkActionSheet';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
 import {Search, Dots, Filter} from '@assets/Icons';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {userSelector} from '@store/user';
-import {AppRole} from '@constants/roles';
+import {AppRole, ROLE_LABELS} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {invoiceApi} from '@services/api/invoice.api';
+import {formatStatus} from '@screens/Invoice/InvoiceList/components/InvoiceDetails/types';
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import Toast from 'react-native-toast-message';
 import {decryptValue} from '@utils/decrypt';
@@ -44,6 +48,10 @@ import {
   selectCanSendMailToBank,
   selectCanMarkAsDisbursed,
 } from '@store/permissions';
+import {
+  selectBulkDisbursementLoading,
+  bulkDisbursementRequest,
+} from '@store/invoice';
 import {useDispatch} from 'react-redux';
 
 const STATUS_COLORS = {
@@ -53,8 +61,54 @@ const STATUS_COLORS = {
   DEFAULT: { bg: '#F7F8FB', text: Colors.darkblack },
 };
 
+function normalizeInvoiceStatus(status: string | null | undefined): string {
+  return (status || '').toLowerCase().trim();
+}
+
+/** Bulk select only rows shown as Invoice Status = Submitted in the list */
+function isSubmittedForBulkSelect(row: DisbursementRow): boolean {
+  if (normalizeInvoiceStatus(row.adminStatus) !== 'verified') return false;
+  if (normalizeInvoiceStatus(row.invoiceStatus) !== 'submitted') return false;
+
+  const hasDisbursement =
+    !!row.disburseDateRaw ||
+    (row.disbursedAmount != null && Number(row.disbursedAmount) > 0);
+  if (hasDisbursement) return false;
+
+  const utr = (row.utrNo || '').trim();
+  if (utr && utr !== '-') return false;
+
+  return true;
+}
+
+function isInProgressInvoiceStatus(status: string | null | undefined): boolean {
+  if (!status?.trim()) return false;
+  const candidates = [
+    status,
+    formatStatus(status),
+    status.replace(/_/g, ' '),
+  ];
+  return candidates.some(s => normalizeInvoiceStatus(s).replace(/_/g, ' ') === 'in progress');
+}
+
+/** Invoice Status = In Progress (admin verified) — eligible for bulk mail to bank */
+function isEligibleForBulkEmail(row: DisbursementRow): boolean {
+  const admin = normalizeInvoiceStatus(row.adminStatus);
+  if (admin && admin !== 'verified') return false;
+  return (
+    isInProgressInvoiceStatus(row.rawInvoiceStatus) ||
+    isInProgressInvoiceStatus(row.invoiceStatus)
+  );
+}
+
+function isBulkSelectableRow(row: DisbursementRow, canSendMail: boolean): boolean {
+  if (isSubmittedForBulkSelect(row)) return true;
+  if (canSendMail && isEligibleForBulkEmail(row)) return true;
+  return false;
+}
+
 function getInvoiceStatusStyles(invoiceStatus: string) {
-  const s = (invoiceStatus || '').toLowerCase();
+  const s = normalizeInvoiceStatus(invoiceStatus);
   if (s === 'disbursed' || s === 'settled') return STATUS_COLORS.SUCCESS;
   if (s === 'submitted' || s.includes('pending') || s.includes('processing')) return STATUS_COLORS.PENDING;
   if (s.includes('reject') || s.includes('fail') || s === 'cancelled') return STATUS_COLORS.REJECTED;
@@ -76,6 +130,7 @@ export type DisbursementRow = {
   disburseDate: string;
   utrNo: string;
   invoiceStatus: string;
+  rawInvoiceStatus: string;
   approvalStatus: string;
   adminStatus: string;
   finalTotal?: number;
@@ -149,10 +204,27 @@ function mapToDisbursementRow(item: any): DisbursementRow {
       item.disbursement_date ?? item.disbursementDate ?? '',
     ),
     utrNo: item.utr_no ?? item.utrNo ?? '-',
-    invoiceStatus:
-      item.invoice_status ??
-      item.invoiceStatus ??
-      (item.disbursement_date || item.disbursed_amount ? 'Disbursed' : ''),
+    rawInvoiceStatus: (item.invoice_status ?? item.invoiceStatus ?? '').trim(),
+    invoiceStatus: (() => {
+      const rawStatus = (item.invoice_status ?? item.invoiceStatus ?? '').trim();
+      const rawNorm = normalizeInvoiceStatus(rawStatus);
+      const disbursedAmt = item.disbursed_amount ?? item.disbursedAmount;
+      const hasDisbursementRecord =
+        !!(item.disbursement_date ?? item.disbursementDate) ||
+        (disbursedAmt != null && Number(disbursedAmt) > 0);
+      // Keep In Progress / Created visible for mail-to-bank; only coerce when already disbursed path
+      const keepRawLabel =
+        rawNorm === 'in progress' ||
+        rawNorm === 'in_progress' ||
+        rawNorm === 'created';
+      if (keepRawLabel) {
+        return formatStatus(rawStatus) || rawStatus;
+      }
+      if (hasDisbursementRecord && rawNorm !== 'rejected') {
+        return 'Disbursed';
+      }
+      return formatStatus(rawStatus) || rawStatus || (hasDisbursementRecord ? 'Disbursed' : '');
+    })(),
     approvalStatus: item.approval_status ?? item.approvalStatus ?? '',
     adminStatus: item.admin_status ?? item.adminStatus ?? '',
     finalTotal: finalTotal != null ? Number(finalTotal) : undefined,
@@ -176,7 +248,15 @@ export const DisbursementScreen: React.FC = () => {
     programSelection?.programScope === 'all'
       ? 'All Program'
       : programSelection?.programName ?? 'Sun Pharma PGM';
-  const isCashnTechUser = userRole === 'cashntech_user';
+  const userInfo = useSelector(userSelector.getUserInfo);
+  const isCashnTechUser =
+    userRole === 'cashntech_user' ||
+    !!(userRole && ROLE_LABELS[userRole as AppRole] === 'CashnTech User') ||
+    String(userInfo?.user_type || '').toLowerCase().trim() === 'cashntech' ||
+    String(userInfo?.email || '').toLowerCase().trim().endsWith('@cashntech.com');
+  const isAnchorAllAccess = userRole === 'anchor_all_access';
+  const isDealerAllAccess = userRole === 'dealer_all_access';
+  const isHighPrivilege = isCashnTechUser || isAnchorAllAccess || isDealerAllAccess;
   const isAnchorChecker = userRole === 'anchor_checker';
   const isAnchorMaker = userRole === 'anchor_maker';
   const isDealerMaker = userRole === 'dealer_maker';
@@ -185,11 +265,12 @@ export const DisbursementScreen: React.FC = () => {
   // Permissions
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canViewDisbursement = useHasPermission(PERMISSIONS.DISBURSEMENT);
-  const canMarkAsDisbursed = useSelector(selectCanMarkAsDisbursed);
-  const canSendMail = useSelector(selectCanSendMailToBank);
+  const canMarkAsDisbursed = isHighPrivilege || useSelector(selectCanMarkAsDisbursed);
+  const canSendMail = isHighPrivilege || useSelector(selectCanSendMailToBank);
   const canDeleteDisbursement = useHasPermission(PERMISSIONS.DISBURSEMENT_DELETE);
   const canExport = useHasPermission(PERMISSIONS.DISBURSEMENT_EXPORT);
   const canFilter = useHasPermission(PERMISSIONS.DISBURSEMENT_FILTER);
+  const canShowBulkActionsBtn = canMarkAsDisbursed || canSendMail;
 
   // The 3-dots icon itself should be visible if the user can view the screen,
   // even if they don't have secondary action permissions (per requirements).
@@ -209,8 +290,19 @@ export const DisbursementScreen: React.FC = () => {
   const [showDisbursedModal, setShowDisbursedModal] = useState(false);
   const [selectedDisbursementId, setSelectedDisbursementId] = useState<string | null>(null);
   const [mailLoadingId, setMailLoadingId] = useState<string | null>(null);
+  const [showBulkActionSheet, setShowBulkActionSheet] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const bulkDisbursementLoading = useSelector(selectBulkDisbursementLoading);
   const menuButtonRefs = useRef<Record<string, any>>({});
   const fetchRequestId = useRef(0);
+  const prevSelectedCount = useRef(0);
+
+  const shouldAutoOpenBulkSheet = isCashnTechUser || isHighPrivilege;
+
 
   const programIds = useMemo(
     () =>
@@ -265,9 +357,13 @@ export const DisbursementScreen: React.FC = () => {
       );
       if (apiFilters?.byInvoiceStatus?.length) {
         verifiedItems = verifiedItems.filter((item: any) =>
-          apiFilters!.byInvoiceStatus!.some(
-            s => (item.invoice_status || '').toLowerCase() === s.toLowerCase(),
-          ),
+          apiFilters!.byInvoiceStatus!.some(s => {
+            const apiNorm = normalizeInvoiceStatus(
+              formatStatus(item.invoice_status || ''),
+            ).replace(/_/g, ' ');
+            const filterNorm = normalizeInvoiceStatus(s).replace(/_/g, ' ');
+            return apiNorm === filterNorm;
+          }),
         );
       }
       
@@ -282,7 +378,7 @@ export const DisbursementScreen: React.FC = () => {
             return status !== 'rejected' && status !== 'cancelled';
           })
         : rows;
-      
+
       setDisbursementRows(finalRows);
     } catch (err: any) {
       if (requestId === fetchRequestId.current) {
@@ -382,6 +478,12 @@ export const DisbursementScreen: React.FC = () => {
   const [visibleCount, setVisibleCount] = useState(30);
   useEffect(() => {
     setVisibleCount(30);
+    // Clear selection state when search or filters change to prevent accidental bulk actions on hidden items
+    if (selectedIds.size > 0) {
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+      setShowBulkActionSheet(false);
+    }
   }, [searchText, appliedFilters]);
   const paginatedData = filteredData.slice(0, visibleCount);
   const hasMore = visibleCount < filteredData.length;
@@ -408,6 +510,243 @@ export const DisbursementScreen: React.FC = () => {
     }
   };
 
+  const selectableData = useMemo(() => {
+    const seenIds = new Set<string>();
+    return filteredData.filter(r => {
+      if (!canShowBulkActionsBtn || !r.id || !isBulkSelectableRow(r, canSendMail)) {
+        return false;
+      }
+      if (seenIds.has(r.id)) return false;
+      seenIds.add(r.id);
+      return true;
+    });
+  }, [filteredData, canShowBulkActionsBtn, canSendMail]);
+
+  const visibleSelectableData = useMemo(() => {
+    const seenIds = new Set<string>();
+    return paginatedData.filter(r => {
+      if (!canShowBulkActionsBtn || !r.id || !isBulkSelectableRow(r, canSendMail)) {
+        return false;
+      }
+      if (seenIds.has(r.id)) return false;
+      seenIds.add(r.id);
+      return true;
+    });
+  }, [paginatedData, canShowBulkActionsBtn, canSendMail]);
+
+  const selectedBulkIds = useMemo(() => {
+    const validIds = new Set(selectableData.map(r => r.id));
+    return new Set([...selectedIds].filter(id => validIds.has(id)));
+  }, [selectedIds, selectableData]);
+
+  const selectedBulkCount = selectedBulkIds.size;
+
+  const allVisibleSelectableSelected =
+    visibleSelectableData.length > 0 &&
+    visibleSelectableData.every(r => selectedBulkIds.has(r.id));
+
+  useEffect(() => {
+    if (selectedIds.size === 0) return;
+    if (selectedBulkCount === selectedIds.size) return;
+    setSelectedIds(selectedBulkIds);
+    if (selectedBulkCount === 0) {
+      setIsSelectionMode(false);
+      setShowBulkActionSheet(false);
+    }
+  }, [selectedBulkCount, selectedBulkIds, selectedIds.size]);
+
+  useEffect(() => {
+    if (
+      shouldAutoOpenBulkSheet &&
+      selectedBulkCount > prevSelectedCount.current &&
+      selectedBulkCount > 0
+    ) {
+      setShowBulkActionSheet(true);
+    }
+    prevSelectedCount.current = selectedBulkCount;
+  }, [selectedBulkCount, shouldAutoOpenBulkSheet]);
+
+  const handleSelectAll = () => {
+    if (visibleSelectableData.length === 0) return;
+
+    if (allVisibleSelectableSelected) {
+      const visibleIds = new Set(visibleSelectableData.map(r => r.id));
+      const next = new Set([...selectedBulkIds].filter(id => !visibleIds.has(id)));
+      setSelectedIds(next);
+      setIsSelectionMode(next.size > 0);
+      if (next.size === 0) {
+        setShowBulkActionSheet(false);
+      }
+      return;
+    }
+
+    const next = new Set(selectedBulkIds);
+    visibleSelectableData.forEach(r => next.add(r.id));
+    setSelectedIds(next);
+    setIsSelectionMode(true);
+    if (shouldAutoOpenBulkSheet) {
+      setShowBulkActionSheet(true);
+    }
+  };
+
+  const toggleSelection = (id: string) => {
+    const row = disbursementRows.find(r => r.id === id);
+    if (!row || !isBulkSelectableRow(row, canSendMail)) return;
+
+    const next = new Set(selectedBulkIds);
+    const wasSelected = next.has(id);
+    if (wasSelected) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedIds(next);
+    setIsSelectionMode(next.size > 0);
+    if (!wasSelected && next.size > 0 && shouldAutoOpenBulkSheet) {
+      setShowBulkActionSheet(true);
+    }
+  };
+
+  const bulkEmailInvoices = useMemo(() => {
+    const selectedRows = Array.from(selectedBulkIds)
+      .map(id => disbursementRows.find(r => r.id === id))
+      .filter((row): row is DisbursementRow => !!row);
+    return selectedRows
+      .filter(row => isEligibleForBulkEmail(row))
+      .map(row => {
+        const amtStr = row.invoiceAmount?.replace(/[,\s₹/-]/g, '') || '0';
+        return {
+          id: row.id,
+          invoiceNo: row.invoiceNo,
+          programName: row.programName,
+          primaryParty: row.primaryParty,
+          invoiceDate: row.invoiceDate,
+          dueDate: row.dueDate,
+          invoiceAmount: parseFloat(amtStr) || row.finalTotal || 0,
+        };
+      });
+  }, [selectedBulkIds, disbursementRows]);
+
+  const handleBulkEmailSubmit = async (invoiceIds: string[]) => {
+    setBulkLoading(true);
+    try {
+      const response = await invoiceApi.bulkEmailToBank({invoiceIds});
+      setShowBulkEmailModal(false);
+      setShowBulkActionSheet(false);
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+      await fetchDisbursementData();
+      Toast.show({
+        type: 'success',
+        text1: response?.message || 'Bulk mail sent to bank successfully',
+        visibilityTime: 3000,
+      });
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: err?.response?.data?.message || err?.message || 'Failed to send bulk mail',
+        visibilityTime: 3000,
+      });
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleBulkAction = (action: string) => {
+    if (action === 'sendMail' || action === 'mail') {
+      const selectedRows = Array.from(selectedBulkIds)
+        .map(id => disbursementRows.find(r => r.id === id))
+        .filter((row): row is DisbursementRow => !!row);
+      const skippedCount = selectedRows.length - bulkEmailInvoices.length;
+
+      if (bulkEmailInvoices.length === 0) {
+        Toast.show({
+          type: 'info',
+          text1: 'No eligible In Progress invoices selected for sending mail',
+          text2: 'Select invoices with Invoice Status = In Progress',
+          visibilityTime: 3500,
+        });
+        return;
+      }
+      if (skippedCount > 0) {
+        Toast.show({
+          type: 'info',
+          text1: `${skippedCount} selected invoice(s) skipped (not In Progress)`,
+          visibilityTime: 2500,
+        });
+      }
+      setShowBulkEmailModal(true);
+    } else if (action === 'markAsDisbursed' || action === 'disburse') {
+      const eligibleIds = Array.from(selectedBulkIds).filter(id => {
+        const row = disbursementRows.find(r => r.id === id);
+        return row && isSubmittedForBulkSelect(row);
+      });
+
+      if (eligibleIds.length === 0) {
+        Toast.show({
+          type: 'info',
+          text1: 'No eligible submitted invoices selected for disbursement',
+        });
+        return;
+      }
+
+      setShowBulkModal(true);
+    }
+  };
+
+  const toApiDate = (ddMmYyyy: string) => {
+    const parts = (ddMmYyyy || '').split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    return ddMmYyyy || new Date().toISOString().slice(0, 10);
+  };
+
+  const handleBulkSubmit = (invoicesData: any[]) => {
+    const invoicesPayload = invoicesData.map(data => {
+      const amtStr = data.disbursedAmount?.toString().replace(/[,\s₹/-]/g, '') || '0';
+      const amt = parseFloat(amtStr) || 0;
+      const status = data.status || 'Disbursed';
+      const isDisbursed = normalizeInvoiceStatus(status) === 'disbursed';
+      const isHold = normalizeInvoiceStatus(status) === 'hold';
+      return {
+        invoiceId: data.id,
+        status,
+        utr_no: isDisbursed ? data.utrNo || undefined : undefined,
+        transaction_no: isDisbursed ? data.transactionNo || undefined : undefined,
+        disbursed_amount: isDisbursed ? amt : 0,
+        disbursement_date: isDisbursed
+          ? toApiDate(data.date)
+          : isHold
+            ? toApiDate(data.expectedReleaseDate)
+            : undefined,
+        remark: data.remark || undefined,
+        hold_category: isHold ? data.holdCategory || undefined : undefined,
+        expected_release_date: isHold ? toApiDate(data.expectedReleaseDate) : undefined,
+        rejection_reason:
+          normalizeInvoiceStatus(status) === 'reject' ? data.remark || undefined : undefined,
+      };
+    });
+
+    dispatch(
+      bulkDisbursementRequest({
+        invoices: invoicesPayload,
+        onSuccess: async (message?: string) => {
+          setShowBulkModal(false);
+          setShowBulkActionSheet(false);
+          setSelectedIds(new Set());
+          setIsSelectionMode(false);
+          await fetchDisbursementData();
+          Toast.show({
+            type: 'success',
+            text1: message || 'Bulk disbursement processed successfully',
+            visibilityTime: 3000,
+          });
+        },
+      }),
+    );
+  };
+
   const handleMenuAction = async (action: string, disbursementId: string) => {
     setOpenMenuId(null);
     setMenuAnchor(null);
@@ -429,17 +768,20 @@ export const DisbursementScreen: React.FC = () => {
               onPress: async () => {
                 setMailLoadingId(disbursementId);
                 try {
-                  await invoiceApi.mailToBank(disbursementId);
+                  const response = await invoiceApi.mailToBank(disbursementId);
+                  await fetchDisbursementData();
                   Toast.show({
                     type: 'success',
-                    text1: 'Invoice submitted for disbursement successfully',
+                    text1: response?.message || 'Mail sent to bank successfully',
                     visibilityTime: 3000,
                   });
-                  fetchDisbursementData();
                 } catch (err: any) {
                   Toast.show({
                     type: 'error',
-                    text1: err?.message || 'Failed to submit for disbursement',
+                    text1:
+                      err?.response?.data?.message ||
+                      err?.message ||
+                      'Failed to send mail to bank',
                     visibilityTime: 3000,
                   });
                 } finally {
@@ -468,43 +810,62 @@ export const DisbursementScreen: React.FC = () => {
   };
 
 
-  const renderDisbursementRow = ({item: row, index}: {item: DisbursementRow; index: number}) => (
-    <View style={styles.cardWrapper}>
-      <View style={styles.listCard}>
-        {(() => {
-          const status = (row.invoiceStatus || '').toLowerCase();
-          const isClosed = status === 'closed' || status === 'close';
-          const hasAvailableActions = !isClosed && ((canSendMail && status !== 'disbursed') || (canMarkAsDisbursed && status === 'submitted'));
-          
-          if (show3DotsIcon && hasAvailableActions) {
-            return (
-              <View
-                ref={(r: View | null) => {
-                  if (r) menuButtonRefs.current[row.id] = r;
-                }}
-                collapsable={false}
-                style={styles.threeDotsButton}>
-                <TouchableOpacity
-                  onPress={() => handleMenuToggle(row.id)}
-                  disabled={permissionsLoading}
-                  activeOpacity={0.7}
-                  style={styles.threeDotsTouchable}>
-                  <Dots
-                    width={scaleWidth(20)}
-                    height={scaleHeight(20)}
-                    fill={permissionsLoading ? Colors.graybase : Colors.darkblack}
-                    style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}}
-                  />
-                </TouchableOpacity>
+  const renderDisbursementRow = ({item: row, index}: {item: DisbursementRow; index: number}) => {
+    const isSelected = selectedBulkIds.has(row.id);
+    const status = normalizeInvoiceStatus(row.invoiceStatus);
+    const isClosed = status === 'closed' || status === 'close';
+    const isSelectable = isBulkSelectableRow(row, canSendMail) && canShowBulkActionsBtn;
+
+    return (
+      <View style={styles.cardWrapper}>
+        <TouchableOpacity
+          activeOpacity={isSelectable ? 0.8 : 1}
+          onPress={() => {
+            if (isSelectable) toggleSelection(row.id);
+          }}
+          onLongPress={() => {
+            if (isSelectable && !isSelectionMode) toggleSelection(row.id);
+          }}
+          style={styles.listCard}>
+          {(() => {
+            const hasAvailableActions = !isClosed && ((canSendMail && status !== 'disbursed') || (canMarkAsDisbursed && status === 'submitted'));
+            
+            if (show3DotsIcon && hasAvailableActions) {
+              return (
+                <View
+                  ref={(r: View | null) => {
+                    if (r) menuButtonRefs.current[row.id] = r;
+                  }}
+                  collapsable={false}
+                  style={styles.threeDotsButton}>
+                  <TouchableOpacity
+                    onPress={() => handleMenuToggle(row.id)}
+                    disabled={permissionsLoading}
+                    activeOpacity={0.7}
+                    style={styles.threeDotsTouchable}>
+                    <Dots
+                      width={scaleWidth(20)}
+                      height={scaleHeight(20)}
+                      fill={permissionsLoading ? Colors.graybase : Colors.darkblack}
+                      style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}}
+                    />
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+            return null;
+          })()}
+          <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: scaleHeight(12)}}>
+            {isSelectable && (
+              <View style={[styles.checkbox, isSelected && styles.checkboxSelected, {marginRight: scaleWidth(10)}]}>
+                {isSelected && <Text style={styles.checkboxCheck}>✓</Text>}
               </View>
-            );
-          }
-          return null;
-        })()}
-        <View style={styles.indexBadge}>
-          <Text style={styles.indexText}>{index + 1}</Text>
-        </View>
-        <View style={styles.infoGrid}>
+            )}
+            <View style={[styles.indexBadge, {marginBottom: 0}]}>
+              <Text style={styles.indexText}>{index + 1}</Text>
+            </View>
+          </View>
+          <View style={styles.infoGrid}>
           {isAnchorMaker ? (
             <>
               {/* Anchor Maker Order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Date → Due Date → Disbursement Date → Invoice Amount (₹) → UTR No. → Invoice Status */}
@@ -665,9 +1026,10 @@ export const DisbursementScreen: React.FC = () => {
             </>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     </View>
   );
+};
 
   return (
     <Container>
@@ -734,6 +1096,48 @@ export const DisbursementScreen: React.FC = () => {
                     </View>
                   </View>
                 )}
+                  <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: scaleHeight(4), marginBottom: scaleHeight(4), minHeight: scaleHeight(44)}}>
+                    <View style={{flex: 1, justifyContent: 'center', minHeight: scaleHeight(32)}}>
+                      {canShowBulkActionsBtn && visibleSelectableData.length > 0 && (
+                        <View style={{flexDirection: 'row', alignItems: 'center', marginTop: scaleHeight(4), marginBottom: scaleHeight(2)}}>
+                          <TouchableOpacity
+                            activeOpacity={0.8}
+                            style={{flexDirection: 'row', alignItems: 'center'}}
+                            disabled={visibleSelectableData.length === 0}
+                            onPress={handleSelectAll}>
+                            <View
+                              style={[
+                                {width: scaleWidth(18), height: scaleWidth(18), borderWidth: 1, borderColor: Colors.graybase, alignItems: 'center', justifyContent: 'center'},
+                                allVisibleSelectableSelected && {backgroundColor: Colors.primaryColor, borderColor: Colors.primaryColor},
+                              ]}>
+                              {allVisibleSelectableSelected && (
+                                <Text style={{color: Colors.white, fontSize: scaleFont(12), lineHeight: scaleFont(12)}}>✓</Text>
+                              )}
+                            </View>
+                            <Text style={{fontSize: scaleFont(13), fontFamily: Fonts.GilroyMedium, color: Colors.graybase, marginLeft: scaleWidth(8)}}>Select all</Text>
+                            {shouldAutoOpenBulkSheet && (
+                              <View style={styles.bulkBadge}>
+                                <Text style={styles.bulkBadgeText}>Bulk Actions</Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                    {selectedBulkCount > 0 && (
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: Colors.primaryColor,
+                          paddingHorizontal: scaleWidth(16),
+                          paddingVertical: scaleHeight(6),
+                          borderRadius: scaleWidth(6),
+                        }}
+                        onPress={() => setShowBulkActionSheet(true)}>
+                        <Text style={{color: Colors.white, fontSize: scaleFont(13), fontFamily: Fonts.GilroySemiBold}}>Actions ({selectedBulkCount})</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
                 <View style={styles.searchFilterRow}>
                   <View style={styles.searchContainer}>
                     <Search width={scaleWidth(18)} height={scaleHeight(18)} />
@@ -941,6 +1345,55 @@ export const DisbursementScreen: React.FC = () => {
           }
         }}
       />
+      
+      <DisbursementBulkActionSheet
+        visible={showBulkActionSheet}
+        onClose={() => {
+          setShowBulkActionSheet(false);
+          setSelectedIds(new Set());
+          setIsSelectionMode(false);
+        }}
+        selectedCount={selectedBulkCount}
+        onAction={(action) => {
+          setShowBulkActionSheet(false);
+          setTimeout(() => {
+            handleBulkAction(action);
+          }, 300);
+        }}
+        canMarkAsDisbursed={canMarkAsDisbursed}
+        canSendMail={canSendMail}
+      />
+
+      <BulkInvoiceEmailModal
+        visible={showBulkEmailModal}
+        onClose={() => setShowBulkEmailModal(false)}
+        isLoading={bulkLoading}
+        invoices={bulkEmailInvoices}
+        onSubmit={handleBulkEmailSubmit}
+      />
+
+      <BulkMarkAsDisbursedModal
+        visible={showBulkModal}
+        onClose={() => setShowBulkModal(false)}
+        isLoading={bulkLoading || bulkDisbursementLoading}
+        selectedInvoices={Array.from(selectedBulkIds)
+          .filter(id => {
+            const row = disbursementRows.find(r => r.id === id);
+            return row && isSubmittedForBulkSelect(row);
+          })
+          .map(id => {
+            const row = disbursementRows.find(r => r.id === id);
+            const amtStr = row?.invoiceAmount?.replace(/[,\s₹/-]/g, '') || '0';
+            const amt = parseFloat(amtStr) || 0;
+            return {
+              id,
+              invoiceNo: row?.invoiceNo || id,
+              amount: amt,
+              invoiceDateRaw: row?.invoiceDateRaw ?? null,
+            };
+          })}
+        onSubmit={handleBulkSubmit}
+      />
     </Container>
   );
 };
@@ -1096,6 +1549,41 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 10,
     elevation: 8,
+  },
+  checkbox: {
+    width: scaleWidth(20),
+    height: scaleWidth(20),
+    borderRadius: scaleWidth(4),
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: Colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxSelected: {
+    backgroundColor: Colors.primaryColor,
+    borderColor: Colors.primaryColor,
+  },
+  checkboxCheck: {
+    color: Colors.white,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
+    lineHeight: scaleFont(12),
+  },
+  bulkBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: scaleWidth(8),
+    paddingVertical: scaleHeight(2),
+    borderRadius: scaleWidth(4),
+    marginLeft: scaleWidth(8),
+    borderWidth: 1,
+    borderColor: '#C3DAFE',
+  },
+  bulkBadgeText: {
+    fontSize: scaleFont(10),
+    fontFamily: Fonts.GilroyBold,
+    color: '#4338CA',
+    textTransform: 'uppercase',
   },
   threeDotsButton: {
     position: 'absolute',

@@ -10,6 +10,9 @@ export type SelectedProgram = {
   programId: string;
   programName: string;
   userType: UserType;
+  method: string | null;
+  role: string | null;
+  status: string | null;
 };
 
 export type ProgramSelectionState = {
@@ -23,6 +26,9 @@ export type ProgramSelectionState = {
   programId: string | null;
   programName: string | null;
   userType: UserType | null;
+  method: string | null;
+  role: string | null;
+  status: string | null;
   // Multiple program selections
   selectedPrograms: SelectedProgram[];
   // User scope (GET /user/scope) - banks, products, programs

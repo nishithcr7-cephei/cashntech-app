@@ -149,6 +149,9 @@ export const SelectProgramScreen: React.FC = () => {
         programId: program.id,
         programName: program.name,
         userType: program.userType,
+        method: program.method,
+        role: program.role,
+        status: program.status,
       }),
     );
     if (fromScreen) {

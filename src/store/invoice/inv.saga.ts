@@ -27,16 +27,21 @@ import {
   bulkUpdateInvoiceRequest,
   bulkUpdateInvoiceSuccess,
   bulkUpdateInvoiceFailure,
+  bulkDisbursementRequest,
+  bulkDisbursementSuccess,
+  bulkDisbursementFailure,
 } from './inv.slice';
 import {
   invoiceApi,
   CreateInvoicePayloadInput,
+  toYYYYMMDD,
 } from '@services/api/invoice.api';
 import type {
   UpdateInvoiceStatusRequest,
   UpdateInvoiceVerificationRequest,
   UpdateInvoicePayload,
   BulkUpdateInvoiceRequest,
+  BulkDisbursementRequest,
 } from './inv.types';
 
 function showActionToast(
@@ -307,9 +312,40 @@ function* bulkUpdateInvoiceSaga(
     const msg =
       error?.response?.data?.message ||
       error?.message ||
-      'Failed to perform bulk action';
+      'Failed to update bulk status';
     showActionToast('error', msg);
     yield put(bulkUpdateInvoiceFailure(msg));
+  }
+}
+
+function* bulkDisbursementSaga(
+  action: PayloadAction<BulkDisbursementRequest>,
+): Generator {
+  try {
+    const {invoices, onSuccess} = action.payload;
+    const formattedInvoices = invoices.map(inv => ({
+      ...inv,
+      disbursement_date: toYYYYMMDD(inv.disbursement_date),
+      expected_release_date: inv.expected_release_date ? toYYYYMMDD(inv.expected_release_date) : undefined,
+    }));
+    const response = yield call(invoiceApi.bulkDisbursement, {
+      invoices: formattedInvoices,
+    });
+    yield put(bulkDisbursementSuccess());
+    if (onSuccess) {
+      const message =
+        response?.message ||
+        response?.data?.message ||
+        'Bulk disbursement processed successfully';
+      yield call(onSuccess, message);
+    }
+  } catch (error: any) {
+    const msg =
+      error?.response?.data?.message ||
+      error?.message ||
+      'Failed to perform bulk disbursement';
+    showActionToast('error', msg);
+    yield put(bulkDisbursementFailure(msg));
   }
 }
 
@@ -322,4 +358,5 @@ export default function* invoiceSaga(): Generator {
   yield takeLatest(updateInvoiceStatusRequest.type, updateInvoiceStatusSaga);
   yield takeLatest(updateInvoiceVerificationRequest.type, updateInvoiceVerificationSaga);
   yield takeLatest(bulkUpdateInvoiceRequest.type, bulkUpdateInvoiceSaga);
+  yield takeLatest(bulkDisbursementRequest.type, bulkDisbursementSaga);
 }

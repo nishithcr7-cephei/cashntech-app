@@ -9,7 +9,14 @@ export type UserScopeApiItem = {
     id: string;
     name: string;
     permission_group?: string;
-    programs: Array<{ id: string; name: string }>;
+    workflow_method: string;
+    programs: Array<{ 
+      id: string; 
+      name: string; 
+      method: string;
+      role: string;
+      status: string;
+    }>;
   }>;
 };
 
@@ -35,6 +42,9 @@ export function mapUserScopeToBanks(data: UserScopeApiItem[]): Bank[] {
         id: pr.id,
         name: pr.name,
         userType: 'dealer' as const, // default - API doesn't provide
+        method: pr.method,
+        role: pr.role,
+        status: pr.status,
       })),
     }));
 

@@ -79,10 +79,13 @@ export function useInvoiceDetails() {
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
   const isAllProgramScope = programSelection?.programScope === 'all';
 
-  const isAnchorMaker = userRole === 'anchor_maker';
-  const isAnchorChecker = userRole === 'anchor_checker';
-  const isDealerMaker = userRole === 'dealer_maker';
-  const isDealerChecker = userRole === 'dealer_checker';
+  const isAnchorAllAccess = userRole === 'anchor_all_access';
+  const isDealerAllAccess = userRole === 'dealer_all_access';
+  
+  const isAnchorMaker = userRole === 'anchor_maker' || isAnchorAllAccess;
+  const isAnchorChecker = userRole === 'anchor_checker' || isAnchorAllAccess;
+  const isDealerMaker = userRole === 'dealer_maker' || isDealerAllAccess;
+  const isDealerChecker = userRole === 'dealer_checker' || isDealerAllAccess;
   const isCashnTechUser =
     userRole === 'cashntech_user' ||
     !!(userRole && ROLE_LABELS[userRole] === 'CashnTech User');
@@ -110,7 +113,8 @@ export function useInvoiceDetails() {
   const canReject = useHasPermission(PERMISSIONS.INVOICE_LIST_REJECT);
   const canVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_ADMIN_VERIFICATION);
   const canCreate = useHasPermission(PERMISSIONS.INVOICE_LIST_CREATE);
-  
+  const canEdit = useHasPermission(PERMISSIONS.INVOICE_LIST_EDIT);
+  const canImport = useHasPermission(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY);
   const hasFunctionalPermission = canApprove || canReject || canVerify;
 
   const [menuAnchor, setMenuAnchor] = useState<{
@@ -188,6 +192,9 @@ export function useInvoiceDetails() {
                 programName: program.name,
                 userType: (product.name || '').toLowerCase().includes('dealer') ? 'dealer' : 'vendor',
                 partyId: bank.id,
+                method: program.method,
+                role: program.role,
+                status: program.status,
               }),
             );
             return;
@@ -504,6 +511,17 @@ export function useInvoiceDetails() {
   };
 
   const isInvoiceSelectable = useCallback((item: any) => {
+    const programMethod = programSelection?.method;
+    const userRoleInternal = programSelection?.role?.toLowerCase().replace(' ', '_');
+
+    if (programMethod === "Push" && userRoleInternal === "anchor_checker") {
+       // follow original logic for checker turn below
+    } else if (programMethod === "Pull" && userRoleInternal === "dealer_checker") {
+       // follow original logic for checker turn below
+    } else if (userRoleInternal === "anchor_checker" || userRoleInternal === "dealer_checker") {
+       return false;
+    }
+
     const iStatus = (item.rawInvoiceStatus || '').toLowerCase();
     const aStatus = (item.rawAdminStatus || '').toLowerCase();
     const approvalS = (item.rawApprovalStatus || '').trim().toUpperCase().replace(/_/g, ' ');
@@ -523,6 +541,11 @@ export function useInvoiceDetails() {
 
     // For regular roles, check if approval_status contains "PENDING [ROLE]"
     const roleLabel = (storedUserRole || '').trim().toUpperCase();
+    if (isAnchorAllAccess || isDealerAllAccess) {
+       const baseRole = isAnchorAllAccess ? 'ANCHOR' : 'DEALER';
+       return approvalS.includes(`PENDING ${baseRole} CHECKER`) || approvalS.includes(`PENDING ${baseRole} MAKER`);
+    }
+    
     if (roleLabel) {
       const expected = `PENDING ${roleLabel}`;
       return approvalS.includes(expected);
@@ -597,13 +620,16 @@ export function useInvoiceDetails() {
     );
   })();
 
-  const approvalLevel = isAnchorChecker
-    ? 1
-    : isDealerMaker
-      ? 2
-      : isDealerChecker
-        ? 3
-        : 1;
+  const approvalLevel = (() => {
+    const row = filteredData.find(r => r.id === selectedInvoiceId) || invoiceData.find(r => r.id === selectedInvoiceId);
+    const s = (row?.rawApprovalStatus || '').toUpperCase();
+    if (s.includes('ANCHOR_CHECKER')) return 1;
+    if (s.includes('DEALER_MAKER')) return 2;
+    if (s.includes('DEALER_CHECKER')) return 3;
+
+    // Fallback to static role-based logic
+    return isAnchorChecker ? 1 : isDealerMaker ? 2 : isDealerChecker ? 3 : 1;
+  })();
 
   const toggleSelectAllVisible = () => {
     if (!isDealerChecker && !isAnchorChecker && !isCashnTechUser) return;
@@ -826,6 +852,27 @@ export function useInvoiceDetails() {
     [],
   );
 
+
+  const programMethod = programSelection?.method;
+  const userRoleInternal = programSelection?.role?.toLowerCase().replace(' ', '_');
+
+  let createInvoiceDisabledReason: string | null = null;
+
+  if (!programSelection?.programId) {
+    createInvoiceDisabledReason = "Select a program from the filter to create an invoice";
+  } else if (programSelection?.status === "Inactive") {
+    createInvoiceDisabledReason = "Program is inactive please contact admin";
+  } else {
+    const isAllowedByMethod =
+      (programMethod === "Pull" && userRoleInternal === "dealer_maker") ||
+      (programMethod === "Push" && userRoleInternal === "anchor_maker");
+    if (!isAllowedByMethod) {
+      createInvoiceDisabledReason = "Role restricted for this program's method";
+    }
+  }
+
+  const isCreateInvoiceEnabled = createInvoiceDisabledReason === null;
+
   const onCreateInvoicePress = React.useCallback(() => {
     if (!canCreate) {
       Toast.show({
@@ -835,42 +882,89 @@ export function useInvoiceDetails() {
       });
       return;
     }
-    (navigation as any).navigate('CreateInvoice');
-  }, [navigation, canCreate]);
 
-  const isCreateInvoiceEnabled =
-    canCreate && !isAllProgramScope && !!concreteProgramId;
+    if (!isCreateInvoiceEnabled) {
+      Toast.show({
+        type: 'info',
+        text1: 'Creation Restricted',
+        text2: createInvoiceDisabledReason || 'Check program selection and role permissions.',
+      });
+      return;
+    }
+
+    (navigation as any).navigate('CreateInvoice');
+  }, [navigation, canCreate, isCreateInvoiceEnabled, createInvoiceDisabledReason]);
+
+  const userPartyType = isCashnTechUser ? 'cashntech' : (isAnchorMaker || isAnchorChecker) ? 'anchor' : 'dealer';
 
   const { pendingCount, draftCount, actionRequiredCount } = React.useMemo(() => {
     let pending = 0;
     let draft = 0;
     let actionRequired = 0;
-    
-    invoiceData.forEach(row => {
-      const iStatus = (row.rawInvoiceStatus || '').trim().toLowerCase();
-      const approvalS = (row.rawApprovalStatus || '').trim().toUpperCase().replace(/_/g, ' ');
 
-      // 1. Draft Logic (Sync with Web/Backend: includes missing attachments)
-      const isDraftState = ['draft', 'pending attachment', 'attachment pending'].includes(iStatus);
+    const myApprovalLevel = String(approvalLevel);
+
+    invoiceData.forEach(row => {
+      const iStatusRaw = (row.rawInvoiceStatus || '').trim();
+      const aStatusRaw = (row.rawAdminStatus || '').trim();
+      const approvalStatus = (row.rawApprovalStatus || '').trim();
+      const approvalS = approvalStatus.toLowerCase().replace(/_/g, ' ');
+
+      // Fix 1 — Draft badge logic
+      const isDraftState =
+        canImport &&
+        (isAnchorMaker || isDealerMaker) &&
+        iStatusRaw === 'Draft' &&
+        approvalStatus === 'Pending Attachment';
       if (isDraftState) {
         draft++;
-      } 
-      // 2. Action Required Logic (Sync with Web: Rejected, Sent Back, Query)
-      else if (
-        ['rejected', 'sent back', 'sent_back', 'query'].includes(iStatus) || 
-        approvalS.includes('REJECTED') || 
-        approvalS.includes('SENT BACK') || 
-        approvalS.includes('QUERY')
-      ) {
+      }
+
+      // Fix 3 — Action Required logic
+      const isActionRequired =
+        canEdit &&
+        (isAnchorMaker || isDealerMaker) &&
+        iStatusRaw === 'Rejected';
+      if (isActionRequired) {
         actionRequired++;
       }
-      // 3. Pending (My Turn) Logic: Uses existing selectable logic for permission parity
-      else if (isInvoiceSelectable(row)) {
-        pending++;
+
+      // Fix 2 — Pending Invoice Approval logic
+      if (userPartyType === 'cashntech') {
+        if (canVerify && aStatusRaw.toLowerCase() === 'pending verification') {
+          pending++;
+        }
+      } else {
+        const isActionable = canApprove || canReject;
+        
+        // Exact stage matching to avoid broad .includes() leaks
+        const isMyLevel = 
+          (approvalStatus === myApprovalLevel) ||
+          (isAnchorChecker && approvalS.includes('pending anchor checker')) ||
+          (isDealerMaker && approvalS.includes('pending dealer maker')) ||
+          (isDealerChecker && approvalS.includes('pending dealer checker'));
+
+        if (isActionable && isMyLevel && iStatusRaw === 'Created') {
+          pending++;
+        }
       }
     });
+
     return { pendingCount: pending, draftCount: draft, actionRequiredCount: actionRequired };
-  }, [invoiceData, isInvoiceSelectable]);
+  }, [
+    invoiceData,
+    userPartyType,
+    isAnchorMaker,
+    isAnchorChecker,
+    isDealerMaker,
+    isDealerChecker,
+    canImport,
+    canEdit,
+    canApprove,
+    canReject,
+    canVerify,
+    approvalLevel,
+  ]);
 
   return {
     programId,
@@ -947,7 +1041,10 @@ export function useInvoiceDetails() {
     getMenuPosition,
     onCreateInvoicePress,
     isCreateInvoiceEnabled,
+    createInvoiceDisabledReason,
     hasAnyProgramContext,
+    canEdit,
+    canImport,
     selectedInvoiceRawAdminStatus: selectedRowForMenu?.rawAdminStatus,
     selectedInvoiceRawApprovalStatus: selectedRowForMenu?.rawApprovalStatus,
     selectedInvoiceRawInvoiceStatus: selectedRowForMenu?.rawInvoiceStatus,
@@ -967,6 +1064,8 @@ export function useInvoiceDetails() {
     handleBulkAction,
     bulkLoading,
     setBulkLoading,
+    isAnchorAllAccess,
+    isDealerAllAccess,
     isInvoiceSelectable,
   };
 }

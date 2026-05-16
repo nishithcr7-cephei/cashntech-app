@@ -97,7 +97,10 @@ export const InvoiceDetails: React.FC = () => {
     getMenuPosition,
     onCreateInvoicePress,
     isCreateInvoiceEnabled,
+    createInvoiceDisabledReason,
     hasAnyProgramContext,
+    canEdit,
+    canImport,
     invoiceFilterData,
     showAllProgramBreadcrumb,
     selectedInvoiceRawAdminStatus,
@@ -121,6 +124,8 @@ export const InvoiceDetails: React.FC = () => {
     setBulkLoading,
     setSelectedInvoiceIds,
     isInvoiceSelectable,
+    isAnchorAllAccess,
+    isDealerAllAccess,
   } = useInvoiceDetails();
 
   const [showBulkActionSheet, setShowBulkActionSheet] = React.useState(false);
@@ -186,6 +191,8 @@ export const InvoiceDetails: React.FC = () => {
                   isAnchorChecker={isAnchorChecker}
                   isDealerChecker={isDealerChecker}
                   isCashnTechUser={isCashnTechUser}
+                  isAnchorAllAccess={isAnchorAllAccess}
+                  isDealerAllAccess={isDealerAllAccess}
                   filteredDataLength={filteredData.length}
                   searchText={searchText}
                   setSearchText={setSearchText}
@@ -197,11 +204,14 @@ export const InvoiceDetails: React.FC = () => {
                   onOpenSendForApprovalModal={() => setShowBulkActionSheet(true)}
                   onCreateInvoicePress={onCreateInvoicePress}
                   isCreateInvoiceEnabled={isCreateInvoiceEnabled}
+                  createInvoiceDisabledReason={createInvoiceDisabledReason}
                   user={userInfoFull}
                   actionRequiredCount={actionRequiredCount}
                   pendingCount={pendingCount}
                   draftCount={draftCount}
                   onBulkAction={handleBulkAction}
+                  canEdit={canEdit}
+                  canImport={canImport}
                 />
                 <View style={styles.listTopSeparator} />
               </>
@@ -216,6 +226,8 @@ export const InvoiceDetails: React.FC = () => {
                 isDealerChecker={isDealerChecker}
                 isAnchorChecker={isAnchorChecker}
                 isCashnTechUser={isCashnTechUser}
+                isAnchorAllAccess={isAnchorAllAccess}
+                isDealerAllAccess={isDealerAllAccess}
                 storedUserRole={storedUserRole}
                 transparency={invoiceListLoading ? 0.6 : 1}
                 isSelected={(isDealerChecker || isAnchorChecker || isCashnTechUser) && selectedInvoiceIds.includes(row.id)}
@@ -358,6 +370,8 @@ export const InvoiceDetails: React.FC = () => {
         isDealerMaker={isDealerMaker}
         isDealerChecker={isDealerChecker}
         isCashnTechUser={isCashnTechUser}
+        isAnchorAllAccess={isAnchorAllAccess}
+        isDealerAllAccess={isDealerAllAccess}
         rawAdminStatus={selectedInvoiceRawAdminStatus}
         rawApprovalStatus={selectedInvoiceRawApprovalStatus}
         rawInvoiceStatus={selectedInvoiceRawInvoiceStatus}

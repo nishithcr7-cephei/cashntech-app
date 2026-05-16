@@ -47,6 +47,9 @@ type InvoiceDetailData = {
   tax: {percent: number; amount: number};
   total: number;
   attachments: AttachmentItem[];
+  invoiceStatus: string;
+  approvalStatus: string;
+  adminStatus: string;
 };
 
 const defaultInvoiceData: InvoiceDetailData = {
@@ -64,7 +67,51 @@ const defaultInvoiceData: InvoiceDetailData = {
   tax: {percent: 0, amount: 0},
   total: 0,
   attachments: [],
+  invoiceStatus: '',
+  approvalStatus: '',
+  adminStatus: '',
 };
+
+const STATUS_COLORS = {
+  ATTACHMENT_PENDING: { backgroundColor: '#FFF4E5', color: '#FF8C00' },
+  CREATED: { backgroundColor: '#E3F2FD', color: '#1976D2' },
+  DISBURSED: { backgroundColor: '#E8F5E9', color: '#2E7D32' },
+  REJECTED: { backgroundColor: '#FFEBEE', color: '#D32F2F' },
+  DEFAULT: { backgroundColor: '#F7F8FB', color: Colors.darkblack },
+};
+
+function getInvoiceStatusStyles(status: string) {
+  const s = (status || '').toLowerCase();
+  if (s.includes('attachment pending')) return STATUS_COLORS.ATTACHMENT_PENDING;
+  if (s.includes('created')) return STATUS_COLORS.CREATED;
+  if (s.includes('disbursed')) return STATUS_COLORS.DISBURSED;
+  if (s.includes('reject')) return STATUS_COLORS.REJECTED;
+  return STATUS_COLORS.DEFAULT;
+}
+
+function getApprovalStatusStyles(status: string) {
+  const s = (status || '').toLowerCase();
+  if (s.includes('pending')) return STATUS_COLORS.ATTACHMENT_PENDING;
+  if (s.includes('reject')) return STATUS_COLORS.REJECTED;
+  if (s.includes('completed') || s.includes('approval complete')) return STATUS_COLORS.DISBURSED;
+  return STATUS_COLORS.DEFAULT;
+}
+
+function getAdminStatusStyles(status: string) {
+  const s = (status || '').toLowerCase();
+  if (s === 'verify' || s === 'verified' || s === 'submitted') return STATUS_COLORS.DISBURSED;
+  if (s === 'hold') return { backgroundColor: '#E0E0E0', color: '#6B5B4F' };
+  if (s === 'reject' || s === 'rejected') return STATUS_COLORS.REJECTED;
+  return STATUS_COLORS.DEFAULT;
+}
+
+function formatStatus(str: string): string {
+  if (!str) return '';
+  return str
+    .split('_')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
 
 export const InvoiceDetailView: React.FC = () => {
   const navigation = useNavigation();
@@ -147,6 +194,9 @@ export const InvoiceDetailView: React.FC = () => {
           tax: {percent: taxPercent, amount: taxTotal},
           total: finalTotal,
           attachments,
+          invoiceStatus: formatStatus(data?.invoice_status || ''),
+          approvalStatus: formatStatus(data?.approval_status || ''),
+          adminStatus: formatStatus(data?.admin_status || ''),
         });
       })
       .catch((err: any) => {
@@ -271,6 +321,23 @@ export const InvoiceDetailView: React.FC = () => {
             <Text style={styles.invoiceTitle}>
               Invoice / Unique Ref. No - {invoiceNo || invoiceId || 'N/A'}
             </Text>
+            <View style={styles.statusBadgesRow}>
+               {invoiceData.invoiceStatus && (
+                 <View style={[styles.statusBadge, { backgroundColor: getInvoiceStatusStyles(invoiceData.invoiceStatus).backgroundColor }]}>
+                   <Text style={[styles.statusBadgeText, { color: getInvoiceStatusStyles(invoiceData.invoiceStatus).color }]}>{invoiceData.invoiceStatus}</Text>
+                 </View>
+               )}
+               {invoiceData.approvalStatus && (
+                 <View style={[styles.statusBadge, { backgroundColor: getApprovalStatusStyles(invoiceData.approvalStatus).backgroundColor }]}>
+                   <Text style={[styles.statusBadgeText, { color: getApprovalStatusStyles(invoiceData.approvalStatus).color }]}>{invoiceData.approvalStatus}</Text>
+                 </View>
+               )}
+               {invoiceData.adminStatus && (
+                 <View style={[styles.statusBadge, { backgroundColor: getAdminStatusStyles(invoiceData.adminStatus).backgroundColor }]}>
+                   <Text style={[styles.statusBadgeText, { color: getAdminStatusStyles(invoiceData.adminStatus).color }]}>{invoiceData.adminStatus}</Text>
+                 </View>
+               )}
+            </View>
             <View style={styles.titleUnderline} />
           </View>
         </View>
@@ -515,6 +582,23 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#E6E6E6',
     width: '100%',
+    marginTop: scaleHeight(8),
+  },
+  statusBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: scaleWidth(8),
+    marginTop: scaleHeight(4),
+    marginBottom: scaleHeight(4),
+  },
+  statusBadge: {
+    paddingHorizontal: scaleWidth(8),
+    paddingVertical: scaleHeight(4),
+    borderRadius: scaleWidth(4),
+  },
+  statusBadgeText: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroySemiBold,
   },
   headerActions: {
     flexDirection: 'row',

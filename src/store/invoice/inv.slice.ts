@@ -9,6 +9,7 @@ import {
   UpdateInvoiceVerificationRequest,
   UpdateInvoicePayload,
   BulkUpdateInvoiceRequest,
+  BulkDisbursementRequest,
 } from './inv.types';
 
 const invoiceSlice = createSlice({
@@ -131,6 +132,21 @@ const invoiceSlice = createSlice({
     bulkUpdateInvoiceFailure: (state, _action: PayloadAction<string>) => {
       state.invoiceListError = null;
     },
+    bulkDisbursementRequest: (state, _action: PayloadAction<BulkDisbursementRequest>) => {
+      state.bulkDisbursementLoading = true;
+      state.bulkDisbursementSuccess = false;
+      state.invoiceListError = null;
+    },
+    bulkDisbursementSuccess: state => {
+      state.bulkDisbursementLoading = false;
+      state.bulkDisbursementSuccess = true;
+      state.invoiceListError = null;
+    },
+    bulkDisbursementFailure: (state, action: PayloadAction<string>) => {
+      state.bulkDisbursementLoading = false;
+      state.bulkDisbursementSuccess = false;
+      state.invoiceListError = action.payload;
+    },
   },
 });
 
@@ -160,6 +176,9 @@ export const {
   bulkUpdateInvoiceRequest,
   bulkUpdateInvoiceSuccess,
   bulkUpdateInvoiceFailure,
+  bulkDisbursementRequest,
+  bulkDisbursementSuccess,
+  bulkDisbursementFailure,
 } = invoiceSlice.actions;
 
 export default invoiceSlice.reducer;

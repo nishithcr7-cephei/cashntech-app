@@ -21,6 +21,16 @@ const UNIT_MAP: Record<string, number> = {
   STRIP: 13,
 };
 
+/**
+ * Numeric precision utility (equivalent to Web's Ue() utility)
+ * Rounds a value to 2 decimal places and ensures it's a valid number.
+ */
+const Ue = (val: number | string): number => {
+  const num = typeof val === 'string' ? parseFloat(val) : val;
+  if (isNaN(num)) return 0;
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+};
+
 function toIsoString(dateStr: string): string {
   if (!dateStr?.trim()) return '';
   const ymd = toYYYYMMDD(dateStr);
@@ -35,7 +45,7 @@ function toIsoString(dateStr: string): string {
   }
 }
 
-function toYYYYMMDD(dateStr: string): string {
+export function toYYYYMMDD(dateStr: string): string {
   if (!dateStr?.trim()) return '';
   const parts = dateStr.split(/[-/]/);
   if (parts.length === 3) {
@@ -85,29 +95,29 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
       name: item.itemName?.trim() || '',
       description: (item.description?.trim() || item.itemName?.trim() || ''),
       created_by: createdBy,
-      quantity: parseFloat(item.quantity) || 0,
+      quantity: Ue(item.quantity),
       unit: String(unitNum),
-      price_per_quantity: parseFloat(item.pricePerQuantity) || 0,
-      total: parseFloat(item.total) || 0,
+      price_per_quantity: Ue(item.pricePerQuantity),
+      total: Ue(item.total),
     };
     if (item.discountType && item.discountValue) {
       const discountType = item.discountType === 'value' ? 'absolute' : item.discountType;
       baseItem.discount_type = discountType;
-      baseItem.discount_value = parseFloat(item.discountValue) || 0;
-      baseItem.discount_amount = parseFloat(item.discountAmount || '0') || 0;
+      baseItem.discount_value = Ue(item.discountValue);
+      baseItem.discount_amount = Ue(item.discountAmount || '0');
     }
     const taxesArray = item.taxes?.filter(t => t.taxType) || [];
     if (taxesArray.length > 0) {
       baseItem.taxes = taxesArray.map(t => ({
         tax_type: t.taxType,
-        tax_percentage: parseFloat(t.taxPercentage || '0') || 0,
-        tax_amount: parseFloat(t.taxAmount || '0') || 0,
+        tax_percentage: Ue(t.taxPercentage || '0'),
+        tax_amount: Ue(t.taxAmount || '0'),
       }));
     } else if (item.taxType && (item.taxPercentage || item.taxAmount)) {
       baseItem.taxes = [{
         tax_type: item.taxType,
-        tax_percentage: parseFloat(item.taxPercentage || '0') || 0,
-        tax_amount: parseFloat(item.taxAmount || '0') || 0,
+        tax_percentage: Ue(item.taxPercentage || '0'),
+        tax_amount: Ue(item.taxAmount || '0'),
       }];
     }
     return baseItem;
@@ -129,10 +139,10 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     product,
     anchorParticipantMapping,
     party,
-    sub_total: Math.round(subtotal * 100) / 100,
-    discount_total: Math.round(discountTotal * 100) / 100,
-    tax_total: Math.round(taxTotal * 100) / 100,
-    final_total: Math.round(finalTotalValue * 100) / 100,
+    sub_total: Ue(subtotal),
+    discount_total: Ue(discountTotal),
+    tax_total: Ue(taxTotal),
+    final_total: Ue(finalTotalValue),
     items,
   };
 
@@ -300,34 +310,24 @@ export const invoiceApi = {
     return response.data;
   },
 
-  getInvoiceSummary: async (
-    _programIds?: string[], // Kept in signature to avoid refactoring callers, but ignored to bypass backend bug
-  ): Promise<any> => {
-    try {
-      const response = await axiosInstance.post(
-        ApiEndPoints.apiInvoiceSummary,
-        {}, // INTENTIONALLY EMPTY: Bypasses the regressed backend bug at Line 1980 (where.program)
-        {authRequired: true} as any,
-      );
-      // Extract nested data structure: response.data.data contains the actual array
-      const data = response?.data?.data ?? response?.data ?? [];
-      return {data};
-    } catch (error) {
-      // FALLBACK: Prevent dashboard lock-up if the Summary API is unstable
-      // eslint-disable-next-line no-console
-      console.warn('[invoiceApi] getInvoiceSummary failed (Workaround active):', error);
-      return {data: []};
-    }
+  getInvoiceSummary: async (programIds?: string[]): Promise<any> => {
+    const body = {
+      programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
+    };
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiInvoiceSummary,
+      body,
+      {authRequired: true} as any,
+    );
+    // Extract nested data structure: response.data.data contains the actual array
+    const data = response?.data?.data ?? response?.data ?? [];
+    return {data};
   },
 
-  getLatestInvoices: async (
-    programIds?: string[],
-  ): Promise<any> => {
-    const body: any = {
-      programIds: programIds ?? [],
+  getLatestInvoices: async (programIds?: string[]): Promise<any> => {
+    const body = {
+      programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
-    // eslint-disable-next-line no-console
-    console.log('[InvoiceLatest] POST Body:', JSON.stringify(body));
     const response = await axiosInstance.post(
       ApiEndPoints.apiInvoiceLatest,
       body,
@@ -339,19 +339,13 @@ export const invoiceApi = {
   },
 
   getInvoiceKpis: async (programIds?: string[]): Promise<InvoiceKpisResponse> => {
-    const body: any = {
-      programIds: programIds ?? [],
+    const body = {
+      programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
-    // eslint-disable-next-line no-console
-    console.log('[InvoiceKpis] POST Body:', JSON.stringify(body));
-    const response = await axiosInstance.post(
-      ApiEndPoints.apiInvoiceKpis,
-      body,
-      {authRequired: true} as any,
-    );
+    const response = await axiosInstance.post(ApiEndPoints.apiInvoiceKpis, body, {
+      authRequired: true,
+    } as any);
     const raw = response?.data?.data ?? {};
-    // eslint-disable-next-line no-console
-    console.log('[InvoiceKpis] API Response Data:', JSON.stringify(raw, null, 2));
     return {
       total_program_limit: raw.total_program_limit ?? '0',
       utilized_amount: raw.utilized_amount ?? '0',
@@ -367,19 +361,13 @@ export const invoiceApi = {
   },
 
   getDisbursementKpis: async (programIds?: string[]): Promise<DisbursementKpisResponse> => {
-    const body: any = {
-      programIds: programIds ?? [],
+    const body = {
+      programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
-    // eslint-disable-next-line no-console
-    console.log('[DisbursementKpis] POST Body:', JSON.stringify(body));
-    const response = await axiosInstance.post(
-      ApiEndPoints.apiDisbursementKpis,
-      body,
-      {authRequired: true} as any,
-    );
+    const response = await axiosInstance.post(ApiEndPoints.apiDisbursementKpis, body, {
+      authRequired: true,
+    } as any);
     const raw = response?.data?.data ?? {};
-    // eslint-disable-next-line no-console
-    console.log('[DisbursementKpis] API Response Data:', JSON.stringify(raw, null, 2));
     return {
       total_uploaded_amount: raw.total_uploaded_amount ?? '0.00',
       total_disbursed_amount: raw.total_disbursed_amount ?? '0.00',
@@ -388,19 +376,13 @@ export const invoiceApi = {
   },
 
   getInterestAccrualKpis: async (programIds?: string[]): Promise<InterestAccrualKpisResponse> => {
-    const body: any = {
-      programIds: programIds ?? [],
+    const body = {
+      programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
-    // eslint-disable-next-line no-console
-    console.log('[InterestAccrualKpis] POST Body:', JSON.stringify(body));
-    const response = await axiosInstance.post(
-      ApiEndPoints.apiInterestAccrualKpis,
-      body,
-      {authRequired: true} as any,
-    );
+    const response = await axiosInstance.post(ApiEndPoints.apiInterestAccrualKpis, body, {
+      authRequired: true,
+    } as any);
     const raw = response?.data?.data ?? {};
-    // eslint-disable-next-line no-console
-    console.log('[InterestAccrualKpis] API Response Data:', JSON.stringify(raw, null, 2));
     return {
       total_interest_accrued_daily: raw.total_interest_accrued_daily ?? '0.00',
       accrual_vs_expected: raw.accrual_vs_expected ?? 0,
@@ -408,19 +390,13 @@ export const invoiceApi = {
   },
 
   getRepaymentKpis: async (programIds?: string[]): Promise<RepaymentKpisResponse> => {
-    const body: any = {
-      programIds: programIds ?? [],
+    const body = {
+      programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
-    // eslint-disable-next-line no-console
-    console.log('[RepaymentKpis] POST Body:', JSON.stringify(body));
-    const response = await axiosInstance.post(
-      ApiEndPoints.apiRepaymentKpis,
-      body,
-      {authRequired: true} as any,
-    );
+    const response = await axiosInstance.post(ApiEndPoints.apiRepaymentKpis, body, {
+      authRequired: true,
+    } as any);
     const raw = response?.data?.data ?? {};
-    // eslint-disable-next-line no-console
-    console.log('[RepaymentKpis] API Response Data:', JSON.stringify(raw, null, 2));
     return {
       total_dsibursed_amount: raw.total_dsibursed_amount ?? '0.00',
       principal_repaid: raw.principal_repaid ?? '0.00',
@@ -431,19 +407,13 @@ export const invoiceApi = {
   },
 
   getDpdKpis: async (programIds?: string[]): Promise<DpdKpisResponse> => {
-    const body: any = {
-      programIds: programIds ?? [],
+    const body = {
+      programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
-    // eslint-disable-next-line no-console
-    console.log('[DpdKpis] POST Body:', JSON.stringify(body));
-    const response = await axiosInstance.post(
-      ApiEndPoints.apiDpdKpis,
-      body,
-      {authRequired: true} as any,
-    );
+    const response = await axiosInstance.post(ApiEndPoints.apiDpdKpis, body, {
+      authRequired: true,
+    } as any);
     const raw = response?.data?.data ?? {};
-    // eslint-disable-next-line no-console
-    console.log('[DpdKpis] API Response Data:', JSON.stringify(raw, null, 2));
     return {
       dpd_bucket_movement: raw.dpd_bucket_movement ?? {
         "0_30_days": "0.00",
@@ -460,7 +430,7 @@ export const invoiceApi = {
     };
   },
 
-  getInvoiceDetails: async (invoiceId: string): Promise<Partial<InvoiceFields>> => {
+  getInvoiceDetails: async (invoiceId: string): Promise<any> => {
     const response = await axiosInstance.get(
       ApiEndPoints.apiGetInvoiceDetails(invoiceId),
       {authRequired: true} as any,
@@ -469,7 +439,9 @@ export const invoiceApi = {
     if (!data) return {};
 
     // Map backend snake_case to frontend camelCase InvoiceFields
+    // We return the merged object so callers can access both raw and mapped fields
     return {
+      ...data,
       invoiceNumber: data.invoice_ref_no,
       invoiceDate: data.invoice_date,
       invoiceDueDate: data.invoice_due_date,
@@ -697,6 +669,16 @@ export const invoiceApi = {
     return response.data;
   },
 
+  /** Bulk email to bank */
+  bulkEmailToBank: async (payload: {invoiceIds: string[]}): Promise<any> => {
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiBulkEmail,
+      payload,
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
   /** Bank accounts for disbursement (Debit From dropdown) */
   getBankAccountsForDisbursement: async (invoiceId: string): Promise<any> => {
     const response = await axiosInstance.get(
@@ -719,68 +701,81 @@ export const invoiceApi = {
     return response.data;
   },
 
-  createInvoice: async (input: CreateInvoicePayloadInput): Promise<any> => {
-    console.log('[invoice.api] createInvoice called with input:', input);
-    const payload = buildCreateInvoicePayload(input);
-    // Log exact request body sent to backend (sub_total, final_total, items, etc.)
-    // eslint-disable-next-line no-console
-    console.log('[CreateInvoice] API body (sent to backend):', JSON.stringify(payload, null, 2));
+  /** Mark multiple invoices as disbursed (BulkInvoiceDisbursementDto) */
+  bulkDisbursement: async (payload: {
+    invoices: {
+      invoiceId: string;
+      status: string;
+      utr_no?: string;
+      transaction_no?: string;
+      disbursed_amount: number;
+      disbursement_date?: string;
+      remark?: string;
+      hold_category?: string;
+      expected_release_date?: string;
+      rejection_reason?: string;
+    }[];
+  }): Promise<any> => {
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiBulkDisbursement,
+      payload,
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
 
-    if (input.attachment) {
-      const formData = new FormData();
-      const items = payload.items as any[];
+  createInvoice: async (input: CreateInvoicePayloadInput): Promise<any> => {
+    const payload = buildCreateInvoicePayload(input);
+    
+    const formData = new FormData();
+    const items = payload.items as any[];
+    
+    // Append all fields except items
+    for (const [key, value] of Object.entries(payload)) {
+      if (key !== 'items' && value !== undefined && value !== null) {
+        formData.append(key, String(value));
+      }
+    }
+    
+    // Append items with array notation
+    items.forEach((item, index) => {
+      formData.append(`items[${index}][name]`, String(item.name || ''));
+      formData.append(`items[${index}][description]`, String(item.description || ''));
+      formData.append(`items[${index}][created_by]`, String(item.created_by || ''));
+      formData.append(`items[${index}][quantity]`, String(item.quantity || 0));
+      formData.append(`items[${index}][unit]`, String(item.unit || '1'));
+      formData.append(`items[${index}][price_per_quantity]`, String(item.price_per_quantity || 0));
+      formData.append(`items[${index}][total]`, String(item.total || 0));
       
-      // Append all fields except items
-      for (const [key, value] of Object.entries(payload)) {
-        if (key !== 'items' && value !== undefined && value !== null) {
-          formData.append(key, String(value));
-        }
+      if (item.discount_type) {
+        formData.append(`items[${index}][discount_type]`, String(item.discount_type));
+      }
+      if (item.discount_value !== undefined && item.discount_value !== null) {
+        formData.append(`items[${index}][discount_value]`, String(item.discount_value));
+      }
+      if (item.discount_amount !== undefined && item.discount_amount !== null) {
+        formData.append(`items[${index}][discount_amount]`, String(item.discount_amount));
       }
       
-      // Append items with array notation
-      items.forEach((item, index) => {
-        formData.append(`items[${index}][name]`, String(item.name || ''));
-        formData.append(`items[${index}][description]`, String(item.description || ''));
-        formData.append(`items[${index}][created_by]`, String(item.created_by || ''));
-        formData.append(`items[${index}][quantity]`, String(item.quantity || 0));
-        formData.append(`items[${index}][unit]`, String(item.unit || '1'));
-        formData.append(`items[${index}][price_per_quantity]`, String(item.price_per_quantity || 0));
-        formData.append(`items[${index}][total]`, String(item.total || 0));
-        
-        if (item.discount_type) {
-          formData.append(`items[${index}][discount_type]`, String(item.discount_type));
-        }
-        if (item.discount_value !== undefined && item.discount_value !== null) {
-          formData.append(`items[${index}][discount_value]`, String(item.discount_value));
-        }
-        if (item.discount_amount !== undefined && item.discount_amount !== null) {
-          formData.append(`items[${index}][discount_amount]`, String(item.discount_amount));
-        }
-        
-        if (item.taxes && item.taxes.length > 0) {
-          item.taxes.forEach((tax: any, taxIndex: number) => {
-            formData.append(`items[${index}][taxes][${taxIndex}][tax_type]`, String(tax.tax_type || ''));
-            formData.append(`items[${index}][taxes][${taxIndex}][tax_percentage]`, String(tax.tax_percentage || 0));
-            formData.append(`items[${index}][taxes][${taxIndex}][tax_amount]`, String(tax.tax_amount || 0));
-          });
-        }
-      });
-      
+      if (item.taxes && item.taxes.length > 0) {
+        item.taxes.forEach((tax: any, taxIndex: number) => {
+          formData.append(`items[${index}][taxes][${taxIndex}][tax_type]`, String(tax.tax_type || ''));
+          formData.append(`items[${index}][taxes][${taxIndex}][tax_percentage]`, String(tax.tax_percentage || 0));
+          formData.append(`items[${index}][taxes][${taxIndex}][tax_amount]`, String(tax.tax_amount || 0));
+        });
+      }
+    });
+    
+    if (input.attachment) {
       formData.append('attachments', {
         uri: input.attachment.uri,
         name: input.attachment.name ?? 'invoice.pdf',
         type: input.attachment.type ?? 'application/pdf',
       } as any);
-
-      const response = await axiosInstance.post(ApiEndPoints.apiCreateInvoice, formData, {
-        isFormData: true,
-        authRequired: true,
-      } as any);
-      return response.data;
     }
 
-    const response = await axiosInstance.post(ApiEndPoints.apiCreateInvoice, payload, {
-      headers: {'Content-Type': 'application/json'},
+    const response = await axiosInstance.post(ApiEndPoints.apiCreateInvoice, formData, {
+      isFormData: true,
       authRequired: true,
     } as any);
     return response.data;
@@ -790,7 +785,7 @@ export const invoiceApi = {
    * Currently commented out as requested.
    */
   updateInvoice: async (input: UpdateInvoicePayload): Promise<any> => {
-    const {invoiceId, fields, attachment, approval_level} = input;
+    const {invoiceId, fields, attachment, approval_level, createdBy} = input;
     
     // Manually calculate totals for the update payload
     const subtotal = fields.items.reduce((sum: number, item: any) => sum + (parseFloat(item.total) || 0), 0);
@@ -806,13 +801,14 @@ export const invoiceApi = {
 
     const items = fields.items.map((item: any) => {
       const unitNum = UNIT_MAP[item.unit?.toUpperCase()] ?? 1;
-      const baseItem: Record<string, unknown> = {
+      const baseItem: any = {
         name: item.itemName?.trim() || '',
         description: (item.description?.trim() || item.itemName?.trim() || ''),
-        quantity: parseFloat(item.quantity) || 0,
+        created_by: createdBy,
+        quantity: Ue(item.quantity),
         unit: String(unitNum),
-        price_per_quantity: parseFloat(item.pricePerQuantity) || 0,
-        total: parseFloat(item.total) || 0,
+        price_per_quantity: Ue(item.pricePerQuantity),
+        total: Ue(item.total),
       };
       
       // Crucial: Backend needs the existing item ID if we want to update it instead of creating new ones
@@ -821,40 +817,33 @@ export const invoiceApi = {
       }
 
       if (item.discountType && item.discountValue) {
-        let discountType = item.discountType;
-        // Normalize discount type to lowercase
-        if (discountType === 'value' || discountType === 'absolute' || discountType === 'Absolute') {
-          discountType = 'absolute';
-        } else if (discountType === 'percentage' || discountType === 'Percentage') {
-          discountType = 'percentage';
-        }
-        baseItem.discount_type = discountType;
-        baseItem.discount_value = parseFloat(item.discountValue) || 0;
-        baseItem.discount_amount = parseFloat(item.discountAmount || '0') || 0;
+        baseItem.discount_type = item.discountType === 'value' ? 'absolute' : item.discountType;
+        baseItem.discount_value = Ue(item.discountValue);
+        baseItem.discount_amount = Ue(item.discountAmount || '0');
       }
       
       const taxesArray = item.taxes?.filter((t: any) => t.taxType) || [];
       if (taxesArray.length > 0) {
         baseItem.taxes = taxesArray.map((t: any) => ({
           tax_type: t.taxType,
-          tax_percentage: parseFloat(t.taxPercentage || '0') || 0,
-          tax_amount: parseFloat(t.taxAmount || '0') || 0,
+          tax_percentage: Ue(t.taxPercentage || '0'),
+          tax_amount: Ue(t.taxAmount || '0'),
         }));
       }
       return baseItem;
     });
 
-    const payload: Record<string, unknown> = {
+    const payload: any = {
       approval_level: Number(approval_level ?? 1),
       invoice_ref_no: fields.invoiceNumber || '',
-      invoice_date: toIsoString(fields.invoiceDate),
-      invoice_due_date: toIsoString(fields.invoiceDueDate),
+      invoice_date: toYYYYMMDD(fields.invoiceDate),
+      invoice_due_date: toYYYYMMDD(fields.invoiceDueDate),
       currency: fields.currency || 'INR',
       remark: fields.remark || '',
-      sub_total: Number((Math.round(subtotal * 100) / 100).toFixed(2)),
-      discount_total: Number((Math.round(discountTotal * 100) / 100).toFixed(2)),
-      tax_total: Number((Math.round(taxTotal * 100) / 100).toFixed(2)),
-      final_total: Number((Math.round(finalTotalValue * 100) / 100).toFixed(2)),
+      sub_total: Ue(subtotal),
+      discount_total: Ue(discountTotal),
+      tax_total: Ue(taxTotal),
+      final_total: Ue(finalTotalValue),
       // Add counter-party information for update
       counter_party_name: fields.dealer || '',
       counter_party_code: fields.dealerCode || '',
@@ -864,11 +853,12 @@ export const invoiceApi = {
     };
 
     if (fields.grnDate?.trim()) {
-      payload.grn_date = toIsoString(fields.grnDate);
+      payload.grn_date = toYYYYMMDD(fields.grnDate);
     }
     if (fields.paymentDate?.trim()) {
-      payload.payment_date = toIsoString(fields.paymentDate);
+      payload.payment_date = toYYYYMMDD(fields.paymentDate);
     }
+
 
     if (attachment) {
       const formData = new FormData();
@@ -918,7 +908,21 @@ export const invoiceApi = {
   },
 
   deleteInvoice: async (invoiceId: string): Promise<any> => {
-    const response = await axiosInstance.delete(ApiEndPoints.apiUpdateInvoice(invoiceId), {
+    const response = await axiosInstance.delete(ApiEndPoints.apiInvoiceById(invoiceId), {
+      authRequired: true,
+    } as any);
+    return response.data;
+  },
+
+  deleteInvoiceItem: async (itemId: string): Promise<any> => {
+    const response = await axiosInstance.delete(ApiEndPoints.apiDeleteInvoiceItem(itemId), {
+      authRequired: true,
+    } as any);
+    return response.data;
+  },
+
+  deleteInvoiceItemTax: async (itemTaxId: string): Promise<any> => {
+    const response = await axiosInstance.delete(ApiEndPoints.apiDeleteInvoiceItemTax(itemTaxId), {
       authRequired: true,
     } as any);
     return response.data;

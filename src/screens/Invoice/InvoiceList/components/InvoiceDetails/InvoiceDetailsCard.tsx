@@ -49,6 +49,8 @@ type Props = {
   isDealerMaker: boolean;
   isDealerChecker: boolean;
   isAnchorChecker: boolean;
+  isAnchorAllAccess?: boolean;
+  isDealerAllAccess?: boolean;
   isCashnTechUser?: boolean;
   storedUserRole?: string;
   isSelected: boolean;
@@ -67,6 +69,8 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   isDealerMaker,
   isDealerChecker,
   isAnchorChecker,
+  isAnchorAllAccess = false,
+  isDealerAllAccess = false,
   isCashnTechUser = false,
   storedUserRole,
   isSelected,
@@ -114,6 +118,10 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   let showPendingBlueDot = false;
   if (isCashnTechUser) {
     showPendingBlueDot = rawAdminStatusUpper === 'PENDING_VERIFICATION' || rawAdminStatusUpper === 'PENDING VERIFICATION';
+  } else if (isAnchorAllAccess) {
+    showPendingBlueDot = approvalSUpper.includes('PENDING ANCHOR MAKER') || approvalSUpper.includes('PENDING ANCHOR CHECKER');
+  } else if (isDealerAllAccess) {
+    showPendingBlueDot = approvalSUpper.includes('PENDING DEALER MAKER') || approvalSUpper.includes('PENDING DEALER CHECKER');
   } else if (storedUserRole) {
     const expected = `PENDING ${(storedUserRole || '').trim().toUpperCase()}`;
     showPendingBlueDot = approvalSUpper.includes(expected);

@@ -12,6 +12,9 @@ const initialState: ProgramSelectionState = {
   programId: null,
   programName: null,
   userType: null,
+  method: null,
+  role: null,
+  status: null,
   selectedPrograms: [],
   scopeData: null,
   scopeLoading: false,
@@ -37,6 +40,9 @@ const programSelectionSlice = createSlice({
         programId?: string | null;
         programName?: string | null;
         userType?: UserType | null;
+        method?: string | null;
+        role?: string | null;
+        status?: string | null;
       }>,
     ) => {
       const p = action.payload;
@@ -48,6 +54,9 @@ const programSelectionSlice = createSlice({
       if (p.programId !== undefined) state.programId = p.programId;
       if (p.programName !== undefined) state.programName = p.programName;
       if (p.userType !== undefined) state.userType = p.userType;
+      if (p.method !== undefined) state.method = p.method;
+      if (p.role !== undefined) state.role = p.role;
+      if (p.status !== undefined) state.status = p.status;
     },
     clearProgramSelection: () => initialState,
     fetchUserScopeRequest: state => {
@@ -100,6 +109,9 @@ const programSelectionSlice = createSlice({
       state.programId = program.programId;
       state.programName = program.programName;
       state.userType = program.userType;
+      state.method = program.method;
+      state.role = program.role;
+      state.status = program.status;
     },
     
     // ============================================================================

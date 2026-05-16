@@ -25,3 +25,7 @@ export const selectInvoiceListLoading = (state: RootState) =>
   state.invoice.invoiceListLoading;
 export const selectInvoiceListError = (state: RootState) =>
   state.invoice.invoiceListError;
+export const selectBulkDisbursementLoading = (state: RootState) =>
+  state.invoice.bulkDisbursementLoading;
+export const selectBulkDisbursementSuccess = (state: RootState) =>
+  state.invoice.bulkDisbursementSuccess;

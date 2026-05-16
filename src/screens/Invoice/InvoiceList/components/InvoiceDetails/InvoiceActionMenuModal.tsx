@@ -79,6 +79,8 @@ type Props = {
   isAnchorChecker: boolean;
   isDealerMaker: boolean;
   isDealerChecker: boolean;
+  isAnchorAllAccess?: boolean;
+  isDealerAllAccess?: boolean;
   isCashnTechUser?: boolean;
   rawAdminStatus?: string;
   rawApprovalStatus?: string;
@@ -98,6 +100,8 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   isAnchorChecker,
   isDealerMaker,
   isDealerChecker,
+  isAnchorAllAccess = false,
+  isDealerAllAccess = false,
   isCashnTechUser = false,
   rawAdminStatus,
   rawApprovalStatus,
@@ -185,7 +189,10 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   const roleLabel = (userInfo?.permission_group?.[0]?.business_role || userInfo?.permission_group?.[0]?.functional_role || '').trim().toUpperCase();
   const isMyTurn = isCashnTechUser 
     ? (rawAdminStatus || '').trim().toUpperCase().includes('PENDING') 
-    : !!roleLabel && approvalS.includes(`PENDING ${roleLabel}`);
+    : (isAnchorAllAccess || isDealerAllAccess)
+      ? approvalS.includes(`PENDING ${isAnchorAllAccess ? 'ANCHOR' : 'DEALER'} CHECKER`) || 
+        approvalS.includes(`PENDING ${isAnchorAllAccess ? 'ANCHOR' : 'DEALER'} MAKER`)
+      : !!roleLabel && approvalS.includes(`PENDING ${roleLabel}`);
 
   const canShowApproveReject = (canApprove || canReject) && isActionable && isMyTurn;
 
@@ -202,7 +209,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
           style={[styles.menu, getMenuPosition(menuAnchor)]}
           onPress={() => {}}>
           {/* Maker actions: Anchor/Dealer Makers OR CashnTech Users with edit permission can edit (Checkers excluded) */}
-          {(isAnchorMaker || isDealerMaker) && !isAnchorChecker && !isDealerChecker && (
+          {((isAnchorMaker || isDealerMaker) && (!isAnchorChecker && !isDealerChecker || isAnchorAllAccess || isDealerAllAccess)) && (
             <>
               {/* Edit – ONLY visible if isEditable */}
               {isEditable && (
@@ -280,7 +287,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
-              {showAttachmentOption && (
+              {showAttachmentOption && !isAnchorAllAccess && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('attachment', openMenuId)}
@@ -292,7 +299,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   </View>
                 </TouchableOpacity>
               )}
-              {canViewHistory && (
+              {canViewHistory && !isAnchorAllAccess && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('approvalHistory', openMenuId)}
@@ -306,7 +313,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
               )}
 
               {/* Delete – visible if isDeletable */}
-              {isDeletable && (
+              {isDeletable && !isAnchorAllAccess && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('delete', openMenuId)}
@@ -335,7 +342,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
-              {canViewHistory && (
+              {canViewHistory && !isDealerAllAccess && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('approvalHistory', openMenuId)}
@@ -345,7 +352,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
-              {showAttachmentOption && (
+              {showAttachmentOption && !isDealerAllAccess && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('attachment', openMenuId)}
@@ -359,7 +366,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
               )}
 
               {/* Delete – visible if isDeletable */}
-              {isDeletable && (
+              {isDeletable && !isDealerAllAccess && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('delete', openMenuId)}

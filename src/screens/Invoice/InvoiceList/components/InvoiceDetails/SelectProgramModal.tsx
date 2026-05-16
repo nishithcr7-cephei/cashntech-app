@@ -118,7 +118,10 @@ export const SelectProgramModal: React.FC<SelectProgramModalProps> = ({
         programId: program.id,
         programName: program.name,
         userType: program.userType,
-        partyId: ''
+        partyId: '',
+        method: program.method,
+        role: program.role,
+        status: program.status,
       }),
     );
     onProgramSelected();

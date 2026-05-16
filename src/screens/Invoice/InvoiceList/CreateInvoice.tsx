@@ -48,7 +48,14 @@ import {
   toggleProgramSelection,
 } from '@store/programSelection/programSelection.slice';
 import {userSelector} from '@store/user';
-import {AppRole} from '@constants/roles';
+import {PERMISSIONS} from '@constants/permissions';
+import {AppRole, ROLE_LABELS} from '@constants/roles';
+import {
+  fetchPermissionsRequest,
+  selectPermissions,
+  selectPermissionsLoading,
+  selectPermissionsError,
+} from '@store/permissions';
 import type {DealerInfoParticipant} from '@store/invoice/inv.types';
 import {decryptValue} from '@utils/decrypt';
 import {invoiceApi} from '@services/api/invoice.api';
@@ -121,12 +128,7 @@ interface ValidationErrors {
   [key: string]: string | undefined;
 }
 
-import {
-  fetchPermissionsRequest,
-  selectPermissions,
-  selectPermissionsLoading,
-  selectPermissionsError,
-} from '@store/permissions';
+
 
 export const CreateInvoice: React.FC = () => {
   const navigation = useNavigation();
@@ -209,6 +211,8 @@ export const CreateInvoice: React.FC = () => {
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isAnchorMaker = userRole === 'anchor_maker';
   const isDealerMaker = userRole === 'dealer_maker';
+  const isAnchorChecker = userRole === 'anchor_checker';
+  const isDealerChecker = userRole === 'dealer_checker';
   const isCashnTechUser = userRole === 'cashntech_user';
 
   const [fields, setFields] = useState<InvoiceFields>(() => getInitialFields());
@@ -216,6 +220,9 @@ export const CreateInvoice: React.FC = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [isOcrUploadModalVisible, setIsOcrUploadModalVisible] = useState(false);
   const [isProofUploadModalVisible, setIsProofUploadModalVisible] = useState(false);
+  // Stores the available limit for the specific participant in edit mode.
+  // Fetched fresh when invoice details load, matching Web Portal behavior.
+  const [apmAvailableLimit, setApmAvailableLimit] = useState<number | null>(null);
 
   const isFormValid = useMemo(() => {
     return !!(
@@ -243,11 +250,11 @@ export const CreateInvoice: React.FC = () => {
   const previewAttachmentFromRoute: DocumentPickerResponse | undefined = route?.params?.previewAttachment;
   const previewReturnToken: number | undefined = route?.params?.previewReturnToken;
   
-  const hasCreatePerm = permissions.includes('lms.transactions.invoice_list.action.create_invoice');
-  const hasEditPerm = permissions.includes('lms.transactions.invoice_list.action.edit');
-  const hasRecreatePerm = permissions.includes('lms.transactions.invoice_list.action.recreate_invoice');
-  const hasUploadPerm = permissions.includes('lms.transactions.invoice_list.action.import');
-  const hasAttachmentPerm = permissions.includes('lms.transactions.invoice_list.action.attachment');
+  const hasCreatePerm = permissions.includes(PERMISSIONS.CREATE_INVOICE);
+  const hasEditPerm = permissions.includes(PERMISSIONS.INVOICE_LIST_EDIT);
+  const hasRecreatePerm = permissions.includes(PERMISSIONS.INVOICE_LIST_RECREATE);
+  const hasUploadPerm = permissions.includes(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY);
+  const hasAttachmentPerm = permissions.includes(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
   const canUploadFinal = hasUploadPerm && hasAttachmentPerm;
 
   // Determine required permission based on mode
@@ -283,12 +290,12 @@ export const CreateInvoice: React.FC = () => {
     return parts.join(' - ');
   }, [programSelection]);
   
-  // Role-based access control: Prevent anchor_checker from accessing Create Invoice screen
+  // Role-based access control: Prevent checkers from accessing Create Invoice screen
   useEffect(() => {
-    if (userRole === 'anchor_checker') {
+    if (isAnchorChecker || isDealerChecker) {
       Alert.alert(
         'Access Denied',
-        'Anchor Checker cannot create invoices. You can only approve/reject invoices.',
+        'Checker roles cannot create invoices. You can only approve/reject invoices.',
         [
           {
             text: 'OK',
@@ -299,7 +306,55 @@ export const CreateInvoice: React.FC = () => {
         ],
       );
     }
-  }, [userRole, navigation]);
+  }, [isAnchorChecker, isDealerChecker, navigation]);
+
+  // Program-level role normalization (e.g., "Anchor Maker" -> "anchor_maker")
+  const programRoleKey = useMemo(() => {
+    const rawRole = programSelection?.role;
+    if (!rawRole) return null;
+    return rawRole.toLowerCase().trim().replace(/\s+/g, '_') as AppRole;
+  }, [programSelection?.role]);
+
+  // Method-based access control: Push-Pull logic
+  const programMethod = programSelection?.method;
+  const isAllowedForMethod = useMemo(() => {
+    // If we are editing an existing invoice, we allow it (matching Web behavior)
+    if (mode === 'edit') return true;
+
+    // Priority: Program-specific role > Global user role
+    const effectiveRole = programRoleKey || userRole;
+    if (!programMethod || !effectiveRole) return true;
+
+    // Checkers are never allowed to create
+    if (effectiveRole === 'anchor_checker' || effectiveRole === 'dealer_checker') return false;
+
+    // Push -> Only Anchor Maker
+    if (programMethod === 'Push') return effectiveRole === 'anchor_maker';
+    // Pull -> Only Dealer Maker
+    if (programMethod === 'Pull') return effectiveRole === 'dealer_maker';
+    
+    return true;
+  }, [programMethod, userRole, programRoleKey, mode]);
+
+  useEffect(() => {
+    if (mode !== 'edit' && programSelection?.programId && !isAllowedForMethod && !permissionsLoading) {
+      const effectiveRole = programRoleKey || userRole;
+      const roleLabel = ROLE_LABELS[effectiveRole as AppRole] || effectiveRole || 'User';
+      
+      Alert.alert(
+        'Method Mismatch',
+        `You are not allowed to create invoices for a ${programMethod} program as a ${roleLabel}.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              (navigation as any).navigate('InvoiceDetails');
+            },
+          },
+        ],
+      );
+    }
+  }, [isAllowedForMethod, programSelection?.programId, programMethod, userRole, programRoleKey, permissionsLoading, navigation]);
 
   // Permission validation for Create/Edit Invoice
   useEffect(() => {
@@ -389,9 +444,11 @@ export const CreateInvoice: React.FC = () => {
     if (previewFieldsFromRoute) setFields(previewFieldsFromRoute);
     if (previewAttachmentFromRoute) setSelectedAttachment(previewAttachmentFromRoute);
     if (previewFieldsFromRoute?.dealer && dealerInfo?.participants?.length) {
-      const participant = dealerInfo.participants.find(
-        p => p.party.entity_name === previewFieldsFromRoute.dealer,
-      );
+      const participant = dealerInfo.participants.find(p => {
+        const pName = p.party?.entity_name || '';
+        const decryptedPName = decryptValue(pName);
+        return pName === previewFieldsFromRoute.dealer || decryptedPName === previewFieldsFromRoute.dealer;
+      });
       if (participant) setSelectedParticipant(participant);
     }
   }, [
@@ -485,17 +542,74 @@ export const CreateInvoice: React.FC = () => {
               productName: data.program?.productConfig?.product?.name || data.product_name || '',
               partyId: data.party?.id || '',
               userType: (data.program?.productConfig?.product?.name || data.product_name || '').toLowerCase().includes('dealer') ? 'dealer' : 'vendor',
+              method: data.program?.method || null,
+              role: data.program?.role || null,
+              status: data.program?.status || null,
             }),
           );
         }
 
-        // Pre-select participant from dealerInfo if available
-        if (dealerInfo?.participants?.length) {
-          const participant = dealerInfo.participants.find(
-            p => p.party.entity_name === rawDealerEntityName || p.id === apm?.id,
-          );
-          if (participant) setSelectedParticipant(participant);
+        // Fetch fresh dealerInfo for this program to get accurate available limit.
+        // This matches the Web Portal's behavior of computing availableLimit = sanctioned_limit - utilized_amount
+        // from the dealerInfo response at the time the edit screen is loaded.
+        if (data.program?.id) {
+          invoiceApi.getDealerInfo(data.program.id)
+            .then((dealerRes: any) => {
+              const participants = dealerRes?.data?.participants || dealerRes?.participants || [];
+              const apmId = apm?.id;
+              const apmCode = apm?.company_code_given_by_party;
+
+              const matchedP = participants.find((p: any) => {
+                const pIdMatch = p.id && apmId && String(p.id) === String(apmId);
+                const partyIdMatch = p.party?.id && apm?.party?.id && String(p.party.id) === String(apm.party.id);
+                const codeMatch = p.company_code && apm?.company_code && String(p.company_code) === String(apm.company_code);
+                const givenCodeMatch = p.company_code_given_by_party && apmCode && String(p.company_code_given_by_party) === String(apmCode);
+                const nameMatch = p.party?.entity_name && (
+                  decryptValue(p.party.entity_name) === decryptedDealerName ||
+                  p.party.entity_name === rawDealerEntityName
+                );
+                
+                return pIdMatch || partyIdMatch || codeMatch || givenCodeMatch || nameMatch;
+              });
+
+              if (!matchedP) {
+                console.log('[EditMode] Matching failed. Diagnostic info:', {
+                  apmId,
+                  apmCode,
+                  rawDealerEntityName,
+                  decryptedDealerName,
+                  participantCount: participants.length,
+                  firstParticipantSample: participants[0] ? {
+                    id: participants[0].id,
+                    code: participants[0].company_code,
+                    givenCode: participants[0].company_code_given_by_party,
+                    partyId: participants[0].party?.id,
+                    partyName: participants[0].party?.entity_name
+                  } : 'none'
+                });
+              }
+
+              if (matchedP) {
+                const sanctioned = parseFloat(String(matchedP.sanctioned_limit ?? '0')) || 0;
+                const utilized = parseFloat(String(matchedP.utilized_amount ?? '0')) || 0;
+                setApmAvailableLimit(sanctioned - utilized);
+                setSelectedParticipant(matchedP);
+                console.log('[EditMode] availableLimit calculated:', sanctioned - utilized, 'for participant:', matchedP.id);
+              } else {
+                // Participant not found in fresh dealerInfo — use 0 to be safe (will block if invoice total > 0)
+                setApmAvailableLimit(0);
+                console.warn('[EditMode] Participant not found in fresh dealerInfo, defaulting availableLimit to 0');
+              }
+            })
+            .catch((err: any) => {
+              console.warn('[EditMode] Failed to fetch fresh dealerInfo for limit check:', err);
+              setApmAvailableLimit(null); // null = unknown, won't block
+            });
         }
+
+        return () => {
+          cancelled = true;
+        };
       })
       .catch(err => {
         Alert.alert('Error', 'Failed to fetch invoice details for editing.');
@@ -541,6 +655,11 @@ export const CreateInvoice: React.FC = () => {
   // Validation function
   const validateField = (fieldName: keyof InvoiceFields, value: any): string | undefined => {
     switch (fieldName) {
+      case 'odAccountNumber':
+        if (programSelection?.method?.toLowerCase() === 'pull' && !value?.trim()) {
+          return 'OD Account No is required for Pull method programs';
+        }
+        return undefined;
       case 'invoiceNumber':
         if (!value?.trim()) {
           return 'Invoice / Unique Ref. No is required';
@@ -631,6 +750,7 @@ export const CreateInvoice: React.FC = () => {
     const validationOrder: string[] = [
       'dealer',
       'dealerCode',
+      'odAccountNumber',
       'invoiceNumber',
       'invoiceDate',
       'invoiceDueDate',
@@ -673,7 +793,9 @@ export const CreateInvoice: React.FC = () => {
     if (patch.currency && patch.currency !== 'INR') patch.currency = 'INR';
     if (patch.dealer && dealerInfo?.participants) {
       const participant = dealerInfo.participants.find(
-        p => p.party.entity_name === patch.dealer,
+        p => 
+          (p.party?.entity_name && (decryptValue(p.party.entity_name) || p.party.entity_name) === patch.dealer) ||
+          p.id === selectedParticipant?.id
       );
       if (participant) {
         patch.dealerCode = decryptValue(participant.company_code ?? '') || participant.company_code;
@@ -775,19 +897,126 @@ export const CreateInvoice: React.FC = () => {
   };
     
   const handleSubmit = async () => {
-    // 1. First, validate all form fields in order of appearance
-    const validation = validateForm(true);
-    console.log('[CreateInvoice] handleSubmit called, validation:', validation);
-    if (!validation.isValid) {
-      Toast.show({
-        type: 'error',
-        text1: validation.firstError || 'Please fill all required fields',
-        visibilityTime: 3000,
-      });
+    // Priority 1: Available Limit Check (Matching Web Portal Logic)
+    // In edit mode, use the pre-fetched available limit (loaded when screen opened, like Web Portal).
+    // In create mode, calculate from selected participant.
+
+    if (mode === 'edit') {
+      // apmAvailableLimit is set at screen load from fresh getDealerInfo call.
+      // If null → fetch failed (don't block, allow cautiously). If number → enforce.
+      if (apmAvailableLimit !== null) {
+        const subTotalCalc = fields.items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
+        const discCalc = fields.items.reduce((s, i) => s + (parseFloat(i.discountAmount || '0') || 0), 0);
+        const taxCalc = fields.items.reduce((s, i) => {
+          if (i.taxes?.length) return s + i.taxes.reduce((ts, t) => ts + (parseFloat(t.taxAmount || '0') || 0), 0);
+          return s + (parseFloat(i.taxAmount || '0') || 0);
+        }, 0);
+        const invoiceTotal = Math.max(0, subTotalCalc - discCalc + taxCalc);
+
+        console.log('[EditMode] Limit check: invoiceTotal=', invoiceTotal, 'availableLimit=', apmAvailableLimit);
+
+        if (invoiceTotal > apmAvailableLimit) {
+          Alert.alert(
+            'Limit Exceeded',
+            'Transaction failed: Invoice amount exceeds the available program limit.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+    } else {
+      // Create mode: calculate from participant
+      const subTotalCalculated = fields.items.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0);
+      const discountTotalCalculated = fields.items.reduce((sum, item) => sum + (parseFloat(item.discountAmount || '0') || 0), 0);
+      const taxTotalCalculated = fields.items.reduce((sum, item) => {
+        if (item.taxes?.length) {
+          return sum + item.taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0);
+        }
+        return sum + (parseFloat(item.taxAmount || '0') || 0);
+      }, 0);
+      const invoiceTotal = Math.max(0, subTotalCalculated - discountTotalCalculated + taxTotalCalculated);
+
+      let participant = selectedParticipant;
+      if (!participant && dealerInfo?.participants?.length && fields.dealer) {
+        participant = dealerInfo.participants.find(p => {
+          const decryptedName = decryptValue(p.party?.entity_name || '') || p.party?.entity_name;
+          const rawName = p.party?.entity_name;
+          const codeMatched = p.company_code_given_by_party === fields.dealerCode;
+          return decryptedName === fields.dealer || rawName === fields.dealer || codeMatched;
+        }) || null;
+      }
+
+      if (participant) {
+        const sanctioned = parseFloat(String(participant.sanctioned_limit || (participant as any).sanctionedLimit || '0')) || 0;
+        const utilized = parseFloat(String(participant.utilized_amount || (participant as any).utilizedAmount || '0')) || 0;
+        const availableLimit = sanctioned - utilized;
+
+        if (invoiceTotal > availableLimit) {
+          Alert.alert(
+            'Limit Exceeded',
+            'Transaction failed: Invoice amount exceeds the available program limit.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+      }
+    }
+
+    // Final Total Integrity Check (0.01 precision)
+    // sum(items.total) - sum(items.discount) + sum(items.tax) must match final_total
+    const subTotalCalc = fields.items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
+    const discCalc = fields.items.reduce((s, i) => s + (parseFloat(i.discountAmount || '0') || 0), 0);
+    const taxCalc = fields.items.reduce((s, i) => {
+      if (i.taxes?.length) return s + i.taxes.reduce((ts, t) => ts + (parseFloat(t.taxAmount || '0') || 0), 0);
+      return s + (parseFloat(i.taxAmount || '0') || 0);
+    }, 0);
+    
+    const calculatedGrandTotal = Math.max(0, subTotalCalc - discCalc + taxCalc);
+    const reportedGrandTotal = parseFloat(fields.grandTotal || '0') || calculatedGrandTotal;
+    
+    if (Math.abs(calculatedGrandTotal - reportedGrandTotal) > 0.01) {
+      console.error('[CreateInvoice] Total Mismatch:', {calculatedGrandTotal, reportedGrandTotal});
+      Alert.alert(
+        'Calculation Error',
+        'Invoice total mismatch detected. Please refresh the item totals.',
+        [{ text: 'OK' }]
+      );
       return;
     }
 
+    // In Edit Mode: skip field-level validations (matches Web Portal behavior).
+    // The invoice already exists and was validated at creation. Only business rules apply.
+    if (mode !== 'edit') {
+      const validation = validateForm(true);
+      console.log('[CreateInvoice] handleSubmit called, validation:', validation);
+      if (!validation.isValid) {
+        Toast.show({
+          type: 'error',
+          text1: validation.firstError || 'Please fill all required fields',
+          visibilityTime: 3000,
+        });
+        return;
+      }
+    }
+
     const createdBy = userId != null ? String(userId) : '';
+
+    // In Edit Mode: dispatch update directly.
+    // The participant/bank IDs are already stored in the backend invoice record.
+    // We don't need selectedParticipant or partnerBankId from the current UI state.
+    if (mode === 'edit' && route?.params?.invoiceId) {
+      console.log('[CreateInvoice] Edit mode: dispatching updateInvoiceRequest directly');
+      dispatch(
+        updateInvoiceRequest({
+          invoiceId: route.params.invoiceId,
+          fields,
+          createdBy,
+          attachment: selectedAttachment ?? undefined,
+          approval_level: 1,
+        }),
+      );
+      return;
+    }
 
     const partnerBankId = programSelection?.bankId;
     if (dealerInfo && (!selectedParticipant || !partnerBankId)) {
@@ -886,6 +1115,57 @@ export const CreateInvoice: React.FC = () => {
     }
   };
 
+  const handleDeleteItem = async (index: number) => {
+    const item = fields.items[index];
+    if (mode === 'edit' && item?.id) {
+      try {
+        setOcrLoading(true);
+        await invoiceApi.deleteInvoiceItem(item.id);
+        Toast.show({
+          type: 'success',
+          text1: 'Item deleted',
+        });
+      } catch (e: any) {
+        Alert.alert('Error', e?.message || 'Failed to delete item');
+        return; // Don't update local state if API fails
+      } finally {
+        setOcrLoading(false);
+      }
+    }
+    const newItems = [...fields.items];
+    newItems.splice(index, 1);
+    applyPatch({items: newItems});
+  };
+
+  const handleDeleteItemTax = async (itemIndex: number, taxIndex: number) => {
+    const item = fields.items[itemIndex];
+    const tax = item?.taxes?.[taxIndex];
+    
+    // In edit mode, if tax has an ID, delete via API
+    if (mode === 'edit' && (tax as any)?.id) {
+      try {
+        setOcrLoading(true);
+        await invoiceApi.deleteInvoiceItemTax((tax as any).id);
+        Toast.show({
+          type: 'success',
+          text1: 'Tax deleted',
+        });
+      } catch (e: any) {
+        Alert.alert('Error', e?.message || 'Failed to delete tax');
+        return;
+      } finally {
+        setOcrLoading(false);
+      }
+    }
+
+    // Update local state
+    const newItems = [...fields.items];
+    const taxes = [...(newItems[itemIndex].taxes || [])];
+    taxes.splice(taxIndex, 1);
+    newItems[itemIndex] = {...newItems[itemIndex], taxes};
+    applyPatch({items: newItems});
+  };
+
   const handleCancel = () => {
     Alert.alert(
       'Cancel Invoice',
@@ -951,6 +1231,10 @@ export const CreateInvoice: React.FC = () => {
   const submitButtonAppearsDisabledInternal = (canUploadFinal && !hasAnyAttachment) || !isFormValid;
   
   const submitDisabledReasonInternal = useMemo(() => {
+    // In Edit mode, we skip field-level mandatory checks for the button state
+    // because the data is already pre-filled and often read-only.
+    if (mode === 'edit') return undefined;
+
     if (!fields.dealer?.trim()) return 'Dealer Name is required';
     if (!fields.dealerCode?.trim()) return 'Dealer Code is required';
     if (!fields.invoiceNumber?.trim()) return 'Invoice / Unique Ref. No is required';
@@ -971,7 +1255,7 @@ export const CreateInvoice: React.FC = () => {
       return 'Please upload the invoice file';
     }
     return undefined;
-  }, [fields, canUploadFinal, hasAnyAttachment]);
+  }, [fields, canUploadFinal, hasAnyAttachment, mode]);
 
   const dealerOptions = useMemo(
     () =>
@@ -1017,9 +1301,9 @@ export const CreateInvoice: React.FC = () => {
   return (
     <Container>
       <AppBar 
-        title={(isAnchorMaker || isDealerMaker || isCashnTechUser) ? "Transactions > Invoice List & Approval" : "Create Invoice"} 
+        title={mode === 'edit' ? "Edit Invoice" : mode === 'recreate' ? "Recreate Invoice" : "Create Invoice"} 
         navigation={navigation as any}
-        hideHamburger={isAnchorMaker || isDealerMaker || isCashnTechUser}
+        hideHamburger={true}
         renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
         onPressLeftIcon={() => (navigation as any).navigate('InvoiceDetails')}
       />
@@ -1037,50 +1321,51 @@ export const CreateInvoice: React.FC = () => {
         </View>
       </View>
       <View style={styles.container}>
-        {/* OCR Badge */}
-        {hasCreatePerm && (
-          <View style={styles.aiBadge}>
-            <AI
-              width={scaleWidth(18)}
-              height={scaleHeight(18)}
-              color={Colors.primaryColor}
-            />
-            <Text style={styles.aiBadgeText}>OCR Extraction (Capture / Upload)</Text>
-          </View>
-        )}
-
-        {/* OCR Section */}
-        {hasCreatePerm && (
-          <View style={styles.ocrSection}>
-            <Text style={styles.ocrTitle}>Scan invoice for OCR</Text>
-            <Text style={styles.ocrSubtitle}>
-              Capture or upload invoice image to auto-fill form fields.
-            </Text>
-
-            <View style={styles.ocrButtons}>
-              <TouchableOpacity
-                style={[styles.ocrButton, styles.cameraButton]}
-                onPress={openCamera}
-                disabled={disabled}>
-                <Camera width={scaleWidth(20)} height={scaleHeight(20)} />
-                <Text style={styles.ocrButtonText}>Capture</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.ocrButton, styles.galleryButton]}
-                onPress={() => setIsOcrUploadModalVisible(true)}
-                disabled={disabled}>
-                <Upload width={scaleWidth(20)} height={scaleHeight(20)} />
-                <Text style={styles.ocrButtonText}>Upload</Text>
-              </TouchableOpacity>
+        {/* OCR Section - Only shown in Create mode */}
+        {!mode && hasCreatePerm && (
+          <>
+            {/* OCR Badge */}
+            <View style={styles.aiBadge}>
+              <AI
+                width={scaleWidth(18)}
+                height={scaleHeight(18)}
+                color={Colors.primaryColor}
+              />
+              <Text style={styles.aiBadgeText}>OCR Extraction (Capture / Upload)</Text>
             </View>
 
-            {ocrLoading && (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={Colors.primaryColor} />
-                <Text style={styles.loadingText}>Extracting invoice data...</Text>
+            {/* OCR Buttons */}
+            <View style={styles.ocrSection}>
+              <Text style={styles.ocrTitle}>Scan invoice for OCR</Text>
+              <Text style={styles.ocrSubtitle}>
+                Capture or upload invoice image to auto-fill form fields.
+              </Text>
+
+              <View style={styles.ocrButtons}>
+                <TouchableOpacity
+                  style={[styles.ocrButton, styles.cameraButton]}
+                  onPress={openCamera}
+                  disabled={disabled}>
+                  <Camera width={scaleWidth(20)} height={scaleHeight(20)} />
+                  <Text style={styles.ocrButtonText}>Capture</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.ocrButton, styles.galleryButton]}
+                  onPress={() => setIsOcrUploadModalVisible(true)}
+                  disabled={disabled}>
+                  <Upload width={scaleWidth(20)} height={scaleHeight(20)} />
+                  <Text style={styles.ocrButtonText}>Upload</Text>
+                </TouchableOpacity>
               </View>
-            )}
-          </View>
+
+              {ocrLoading && (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={Colors.primaryColor} />
+                  <Text style={styles.loadingText}>Extracting invoice data...</Text>
+                </View>
+              )}
+            </View>
+          </>
         )}
 
         {/* Invoice Form */}
@@ -1105,6 +1390,8 @@ export const CreateInvoice: React.FC = () => {
             defaultPaymentTermsDays={dealerInfo?.basic_parameters?.default_payment_terms_days != null ? Number(dealerInfo.basic_parameters.default_payment_terms_days) : undefined}
             mode={mode}
             onDeleteAttachment={handleDeleteAttachment}
+            onDeleteItem={handleDeleteItem}
+            onDeleteItemTax={handleDeleteItemTax}
             canUploadFinal={canUploadFinal}
             onAddAttachment={() => setIsProofUploadModalVisible(true)}
             selectedAttachment={selectedAttachment}

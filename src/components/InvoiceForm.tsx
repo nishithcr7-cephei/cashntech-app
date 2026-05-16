@@ -82,6 +82,8 @@ type Props = {
   submitDisabledReason?: string;
   mode?: 'edit' | 'recreate';
   onDeleteAttachment?: (id: number) => void;
+  onDeleteItem?: (index: number) => void;
+  onDeleteItemTax?: (itemIndex: number, taxIndex: number) => void;
   canUploadFinal?: boolean;
   onAddAttachment?: () => void;
   selectedAttachment?: any; // To avoid import complexity now, using any for DocumentPickerResponse
@@ -108,6 +110,8 @@ export const InvoiceForm: React.FC<Props> = ({
   submitDisabledReason,
   mode,
   onDeleteAttachment,
+  onDeleteItem,
+  onDeleteItemTax,
   canUploadFinal = false,
   onAddAttachment,
   selectedAttachment,
@@ -270,6 +274,16 @@ export const InvoiceForm: React.FC<Props> = ({
     return moment(date).format('DD-MM-YYYY');
   };
 
+  /**
+   * Numeric precision utility (equivalent to Web's Ue() utility)
+   * Rounds a value to 2 decimal places and ensures it's a valid number.
+   */
+  const roundToTwo = (val: number | string): number => {
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    if (isNaN(num)) return 0;
+    return Math.round((num + Number.EPSILON) * 100) / 100;
+  };
+
   const updateItem = (index: number, field: keyof InvoiceLineItem, text: string) => {
     const newItems = [...(value.items || [])];
     if (!newItems[index]) {
@@ -294,30 +308,43 @@ export const InvoiceForm: React.FC<Props> = ({
     // Auto-calculate line total (qty * price)
     const qty = parseFloat(newItems[index].quantity) || 0;
     const price = parseFloat(newItems[index].pricePerQuantity) || 0;
-    const lineTotal = qty * price;
+    const lineTotal = roundToTwo(qty * price);
     newItems[index].total = lineTotal.toFixed(2);
     
     // Auto-calculate item-level discount
     const discountType = newItems[index].discountType || '';
-    const discountValue = parseFloat(newItems[index].discountValue || '0') || 0;
-    let discountAmount = 0;
+    let discountValue = parseFloat(newItems[index].discountValue || '0') || 0;
     
+    // Validation: Percentage must be <= 100
+    if (discountType === 'percentage' && discountValue > 100) {
+      discountValue = 100;
+      newItems[index].discountValue = '100';
+    }
+    // Validation: Absolute must be <= lineTotal
+    if (discountType === 'value' && discountValue > lineTotal) {
+      discountValue = lineTotal;
+      newItems[index].discountValue = lineTotal.toFixed(2);
+    }
+
+    let discountAmount = 0;
     if (discountType === 'percentage' && discountValue > 0) {
-      discountAmount = (lineTotal * discountValue) / 100;
+      discountAmount = roundToTwo((lineTotal * discountValue) / 100);
     } else if (discountType === 'value' && discountValue > 0) {
-      discountAmount = discountValue;
+      discountAmount = roundToTwo(discountValue);
     }
     newItems[index].discountAmount = discountAmount.toFixed(2);
     
-    // Auto-calculate item-level taxes on Sub Total (base price), NOT on the after-discount amount
+    // Auto-calculate item-level taxes on (Sub Total - Discount), matching Web Portal logic
+    const discountedPrice = Math.max(0, lineTotal - discountAmount);
+    
     const rawTaxes = newItems[index].taxes?.length ? newItems[index].taxes! : (newItems[index].taxType ? [{taxType: newItems[index].taxType!, taxPercentage: newItems[index].taxPercentage || '', taxAmount: newItems[index].taxAmount || ''}] : []);
     const taxes = rawTaxes.map(t => ({...t}));
     taxes.forEach((t, i) => {
       const pct = parseFloat(t.taxPercentage || '0') || 0;
-      taxes[i] = {...t, taxAmount: ((lineTotal * pct) / 100).toFixed(2)};
+      taxes[i] = {...t, taxAmount: roundToTwo((discountedPrice * pct) / 100).toFixed(2)};
     });
     newItems[index].taxes = taxes.length ? taxes : [{taxType: '', taxPercentage: '', taxAmount: ''}];
-    newItems[index].taxAmount = taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0).toFixed(2);
+    newItems[index].taxAmount = roundToTwo(taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0)).toFixed(2);
     
     onChange({items: newItems});
   };
@@ -329,14 +356,17 @@ export const InvoiceForm: React.FC<Props> = ({
     const taxes = [...(item.taxes?.length ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}])];
     if (!taxes[taxIndex]) taxes[taxIndex] = {taxType: '', taxPercentage: '', taxAmount: ''};
     taxes[taxIndex] = {...taxes[taxIndex], [field]: fieldValue};
-    // Tax is calculated on Sub Total (base price), not on the after-discount amount
+    // Tax is calculated on (Sub Total - Discount), matching Web Portal logic
     const itemSubTotal = parseFloat(item.total) || 0;
+    const itemDiscAmount = parseFloat(item.discountAmount || '0') || 0;
+    const discountedPrice = Math.max(0, itemSubTotal - itemDiscAmount);
+
     taxes.forEach((t, i) => {
       const pct = parseFloat(t.taxPercentage || '0') || 0;
-      taxes[i] = {...t, taxAmount: ((itemSubTotal * pct) / 100).toFixed(2)};
+      taxes[i] = {...t, taxAmount: roundToTwo((discountedPrice * pct) / 100).toFixed(2)};
     });
     newItems[itemIndex] = {...item, taxes};
-    newItems[itemIndex].taxAmount = taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0).toFixed(2);
+    newItems[itemIndex].taxAmount = roundToTwo(taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0)).toFixed(2);
     onChange({items: newItems});
   };
 
@@ -356,13 +386,20 @@ export const InvoiceForm: React.FC<Props> = ({
     const taxes = item?.taxes?.length ? item.taxes : (item?.taxType ? [{taxType: item.taxType, taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}] : []);
     if (!item || taxes.length <= 1) return;
     const taxesFiltered = taxes.filter((_, i) => i !== taxIndex);
-    // Tax is calculated on Sub Total (base price), not on the after-discount amount
+    if (onDeleteItemTax) {
+      onDeleteItemTax(itemIndex, taxIndex);
+      return;
+    }
+    // Tax is calculated on (Sub Total - Discount), matching Web Portal logic
     const itemSubTotalForRemove = parseFloat(item.total) || 0;
+    const itemDiscAmountForRemove = parseFloat(item.discountAmount || '0') || 0;
+    const discountedPrice = Math.max(0, itemSubTotalForRemove - itemDiscAmountForRemove);
+
     taxesFiltered.forEach((t, i) => {
       const pct = parseFloat(t.taxPercentage || '0') || 0;
-      taxesFiltered[i] = {...t, taxAmount: ((itemSubTotalForRemove * pct) / 100).toFixed(2)};
+      taxesFiltered[i] = {...t, taxAmount: roundToTwo((discountedPrice * pct) / 100).toFixed(2)};
     });
-    newItems[itemIndex] = {...item, taxes: taxesFiltered, taxAmount: taxesFiltered.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0).toFixed(2)};
+    newItems[itemIndex] = {...item, taxes: taxesFiltered, taxAmount: roundToTwo(taxesFiltered.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0)).toFixed(2)};
     onChange({items: newItems});
   };
 
@@ -386,6 +423,10 @@ export const InvoiceForm: React.FC<Props> = ({
   };
 
   const removeItem = (index: number) => {
+    if (onDeleteItem) {
+      onDeleteItem(index);
+      return;
+    }
     const newItems = [...(value.items || [])];
     newItems.splice(index, 1);
     onChange({items: newItems});
@@ -403,14 +444,15 @@ export const InvoiceForm: React.FC<Props> = ({
         <View style={styles.row}>
           <View style={styles.dealerNameWidth}>
             {mode === 'edit' ? (
-              <View style={styles.readOnlyFieldContainer}>
-                <Text style={styles.label}>{`${entityNameLabel} *`}</Text>
-                <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
-                  <Text style={styles.readOnlyText} numberOfLines={1}>
-                    {value.dealer || `Select ${entityLabel}`}
-                  </Text>
-                </View>
-              </View>
+              <CustomDropdown
+                label={`${entityNameLabel} *`}
+                data={[{label: value.dealer || '', value: value.dealer || ''}]}
+                value={value.dealer}
+                onChange={() => {}}
+                placeholder={`Select ${entityLabel}`}
+                containerStyle={styles.dropdownContainer}
+                editable={false}
+              />
             ) : (
               <CustomDropdown
                 label={`${entityNameLabel} *`}
@@ -425,16 +467,15 @@ export const InvoiceForm: React.FC<Props> = ({
           </View>
           <View style={styles.dealerCodeWidth}>
             {mode === 'edit' ? (
-              <View style={styles.readOnlyFieldContainer}>
-                <Text style={styles.label}>{`${entityCodeLabel} *`}</Text>
-                <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
-                  <Text
-                    style={value.dealerCode ? styles.readOnlyText : styles.readOnlyPlaceholder}
-                    numberOfLines={1}>
-                    {value.dealerCode || entityCodeLabel}
-                  </Text>
-                </View>
-              </View>
+              <CustomDropdown
+                label={`${entityCodeLabel} *`}
+                data={[{label: value.dealerCode || '', value: value.dealerCode || ''}]}
+                value={value.dealerCode}
+                onChange={() => {}}
+                placeholder={entityCodeLabel}
+                containerStyle={styles.dropdownContainer}
+                editable={false}
+              />
             ) : (
               <CustomDropdown
                 label={`${entityCodeLabel} *`}
@@ -452,13 +493,15 @@ export const InvoiceForm: React.FC<Props> = ({
         <View style={styles.field}>
           <Text style={styles.label}>OD Account No</Text>
           {mode === 'edit' ? (
-            <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
-              <Text
-                style={value.odAccountNumber ? styles.readOnlyText : styles.readOnlyPlaceholder}
-                numberOfLines={1}>
-                {value.odAccountNumber || 'OD Account No'}
-              </Text>
-            </View>
+            <CustomDropdown
+              label=""
+              data={[{label: value.odAccountNumber || '', value: value.odAccountNumber || ''}]}
+              value={value.odAccountNumber}
+              onChange={() => {}}
+              placeholder="OD Account No"
+              containerStyle={styles.dropdownContainer}
+              editable={false}
+            />
           ) : (
             <CustomDropdown
               label=""

@@ -24,6 +24,8 @@ type Props = {
   isAnchorMaker: boolean;
   isAnchorChecker: boolean;
   isDealerChecker: boolean;
+  isAnchorAllAccess?: boolean;
+  isDealerAllAccess?: boolean;
   isCashnTechUser?: boolean;
   filteredDataLength: number;
   searchText: string;
@@ -36,11 +38,14 @@ type Props = {
   onOpenSendForApprovalModal: () => void;
   onCreateInvoicePress?: () => void;
   isCreateInvoiceEnabled?: boolean;
+  createInvoiceDisabledReason?: string | null;
   user?: any;
   actionRequiredCount?: number;
   pendingCount?: number;
   draftCount?: number;
   onBulkAction?: (action: 'Verify' | 'Reject' | 'On Hold') => void;
+  canEdit?: boolean;
+  canImport?: boolean;
 };
 
 export const InvoiceDetailsControls: React.FC<Props> = ({
@@ -50,6 +55,8 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   isAnchorMaker,
   isAnchorChecker,
   isDealerChecker,
+  isAnchorAllAccess = false,
+  isDealerAllAccess = false,
   isCashnTechUser = false,
   filteredDataLength,
   searchText,
@@ -62,14 +69,17 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   onOpenSendForApprovalModal,
   onCreateInvoicePress,
   isCreateInvoiceEnabled = true,
+  createInvoiceDisabledReason,
   user,
   actionRequiredCount = 0,
   pendingCount = 0,
   draftCount = 0,
   onBulkAction,
+  canEdit = false,
+  canImport = false,
 }) => {
   const permissionsLoading = useSelector(selectPermissionsLoading);
-  const canCreateInvoice = useHasPermission(PERMISSIONS.INVOICE_LIST_CREATE);
+  const canCreateInvoice = useHasPermission(PERMISSIONS.CREATE_INVOICE);
   const canUploadInvoice = useHasPermission(PERMISSIONS.INVOICE_LIST_IMPORT);
   const canApprove = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVE);
   const canReject = useHasPermission(PERMISSIONS.INVOICE_LIST_REJECT);
@@ -84,8 +94,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
     if (!isCreateInvoiceEnabled) {
       Toast.show({
         type: 'info',
-        text1: 'Select a program to create an invoice',
-        text2: 'Use the filter above to choose a specific program.',
+        text1: createInvoiceDisabledReason || 'Select a program to create an invoice',
       });
       return;
     }
@@ -103,12 +112,14 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
           <Text style={[styles.summaryCount, styles.pendingText]}>{pendingCount}</Text>
           <Text style={styles.summaryLabel}>PENDING FOR APPROVAL</Text>
         </View>
-        <View style={[styles.summaryCard, styles.draftCard]}>
-          <View style={styles.draftDotSmall} />
-          <Text style={[styles.summaryCount, styles.draftText]}>{draftCount}</Text>
-          <Text style={styles.summaryLabel}>DRAFT</Text>
-        </View>
-        {(isAnchorMaker || isAnchorChecker) && (
+        {draftCount > 0 && (isAnchorMaker || isDealerMaker || isAnchorAllAccess || isDealerAllAccess) && canImport && (
+          <View style={[styles.summaryCard, styles.draftCard]}>
+            <View style={styles.draftDotSmall} />
+            <Text style={[styles.summaryCount, styles.draftText]}>{draftCount}</Text>
+            <Text style={styles.summaryLabel}>DRAFT</Text>
+          </View>
+        )}
+        {actionRequiredCount > 0 && (isAnchorMaker || isDealerMaker || isAnchorAllAccess || isDealerAllAccess) && canEdit && (
           <View style={[styles.summaryCard, styles.actionRequiredCard]}>
             <View style={styles.actionDotSmall} />
             <Text style={[styles.summaryCount, styles.actionRequiredText]}>{actionRequiredCount}</Text>
@@ -124,7 +135,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
 
       <View style={styles.selectAllCreateRow}>
         <View style={styles.dmSelectAllWrapper}>
-          {(isDealerChecker || isAnchorChecker || isCashnTechUser) && hasFunctionalPermission && (
+          {(isDealerChecker || isAnchorChecker || isCashnTechUser || isAnchorAllAccess || isDealerAllAccess) && hasFunctionalPermission && (
             <TouchableOpacity
               activeOpacity={0.8}
               style={[
@@ -143,7 +154,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
                 )}
               </View>
               <Text style={styles.dmSelectAllText}>Select all</Text>
-              {(isCashnTechUser || isAnchorChecker || isDealerChecker) && (
+              {(isCashnTechUser || isAnchorChecker || isDealerChecker || isAnchorAllAccess || isDealerAllAccess) && (
                 <View style={styles.bulkBadge}>
                   <Text style={styles.bulkBadgeText}>Bulk Actions</Text>
                 </View>
@@ -153,7 +164,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
         </View>
 
         <View style={styles.primaryActionsRow}>
-          {(isAnchorMaker || isCashnTechUser) && showCreateButton && (
+          {(isAnchorMaker || isCashnTechUser || isAnchorAllAccess) && showCreateButton && (
             <TouchableOpacity
               style={[
                 styles.primaryButton,
@@ -168,7 +179,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
               <Text style={styles.primaryButtonText}>Create Invoice</Text>
             </TouchableOpacity>
           )}
-          {isDealerMaker && !isCashnTechUser && (
+          {(isDealerMaker || isDealerAllAccess) && !isCashnTechUser && (
             <>
               {showCreateButton && (
                 <TouchableOpacity
@@ -230,17 +241,8 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
         </View>
       </View>
 
-      {(isAnchorMaker || isDealerMaker) &&
-        !isCashnTechUser &&
-        !isCreateInvoiceEnabled && (
-          <View style={styles.disabledHintContainer}>
-            <Text style={styles.disabledHintText}>
-              Select a program to create an invoice
-            </Text>
-          </View>
-        )}
 
-      {(isDealerChecker || isAnchorChecker || isCashnTechUser) && 
+      {(isDealerChecker || isAnchorChecker || isCashnTechUser || isAnchorAllAccess || isDealerAllAccess) && 
         hasFunctionalPermission && 
         selectedInvoiceIdsLength > 0 && (
         <TouchableOpacity
