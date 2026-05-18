@@ -12,6 +12,8 @@ import {soaSaga} from '@store/soa/soa.saga';
 import {dealerSaga} from '@store/soa/dealer/dealer.saga';
 import {creditAccountDetailsSaga} from '@store/soa/creditAccountDetails/saga';
 
+import {reportSaga} from '@store/report';
+
 export default function* rootSaga() {
   yield all([
     authSaga(),
@@ -26,6 +28,7 @@ export default function* rootSaga() {
     repaymentSaga(),
     dpdSaga(),
     interestAccrualSaga(),
+    reportSaga(),
     soaSaga(),
     dealerSaga(),
     creditAccountDetailsSaga(),

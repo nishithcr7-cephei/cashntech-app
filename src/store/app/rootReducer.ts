@@ -9,6 +9,7 @@ import {permissionsReducer} from '@store/permissions';
 import {repaymentReducer} from '@store/repayment';
 import {dpdReducer} from '@store/dpd';
 import {interestAccrualReducer} from '@store/interestAccrual';
+import {reportReducer} from '@store/report';
 import soaReducer from '@store/soa/soa.slice';
 import soaDealerReducer from '@store/soa/dealer/dealer.slice';
 import {creditAccountDetailsReducer} from '@store/soa/creditAccountDetails/slice';
@@ -23,6 +24,7 @@ const rootReducer = combineReducers({
   repayment: repaymentReducer,
   dpd: dpdReducer,
   interestAccrual: interestAccrualReducer,
+  report: reportReducer,
   soa: soaReducer,
   soaDealer: soaDealerReducer,
   creditAccountDetails: creditAccountDetailsReducer,

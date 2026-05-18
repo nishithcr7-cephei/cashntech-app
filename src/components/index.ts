@@ -22,6 +22,7 @@ export * from './ApproveRejectModal/ApproveRejectModal';
 export * from './BulkReviewModal/BulkReviewModal';
 export * from './AddFundModal/AddFundModal';
 export * from './FilterModal/FilterModal';
+export * from './ReportFilterModal/ReportFilterModal';
 export * from './InvoiceAttachmentsModal/InvoiceAttachmentsModal';
 
 // Filter components

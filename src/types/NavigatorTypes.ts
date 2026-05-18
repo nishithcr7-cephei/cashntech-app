@@ -127,4 +127,14 @@ export type HomeNavigatorType = {
   OcrInvoice: undefined;
   Profile: undefined;
   SelectProgramScreen: {fromScreen?: string} | undefined;
+  AllLoanReportScreen: undefined;
+  DisbursementReportScreen: undefined;
+  DpdReportScreen: undefined;
+  DailyAccrualReportScreen: undefined;
+  MonthlyInterestReportScreen: undefined;
+  RepaymentReportScreen: undefined;
+  InvoiceOutstandingReportScreen: undefined;
+  LoanStatusReportScreen: undefined;
+  AllProductOutstandingReportScreen: undefined;
+  UtilizationReportScreen: undefined;
 };

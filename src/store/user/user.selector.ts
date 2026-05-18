@@ -23,6 +23,13 @@ const getIsClient = createSelector(
   (user) => user.is_client
 );
 
+/** True when API `user_type` is Cashntech (case-insensitive). */
+export const getIsCashntechUserType = createSelector(_selectState, user =>
+  String(user.user_type || '')
+    .toLowerCase()
+    .trim() === 'cashntech',
+);
+
 export const getPrimaryPermissionGroupId = createSelector(
   _selectState,
   (user) => {
@@ -37,5 +44,6 @@ export default {
   getFullName,
   getUserRole,
   getIsClient,
+  getIsCashntechUserType,
   getPrimaryPermissionGroupId,
 };

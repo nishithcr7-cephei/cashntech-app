@@ -5,7 +5,7 @@ import {scaleWidth} from '@utils/Scale';
 import React, {useEffect} from 'react';
 import {Dimensions} from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
-import {userSelector} from '@store/user';
+import {getIsCashntechUserType, userSelector} from '@store/user';
 import {fetchUserScopeRequest} from '@store/programSelection/programSelection.slice';
 import {fetchPermissionsRequest} from '@store/permissions';
 import {AppRole} from '@constants/roles';
@@ -40,6 +40,16 @@ import {
   SOADealerList,
   ProfileScreen,
   SelectProgramScreen,
+  AllLoanReportScreen,
+  DisbursementReportScreen,
+  DpdReportScreen,
+  DailyAccrualReportScreen,
+  MonthlyInterestReportScreen,
+  RepaymentReportScreen,
+  InvoiceOutstandingReportScreen,
+  LoanStatusReportScreen,
+  AllProductOutstandingReportScreen,
+  UtilizationReportScreen,
 } from '@screens/index';
 
 const Drawer = createDrawerNavigator<HomeNavigatorType>();
@@ -47,6 +57,7 @@ const Drawer = createDrawerNavigator<HomeNavigatorType>();
 export const HomeNavigator = () => {
   const dispatch = useDispatch();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const canViewReports = useSelector(getIsCashntechUserType);
   const initialRoute = 'InvoiceDashboard';
 
   // Pre-load user scope and permissions when entering home
@@ -101,6 +112,44 @@ export const HomeNavigator = () => {
       <Drawer.Screen name="OcrInvoice" component={OcrInvoiceScreen} />
       <Drawer.Screen name="Profile" component={ProfileScreen} />
       <Drawer.Screen name="SelectProgramScreen" component={SelectProgramScreen} />
+      {canViewReports ? (
+        <>
+          <Drawer.Screen name="AllLoanReportScreen" component={AllLoanReportScreen} />
+          <Drawer.Screen
+            name="DisbursementReportScreen"
+            component={DisbursementReportScreen}
+          />
+          <Drawer.Screen name="DpdReportScreen" component={DpdReportScreen} />
+          <Drawer.Screen
+            name="DailyAccrualReportScreen"
+            component={DailyAccrualReportScreen}
+          />
+          <Drawer.Screen
+            name="MonthlyInterestReportScreen"
+            component={MonthlyInterestReportScreen}
+          />
+          <Drawer.Screen
+            name="RepaymentReportScreen"
+            component={RepaymentReportScreen}
+          />
+          <Drawer.Screen
+            name="InvoiceOutstandingReportScreen"
+            component={InvoiceOutstandingReportScreen}
+          />
+          <Drawer.Screen
+            name="LoanStatusReportScreen"
+            component={LoanStatusReportScreen}
+          />
+          <Drawer.Screen
+            name="AllProductOutstandingReportScreen"
+            component={AllProductOutstandingReportScreen}
+          />
+          <Drawer.Screen
+            name="UtilizationReportScreen"
+            component={UtilizationReportScreen}
+          />
+        </>
+      ) : null}
     </Drawer.Navigator>
   );
 };

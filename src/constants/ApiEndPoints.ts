@@ -183,6 +183,16 @@ const Endpoints = {
   apiProgramDealersDetails: (id: string) => `transactions/dealers/${id}`,
   apiBulkDisbursement: '/invoice/bulk-disbursement',
   apiBulkEmail: '/invoice/bulk-email',
+  apiAllLoansReport: '/report/all-loans-report',
+  apiDisbursementReport: '/report/disbursement',
+  apiDpdOverdueReport: '/report/overdue-report',
+  apiDailyAccrualReport: '/report/daily-accrual',
+  apiMonthlyAccrualReport: '/report/monthly-accrual',
+  apiRepaymentReport: '/report/repayment',
+  apiInvoiceOutstandingReport: '/report/invoice-outstanding',
+  apiLoanStatusReport: '/report/loan-status',
+  apiAllProductOutstandingReport: '/report/all-product-outstanding',
+  apiUtilizationReport: '/report/utilization-report',
 } as const;
 
 export default Endpoints;

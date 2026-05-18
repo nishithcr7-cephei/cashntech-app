@@ -1,0 +1,533 @@
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  ListRenderItem,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import {CompositeNavigationProp} from '@react-navigation/native';
+import {DrawerNavigationProp} from '@react-navigation/drawer';
+import {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {useSelector} from 'react-redux';
+import Toast from 'react-native-toast-message';
+import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
+import {AppBar, Container, ReportFilterModal} from '@components/index';
+import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {Colors, Fonts} from '@constants/index';
+import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+import {HomeNavigatorType} from '@type/NavigatorTypes';
+import {Search, Filter} from '@assets/Icons';
+import {matchesReportSearch} from '@utils/reportSearch';
+import {fetchRepaymentReportRequest} from '@store/report';
+import {
+  selectIsRepaymentLoading,
+  selectRepaymentError,
+  selectRepaymentReportData,
+} from '@store/report/report.selector';
+import type {RepaymentReportItem} from '@store/report/report.types';
+
+type FieldDef = {
+  label: string;
+  value: string;
+  valueStyle?: object;
+};
+
+const INITIAL_PAGE_SIZE = 20;
+const LOAD_MORE_SIZE = 20;
+const INITIAL_VISIBLE_FIELD_COUNT = 6;
+
+const formatAmount = (val: number | undefined | null): string => {
+  if (val == null || Number.isNaN(Number(val))) {
+    return '-';
+  }
+  return `₹ ${Number(val).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
+
+const formatText = (val: string | number | undefined | null): string => {
+  if (val == null || val === '') {
+    return '-';
+  }
+  return String(val);
+};
+
+const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
+  <View style={styles.infoGrid}>
+    {fields.map(field => (
+      <View key={field.label} style={styles.infoColumn}>
+        <Text style={styles.infoLabel}>{field.label}</Text>
+        <Text style={[styles.infoValue, field.valueStyle]} numberOfLines={3}>
+          {field.value}
+        </Text>
+      </View>
+    ))}
+  </View>
+);
+
+const buildAllListFields = (item: RepaymentReportItem): FieldDef[] => [
+  {label: 'LMS ID', value: formatText(item.lms_id)},
+  {label: 'Loan Ref No', value: formatText(item.loan_ref_no)},
+  {label: 'Invoice No', value: formatText(item.invoice_no)},
+  {label: 'Bank Name', value: formatText(item.bank_name)},
+  {label: 'Product Name', value: formatText(item.product_name)},
+  {label: 'Program Name', value: formatText(item.program_name)},
+  {label: 'Anchor Name', value: formatText(item.anchor_name)},
+  {label: 'Dealer Name', value: formatText(item.dealer_name)},
+  {label: 'Payment Date', value: formatText(item.payment_date)},
+  {label: 'Invoice Amount', value: formatAmount(item.invoice_amount)},
+  {label: 'Disbursed Amount', value: formatAmount(item.disbursed_amount)},
+  {label: 'Due Amount', value: formatAmount(item.due_amount)},
+  {label: 'Paid Amount', value: formatAmount(item.paid_amount)},
+  {label: 'Principal Settled', value: formatAmount(item.principal_settled)},
+  {label: 'Interest Settled', value: formatAmount(item.interest_settled)},
+  {
+    label: 'Penal Interest Settled',
+    value: formatAmount(item.penal_interest_settled),
+  },
+  {
+    label: 'Settlement Priority',
+    value: formatText(item.settlement_priority),
+  },
+  {
+    label: 'Total Outstanding',
+    value: formatAmount(item.total_outstanding_amount),
+  },
+  {label: 'Processed By', value: formatText(item.processed_by_user)},
+  {label: 'Processed On', value: formatText(item.processed_on_date)},
+  {label: 'Created On', value: formatText(item.created_on)},
+  {
+    label: 'Status',
+    value: formatText(item.status),
+    valueStyle:
+      item.status === 'Closed'
+        ? {color: Colors.green, fontFamily: Fonts.GilroySemiBold}
+        : undefined,
+  },
+  {label: 'UTR No', value: formatText(item.utr_no)},
+  {label: 'Excess Amount', value: formatAmount(item.excess_amount)},
+  {
+    label: 'Outstanding Interest',
+    value: formatAmount(item.outstanding_interest),
+  },
+  {label: 'Transaction Date', value: formatText(item.transaction_date)},
+];
+
+const buildInitialFields = (item: RepaymentReportItem): FieldDef[] =>
+  buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT);
+
+const buildExpandedFields = (item: RepaymentReportItem): FieldDef[] =>
+  buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT);
+
+function repaymentRowKey(item: RepaymentReportItem, index: number): string {
+  return `${item.id}-${item.invoice_no}-${String(index)}`;
+}
+
+export const RepaymentReportScreen: React.FC = () => {
+  const navigation = useNavigation<
+    CompositeNavigationProp<
+      DrawerNavigationProp<HomeNavigatorType>,
+      NativeStackNavigationProp<Record<string, object | undefined>>
+    >
+  >();
+  const rows = useSelector(selectRepaymentReportData);
+  const loading = useSelector(selectIsRepaymentLoading);
+  const error = useSelector(selectRepaymentError);
+
+  const {
+    appliedFilters,
+    showFilterModal,
+    setShowFilterModal,
+    handleApplyFilters,
+    handleClearAllFilters,
+    refetch,
+  } = useReportApiFilter(fetchRepaymentReportRequest);
+
+  const [searchText, setSearchText] = useState('');
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+
+  const filteredData = useMemo(() => {
+    let data = rows;
+
+    if (searchText.trim()) {
+      data = data.filter(item =>
+        matchesReportSearch(
+          searchText,
+          item.loan_ref_no,
+          item.invoice_no,
+          item.lms_id,
+          item.dealer_name,
+          item.anchor_name,
+          item.program_name,
+          item.utr_no,
+        ),
+      );
+    }
+
+    return data;
+  }, [rows, searchText]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_PAGE_SIZE);
+  }, [searchText, rows]);
+
+  const paginatedData = useMemo(
+    () => filteredData.slice(0, visibleCount),
+    [filteredData, visibleCount],
+  );
+
+  const hasMore = visibleCount < filteredData.length;
+
+  const loadMore = useCallback(() => {
+    setVisibleCount(prev =>
+      Math.min(prev + LOAD_MORE_SIZE, filteredData.length),
+    );
+  }, [filteredData.length]);
+
+  const toggleExpanded = (rowKey: string) => {
+    setExpandedIds(prev => ({...prev, [rowKey]: !prev[rowKey]}));
+  };
+
+  const handleExport = () => {
+    Toast.show({
+      type: 'info',
+      text1: 'Export',
+      text2: 'Excel export will be available in a future update.',
+      visibilityTime: 2500,
+    });
+  };
+
+  const renderItem: ListRenderItem<RepaymentReportItem> = useCallback(
+    ({item, index}) => {
+      const rowKey = repaymentRowKey(item, index);
+      const isExpanded = !!expandedIds[rowKey];
+      const serialNo =
+        item.sr_no != null && item.sr_no > 0 ? item.sr_no : index + 1;
+
+      return (
+        <View style={styles.cardWrapper}>
+          <View style={styles.listCard}>
+            <View style={styles.indexBadge}>
+              <Text style={styles.indexText}>{serialNo}</Text>
+            </View>
+            <InfoFieldGrid fields={buildInitialFields(item)} />
+            {isExpanded ? (
+              <View style={styles.expandedSection}>
+                <InfoFieldGrid fields={buildExpandedFields(item)} />
+              </View>
+            ) : null}
+            <TouchableOpacity
+              style={styles.expandButton}
+              onPress={() => toggleExpanded(rowKey)}
+              activeOpacity={0.7}>
+              <Text style={styles.expandButtonText}>
+                {isExpanded ? 'View Less' : 'View More'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    },
+    [expandedIds],
+  );
+
+  const listHeader = (
+    <>
+      <View style={styles.pageTitleBar}>
+        <Text style={styles.pageTitleText}>Repayment Report</Text>
+      </View>
+
+      <View style={styles.listToolbar}>
+        <View style={styles.searchContainer}>
+          <Search width={scaleWidth(18)} height={scaleHeight(18)} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by loan ref no."
+            placeholderTextColor={Colors.graybase}
+            value={searchText}
+            onChangeText={setSearchText}
+          />
+        </View>
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setShowFilterModal(true)}>
+          <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
+          <Text style={styles.filterButtonText}>Filters</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+          <FontAwesome6
+            name="file-excel"
+            iconStyle="solid"
+            color={Colors.white}
+            size={scaleFont(16)}
+          />
+          <Text style={styles.exportButtonText}>Export</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.recordsHeader}>
+        <Text style={styles.recordsLabel}>Report</Text>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{filteredData.length}</Text>
+        </View>
+      </View>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+    </>
+  );
+
+  return (
+    <Container>
+      <AppBar
+        title="Reporting > Repayment Report"
+        navigation={navigation as never}
+      />
+      <FlatList
+        data={paginatedData}
+        keyExtractor={(item, index) => repaymentRowKey(item, index)}
+        renderItem={renderItem}
+        ListHeaderComponent={listHeader}
+        contentContainerStyle={styles.content}
+        ItemSeparatorComponent={() => <View style={{height: scaleHeight(12)}} />}
+        initialNumToRender={INITIAL_PAGE_SIZE}
+        maxToRenderPerBatch={LOAD_MORE_SIZE}
+        windowSize={5}
+        onEndReached={!loading && hasMore ? loadMore : undefined}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={
+          !loading && hasMore ? (
+            <View style={styles.loadMoreFooter}>
+              <ActivityIndicator size="small" color={Colors.primaryColor} />
+              <Text style={styles.loadMoreText}>Loading more...</Text>
+            </View>
+          ) : null
+        }
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator
+              size="large"
+              color={Colors.primaryColor}
+              style={styles.loader}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>
+                {error ? 'No data to display.' : 'No repayment records found.'}
+              </Text>
+            </View>
+          )
+        }
+        refreshing={loading}
+        onRefresh={refetch}
+      />
+
+      <ReportFilterModal
+        visible={showFilterModal}
+        onClose={() => setShowFilterModal(false)}
+        onApply={handleApplyFilters}
+        onClearAll={handleClearAllFilters}
+        appliedFilters={appliedFilters}
+      />
+    </Container>
+  );
+};
+
+const styles = StyleSheet.create({
+  content: {
+    paddingHorizontal: scaleWidth(16),
+    paddingBottom: scaleHeight(24),
+  },
+  pageTitleBar: {
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
+    backgroundColor: Colors.white,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E6E6E6',
+    marginBottom: scaleHeight(8),
+    marginHorizontal: -scaleWidth(16),
+  },
+  pageTitleText: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  listToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(8),
+    marginBottom: scaleHeight(12),
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: scaleWidth(12),
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(12),
+    gap: scaleWidth(6),
+    minWidth: 0,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: scaleFont(13),
+    color: Colors.darkblack,
+    padding: 0,
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryColor,
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(12),
+    borderRadius: scaleWidth(12),
+    gap: scaleWidth(4),
+  },
+  filterButtonText: {
+    color: Colors.white,
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  exportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#217346',
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(12),
+    borderRadius: scaleWidth(12),
+    gap: scaleWidth(4),
+  },
+  exportButtonText: {
+    color: Colors.white,
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  recordsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(8),
+    marginBottom: scaleHeight(12),
+  },
+  recordsLabel: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  badge: {
+    backgroundColor: Colors.primaryColor,
+    borderRadius: scaleWidth(12),
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(4),
+    minWidth: scaleWidth(40),
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: Colors.white,
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  errorText: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.primaryColor,
+    marginBottom: scaleHeight(8),
+  },
+  cardWrapper: {
+    position: 'relative',
+  },
+  listCard: {
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(12),
+    padding: scaleWidth(16),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E6E6E6',
+    shadowColor: '#00000035',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  indexBadge: {
+    backgroundColor: '#F7F8FB',
+    width: scaleWidth(28),
+    height: scaleWidth(28),
+    borderRadius: scaleWidth(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: scaleHeight(12),
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+  },
+  indexText: {
+    color: Colors.graybase,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyBold,
+  },
+  loadMoreFooter: {
+    paddingVertical: scaleHeight(16),
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: scaleWidth(8),
+  },
+  loadMoreText: {
+    fontSize: scaleFont(13),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: scaleWidth(12),
+  },
+  infoColumn: {
+    width: '47%',
+    backgroundColor: '#F7F8FB',
+    borderRadius: scaleWidth(10),
+    padding: scaleWidth(12),
+  },
+  infoLabel: {
+    fontSize: scaleFont(12),
+    color: Colors.graybase,
+    marginBottom: scaleHeight(4),
+  },
+  infoValue: {
+    fontSize: scaleFont(14),
+    color: Colors.darkblack,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  expandedSection: {
+    marginTop: scaleHeight(12),
+  },
+  expandButton: {
+    marginTop: scaleHeight(12),
+    alignItems: 'center',
+    paddingVertical: scaleHeight(4),
+  },
+  expandButtonText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+  },
+  loader: {
+    marginTop: scaleHeight(24),
+  },
+  emptyState: {
+    paddingVertical: scaleHeight(32),
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
+});

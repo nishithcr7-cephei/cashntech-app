@@ -24,16 +24,32 @@ import {useNavigationState} from '@react-navigation/native';
 import {Colors, Fonts, ROLE_HEADER_COLORS} from '@constants/index';
 import {useDispatch, useSelector} from 'react-redux';
 import {Alert} from 'react-native';
-import {userSelector} from '@store/user';
+import {getIsCashntechUserType, userSelector} from '@store/user';
 import {logoutUser} from '@services/api/api';
 import Toast from 'react-native-toast-message';
 import {AppRole, ROLE_LABELS} from '@constants/roles';
 import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
 import {selectPermissionsLoading} from '@store/permissions';
+import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
+
+const REPORT_MENU_ITEMS = [
+  {key: 'all-loans', title: 'All Loans Report'},
+  {key: 'disbursement', title: 'Disbursment Report'},
+  {key: 'dpd', title: 'DPD Report'},
+  {key: 'daily-accrual', title: 'Daily Accrual Report'},
+  {key: 'monthly-interest', title: 'Monthly Interest Report'},
+  {key: 'repayment', title: 'Repayment Report'},
+  {key: 'invoice-outstanding', title: 'Invoice Outstanding Report'},
+  {key: 'loan-status', title: 'Loan Status Report'},
+  {key: 'all-product-outstanding', title: 'All Product Outstanding Report'},
+  {key: 'utilization', title: 'Utilization Report'},
+] as const;
 
 export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const [isProductsOpen, setIsProductsOpen] = React.useState(false);
+  const [isReportingOpen, setIsReportingOpen] = React.useState(false);
+  const [activeReportKey, setActiveReportKey] = React.useState<string | null>(null);
   const [isDealerFinanceOpen, setIsDealerFinanceOpen] = React.useState(false);
   const [isTransactionsOpen, setIsTransactionsOpen] = React.useState(false);
   const [isFundPlannerOpen, setIsFundPlannerOpen] = React.useState(false);
@@ -42,6 +58,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const userInfo = useSelector(userSelector.getUserInfo);
   const fullName = useSelector(userSelector.getFullName);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const canViewReports = useSelector(getIsCashntechUserType);
   
   // Get role-based header colors (default to anchor_maker if no role)
   const headerColors = userRole
@@ -165,6 +182,68 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
     }
 
   }, [currentRoute, isDealerMaker]);
+
+  const handleReportPress = (reportKey: string) => {
+    setActiveReportKey(reportKey);
+    navigation.closeDrawer();
+
+    if (reportKey === 'all-loans') {
+      navigation.navigate('AllLoanReportScreen');
+      return;
+    }
+
+    if (reportKey === 'disbursement') {
+      navigation.navigate('DisbursementReportScreen');
+      return;
+    }
+
+    if (reportKey === 'dpd') {
+      navigation.navigate('DpdReportScreen');
+      return;
+    }
+
+    if (reportKey === 'daily-accrual') {
+      navigation.navigate('DailyAccrualReportScreen');
+      return;
+    }
+
+    if (reportKey === 'monthly-interest') {
+      navigation.navigate('MonthlyInterestReportScreen');
+      return;
+    }
+
+    if (reportKey === 'repayment') {
+      navigation.navigate('RepaymentReportScreen');
+      return;
+    }
+
+    if (reportKey === 'invoice-outstanding') {
+      navigation.navigate('InvoiceOutstandingReportScreen');
+      return;
+    }
+
+    if (reportKey === 'loan-status') {
+      navigation.navigate('LoanStatusReportScreen');
+      return;
+    }
+
+    if (reportKey === 'all-product-outstanding') {
+      navigation.navigate('AllProductOutstandingReportScreen');
+      return;
+    }
+
+    if (reportKey === 'utilization') {
+      navigation.navigate('UtilizationReportScreen');
+      return;
+    }
+
+    Toast.show({
+      type: 'info',
+      text1: 'Reporting',
+      text2: 'This report will be available in a future update.',
+      visibilityTime: 2500,
+    });
+  };
 
   const handleLogout = () => {
     // Add a small delay to ensure the Drawer Activity is still properly attached
@@ -650,6 +729,61 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                 </View>
               )}
             </View>
+
+            {/* Reporting & Analysis — Cashntech user_type only */}
+            {canViewReports ? (
+              <View style={styles.reportingSection}>
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    isReportingOpen && styles.parentMenuButton,
+                  ]}
+                  onPress={() => setIsReportingOpen(prev => !prev)}>
+                  <View style={styles.rowCenter}>
+                    <FontAwesome6
+                      name="chart-column"
+                      iconStyle="solid"
+                      size={scaleHeight(22)}
+                      color={isReportingOpen ? Colors.primaryColor : '#84919A'}
+                    />
+                    <Text
+                      style={[
+                        isReportingOpen
+                          ? styles.parentMenuText
+                          : styles.buttonText,
+                      ]}>
+                      Reporting & Analysis
+                    </Text>
+                  </View>
+                  <View style={styles.arrowContainer}>
+                    <UpChevron rotation={isReportingOpen ? 0 : 180} />
+                  </View>
+                </TouchableOpacity>
+
+                {isReportingOpen && (
+                  <View style={styles.reportingSubMenu}>
+                    {REPORT_MENU_ITEMS.map(item => {
+                      const isActive = activeReportKey === item.key;
+                      return (
+                        <TouchableOpacity
+                          key={item.key}
+                          style={[styles.button, isActive && styles.activeButton]}
+                          onPress={() => handleReportPress(item.key)}>
+                          <Text
+                            style={[
+                              styles.buttonText,
+                              styles.reportingSubMenuText,
+                              isActive && styles.activeButtonText,
+                            ]}>
+                            {item.title}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            ) : null}
           </ScrollView>
         </View>
         {/* Bottom actions: Profile & Logout */}
@@ -819,6 +953,16 @@ const styles = StyleSheet.create({
   parentMenuText: {
     color: '#E30613',
     fontFamily: Fonts.GilroySemiBold,
+  },
+  reportingSection: {
+    marginTop: scaleHeight(8),
+  },
+  reportingSubMenu: {
+    marginLeft: scaleWidth(16),
+  },
+  reportingSubMenuText: {
+    marginStart: 0,
+    fontSize: scaleFont(15),
   },
   logOut: {
     marginHorizontal: scaleWidth(16),
