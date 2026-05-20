@@ -53,6 +53,7 @@ export async function intelligentParseInvoice(
     // Invoice Details
     'invoiceNumber',
     'associatedPO',
+    'tenor',
     'invoiceDate',
     'invoiceDueDate',
     // Additional Invoice Information
@@ -130,6 +131,7 @@ export function intelligentParseInvoiceSync(
     // Invoice Details
     'invoiceNumber',
     'associatedPO',
+    'tenor',
     'invoiceDate',
     'invoiceDueDate',
     // Additional Invoice Information
@@ -195,7 +197,7 @@ function mergeMLWithRuleBased(
   // Fill in missing fields from rule-based parsers
   const allFields: (keyof InvoiceFields)[] = [
     'dealer', 'dealerCode', 'odAccountNumber',
-    'invoiceNumber', 'associatedPO', 'invoiceDate', 'invoiceDueDate',
+    'invoiceNumber', 'associatedPO', 'tenor', 'invoiceDate', 'invoiceDueDate',
     'earlyPaymentDiscount', 'currency', 'remark',
     'vendorName', 'memberName', 'memberId', 'phone', 'email',
     'program', 'startDate', 'expiryDate',

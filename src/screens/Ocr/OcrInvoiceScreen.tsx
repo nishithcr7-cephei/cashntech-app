@@ -16,11 +16,15 @@ const emptyFields: InvoiceFields = {
   // Invoice Details
   invoiceNumber: '',
   associatedPO: '',
+  tenor: '',
   invoiceDate: '',
   invoiceDueDate: '',
+  paymentDate: '',
+  grnDate: '',
   // Additional Invoice Information
   earlyPaymentDiscount: '',
   currency: '',
+  creditTo: '',
   remark: '',
   // Line Items
   items: [],

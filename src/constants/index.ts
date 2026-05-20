@@ -6,3 +6,4 @@ export {default as ApiEndPoints} from './ApiEndPoints';
 export {default as Cities} from './Cities';
 export * from './Screens';
 export * from './roles';
+export * from './LegalUrls';

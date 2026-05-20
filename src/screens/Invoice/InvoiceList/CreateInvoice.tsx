@@ -66,6 +66,7 @@ const getInitialFields = (): InvoiceFields => ({
   odAccountNumber: '',
   invoiceNumber: '',
   associatedPO: '',
+  tenor: '',
   invoiceDate: '',
   paymentDate: '',
   invoiceDueDate: '',
@@ -124,6 +125,7 @@ interface ValidationErrors {
   dealer?: string;
   dealerCode?: string;
   invoiceDate?: string;
+  tenor?: string;
   items?: string;
   [key: string]: string | undefined;
 }
@@ -225,10 +227,13 @@ export const CreateInvoice: React.FC = () => {
   const [apmAvailableLimit, setApmAvailableLimit] = useState<number | null>(null);
 
   const isFormValid = useMemo(() => {
+    const tenorDays = parseInt(String(fields.tenor ?? '').trim(), 10);
+    const tenorOk = Number.isFinite(tenorDays) && tenorDays > 0;
     return !!(
       fields.invoiceNumber?.trim() &&
       fields.dealer?.trim() &&
       fields.invoiceDate?.trim() &&
+      tenorOk &&
       fields.items &&
       fields.items.length > 0 &&
       fields.creditTo?.trim()
@@ -427,6 +432,19 @@ export const CreateInvoice: React.FC = () => {
     }
   }, [dealerInfoError]);
 
+  /** Default tenor from program/dealer basic params when creating (not edit/recreate). */
+  useEffect(() => {
+    if (mode === 'edit' || mode === 'recreate') return;
+    const raw = dealerInfo?.basic_parameters?.default_payment_terms_days;
+    if (raw === undefined || raw === null) return;
+    const days = typeof raw === 'string' ? parseFloat(raw.trim()) : Number(raw);
+    if (!Number.isFinite(days) || days <= 0) return;
+    setFields(prev => {
+      if (prev.tenor?.trim()) return prev;
+      return {...prev, tenor: String(Math.round(days))};
+    });
+  }, [dealerInfo?.basic_parameters?.default_payment_terms_days, mode]);
+
   // Load last selected product type (Dealer Finance / Vendor Finance) for dynamic labels
   useEffect(() => {
     AsyncStorage.getItem('selectedProductType')
@@ -508,7 +526,11 @@ export const CreateInvoice: React.FC = () => {
           dealerCode,
           odAccountNumber,
           invoiceNumber: data.invoice_ref_no || '',
-          associatedPO: '',
+          associatedPO: data.po_ref_no != null ? String(data.po_ref_no) : '',
+          tenor:
+            data.tenor != null && data.tenor !== ''
+              ? String(Math.round(Number(data.tenor)))
+              : '',
           invoiceDate: formatDate(data.invoice_date),
           paymentDate: formatDate(data.payment_date),
           invoiceDueDate: formatDate(data.invoice_due_date),
@@ -680,6 +702,16 @@ export const CreateInvoice: React.FC = () => {
           return 'Invoice Date is required';
         }
         return undefined;
+      case 'tenor': {
+        const n = parseInt(String(value ?? '').trim(), 10);
+        if (!String(value ?? '').trim()) {
+          return 'Tenor (days) is required';
+        }
+        if (!Number.isFinite(n) || n <= 0) {
+          return 'Enter a valid tenor greater than zero';
+        }
+        return undefined;
+      }
       case 'invoiceDueDate':
         if (!value?.trim()) {
           return 'Invoice Due Date is required';
@@ -753,6 +785,7 @@ export const CreateInvoice: React.FC = () => {
       'odAccountNumber',
       'invoiceNumber',
       'invoiceDate',
+      'tenor',
       'invoiceDueDate',
       'creditTo',
       'items',
@@ -1239,6 +1272,10 @@ export const CreateInvoice: React.FC = () => {
     if (!fields.dealerCode?.trim()) return 'Dealer Code is required';
     if (!fields.invoiceNumber?.trim()) return 'Invoice / Unique Ref. No is required';
     if (!fields.invoiceDate?.trim()) return 'Invoice Date is required';
+    const tenorDaysHint = parseInt(String(fields.tenor ?? '').trim(), 10);
+    if (!Number.isFinite(tenorDaysHint) || tenorDaysHint <= 0) {
+      return 'Tenor (days) is required — enter a whole number greater than zero';
+    }
     if (!fields.creditTo?.trim()) return 'Credit To is required';
     if (!fields.items || fields.items.length === 0) return 'At least one item is required';
     

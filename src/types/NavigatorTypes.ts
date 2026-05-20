@@ -12,7 +12,7 @@ export type AuthNavigatorType = {
   PasswordScreen: PasswordScreenParams;
 
   SigninScreen: SigninScreenParams | undefined;
-  TermsOfService: undefined;
+  TermsOfService: {uri: string; title?: string};
   SuccessScreen: {
     authMode: 'signin' | 'signup' | 'password';
     firstName: string;

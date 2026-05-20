@@ -72,6 +72,11 @@ export type CreateInvoicePayloadInput = {
   attachment?: DocumentPickerResponse | null;
 };
 
+function parseTenorDays(raw: string | undefined): number {
+  const n = parseInt(String(raw ?? '').trim(), 10);
+  return Number.isFinite(n) ? n : NaN;
+}
+
 function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<string, unknown> {
   const {fields, createdBy, partnerBank, program, product, anchorParticipantMapping, party, counterPartyName, counterPartyCode, counterPartyOdAccount} = input;
 
@@ -139,6 +144,7 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     product,
     anchorParticipantMapping,
     party,
+    tenor: parseTenorDays(fields.tenor),
     sub_total: Ue(subtotal),
     discount_total: Ue(discountTotal),
     tax_total: Ue(taxTotal),
@@ -151,6 +157,10 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
   }
   if (fields.paymentDate?.trim()) {
     payload.payment_date = toYYYYMMDD(fields.paymentDate);
+  }
+  const poRef = fields.associatedPO?.trim();
+  if (poRef) {
+    payload.po_ref_no = poRef;
   }
 
   return payload;
@@ -835,6 +845,7 @@ export const invoiceApi = {
 
     const payload: any = {
       approval_level: Number(approval_level ?? 1),
+      tenor: parseTenorDays(fields.tenor),
       invoice_ref_no: fields.invoiceNumber || '',
       invoice_date: toYYYYMMDD(fields.invoiceDate),
       invoice_due_date: toYYYYMMDD(fields.invoiceDueDate),
@@ -858,7 +869,10 @@ export const invoiceApi = {
     if (fields.paymentDate?.trim()) {
       payload.payment_date = toYYYYMMDD(fields.paymentDate);
     }
-
+    const poRefUpdate = fields.associatedPO?.trim();
+    if (poRefUpdate) {
+      payload.po_ref_no = poRefUpdate;
+    }
 
     if (attachment) {
       const formData = new FormData();

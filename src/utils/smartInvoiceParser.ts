@@ -1219,6 +1219,7 @@ export function smartParseInvoiceFields(text: string): Partial<InvoiceFields> {
     // Invoice Details
     invoiceNumber: invoiceNumber || '',
     associatedPO: associatedPO || '',
+    tenor: '',
     invoiceDate: invoiceDate || '',
     invoiceDueDate: invoiceDueDate || '',
     // Additional Invoice Information

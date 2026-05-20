@@ -22,6 +22,7 @@ export function extractStructuredInvoiceJSON(rawOcrText: string): InvoiceFields 
     // Invoice Details Section
     invoiceNumber: extractInvoiceNumber(lines, cleaned),
     associatedPO: extractAssociatedPO(lines, cleaned),
+    tenor: '',
     invoiceDate: extractInvoiceDate(lines, cleaned),
     invoiceDueDate: extractInvoiceDueDate(lines, cleaned),
 

@@ -106,6 +106,7 @@ export function parseInvoiceFields(text: string): Partial<InvoiceFields> {
     dealerCode: '',
     odAccountNumber: '',
     associatedPO: '',
+    tenor: '',
     invoiceDueDate: '',
     earlyPaymentDiscount: '',
     currency: '',

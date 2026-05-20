@@ -32,6 +32,7 @@ const emptyFields: InvoiceFields = {
   odAccountNumber: '',
   invoiceNumber: '',
   associatedPO: '',
+  tenor: '',
   invoiceDate: '',
   paymentDate: '',
   invoiceDueDate: '',
@@ -53,6 +54,7 @@ interface ValidationErrors {
   dealer?: string;
   dealerCode?: string;
   invoiceDate?: string;
+  tenor?: string;
   items?: string;
   [key: string]: string | undefined;
 }
@@ -589,6 +591,25 @@ export const InvoiceForm: React.FC<Props> = ({
               )}
             </View>
           </View>
+        </View>
+        <View style={styles.row}>
+          <View style={styles.halfWidth}>
+            <View style={styles.fieldInRow}>
+              <L label="Tenor (days) *">
+                <TextInput
+                  style={[styles.input, errors.tenor && styles.inputError]}
+                  value={value.tenor}
+                  onChangeText={set('tenor')}
+                  placeholder="e.g. 60"
+                  keyboardType="number-pad"
+                />
+              </L>
+              {errors.tenor ? (
+                <Text style={styles.errorText}>{errors.tenor}</Text>
+              ) : null}
+            </View>
+          </View>
+          <View style={styles.halfWidth} />
         </View>
         <View style={styles.row}>
           <View style={styles.halfWidth}>

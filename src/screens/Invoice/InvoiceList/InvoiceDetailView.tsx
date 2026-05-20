@@ -39,6 +39,7 @@ type InvoiceDetailData = {
   anchorName: string;
   remark: string;
   poRefNo: string;
+  tenorDays: string;
   invoiceDate: string;
   invoiceDueDate: string;
   earlyPaymentDiscount: number;
@@ -59,6 +60,7 @@ const defaultInvoiceData: InvoiceDetailData = {
   anchorName: '',
   remark: '',
   poRefNo: '',
+  tenorDays: '',
   invoiceDate: '',
   invoiceDueDate: '',
   earlyPaymentDiscount: 0,
@@ -150,9 +152,20 @@ export const InvoiceDetailView: React.FC = () => {
           decryptValue(apm?.od_account_no ?? '') || '';
         const anchorName = decryptValue(party?.entity_name ?? '') || '';
         const remark = data?.remark ?? '';
-        const poRefNo = data?.loan_ref_no ?? data?.invoice_ref_no ?? '';
+        const poRef =
+          data?.po_ref_no != null && String(data.po_ref_no).trim() !== ''
+            ? String(data.po_ref_no)
+            : '';
+        const poRefNo =
+          poRef ||
+          (data?.loan_ref_no != null ? String(data.loan_ref_no) : '') ||
+          (data?.invoice_ref_no != null ? String(data.invoice_ref_no) : '');
         const invoiceDate = data?.invoice_date ? formatDateDash(data.invoice_date) : '';
         const invoiceDueDate = data?.invoice_due_date ? formatDateDash(data.invoice_due_date) : '';
+        const tenorDays =
+          data?.tenor != null && data?.tenor !== ''
+            ? String(Math.round(Number(data.tenor)))
+            : '';
         const earlyPaymentDiscount = Number(data?.early_payment_discount) || 0;
         const subTotal = Number(data?.sub_total) || 0;
         const taxTotal = Number(data?.tax_total) || 0;
@@ -186,6 +199,7 @@ export const InvoiceDetailView: React.FC = () => {
           anchorName,
           remark,
           poRefNo,
+          tenorDays,
           invoiceDate,
           invoiceDueDate,
           earlyPaymentDiscount,
@@ -419,6 +433,10 @@ export const InvoiceDetailView: React.FC = () => {
                 <Text style={styles.detailValue}>
                   {invoiceData.invoiceDueDate || '-'}
                 </Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Tenor (days):</Text>
+                <Text style={styles.detailValue}>{invoiceData.tenorDays || '-'}</Text>
               </View>
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Early Payment Discount (%):</Text>

@@ -33,6 +33,8 @@ export type InvoiceFields = {
   // Invoice Details Section
   invoiceNumber: string; // Invoice / Unique Ref. No
   associatedPO: string;
+  /** Invoice tenor in days (maps to backend `tenor`) */
+  tenor: string;
   invoiceDate: string; // can be textual like "October 30, 2025"
   paymentDate: string; // Payment Date
   invoiceDueDate: string; // Invoice Due Date

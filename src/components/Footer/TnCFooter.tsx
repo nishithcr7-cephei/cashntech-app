@@ -1,7 +1,7 @@
 import {View, Text, StyleSheet} from 'react-native';
 import React from 'react';
 import {scaleFont, scaleHeight} from '@utils/Scale';
-import {AuthScreens, Colors, Fonts} from '@constants/index';
+import {AuthScreens, Colors, Fonts, LEGAL_URLS} from '@constants/index';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
 
@@ -29,11 +29,18 @@ type tncProps = {
  */
 
 export const TnCFooter: React.FC<tncProps> = ({navigation}) => {
-  /**
-   * Navigate to the TermsOfService screen when the Terms of Service text is pressed.
-   */
-  const handlePress = () => {
-    navigation.navigate(AuthScreens.TermsOfService);
+  const openPrivacyPolicy = () => {
+    navigation.navigate(AuthScreens.TermsOfService, {
+      uri: LEGAL_URLS.privacyPolicy,
+      title: Strings.privacyPolicy,
+    });
+  };
+
+  const openTermsOfService = () => {
+    navigation.navigate(AuthScreens.TermsOfService, {
+      uri: LEGAL_URLS.termsOfService,
+      title: Strings.termsOfService,
+    });
   };
 
   return (
@@ -41,11 +48,11 @@ export const TnCFooter: React.FC<tncProps> = ({navigation}) => {
       <View style={styles.copyRightContainer}>
         <Text style={styles.termConText}>{Strings.bySigningIn}</Text>
         <Text style={styles.termConText}>
-          <Text style={styles.termConLinkText} onPress={handlePress}>
+          <Text style={styles.termConLinkText} onPress={openPrivacyPolicy}>
             {Strings.privacyPolicy}
           </Text>
           <Text style={styles.termConText}>{Strings.and}</Text>
-          <Text style={styles.termConLinkText} onPress={handlePress}>
+          <Text style={styles.termConLinkText} onPress={openTermsOfService}>
             {Strings.termsOfService}
           </Text>
         </Text>
