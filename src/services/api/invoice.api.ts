@@ -3,6 +3,7 @@ import ApiEndPoints from '@constants/ApiEndPoints';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import type {DocumentPickerResponse} from '@react-native-documents/picker';
 import type {InvoiceListItemApi, UpdateInvoicePayload} from '@store/invoice/inv.types';
+import {normalizeDealerInfoResponse} from '@utils/normalizeDealerInfo';
 
 // Unit mapping: PCS=1, KG=2, LTR=3, etc. (backend accepts any number)
 const UNIT_MAP: Record<string, number> = {
@@ -310,7 +311,14 @@ export const invoiceApi = {
     const response = await axiosInstance.get(ApiEndPoints.apiDealerInfo(programId), {
       authRequired: true,
     } as any);
-    return response.data;
+    const body = response.data;
+    if (!body || typeof body !== 'object') {
+      return body;
+    }
+    return {
+      ...body,
+      data: normalizeDealerInfoResponse(programId, body),
+    };
   },
 
   getBankProductList: async (): Promise<any> => {

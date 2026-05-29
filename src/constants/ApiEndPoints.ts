@@ -193,6 +193,7 @@ const Endpoints = {
   apiLoanStatusReport: '/report/loan-status',
   apiAllProductOutstandingReport: '/report/all-product-outstanding',
   apiUtilizationReport: '/report/utilization-report',
+  apiGenericExcelExport: '/export/generic-excel',
 } as const;
 
 export default Endpoints;

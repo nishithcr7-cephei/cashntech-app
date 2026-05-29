@@ -71,3 +71,73 @@ export const showDownloadErrorAlert = (error: string) => {
     text2: `Failed to download KYC documents. ${error}`,
   });
 };
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  const btoaFn =
+    typeof globalThis.btoa === 'function'
+      ? globalThis.btoa.bind(globalThis)
+      : null;
+  if (btoaFn) {
+    return btoaFn(binary);
+  }
+  throw new Error('Base64 encoding is not available on this device');
+}
+
+const sanitizeExcelFileName = (name: string): string =>
+  name.replace(/[^\w\-]+/g, '_').replace(/_+/g, '_') || 'report_export';
+
+/** Save `.xlsx` bytes from POST /export/generic-excel to device storage. */
+export async function downloadExcelBuffer(
+  buffer: ArrayBuffer,
+  baseFileName: string,
+): Promise<DownloadResult> {
+  try {
+    const base64Data = arrayBufferToBase64(buffer);
+    const safeName = sanitizeExcelFileName(baseFileName);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const finalFileName = `${safeName}_${timestamp}.xlsx`;
+
+    const downloadPath =
+      Platform.OS === 'ios'
+        ? `${RNFS.DocumentDirectoryPath}/${finalFileName}`
+        : `${RNFS.DownloadDirectoryPath}/${finalFileName}`;
+
+    await RNFS.writeFile(downloadPath, base64Data, 'base64');
+
+    return {
+      success: true,
+      filePath: downloadPath,
+    };
+  } catch (error) {
+    console.error('Excel download error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Download failed',
+    };
+  }
+}
+
+export const showExcelDownloadSuccess = (filePath: string) => {
+  const location =
+    Platform.OS === 'android' ? 'Downloads folder' : 'app documents';
+  Toast.show({
+    type: 'success',
+    text1: 'Export complete',
+    text2: `Saved to ${location}: ${filePath.split('/').pop() || 'file'}`,
+    visibilityTime: 4000,
+  });
+};
+
+export const showExcelDownloadError = (error: string) => {
+  Toast.show({
+    type: 'error',
+    text1: 'Export failed',
+    text2: error,
+    visibilityTime: 3500,
+  });
+};

@@ -18,6 +18,8 @@ import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportExport} from '@hooks/useReportExport';
+import {DAILY_ACCRUAL_EXPORT_COLUMNS} from '@utils/reportExportColumns';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -71,11 +73,12 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
 );
 
 const buildListFields = (row: DailyAccrualReportItem): FieldDef[] => [
-  {label: 'Account No', value: formatText(row['Account No'])},
-  {label: 'Customer', value: formatText(row.Customer)},
-  {label: 'Daily Interest', value: formatAmount(row['Daily Interest'])},
-  {label: 'Date', value: formatText(row.Date)},
-  {label: 'Cumulative', value: formatAmount(row.Cumulative)},
+  {label: 'Loan Account Number', value: formatText(row.loanAccountNumber)},
+  {label: 'Invoice Number', value: formatText(row.invoiceNumber)},
+  {label: 'Customer', value: formatText(row.customer)},
+  {label: 'Daily Interest', value: formatAmount(row.dailyInterest)},
+  {label: 'Date', value: formatText(row.date)},
+  {label: 'Cumulative', value: formatAmount(row.cumulative)},
 ];
 
 export const DailyAccrualReportScreen: React.FC = () => {
@@ -108,9 +111,10 @@ export const DailyAccrualReportScreen: React.FC = () => {
       data = data.filter(item =>
         matchesReportSearch(
           searchText,
-          item['Account No'],
-          item.Customer,
-          item.Date,
+          item.loanAccountNumber,
+          item.invoiceNumber,
+          item.customer,
+          item.date,
         ),
       );
     }
@@ -135,21 +139,18 @@ export const DailyAccrualReportScreen: React.FC = () => {
     );
   }, [filteredData.length]);
 
-  const handleExport = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Export',
-      text2: 'Excel export will be available in a future update.',
-      visibilityTime: 2500,
-    });
-  };
+  const {handleExport, exporting} = useReportExport({
+    reportTitle: 'Daily Accrual Report',
+    filename: 'daily-accrual-report',
+    columns: DAILY_ACCRUAL_EXPORT_COLUMNS,
+    getExportRows: () => filteredData,
+    appliedFilters,
+  });
 
   const renderItem: ListRenderItem<DailyAccrualReportItem> = useCallback(
     ({item, index}) => {
       const serialNo =
-        item['Sr No'] != null && item['Sr No'] > 0
-          ? item['Sr No']
-          : index + 1;
+        item.srNo != null && item.srNo > 0 ? item.srNo : index + 1;
 
       return (
         <View style={styles.cardWrapper}>
@@ -188,7 +189,10 @@ export const DailyAccrualReportScreen: React.FC = () => {
           <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
           <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+        <TouchableOpacity
+          style={[styles.exportButton, exporting && {opacity: 0.6}]}
+          onPress={handleExport}
+          disabled={exporting}>
           <FontAwesome6
             name="file-excel"
             iconStyle="solid"
@@ -219,7 +223,7 @@ export const DailyAccrualReportScreen: React.FC = () => {
       <FlatList
         data={paginatedData}
         keyExtractor={(item, index) =>
-          `daily-accrual-${String(item['Account No'])}-${String(item.Date)}-${String(item['Sr No'])}-${index}`
+          `daily-accrual-${item.loanAccountNumber}-${item.invoiceNumber}-${item.date}-${item.srNo}-${index}`
         }
         renderItem={renderItem}
         ListHeaderComponent={listHeader}

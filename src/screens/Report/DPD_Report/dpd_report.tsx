@@ -18,6 +18,8 @@ import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportExport} from '@hooks/useReportExport';
+import {DPD_EXPORT_COLUMNS} from '@utils/reportExportColumns';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -71,19 +73,35 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
 );
 
 const buildListFields = (row: DpdReportItem): FieldDef[] => [
-  {label: 'Customer', value: formatText(row.Customer)},
-  {label: 'Account No', value: formatText(row['Account No'])},
-  {label: 'Outstanding', value: formatAmount(row.Outstanding)},
-  {label: 'Overdue Amt', value: formatAmount(row['Overdue Amt'])},
+  {label: 'Lms Id', value: formatText(row.lmsId)},
+  {label: 'Invoice Number', value: formatText(row.invoiceNumber)},
+  {label: 'Invoice Date', value: formatText(row.invoiceDate)},
+  {label: 'Loan Account Number', value: formatText(row.loanAccountNumber)},
+  {label: 'Program Name', value: formatText(row.programName)},
+  {label: 'Product Type', value: formatText(row.productType)},
+  {label: 'Bank Name', value: formatText(row.bankName)},
+  {label: 'Anchor Name', value: formatText(row.anchorName)},
+  {label: 'Borrower Name', value: formatText(row.borrowerName)},
+  {label: 'Disbursement Date', value: formatText(row.disbursementDate)},
+  {label: 'Due Date', value: formatText(row.dueDate)},
+  {label: 'Tenure', value: formatText(row.tenure)},
+  {label: 'Principal O S', value: formatAmount(row.principalOS)},
+  {label: 'Principal Due', value: formatAmount(row.principalDue)},
+  {label: 'Interest O S', value: formatAmount(row.interestOS)},
+  {label: 'Interest Due', value: formatAmount(row.interestDue)},
+  {label: 'Penal Due', value: formatAmount(row.penalDue)},
+  {label: 'Total Outstanding', value: formatAmount(row.totalOutstanding)},
   {
-    label: 'DPD',
-    value: formatText(row.DPD),
+    label: 'Dpd',
+    value: formatText(row.dpd),
     valueStyle:
-      row.DPD > 90
+      row.dpd > 90
         ? {color: Colors.primaryColor, fontFamily: Fonts.GilroySemiBold}
         : undefined,
   },
-  {label: 'Bucket', value: formatText(row.Bucket)},
+  {label: 'Principal Dpd', value: formatText(row.principalDpd)},
+  {label: 'Interest Dpd', value: formatText(row.interestDpd)},
+  {label: 'Bucket', value: formatText(row.bucket)},
 ];
 
 export const DpdReportScreen: React.FC = () => {
@@ -116,9 +134,13 @@ export const DpdReportScreen: React.FC = () => {
       data = data.filter(item =>
         matchesReportSearch(
           searchText,
-          item['Account No'],
-          item.Customer,
-          item.Bucket,
+          item.loanAccountNumber,
+          item.invoiceNumber,
+          item.lmsId,
+          item.anchorName,
+          item.borrowerName,
+          item.programName,
+          item.bucket,
         ),
       );
     }
@@ -143,20 +165,19 @@ export const DpdReportScreen: React.FC = () => {
     );
   }, [filteredData.length]);
 
-  const handleExport = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Export',
-      text2: 'Excel export will be available in a future update.',
-      visibilityTime: 2500,
-    });
-  };
+  const {handleExport, exporting} = useReportExport({
+    reportTitle: 'DPD / Overdue Report',
+    filename: 'dpd-overdue-report',
+    columns: DPD_EXPORT_COLUMNS,
+    getExportRows: () => filteredData,
+    appliedFilters,
+  });
 
   const renderItem: ListRenderItem<DpdReportItem> = useCallback(
     ({item, index}) => {
       const serialNo =
-        item['Sr No'] != null && item['Sr No'] > 0
-          ? item['Sr No']
+        item.srNo != null && item.srNo > 0
+          ? item.srNo
           : index + 1;
 
       return (
@@ -196,7 +217,10 @@ export const DpdReportScreen: React.FC = () => {
           <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
           <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+        <TouchableOpacity
+          style={[styles.exportButton, exporting && {opacity: 0.6}]}
+          onPress={handleExport}
+          disabled={exporting}>
           <FontAwesome6
             name="file-excel"
             iconStyle="solid"
@@ -224,7 +248,7 @@ export const DpdReportScreen: React.FC = () => {
       <FlatList
         data={paginatedData}
         keyExtractor={(item, index) =>
-          `dpd-${String(item['Account No'])}-${String(item['Sr No'])}-${index}`
+          `dpd-${item.lmsId}-${item.invoiceNumber}-${item.loanAccountNumber}-${index}`
         }
         renderItem={renderItem}
         ListHeaderComponent={listHeader}

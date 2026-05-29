@@ -38,6 +38,8 @@ export type CustomRequestConfig = InternalAxiosRequestConfig & {
   authRequired?: boolean;
   isFormData?: boolean;
   controller?: AbortController;
+  /** Skip decrypt/transform on binary responses (e.g. Excel export). */
+  skipResponseTransform?: boolean;
 };
 
 const cancelTokens: Array<AbortController> = [];
@@ -144,7 +146,9 @@ axiosInstance.interceptors.request.use(
  */
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
-    if (response.data) {
+    const skipTransform = (response.config as CustomRequestConfig)
+      ?.skipResponseTransform;
+    if (response.data && !skipTransform) {
       // Transform the response data recursively to decrypt any encrypted strings
       response.data = transformApiResponse(response.data);
     }
@@ -172,7 +176,9 @@ axiosInstance.interceptors.response.use(
    * @returns {Promise<never>} The error object.
    */
   async (error: AxiosError): Promise<never> => {
-    if (error.response?.data) {
+    const skipTransform = (error.config as CustomRequestConfig)
+      ?.skipResponseTransform;
+    if (error.response?.data && !skipTransform) {
       error.response.data = transformApiResponse(error.response.data);
     }
 

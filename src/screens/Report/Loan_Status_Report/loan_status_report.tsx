@@ -18,6 +18,8 @@ import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportExport} from '@hooks/useReportExport';
+import {LOAN_STATUS_EXPORT_COLUMNS} from '@utils/reportExportColumns';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -191,14 +193,13 @@ export const LoanStatusReportScreen: React.FC = () => {
     setExpandedIds(prev => ({...prev, [rowKey]: !prev[rowKey]}));
   };
 
-  const handleExport = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Export',
-      text2: 'Excel export will be available in a future update.',
-      visibilityTime: 2500,
-    });
-  };
+  const {handleExport, exporting} = useReportExport({
+    reportTitle: 'Loan Status Report',
+    filename: 'loan-status-report',
+    columns: LOAN_STATUS_EXPORT_COLUMNS,
+    getExportRows: () => filteredData,
+    appliedFilters,
+  });
 
   const renderItem: ListRenderItem<LoanStatusReportItem> = useCallback(
     ({item, index}) => {
@@ -255,7 +256,10 @@ export const LoanStatusReportScreen: React.FC = () => {
           <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
           <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+        <TouchableOpacity
+          style={[styles.exportButton, exporting && {opacity: 0.6}]}
+          onPress={handleExport}
+          disabled={exporting}>
           <FontAwesome6
             name="file-excel"
             iconStyle="solid"

@@ -18,6 +18,8 @@ import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportExport} from '@hooks/useReportExport';
+import {DISBURSEMENT_EXPORT_COLUMNS} from '@utils/reportExportColumns';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -74,32 +76,30 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
 const INITIAL_VISIBLE_FIELD_COUNT = 6;
 
 const buildAllListFields = (item: DisbursementReportItem): FieldDef[] => [
-  {label: 'Invoice No', value: formatText(item.invoiceNumber)},
+  {label: 'Invoice Number', value: formatText(item.invoiceNumber)},
   {label: 'Anchor Name', value: formatText(item.anchorName)},
-  {label: 'Anchor PAN', value: formatText(item.anchorPan)},
+  {label: 'Anchor Pan', value: formatText(item.anchorPan)},
   {label: 'Borrower Name', value: formatText(item.borrowerName)},
-  {label: 'Borrower PAN', value: formatText(item.borrowerPan)},
-  {label: 'Master Program', value: formatText(item.masterProgramName)},
+  {label: 'Borrower Pan', value: formatText(item.borrowerPan)},
+  {label: 'Master Program Name', value: formatText(item.masterProgramName)},
   {label: 'Program Name', value: formatText(item.programName)},
-  {label: 'Program Type', value: formatText(item.programTypeName)},
-  {label: 'Loan A/C No', value: formatText(item.loanAccountNumber)},
-  {label: 'LOS ID', value: formatText(item.losId)},
-  {label: 'Tranch No', value: formatText(item.tranchNumber)},
-  {label: 'Finnone Bill No', value: formatText(item.finnone_bill_no)},
+  {label: 'Program Type Name', value: formatText(item.programTypeName)},
+  {label: 'Loan Account Number', value: formatText(item.loanAccountNumber)},
+  {label: 'Los Id', value: formatText(item.losId)},
+  {label: 'Tranch Number', value: formatText(item.tranchNumber)},
   {label: 'Invoice Date', value: formatText(item.invoiceDate)},
   {label: 'Disbursement Date', value: formatText(item.disbursementDate)},
   {label: 'Maturity Date', value: formatText(item.maturityDate)},
   {label: 'Invoice Value', value: formatAmount(item.invoiceValue)},
-  {label: 'Loan Value', value: formatAmount(item.loanValue)},
   {
     label: 'Disbursement Amount',
     value: formatAmount(item.disbursementAmount),
   },
-  {label: 'ROI (%)', value: formatText(item.roi)},
+  {label: 'Roi', value: formatText(item.roi)},
   {label: 'Margin', value: formatAmount(item.margin)},
   {label: 'Bank Name', value: formatText(item.bankName)},
-  {label: 'Bank A/C No', value: formatText(item.bankAccountNumber)},
-  {label: 'IFSC Code', value: formatText(item.ifscCode)},
+  {label: 'Bank Account Number', value: formatText(item.bankAccountNumber)},
+  {label: 'Ifsc Code', value: formatText(item.ifscCode)},
   {
     label: 'Status',
     value: formatText(item.status),
@@ -108,7 +108,7 @@ const buildAllListFields = (item: DisbursementReportItem): FieldDef[] => [
         ? {color: Colors.green, fontFamily: Fonts.GilroySemiBold}
         : undefined,
   },
-  {label: 'UTR No', value: formatText(item.utrNo)},
+  {label: 'Utr No', value: formatText(item.utrNo)},
   {label: 'Message', value: formatText(item.message)},
   {label: 'Generated Date', value: formatText(item.generatedDate)},
 ];
@@ -189,14 +189,13 @@ export const DisbursementReportScreen: React.FC = () => {
     setExpandedIds(prev => ({...prev, [rowKey]: !prev[rowKey]}));
   };
 
-  const handleExport = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Export',
-      text2: 'Excel export will be available in a future update.',
-      visibilityTime: 2500,
-    });
-  };
+  const {handleExport, exporting} = useReportExport({
+    reportTitle: 'Disbursement Report',
+    filename: 'disbursement-report',
+    columns: DISBURSEMENT_EXPORT_COLUMNS,
+    getExportRows: () => filteredData,
+    appliedFilters,
+  });
 
   const renderItem: ListRenderItem<DisbursementReportItem> = useCallback(
     ({item, index}) => {
@@ -254,7 +253,10 @@ export const DisbursementReportScreen: React.FC = () => {
           <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
           <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+        <TouchableOpacity
+          style={[styles.exportButton, exporting && {opacity: 0.6}]}
+          onPress={handleExport}
+          disabled={exporting}>
           <FontAwesome6
             name="file-excel"
             iconStyle="solid"

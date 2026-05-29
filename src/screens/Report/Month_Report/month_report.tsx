@@ -18,6 +18,8 @@ import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportExport} from '@hooks/useReportExport';
+import {MONTHLY_ACCRUAL_EXPORT_COLUMNS} from '@utils/reportExportColumns';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -78,11 +80,22 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
 );
 
 const buildListFields = (row: MonthlyAccrualReportItem): FieldDef[] => [
-  {label: 'Account No', value: formatText(row['Account No'])},
-  {label: 'Customer', value: formatText(row.Customer)},
-  {label: 'Interest Amount', value: formatAmount(row['Interest Amount'])},
-  {label: 'Rate', value: formatRate(row.Rate)},
-  {label: 'Month', value: formatText(row.Month)},
+  {label: 'Loan Account Number', value: formatText(row.loanAccountNumber)},
+  {label: 'Invoice Number', value: formatText(row.invoiceNumber)},
+  {label: 'Anchor Name', value: formatText(row.anchorName)},
+  {label: 'Bank Name', value: formatText(row.bankName)},
+  {label: 'Customer', value: formatText(row.customer)},
+  {
+    label: 'Accrued Interest Amount',
+    value: formatAmount(row.accruedInterestAmount),
+  },
+  {
+    label: 'Posted Interest Amount',
+    value: formatAmount(row.postedInterestAmount),
+  },
+  {label: 'Rate', value: formatRate(row.rate)},
+  {label: 'Month', value: formatText(row.month)},
+  {label: 'Posted Date', value: formatText(row.postedDate)},
 ];
 
 export const MonthlyInterestReportScreen: React.FC = () => {
@@ -115,9 +128,12 @@ export const MonthlyInterestReportScreen: React.FC = () => {
       data = data.filter(item =>
         matchesReportSearch(
           searchText,
-          item['Account No'],
-          item.Customer,
-          item.Month,
+          item.loanAccountNumber,
+          item.invoiceNumber,
+          item.anchorName,
+          item.bankName,
+          item.customer,
+          item.month,
         ),
       );
     }
@@ -142,20 +158,19 @@ export const MonthlyInterestReportScreen: React.FC = () => {
     );
   }, [filteredData.length]);
 
-  const handleExport = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Export',
-      text2: 'Excel export will be available in a future update.',
-      visibilityTime: 2500,
-    });
-  };
+  const {handleExport, exporting} = useReportExport({
+    reportTitle: 'Monthly Interest Report',
+    filename: 'monthly-interest-report',
+    columns: MONTHLY_ACCRUAL_EXPORT_COLUMNS,
+    getExportRows: () => filteredData,
+    appliedFilters,
+  });
 
   const renderItem: ListRenderItem<MonthlyAccrualReportItem> = useCallback(
     ({item, index}) => {
       const serialNo =
-        item['Sr No'] != null && item['Sr No'] > 0
-          ? item['Sr No']
+        item.srNo != null && item.srNo > 0
+          ? item.srNo
           : index + 1;
 
       return (
@@ -195,7 +210,10 @@ export const MonthlyInterestReportScreen: React.FC = () => {
           <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
           <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+        <TouchableOpacity
+          style={[styles.exportButton, exporting && {opacity: 0.6}]}
+          onPress={handleExport}
+          disabled={exporting}>
           <FontAwesome6
             name="file-excel"
             iconStyle="solid"
@@ -226,7 +244,7 @@ export const MonthlyInterestReportScreen: React.FC = () => {
       <FlatList
         data={paginatedData}
         keyExtractor={(item, index) =>
-          `monthly-accrual-${String(item['Account No'])}-${String(item.Month)}-${String(item['Sr No'])}-${index}`
+          `monthly-accrual-${item.loanAccountNumber}-${item.invoiceNumber}-${item.month}-${item.srNo}-${index}`
         }
         renderItem={renderItem}
         ListHeaderComponent={listHeader}

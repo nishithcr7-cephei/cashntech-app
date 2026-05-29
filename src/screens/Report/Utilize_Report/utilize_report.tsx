@@ -18,6 +18,8 @@ import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportExport} from '@hooks/useReportExport';
+import {UTILIZATION_EXPORT_COLUMNS} from '@utils/reportExportColumns';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -80,16 +82,16 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
 
 const buildAllListFields = (item: UtilizationReportItem): FieldDef[] => [
   {label: 'Anchor Name', value: formatText(item.anchorName)},
-  {label: 'Anchor PAN', value: formatText(item.anchorPan)},
+  {label: 'Anchor Pan', value: formatText(item.anchorPan)},
   {label: 'Borrower Name', value: formatText(item.borrowerName)},
-  {label: 'Borrower PAN', value: formatText(item.borrowerPan)},
-  {label: 'LAN', value: formatText(item.lan)},
+  {label: 'Borrower Pan', value: formatText(item.borrowerPan)},
+  {label: 'Loan Account Number', value: formatText(item.lan)},
   {label: 'Program Name', value: formatText(item.programName)},
-  {label: 'Program Type', value: formatText(item.programTypeName)},
+  {label: 'Program Type Name', value: formatText(item.programTypeName)},
   {label: 'Master Program Name', value: formatText(item.masterProgramName)},
-  {label: 'Finagg LOS ID', value: formatText(item.losid)},
+  {label: 'Los Id', value: formatText(item.losid)},
   {label: 'Scheme Type', value: formatText(item.schemetype)},
-  {label: 'Loan Account ROI', value: formatText(item.loanaccountroi)},
+  {label: 'Loan Account Roi', value: formatText(item.loanaccountroi)},
   {label: 'Loan Tenure', value: formatLoanTenure(item.loanTenure)},
   {label: 'Limit Creation Date', value: formatText(item.limitCreationDate)},
   {label: 'Limit Expiry Date', value: formatText(item.limitExpiryDate)},
@@ -97,16 +99,16 @@ const buildAllListFields = (item: UtilizationReportItem): FieldDef[] => [
   {label: 'Total Utilized Limit', value: formatAmount(item.totalUtilizedLimit)},
   {label: 'Net Available Limit', value: formatAmount(item.netAvailableLimit)},
   {
-    label: 'Total Principal O/S',
+    label: 'Total Principal O S',
     value: formatAmount(item.totalPrincipalOS),
   },
   {label: 'Principal Due', value: formatAmount(item.principalDue)},
-  {label: 'Interest O/S', value: formatAmount(item.interestOS)},
+  {label: 'Interest O S', value: formatAmount(item.interestOS)},
   {label: 'Late Payment Due', value: formatAmount(item.latePaymentDue)},
   {label: 'Total Charges Due', value: formatAmount(item.totalChargesDue)},
   {label: 'Total Amount Due', value: formatAmount(item.totalAmountDue)},
   {
-    label: 'DPD',
+    label: 'Dpd',
     value: formatText(item.dpd),
     valueStyle:
       item.dpd > 90
@@ -114,7 +116,7 @@ const buildAllListFields = (item: UtilizationReportItem): FieldDef[] => [
         : undefined,
   },
   {label: 'Generation Date', value: formatText(item.generationDate)},
-  {label: 'EOD Date', value: formatText(item.eodDate)},
+  {label: 'Eod Date', value: formatText(item.eodDate)},
 ];
 
 const buildInitialFields = (item: UtilizationReportItem): FieldDef[] =>
@@ -192,14 +194,13 @@ export const UtilizationReportScreen: React.FC = () => {
     setExpandedIds(prev => ({...prev, [rowKey]: !prev[rowKey]}));
   };
 
-  const handleExport = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Export',
-      text2: 'Excel export will be available in a future update.',
-      visibilityTime: 2500,
-    });
-  };
+  const {handleExport, exporting} = useReportExport({
+    reportTitle: 'Utilization Report',
+    filename: 'utilization-report',
+    columns: UTILIZATION_EXPORT_COLUMNS,
+    getExportRows: () => filteredData,
+    appliedFilters,
+  });
 
   const renderItem: ListRenderItem<UtilizationReportItem> = useCallback(
     ({item, index}) => {
@@ -256,7 +257,10 @@ export const UtilizationReportScreen: React.FC = () => {
           <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
           <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+        <TouchableOpacity
+          style={[styles.exportButton, exporting && {opacity: 0.6}]}
+          onPress={handleExport}
+          disabled={exporting}>
           <FontAwesome6
             name="file-excel"
             iconStyle="solid"

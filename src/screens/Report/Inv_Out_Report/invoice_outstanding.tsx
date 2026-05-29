@@ -18,6 +18,8 @@ import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportExport} from '@hooks/useReportExport';
+import {INVOICE_OUTSTANDING_EXPORT_COLUMNS} from '@utils/reportExportColumns';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -73,22 +75,26 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
 
 const buildAllListFields = (item: InvoiceOutstandingReportItem): FieldDef[] => [
   {label: 'Anchor Name', value: formatText(item.anchorName)},
-  {label: 'Anchor PAN', value: formatText(item.anchorPan)},
+  {label: 'Anchor Pan', value: formatText(item.anchorPan)},
   {label: 'Borrower Name', value: formatText(item.borrowerName)},
-  {label: 'Borrower PAN', value: formatText(item.borrowerPan)},
-  {label: 'Loan A/C No', value: formatText(item.loanAccountNumber)},
-  {label: 'LOS ID', value: formatText(item.losId)},
+  {label: 'Borrower Pan', value: formatText(item.borrowerPan)},
+  {label: 'Loan Account Number', value: formatText(item.loanAccountNumber)},
+  {label: 'Los Id', value: formatText(item.losId)},
   {label: 'Scheme Type', value: formatText(item.schemeType)},
-  {label: 'Invoice No', value: formatText(item.invoiceNumber)},
-  {label: 'Tranch No', value: formatText(item.tranchNumber)},
+  {label: 'Invoice Number', value: formatText(item.invoiceNumber)},
+  {label: 'Tranch Number', value: formatText(item.tranchNumber)},
   {label: 'Invoice Date', value: formatText(item.invoiceDate)},
   {label: 'Disbursement Date', value: formatText(item.disbursementDate)},
   {label: 'Maturity Date', value: formatText(item.maturityDate)},
-  {label: 'ROI (%)', value: formatText(item.roi)},
+  {label: 'Roi', value: formatText(item.roi)},
   {label: 'Invoice Amount', value: formatAmount(item.invoiceValue)},
   {label: 'Loan Amount', value: formatAmount(item.loanValue)},
   {label: 'Disbursement Amount', value: formatAmount(item.disbursementAmount)},
-  {label: 'Principal O/S', value: formatAmount(item.principalOS)},
+  {label: 'Principal O S', value: formatAmount(item.principalOS)},
+  {label: 'Interest O S', value: formatAmount(item.interestOS)},
+  {label: 'Penal O S', value: formatAmount(item.penalOS)},
+  {label: 'Invoice Status', value: formatText(item.invoiceStatus)},
+  {label: 'Closed Date', value: formatText(item.closedDate)},
 ];
 
 const buildInitialFields = (item: InvoiceOutstandingReportItem): FieldDef[] =>
@@ -169,14 +175,13 @@ export const InvoiceOutstandingReportScreen: React.FC = () => {
     setExpandedIds(prev => ({...prev, [rowKey]: !prev[rowKey]}));
   };
 
-  const handleExport = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Export',
-      text2: 'Excel export will be available in a future update.',
-      visibilityTime: 2500,
-    });
-  };
+  const {handleExport, exporting} = useReportExport({
+    reportTitle: 'Invoice Outstanding Report',
+    filename: 'invoice-outstanding-report',
+    columns: INVOICE_OUTSTANDING_EXPORT_COLUMNS,
+    getExportRows: () => filteredData,
+    appliedFilters,
+  });
 
   const renderItem: ListRenderItem<InvoiceOutstandingReportItem> = useCallback(
     ({item, index}) => {
@@ -234,7 +239,10 @@ export const InvoiceOutstandingReportScreen: React.FC = () => {
           <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
           <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+        <TouchableOpacity
+          style={[styles.exportButton, exporting && {opacity: 0.6}]}
+          onPress={handleExport}
+          disabled={exporting}>
           <FontAwesome6
             name="file-excel"
             iconStyle="solid"

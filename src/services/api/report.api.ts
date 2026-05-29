@@ -65,7 +65,7 @@ export function normalizeAllLoanReportItem(
   return {
     srNo: readNumber(r.srNo, index + 1),
     lmsId: readString(r.lmsId),
-    loanAccountNo: readString(r.loanAccountNo),
+    loanAccountNo: readString(r.loanAccountNo, r.invoiceNo),
     productType: readString(r.productType),
     productCode: readString(r.productCode),
     anchorName: readString(r.anchorName),
@@ -209,13 +209,29 @@ export function normalizeDpdReportItem(
 ): DpdReportItem {
   const r = raw as DpdReportApiRow & Record<string, unknown>;
   return {
-    'Sr No': readNumber(r['Sr No'], index + 1),
-    Customer: readString(r.Customer),
-    'Account No': readString(r['Account No']),
-    Outstanding: readNumber(r.Outstanding),
-    'Overdue Amt': readNumber(r['Overdue Amt']),
-    DPD: readNumber(r.DPD),
-    Bucket: readString(r.Bucket),
+    srNo: readNumber(r.srNo, index + 1),
+    lmsId: readString(r.lmsId),
+    invoiceNumber: readString(r.invoiceNumber),
+    invoiceDate: readString(r.invoiceDate),
+    loanAccountNumber: readString(r.loanAccountNumber),
+    programName: readString(r.programName),
+    productType: readString(r.productType),
+    bankName: readString(r.bankName),
+    anchorName: readString(r.anchorName),
+    borrowerName: readString(r.borrowerName),
+    disbursementDate: readString(r.disbursementDate),
+    dueDate: readString(r.dueDate),
+    tenure: readNumber(r.tenure),
+    principalOS: readNumber(r.principalOS),
+    principalDue: readNumber(r.principalDue),
+    interestOS: readNumber(r.interestOS),
+    interestDue: readNumber(r.interestDue),
+    penalDue: readNumber(r.penalDue),
+    totalOutstanding: readNumber(r.totalOutstanding),
+    dpd: readNumber(r.dpd),
+    principalDpd: readNumber(r.principalDpd),
+    interestDpd: readNumber(r.interestDpd),
+    bucket: readString(r.bucket),
   };
 }
 
@@ -245,20 +261,30 @@ export async function fetchDpdReportApi(
 }
 
 /**
- * Maps daily accrual API row to `DailyAccrualReportItem` (API key names preserved).
+ * Maps daily accrual API row to `DailyAccrualReportItem` (camelCase; legacy keys as fallback).
  */
 export function normalizeDailyAccrualReportItem(
   raw: unknown,
   index: number,
 ): DailyAccrualReportItem {
   const r = raw as DailyAccrualReportApiRow & Record<string, unknown>;
+  const dateRaw = r.date ?? r.Date;
+  const dateStr =
+    dateRaw instanceof Date
+      ? dateRaw.toLocaleDateString('en-GB')
+      : readString(dateRaw);
+
   return {
-    'Sr No': readNumber(r['Sr No'], index + 1),
-    'Account No': readString(r['Account No']),
-    Customer: readString(r.Customer),
-    'Daily Interest': readNumber(r['Daily Interest']),
-    Date: readString(r.Date),
-    Cumulative: readNumber(r.Cumulative),
+    srNo: readNumber(r.srNo, r['Sr No'], index + 1),
+    loanAccountNumber: readString(
+      r.loanAccountNumber,
+      r['Account No'],
+    ),
+    invoiceNumber: readString(r.invoiceNumber),
+    customer: readString(r.customer, r.Customer),
+    dailyInterest: readNumber(r.dailyInterest, r['Daily Interest']),
+    date: dateStr,
+    cumulative: readNumber(r.cumulative, r.Cumulative),
   };
 }
 
@@ -295,19 +321,24 @@ export function normalizeMonthlyAccrualReportItem(
   index: number,
 ): MonthlyAccrualReportItem {
   const r = raw as MonthlyAccrualReportApiRow & Record<string, unknown>;
-  const monthRaw = r.Month;
+  const monthRaw = r.month;
   const monthStr =
     monthRaw instanceof Date
       ? monthRaw.toISOString().slice(0, 10)
       : readString(monthRaw);
 
   return {
-    'Sr No': readNumber(r['Sr No'], index + 1),
-    'Account No': readString(r['Account No']),
-    Customer: readString(r.Customer),
-    'Interest Amount': readNumber(r['Interest Amount']),
-    Rate: readNumber(r.Rate),
-    Month: monthStr,
+    srNo: readNumber(r.srNo, index + 1),
+    loanAccountNumber: readString(r.loanAccountNumber),
+    invoiceNumber: readString(r.invoiceNumber),
+    anchorName: readString(r.anchorName),
+    bankName: readString(r.bankName),
+    customer: readString(r.customer),
+    accruedInterestAmount: readNumber(r.accruedInterestAmount),
+    postedInterestAmount: readNumber(r.postedInterestAmount),
+    rate: readNumber(r.rate),
+    month: monthStr,
+    postedDate: readString(r.postedDate),
   };
 }
 
@@ -337,7 +368,7 @@ export async function fetchMonthlyAccrualReportApi(
 }
 
 /**
- * Maps repayment API row to `RepaymentReportItem` (snake_case keys preserved).
+ * Maps repayment API row to `RepaymentReportItem` (snake_case; camelCase fallbacks).
  */
 export function normalizeRepaymentReportItem(
   raw: unknown,
@@ -346,33 +377,52 @@ export function normalizeRepaymentReportItem(
   const r = raw as RepaymentReportApiRow & Record<string, unknown>;
   return {
     id: readString(r.id, `repayment-${index}`),
-    sr_no: readNumber(r.sr_no, index + 1),
-    lms_id: readString(r.lms_id),
-    loan_ref_no: readString(r.loan_ref_no),
-    invoice_no: readString(r.invoice_no),
-    bank_name: readString(r.bank_name),
-    product_name: readString(r.product_name),
-    program_name: readString(r.program_name),
-    anchor_name: readString(r.anchor_name),
-    dealer_name: readString(r.dealer_name),
-    payment_date: readString(r.payment_date),
-    invoice_amount: readNumber(r.invoice_amount),
-    disbursed_amount: readNumber(r.disbursed_amount),
-    due_amount: readNumber(r.due_amount),
-    paid_amount: readNumber(r.paid_amount),
-    principal_settled: readNumber(r.principal_settled),
-    interest_settled: readNumber(r.interest_settled),
-    penal_interest_settled: readNumber(r.penal_interest_settled),
-    settlement_priority: readString(r.settlement_priority),
-    total_outstanding_amount: readNumber(r.total_outstanding_amount),
-    processed_by_user: readString(r.processed_by_user),
-    processed_on_date: readString(r.processed_on_date),
-    created_on: readString(r.created_on),
-    status: readString(r.status),
-    utr_no: readString(r.utr_no),
-    excess_amount: readNumber(r.excess_amount),
-    outstanding_interest: readNumber(r.outstanding_interest),
-    transaction_date: readString(r.transaction_date),
+    sr_no: readNumber(r.sr_no, r.srNo, index + 1),
+    lms_id: readString(r.lms_id, r.lmsId),
+    loan_ref_no: readString(r.loan_ref_no, r.loanAccountNumber),
+    invoice_no: readString(r.invoice_no, r.invoiceNumber),
+    bank_name: readString(r.bank_name, r.bankName),
+    product_name: readString(r.product_name, r.productName),
+    program_name: readString(r.program_name, r.programName),
+    anchor_name: readString(r.anchor_name, r.anchorName),
+    dealer_name: readString(r.dealer_name, r.borrowerName),
+    payment_date: formatReportDateString(
+      readString(r.payment_date, r.paymentDate),
+    ),
+    invoice_amount: readNumber(r.invoice_amount, r.invoiceValue),
+    disbursed_amount: readNumber(r.disbursed_amount, r.loanValue),
+    due_amount: readNumber(r.due_amount, r.dueAmount),
+    paid_amount: readNumber(r.paid_amount, r.paidAmount),
+    principal_settled: readNumber(r.principal_settled, r.principalSettled),
+    interest_settled: readNumber(r.interest_settled, r.interestSettled),
+    penal_interest_settled: readNumber(
+      r.penal_interest_settled,
+      r.penalInterestSettled,
+    ),
+    settlement_priority: readString(
+      r.settlement_priority,
+      r.settlementPriority,
+    ),
+    total_outstanding_amount: readNumber(
+      r.total_outstanding_amount,
+      r.totalOutstanding,
+    ),
+    processed_by_user: readString(r.processed_by_user, r.processedByUser),
+    processed_on_date: formatReportDateString(
+      readString(r.processed_on_date, r.processedOnDate),
+    ),
+    created_on: formatReportDateString(readString(r.created_on, r.createdDate)),
+    status: readString(r.status, r.loanStatus),
+    utr_no: readString(r.utr_no, r.utrNo),
+    excess_amount: readNumber(r.excess_amount, r.excessAmount),
+    outstanding_interest: readNumber(r.outstanding_interest, r.interestOS),
+    principal_amount: readNumber(r.principal_amount, r.principalAmount),
+    interest_amount: readNumber(r.interest_amount, r.interestAmount),
+    penal_amount: readNumber(r.penal_amount, r.penalAmount),
+    principal_os: readNumber(r.principal_os, r.principalOS, r.PrincipalOS),
+    transaction_date: formatReportDateString(
+      readString(r.transaction_date, r.transactionDate),
+    ),
   };
 }
 
@@ -445,12 +495,16 @@ export function normalizeInvoiceOutstandingReportItem(
     tranchNumber: readString(r.tranchNumber),
     invoiceDate: formatReportDateString(readString(r.invoiceDate)),
     disbursementDate: formatReportDateString(readString(r.disbursementDate)),
+    invoiceStatus: readString(r.invoiceStatus),
     maturityDate: formatReportDateString(readString(r.maturityDate)),
     roi: formatRoiString(r.roi),
     invoiceValue: readNumber(r.invoiceValue),
     loanValue: readNumber(r.loanValue),
     disbursementAmount: readNumber(r.disbursementAmount),
     principalOS,
+    interestOS: readNumber(r.interestOS),
+    penalOS: readNumber(r.penalOS),
+    closedDate: formatReportDateString(readString(r.closedDate)),
   };
 }
 
@@ -493,7 +547,7 @@ export function normalizeLoanStatusReportItem(
     programTypeName: readString(r.programTypeName),
     anchorName: readString(r.anchorName),
     anchorPan: readString(r.anchorPan),
-    loanAccNo: readString(r.loanAccNo),
+    loanAccNo: readString(r.loanAccNo, r.loanAccountNumber),
     borrowerName: readString(r.borrowerName),
     borrowerPan: readString(r.borrowerPan),
     borrowerConstitution: readString(r.borrowerConstitution),
@@ -511,7 +565,7 @@ export function normalizeLoanStatusReportItem(
     excessAmount: readNumber(r.excessAmount, r.excessamount),
     rmName: readString(r.rmName, r.rmname),
     borrowerCifNo: readString(r.borrowerCifNo),
-    status: readString(r.status),
+    status: readString(r.status, r.loanStatus),
     loanTenure: tenure,
     generatedDate: formatReportDateString(
       readString(r.generatedDate, r.generateddate),
@@ -630,7 +684,7 @@ export function normalizeUtilizationReportItem(
     anchorPan: readString(r.anchorPan),
     borrowerName: readString(r.borrowerName),
     borrowerPan: readString(r.borrowerPan),
-    lan: readString(r.lan),
+    lan: readString(r.lan, r.loanAccountNumber),
     programName: readString(r.programName),
     programTypeName: readString(r.programTypeName),
     masterProgramName: readString(r.masterProgramName),
@@ -644,7 +698,7 @@ export function normalizeUtilizationReportItem(
     limitExpiryDate: formatReportDateString(readString(r.limitExpiryDate)),
     sanctionedLimit: readNumber(r.sanctionedLimit),
     totalUtilizedLimit: readNumber(r.totalUtilizedLimit),
-    netAvailableLimit: readNumber(r.netAvailableLimit),
+    netAvailableLimit: readNumber(r.netAvailableLimit, r.netavailablelimit),
     totalPrincipalOS: readNumber(
       r.totalPrincipalOS,
       r.totalPrincipalOs,

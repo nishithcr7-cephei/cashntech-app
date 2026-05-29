@@ -22,7 +22,7 @@ import {runGSTInvoiceExtractionWithAI} from '@services/ocr';
 import {InvoiceForm} from '@components/InvoiceForm';
 import {InvoiceCamera} from '@components/InvoiceCamera';
 import {UploadModal} from '@components/index';
-import type {InvoiceFields, InvoiceLineItem} from '../../types/Invoice';
+import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import type {GSTInvoiceJSON} from '@services/gstInvoiceExtractor';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {Camera, Upload, AI, Plus, LeftChevron} from '@assets/Icons';
@@ -57,6 +57,7 @@ import {
   selectPermissionsError,
 } from '@store/permissions';
 import type {DealerInfoParticipant} from '@store/invoice/inv.types';
+import {getParticipantAvailableLimit} from '@utils/normalizeDealerInfo';
 import {decryptValue} from '@utils/decrypt';
 import {invoiceApi} from '@services/api/invoice.api';
 
@@ -572,8 +573,7 @@ export const CreateInvoice: React.FC = () => {
         }
 
         // Fetch fresh dealerInfo for this program to get accurate available limit.
-        // This matches the Web Portal's behavior of computing availableLimit = sanctioned_limit - utilized_amount
-        // from the dealerInfo response at the time the edit screen is loaded.
+        // Available limit = sanctioned - utilized - pipeline_requests (matches backend).
         if (data.program?.id) {
           invoiceApi.getDealerInfo(data.program.id)
             .then((dealerRes: any) => {
@@ -612,11 +612,15 @@ export const CreateInvoice: React.FC = () => {
               }
 
               if (matchedP) {
-                const sanctioned = parseFloat(String(matchedP.sanctioned_limit ?? '0')) || 0;
-                const utilized = parseFloat(String(matchedP.utilized_amount ?? '0')) || 0;
-                setApmAvailableLimit(sanctioned - utilized);
+                const availableLimit = getParticipantAvailableLimit(matchedP);
+                setApmAvailableLimit(availableLimit);
                 setSelectedParticipant(matchedP);
-                console.log('[EditMode] availableLimit calculated:', sanctioned - utilized, 'for participant:', matchedP.id);
+                console.log(
+                  '[EditMode] availableLimit calculated:',
+                  availableLimit,
+                  'for participant:',
+                  matchedP.id,
+                );
               } else {
                 // Participant not found in fresh dealerInfo — use 0 to be safe (will block if invoice total > 0)
                 setApmAvailableLimit(0);
@@ -980,9 +984,7 @@ export const CreateInvoice: React.FC = () => {
       }
 
       if (participant) {
-        const sanctioned = parseFloat(String(participant.sanctioned_limit || (participant as any).sanctionedLimit || '0')) || 0;
-        const utilized = parseFloat(String(participant.utilized_amount || (participant as any).utilizedAmount || '0')) || 0;
-        const availableLimit = sanctioned - utilized;
+        const availableLimit = getParticipantAvailableLimit(participant);
 
         if (invoiceTotal > availableLimit) {
           Alert.alert(
@@ -1305,7 +1307,8 @@ export const CreateInvoice: React.FC = () => {
   const creditToOptions = useMemo(
     () => {
       // Use bank_details from party root if available
-      const details = (dealerInfo as any)?.bank_details || dealerInfo?.party?.party_bank_details;
+      const details =
+        dealerInfo?.bank_details || dealerInfo?.party?.party_bank_details;
       return details?.map((b: any) => ({
         label: decryptValue(b.account_number ?? '') || b.account_number,
         value: b.account_number,

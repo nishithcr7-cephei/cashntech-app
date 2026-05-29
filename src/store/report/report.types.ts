@@ -15,6 +15,7 @@ export type AllLoansReportApiRow = {
   srNo?: number;
   lmsId?: string;
   loanAccountNo?: string;
+  invoiceNo?: string;
   productType?: string;
   productCode?: string;
   anchorName?: string;
@@ -175,29 +176,61 @@ export type DpdReportRequestPayload = {
 };
 
 /**
- * Raw DPD / overdue API row (keys match API, including spaces).
+ * Raw DPD / overdue API row (camelCase keys).
  */
 export type DpdReportApiRow = Partial<{
-  'Sr No': number | string;
-  Customer: string;
-  'Account No': string;
-  Outstanding: number | string;
-  'Overdue Amt': number | string;
-  DPD: number | string;
-  Bucket: string;
+  srNo: number | string;
+  lmsId: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  loanAccountNumber: string;
+  programName: string;
+  productType: string;
+  bankName: string;
+  anchorName: string;
+  borrowerName: string;
+  disbursementDate: string;
+  dueDate: string;
+  tenure: number | string;
+  principalOS: number | string;
+  principalDue: number | string;
+  interestOS: number | string;
+  interestDue: number | string;
+  penalDue: number | string;
+  totalOutstanding: number | string;
+  dpd: number | string;
+  principalDpd: number | string;
+  interestDpd: number | string;
+  bucket: string;
 }>;
 
 /**
- * Normalized DPD row — keys match API response exactly (quoted where spaces).
+ * Normalized DPD row.
  */
 export type DpdReportItem = {
-  'Sr No': number;
-  Customer: string;
-  'Account No': string;
-  Outstanding: number;
-  'Overdue Amt': number;
-  DPD: number;
-  Bucket: string;
+  srNo: number;
+  lmsId: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  loanAccountNumber: string;
+  programName: string;
+  productType: string;
+  bankName: string;
+  anchorName: string;
+  borrowerName: string;
+  disbursementDate: string;
+  dueDate: string;
+  tenure: number;
+  principalOS: number;
+  principalDue: number;
+  interestOS: number;
+  interestDue: number;
+  penalDue: number;
+  totalOutstanding: number;
+  dpd: number;
+  principalDpd: number;
+  interestDpd: number;
+  bucket: string;
 };
 
 /**
@@ -210,27 +243,36 @@ export type DailyAccrualReportRequestPayload = {
 };
 
 /**
- * Raw daily accrual API row (keys match API, including spaces).
+ * Raw daily accrual API row (camelCase from backend; legacy spaced keys supported).
  */
 export type DailyAccrualReportApiRow = Partial<{
+  srNo: number | string;
+  loanAccountNumber: string;
+  invoiceNumber: string;
+  customer: string;
+  dailyInterest: number | string;
+  date: string | Date;
+  cumulative: number | string;
+  /** @deprecated legacy API keys */
   'Sr No': number | string;
   'Account No': string;
   Customer: string;
   'Daily Interest': number | string;
-  Date: string;
+  Date: string | Date;
   Cumulative: number | string;
 }>;
 
 /**
- * Normalized daily accrual row — keys match API response exactly.
+ * Normalized daily accrual row (camelCase).
  */
 export type DailyAccrualReportItem = {
-  'Sr No': number;
-  'Account No': string;
-  Customer: string;
-  'Daily Interest': number;
-  Date: string;
-  Cumulative: number;
+  srNo: number;
+  loanAccountNumber: string;
+  invoiceNumber: string;
+  customer: string;
+  dailyInterest: number;
+  date: string;
+  cumulative: number;
 };
 
 /**
@@ -243,27 +285,37 @@ export type MonthlyAccrualReportRequestPayload = {
 };
 
 /**
- * Raw monthly accrual API row (keys match API, including spaces).
+ * Raw monthly accrual API row (camelCase keys).
  */
 export type MonthlyAccrualReportApiRow = Partial<{
-  'Sr No': number | string;
-  'Account No': string;
-  Customer: string;
-  'Interest Amount': number | string;
-  Rate: number | string;
-  Month: string;
+  srNo: number | string;
+  loanAccountNumber: string;
+  invoiceNumber: string;
+  anchorName: string;
+  bankName: string;
+  customer: string;
+  accruedInterestAmount: number | string;
+  postedInterestAmount: number | string;
+  rate: number | string;
+  month: string;
+  postedDate: string;
 }>;
 
 /**
- * Normalized monthly accrual row — keys match API response exactly.
+ * Normalized monthly accrual row.
  */
 export type MonthlyAccrualReportItem = {
-  'Sr No': number;
-  'Account No': string;
-  Customer: string;
-  'Interest Amount': number;
-  Rate: number;
-  Month: string;
+  srNo: number;
+  loanAccountNumber: string;
+  invoiceNumber: string;
+  anchorName: string;
+  bankName: string;
+  customer: string;
+  accruedInterestAmount: number;
+  postedInterestAmount: number;
+  rate: number;
+  month: string;
+  postedDate: string;
 };
 
 /**
@@ -281,32 +333,68 @@ export type RepaymentReportRequestPayload = {
 export type RepaymentReportApiRow = {
   id?: string;
   sr_no?: number | string;
+  srNo?: number | string;
   lms_id?: string;
+  lmsId?: string;
   loan_ref_no?: string;
+  loanAccountNumber?: string;
   invoice_no?: string;
+  invoiceNumber?: string;
   bank_name?: string;
+  bankName?: string;
   product_name?: string;
+  productName?: string;
   program_name?: string;
+  programName?: string;
   anchor_name?: string;
+  anchorName?: string;
   dealer_name?: string;
+  borrowerName?: string;
   payment_date?: string;
+  paymentDate?: string;
   invoice_amount?: number | string;
+  invoiceValue?: number | string;
   disbursed_amount?: number | string;
+  loanValue?: number | string;
   due_amount?: number | string;
+  dueAmount?: number | string;
   paid_amount?: number | string;
+  paidAmount?: number | string;
   principal_settled?: number | string;
+  principalSettled?: number | string;
   interest_settled?: number | string;
+  interestSettled?: number | string;
   penal_interest_settled?: number | string;
+  penalInterestSettled?: number | string;
   settlement_priority?: string;
+  settlementPriority?: string;
   total_outstanding_amount?: number | string;
+  totalOutstanding?: number | string;
   processed_by_user?: string;
+  processedByUser?: string;
   processed_on_date?: string;
+  processedOnDate?: string;
   created_on?: string;
+  createdDate?: string;
   status?: string;
+  loanStatus?: string;
   utr_no?: string;
+  utrNo?: string;
   excess_amount?: number | string;
+  excessAmount?: number | string;
   outstanding_interest?: number | string;
+  interestOS?: number | string;
+  principal_amount?: number | string;
+  principalAmount?: number | string;
+  interest_amount?: number | string;
+  interestAmount?: number | string;
+  penal_amount?: number | string;
+  penalAmount?: number | string;
+  PrincipalOS?: number | string;
+  principal_os?: number | string;
+  principalOS?: number | string;
   transaction_date?: string;
+  transactionDate?: string;
 };
 
 /**
@@ -337,6 +425,7 @@ export type InvoiceOutstandingReportApiRow = {
   tranchNumber?: string;
   invoiceDate?: string;
   disbursementDate?: string;
+  invoiceStatus?: string;
   maturityDate?: string;
   roi?: number | string;
   invoiceValue?: number | string;
@@ -344,6 +433,9 @@ export type InvoiceOutstandingReportApiRow = {
   disbursementAmount?: number | string;
   principalOS?: number | string;
   outstandingprincipal?: number | string;
+  interestOS?: number | string;
+  penalOS?: number | string;
+  closedDate?: string;
 };
 
 /**
@@ -367,6 +459,10 @@ export type InvoiceOutstandingReportItem = {
   loanValue: number;
   disbursementAmount: number;
   principalOS: number;
+  interestOS: number;
+  penalOS: number;
+  invoiceStatus: string;
+  closedDate: string;
 };
 
 /**
@@ -387,6 +483,7 @@ export type LoanStatusReportApiRow = {
   anchorName?: string;
   anchorPan?: string;
   loanAccNo?: string;
+  loanAccountNumber?: string;
   borrowerName?: string;
   borrowerPan?: string;
   borrowerConstitution?: string;
@@ -411,7 +508,9 @@ export type LoanStatusReportApiRow = {
   rmname?: string;
   borrowerCifNo?: string;
   status?: string;
+  loanStatus?: string;
   loanTenure?: number | string;
+  utilizedAmount?: number | string;
   generatedDate?: string;
   generateddate?: string;
   eodDate?: string;
@@ -561,6 +660,7 @@ export type UtilizationReportApiRow = {
   borrowerName?: string;
   borrowerPan?: string;
   lan?: string;
+  loanAccountNumber?: string;
   programName?: string;
   programTypeName?: string;
   masterProgramName?: string;
@@ -649,6 +749,10 @@ export type RepaymentReportItem = {
   utr_no: string;
   excess_amount: number;
   outstanding_interest: number;
+  principal_amount: number;
+  interest_amount: number;
+  penal_amount: number;
+  principal_os: number;
   transaction_date: string;
 };
 

@@ -18,6 +18,8 @@ import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportExport} from '@hooks/useReportExport';
+import {ALL_LOAN_EXPORT_COLUMNS} from '@utils/reportExportColumns';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -70,9 +72,20 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   </View>
 );
 
-const buildInitialFields = (item: AllLoanReportItem): FieldDef[] => [
-  {label: 'LMS ID', value: formatText(item.lmsId)},
+const INITIAL_VISIBLE_FIELD_COUNT = 6;
+
+const buildAllListFields = (item: AllLoanReportItem): FieldDef[] => [
+  {label: 'Lms Id', value: formatText(item.lmsId)},
   {label: 'Loan Account No', value: formatText(item.loanAccountNo)},
+  {label: 'Od Account No', value: formatText(item.odAccountNo)},
+  {label: 'Product Type', value: formatText(item.productType)},
+  {label: 'Product Code', value: formatText(item.productCode)},
+  {label: 'Anchor Name', value: formatText(item.anchorName)},
+  {label: 'Vendor Dealer Name', value: formatText(item.vendorDealerName)},
+  {label: 'Bank Name', value: formatText(item.bankName)},
+  {label: 'Sanction Amount', value: formatAmount(item.sanctionAmount)},
+  {label: 'Disbursed Amount', value: formatAmount(item.disbursedAmount)},
+  {label: 'Outstanding Amount', value: formatAmount(item.outstandingAmount)},
   {
     label: 'Loan Status',
     value: formatText(item.loanStatus),
@@ -81,21 +94,10 @@ const buildInitialFields = (item: AllLoanReportItem): FieldDef[] => [
         ? {color: Colors.green, fontFamily: Fonts.GilroySemiBold}
         : undefined,
   },
-  {label: 'Vendor / Dealer Name', value: formatText(item.vendorDealerName)},
-  {label: 'Product Type', value: formatText(item.productType)},
-  {label: 'Product Code', value: formatText(item.productCode)},
-];
-
-const buildExpandedFields = (item: AllLoanReportItem): FieldDef[] => [
-  {label: 'Anchor Name', value: formatText(item.anchorName)},
-  {label: 'Bank Name', value: formatText(item.bankName)},
-  {label: 'Sanction Amount', value: formatAmount(item.sanctionAmount)},
-  {label: 'Disbursed Amount', value: formatAmount(item.disbursedAmount)},
-  {label: 'Outstanding Amount', value: formatAmount(item.outstandingAmount)},
   {label: 'Disbursement Date', value: formatText(item.disbursementDate)},
   {label: 'Due Date', value: formatText(item.dueDate)},
-  {label: 'Tenor (Days)', value: formatText(item.tenor)},
-  {label: 'Interest Rate', value: formatText(item.roi)},
+  {label: 'Tenor', value: formatText(item.tenor)},
+  {label: 'Roi', value: formatText(item.roi)},
   {label: 'Repaid Amount', value: formatAmount(item.repaidAmount)},
   {
     label: 'Principal Outstanding',
@@ -109,8 +111,8 @@ const buildExpandedFields = (item: AllLoanReportItem): FieldDef[] => [
     label: 'Charges Outstanding',
     value: formatAmount(item.chargesOutstanding),
   },
-  {label: 'DPD', value: formatText(item.dpd)},
-  {label: 'NPA Status', value: formatText(item.npaStatus)},
+  {label: 'Dpd', value: formatText(item.dpd)},
+  {label: 'Npa Status', value: formatText(item.npaStatus)},
   {label: 'Last Repayment Date', value: formatText(item.lastRepaymentDate)},
   {
     label: 'Last Repayment Amount',
@@ -118,11 +120,16 @@ const buildExpandedFields = (item: AllLoanReportItem): FieldDef[] => [
   },
   {label: 'Overdue Amount', value: formatAmount(item.overdueAmount)},
   {label: 'Settlement Status', value: formatText(item.settlementStatus)},
-  {label: 'OD Account No', value: formatText(item.odAccountNo)},
   {label: 'Branch Name', value: formatText(item.branchName)},
   {label: 'Created By', value: formatText(item.createdBy)},
   {label: 'Created Date', value: formatText(item.createdDate)},
 ];
+
+const buildInitialFields = (item: AllLoanReportItem): FieldDef[] =>
+  buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT);
+
+const buildExpandedFields = (item: AllLoanReportItem): FieldDef[] =>
+  buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT);
 
 export const AllLoanReportScreen: React.FC = () => {
   const navigation = useNavigation<
@@ -190,14 +197,13 @@ export const AllLoanReportScreen: React.FC = () => {
     setExpandedIds(prev => ({...prev, [rowKey]: !prev[rowKey]}));
   };
 
-  const handleExport = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Export',
-      text2: 'Excel export will be available in a future update.',
-      visibilityTime: 2500,
-    });
-  };
+  const {handleExport, exporting} = useReportExport({
+    reportTitle: 'All Loans Report',
+    filename: 'all-loans-report',
+    columns: ALL_LOAN_EXPORT_COLUMNS,
+    getExportRows: () => filteredData,
+    appliedFilters,
+  });
 
   const renderItem: ListRenderItem<AllLoanReportItem> = useCallback(
     ({item, index}) => {
@@ -256,7 +262,10 @@ export const AllLoanReportScreen: React.FC = () => {
           <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
           <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+        <TouchableOpacity
+          style={[styles.exportButton, exporting && {opacity: 0.6}]}
+          onPress={handleExport}
+          disabled={exporting}>
           <FontAwesome6
             name="file-excel"
             iconStyle="solid"

@@ -6,6 +6,8 @@ export type DealerInfoParticipant = {
   party: {id: string; entity_name: string};
   sanctioned_limit?: number | string;
   utilized_amount?: number | string;
+  /** Pending invoice total (non-disbursed/closed/rejected) — used for available limit. */
+  pipeline_requests?: number | string;
 };
 
 export type PartyBankDetail = {
@@ -29,6 +31,8 @@ export type DealerInfoResponse = {
     party_bank_details: PartyBankDetail[];
   };
   participants: DealerInfoParticipant[];
+  /** Program bank accounts for credit-to (aggregated from flat dealer-info rows). */
+  bank_details?: PartyBankDetail[];
 };
 
 export type PartnerBank = {

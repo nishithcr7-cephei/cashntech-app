@@ -18,6 +18,8 @@ import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportExport} from '@hooks/useReportExport';
+import {REPAYMENT_EXPORT_COLUMNS} from '@utils/reportExportColumns';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -72,7 +74,7 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
 );
 
 const buildAllListFields = (item: RepaymentReportItem): FieldDef[] => [
-  {label: 'LMS ID', value: formatText(item.lms_id)},
+  {label: 'Lms Id', value: formatText(item.lms_id)},
   {label: 'Loan Ref No', value: formatText(item.loan_ref_no)},
   {label: 'Invoice No', value: formatText(item.invoice_no)},
   {label: 'Bank Name', value: formatText(item.bank_name)},
@@ -96,12 +98,18 @@ const buildAllListFields = (item: RepaymentReportItem): FieldDef[] => [
     value: formatText(item.settlement_priority),
   },
   {
-    label: 'Total Outstanding',
+    label: 'Total Outstanding Amount',
     value: formatAmount(item.total_outstanding_amount),
   },
-  {label: 'Processed By', value: formatText(item.processed_by_user)},
-  {label: 'Processed On', value: formatText(item.processed_on_date)},
+  {label: 'Outstanding Interest', value: formatAmount(item.outstanding_interest)},
+  {label: 'Principal Amount', value: formatAmount(item.principal_amount)},
+  {label: 'Interest Amount', value: formatAmount(item.interest_amount)},
+  {label: 'Penal Amount', value: formatAmount(item.penal_amount)},
+  {label: 'Principal O S', value: formatAmount(item.principal_os)},
+  {label: 'Processed By User', value: formatText(item.processed_by_user)},
+  {label: 'Processed On Date', value: formatText(item.processed_on_date)},
   {label: 'Created On', value: formatText(item.created_on)},
+  {label: 'Transaction Date', value: formatText(item.transaction_date)},
   {
     label: 'Status',
     value: formatText(item.status),
@@ -110,13 +118,8 @@ const buildAllListFields = (item: RepaymentReportItem): FieldDef[] => [
         ? {color: Colors.green, fontFamily: Fonts.GilroySemiBold}
         : undefined,
   },
-  {label: 'UTR No', value: formatText(item.utr_no)},
+  {label: 'Utr No', value: formatText(item.utr_no)},
   {label: 'Excess Amount', value: formatAmount(item.excess_amount)},
-  {
-    label: 'Outstanding Interest',
-    value: formatAmount(item.outstanding_interest),
-  },
-  {label: 'Transaction Date', value: formatText(item.transaction_date)},
 ];
 
 const buildInitialFields = (item: RepaymentReportItem): FieldDef[] =>
@@ -195,14 +198,13 @@ export const RepaymentReportScreen: React.FC = () => {
     setExpandedIds(prev => ({...prev, [rowKey]: !prev[rowKey]}));
   };
 
-  const handleExport = () => {
-    Toast.show({
-      type: 'info',
-      text1: 'Export',
-      text2: 'Excel export will be available in a future update.',
-      visibilityTime: 2500,
-    });
-  };
+  const {handleExport, exporting} = useReportExport({
+    reportTitle: 'Repayment Report',
+    filename: 'repayment-report',
+    columns: REPAYMENT_EXPORT_COLUMNS,
+    getExportRows: () => filteredData,
+    appliedFilters,
+  });
 
   const renderItem: ListRenderItem<RepaymentReportItem> = useCallback(
     ({item, index}) => {
@@ -261,7 +263,10 @@ export const RepaymentReportScreen: React.FC = () => {
           <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
           <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+        <TouchableOpacity
+          style={[styles.exportButton, exporting && {opacity: 0.6}]}
+          onPress={handleExport}
+          disabled={exporting}>
           <FontAwesome6
             name="file-excel"
             iconStyle="solid"
