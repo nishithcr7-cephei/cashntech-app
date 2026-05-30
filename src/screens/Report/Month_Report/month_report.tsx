@@ -280,7 +280,7 @@ export const MonthlyInterestReportScreen: React.FC = () => {
             </View>
           )
         }
-        refreshing={loading}
+        refreshing={loading && filteredData.length > 0}
         onRefresh={refetch}
       />
 

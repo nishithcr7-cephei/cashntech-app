@@ -32,6 +32,7 @@ import type {
   DpdReportItem,
   DpdReportRequestPayload,
 } from '@store/report/report.types';
+import {formatReportDisplayDate} from '@utils/reportDateFormat';
 
 function readNumber(
   ...values: Array<number | string | undefined | null>
@@ -75,8 +76,8 @@ export function normalizeAllLoanReportItem(
     disbursedAmount: readNumber(r.disbursedAmount),
     outstandingAmount: readNumber(r.outstandingAmount),
     loanStatus: readString(r.loanStatus),
-    disbursementDate: readString(r.disbursementDate),
-    dueDate: readString(r.dueDate),
+    disbursementDate: formatReportDisplayDate(readString(r.disbursementDate)),
+    dueDate: formatReportDisplayDate(readString(r.dueDate)),
     tenor: readNumber(r.tenor),
     roi: readString(r.roi, '0%'),
     repaidAmount: readNumber(r.repaidamount, r.repaidAmount),
@@ -94,9 +95,8 @@ export function normalizeAllLoanReportItem(
     ),
     dpd: readNumber(r.dpd),
     npaStatus: readString(r.npastatus, r.npaStatus),
-    lastRepaymentDate: readString(
-      r.lastRepaymentDate,
-      r.lastrepaymentdate,
+    lastRepaymentDate: formatReportDisplayDate(
+      readString(r.lastRepaymentDate, r.lastrepaymentdate),
     ),
     lastRepaymentAmount: readNumber(
       r.lastRepaymentAmount,
@@ -110,7 +110,7 @@ export function normalizeAllLoanReportItem(
     odAccountNo: readString(r.oDAccountNo, r.odAccountNo),
     branchName: readString(r.branchName),
     createdBy: readString(r.createdBy),
-    createdDate: readString(r.createdDate),
+    createdDate: formatReportDisplayDate(readString(r.createdDate)),
   };
 }
 
@@ -159,9 +159,9 @@ export function normalizeDisbursementReportItem(
     invoiceNumber: readString(r.invoiceNumber),
     tranchNumber: readString(r.tranchNumber),
     finnone_bill_no: readString(r.finnone_bill_no),
-    invoiceDate: readString(r.invoiceDate),
-    disbursementDate: readString(r.disbursementDate),
-    maturityDate: readString(r.maturityDate),
+    invoiceDate: formatReportDisplayDate(readString(r.invoiceDate)),
+    disbursementDate: formatReportDisplayDate(readString(r.disbursementDate)),
+    maturityDate: formatReportDisplayDate(readString(r.maturityDate)),
     invoiceValue: readNumber(r.invoiceValue),
     loanValue: readNumber(r.loanValue),
     disbursementAmount: readNumber(r.disbursementAmount),
@@ -173,7 +173,7 @@ export function normalizeDisbursementReportItem(
     status: readString(r.status),
     utrNo: readString(r.utrNo),
     message: readString(r.message),
-    generatedDate: readString(r.generatedDate),
+    generatedDate: formatReportDisplayDate(readString(r.generatedDate)),
   };
 }
 
@@ -212,15 +212,15 @@ export function normalizeDpdReportItem(
     srNo: readNumber(r.srNo, index + 1),
     lmsId: readString(r.lmsId),
     invoiceNumber: readString(r.invoiceNumber),
-    invoiceDate: readString(r.invoiceDate),
+    invoiceDate: formatReportDisplayDate(readString(r.invoiceDate)),
     loanAccountNumber: readString(r.loanAccountNumber),
     programName: readString(r.programName),
     productType: readString(r.productType),
     bankName: readString(r.bankName),
     anchorName: readString(r.anchorName),
     borrowerName: readString(r.borrowerName),
-    disbursementDate: readString(r.disbursementDate),
-    dueDate: readString(r.dueDate),
+    disbursementDate: formatReportDisplayDate(readString(r.disbursementDate)),
+    dueDate: formatReportDisplayDate(readString(r.dueDate)),
     tenure: readNumber(r.tenure),
     principalOS: readNumber(r.principalOS),
     principalDue: readNumber(r.principalDue),
@@ -269,10 +269,9 @@ export function normalizeDailyAccrualReportItem(
 ): DailyAccrualReportItem {
   const r = raw as DailyAccrualReportApiRow & Record<string, unknown>;
   const dateRaw = r.date ?? r.Date;
-  const dateStr =
-    dateRaw instanceof Date
-      ? dateRaw.toLocaleDateString('en-GB')
-      : readString(dateRaw);
+  const dateStr = formatReportDisplayDate(
+    dateRaw instanceof Date ? dateRaw : readString(dateRaw),
+  );
 
   return {
     srNo: readNumber(r.srNo, r['Sr No'], index + 1),
@@ -324,8 +323,8 @@ export function normalizeMonthlyAccrualReportItem(
   const monthRaw = r.month;
   const monthStr =
     monthRaw instanceof Date
-      ? monthRaw.toISOString().slice(0, 10)
-      : readString(monthRaw);
+      ? formatReportDisplayDate(monthRaw)
+      : formatReportDisplayDate(readString(monthRaw));
 
   return {
     srNo: readNumber(r.srNo, index + 1),
@@ -338,7 +337,7 @@ export function normalizeMonthlyAccrualReportItem(
     postedInterestAmount: readNumber(r.postedInterestAmount),
     rate: readNumber(r.rate),
     month: monthStr,
-    postedDate: readString(r.postedDate),
+    postedDate: formatReportDisplayDate(readString(r.postedDate)),
   };
 }
 
@@ -386,7 +385,7 @@ export function normalizeRepaymentReportItem(
     program_name: readString(r.program_name, r.programName),
     anchor_name: readString(r.anchor_name, r.anchorName),
     dealer_name: readString(r.dealer_name, r.borrowerName),
-    payment_date: formatReportDateString(
+    payment_date: formatReportDisplayDate(
       readString(r.payment_date, r.paymentDate),
     ),
     invoice_amount: readNumber(r.invoice_amount, r.invoiceValue),
@@ -408,10 +407,10 @@ export function normalizeRepaymentReportItem(
       r.totalOutstanding,
     ),
     processed_by_user: readString(r.processed_by_user, r.processedByUser),
-    processed_on_date: formatReportDateString(
+    processed_on_date: formatReportDisplayDate(
       readString(r.processed_on_date, r.processedOnDate),
     ),
-    created_on: formatReportDateString(readString(r.created_on, r.createdDate)),
+    created_on: formatReportDisplayDate(readString(r.created_on, r.createdDate)),
     status: readString(r.status, r.loanStatus),
     utr_no: readString(r.utr_no, r.utrNo),
     excess_amount: readNumber(r.excess_amount, r.excessAmount),
@@ -420,7 +419,7 @@ export function normalizeRepaymentReportItem(
     interest_amount: readNumber(r.interest_amount, r.interestAmount),
     penal_amount: readNumber(r.penal_amount, r.penalAmount),
     principal_os: readNumber(r.principal_os, r.principalOS, r.PrincipalOS),
-    transaction_date: formatReportDateString(
+    transaction_date: formatReportDisplayDate(
       readString(r.transaction_date, r.transactionDate),
     ),
   };
@@ -449,17 +448,6 @@ export async function fetchRepaymentReportApi(
   return rowsUnknown.map((row, index) =>
     normalizeRepaymentReportItem(row, index),
   );
-}
-
-function formatReportDateString(val: string | undefined | null): string {
-  if (val == null || val === '' || val === '-') {
-    return '-';
-  }
-  const t = Date.parse(val);
-  if (Number.isNaN(t)) {
-    return String(val);
-  }
-  return new Date(t).toLocaleDateString('en-GB');
 }
 
 function formatRoiString(val: string | number | undefined | null): string {
@@ -493,10 +481,10 @@ export function normalizeInvoiceOutstandingReportItem(
     schemeType,
     invoiceNumber: readString(r.invoiceNumber),
     tranchNumber: readString(r.tranchNumber),
-    invoiceDate: formatReportDateString(readString(r.invoiceDate)),
-    disbursementDate: formatReportDateString(readString(r.disbursementDate)),
+    invoiceDate: formatReportDisplayDate(readString(r.invoiceDate)),
+    disbursementDate: formatReportDisplayDate(readString(r.disbursementDate)),
     invoiceStatus: readString(r.invoiceStatus),
-    maturityDate: formatReportDateString(readString(r.maturityDate)),
+    maturityDate: formatReportDisplayDate(readString(r.maturityDate)),
     roi: formatRoiString(r.roi),
     invoiceValue: readNumber(r.invoiceValue),
     loanValue: readNumber(r.loanValue),
@@ -504,7 +492,7 @@ export function normalizeInvoiceOutstandingReportItem(
     principalOS,
     interestOS: readNumber(r.interestOS),
     penalOS: readNumber(r.penalOS),
-    closedDate: formatReportDateString(readString(r.closedDate)),
+    closedDate: formatReportDisplayDate(readString(r.closedDate)),
   };
 }
 
@@ -556,9 +544,9 @@ export function normalizeLoanStatusReportItem(
     anchorState: readString(r.anchorState),
     anchorPincode: readString(r.anchorPincode),
     schemetype: schemeType,
-    loanSanctionDate: formatReportDateString(readString(r.loanSanctionDate)),
-    loanEndDate: formatReportDateString(readString(r.loanEndDate)),
-    loanlivedate: formatReportDateString(loanLiveDate),
+    loanSanctionDate: formatReportDisplayDate(readString(r.loanSanctionDate)),
+    loanEndDate: formatReportDisplayDate(readString(r.loanEndDate)),
+    loanlivedate: formatReportDisplayDate(loanLiveDate),
     sanctionedLimit: readNumber(r.sanctionedLimit, r.sanctionLimit),
     availableLimit: readNumber(r.availableLimit, r.availablelimit),
     roi: formatRoiString(r.roi),
@@ -567,10 +555,10 @@ export function normalizeLoanStatusReportItem(
     borrowerCifNo: readString(r.borrowerCifNo),
     status: readString(r.status, r.loanStatus),
     loanTenure: tenure,
-    generatedDate: formatReportDateString(
+    generatedDate: formatReportDisplayDate(
       readString(r.generatedDate, r.generateddate),
     ),
-    eodDate: formatReportDateString(readString(r.eodDate, r.eoddate)),
+    eodDate: formatReportDisplayDate(readString(r.eodDate, r.eoddate)),
   };
 }
 
@@ -620,9 +608,9 @@ export function normalizeAllProductOutstandingReportItem(
     buyerName: readString(r.buyerName),
     sellerName: readString(r.sellerName),
     invoiceNo: readString(r.invoiceNo),
-    invoiceDate: readString(r.invoiceDate),
-    disbursementDate: readString(r.disbursementDate),
-    dueDate: readString(r.dueDate),
+    invoiceDate: formatReportDisplayDate(readString(r.invoiceDate)),
+    disbursementDate: formatReportDisplayDate(readString(r.disbursementDate)),
+    dueDate: formatReportDisplayDate(readString(r.dueDate)),
     bankName: readString(r.bankName),
     sanctionAmount: readNumber(r.sanctionAmount),
     invoiceAmount: readNumber(r.invoiceAmount),
@@ -637,12 +625,12 @@ export function normalizeAllProductOutstandingReportItem(
     loanStatus: readString(r.loanStatus),
     settlementStatus: readString(r.settlementStatus),
     settlementPriority: readString(r.settlementPriority),
-    lastRepaymentDate: readString(r.lastRepaymentDate),
+    lastRepaymentDate: formatReportDisplayDate(readString(r.lastRepaymentDate)),
     lastRepaymentAmount: readNumber(r.lastRepaymentAmount),
     odAccountNo: readString(r.odAccountNo),
     branchName: readString(r.branchName),
     createdBy: readString(r.createdBy),
-    createdDate: readString(r.createdDate),
+    createdDate: formatReportDisplayDate(readString(r.createdDate)),
   };
 }
 
@@ -692,10 +680,10 @@ export function normalizeUtilizationReportItem(
     schemetype: readString(r.schemetype, r.schemeType),
     loanaccountroi: formatRoiString(r.loanaccountroi, r.loanAccountRoi),
     loanTenure: readNumber(r.loanTenure),
-    limitCreationDate: formatReportDateString(
+    limitCreationDate: formatReportDisplayDate(
       readString(r.limitCreationDate),
     ),
-    limitExpiryDate: formatReportDateString(readString(r.limitExpiryDate)),
+    limitExpiryDate: formatReportDisplayDate(readString(r.limitExpiryDate)),
     sanctionedLimit: readNumber(r.sanctionedLimit),
     totalUtilizedLimit: readNumber(r.totalUtilizedLimit),
     netAvailableLimit: readNumber(r.netAvailableLimit, r.netavailablelimit),
@@ -709,8 +697,8 @@ export function normalizeUtilizationReportItem(
     totalChargesDue: readNumber(r.totalChargesDue),
     totalAmountDue: readNumber(r.totalAmountDue),
     dpd: readNumber(r.dpd),
-    generationDate: formatReportDateString(readString(r.generationDate)),
-    eodDate: formatReportDateString(readString(r.eodDate)),
+    generationDate: formatReportDisplayDate(readString(r.generationDate)),
+    eodDate: formatReportDisplayDate(readString(r.eodDate)),
   };
 }
 

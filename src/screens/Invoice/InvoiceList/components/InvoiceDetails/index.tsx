@@ -174,6 +174,11 @@ export const InvoiceDetails: React.FC = () => {
             <Text style={styles.errorStateText}>{invoiceListError}</Text>
           </View>
         </ScrollView>
+      ) : invoiceListLoading && invoiceData.length === 0 ? (
+        <View style={styles.fullScreenLoading}>
+          <ActivityIndicator size="large" color={Colors.primaryColor} />
+          <Text style={styles.loadingText}>Loading Invoices...</Text>
+        </View>
       ) : (
         <>
           <FlatList
@@ -239,7 +244,12 @@ export const InvoiceDetails: React.FC = () => {
               />
             )}
             ListEmptyComponent={
-              !invoiceListLoading && filteredData.length === 0 ? (
+              invoiceListLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={Colors.primaryColor} />
+                  <Text style={styles.loadingText}>Loading Invoices...</Text>
+                </View>
+              ) : filteredData.length === 0 ? (
                 <View style={styles.loadingContainer}>
                   <Text style={styles.loadingText}>
                     {selectedDealerName

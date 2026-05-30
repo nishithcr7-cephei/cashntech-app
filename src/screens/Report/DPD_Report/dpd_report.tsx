@@ -72,7 +72,9 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   </View>
 );
 
-const buildListFields = (row: DpdReportItem): FieldDef[] => [
+const INITIAL_VISIBLE_FIELD_COUNT = 6;
+
+const buildAllListFields = (row: DpdReportItem): FieldDef[] => [
   {label: 'Lms Id', value: formatText(row.lmsId)},
   {label: 'Invoice Number', value: formatText(row.invoiceNumber)},
   {label: 'Invoice Date', value: formatText(row.invoiceDate)},
@@ -104,6 +106,16 @@ const buildListFields = (row: DpdReportItem): FieldDef[] => [
   {label: 'Bucket', value: formatText(row.bucket)},
 ];
 
+const buildInitialFields = (row: DpdReportItem): FieldDef[] =>
+  buildAllListFields(row).slice(0, INITIAL_VISIBLE_FIELD_COUNT);
+
+const buildExpandedFields = (row: DpdReportItem): FieldDef[] =>
+  buildAllListFields(row).slice(INITIAL_VISIBLE_FIELD_COUNT);
+
+function dpdRowKey(item: DpdReportItem, index: number): string {
+  return `${item.lmsId}-${item.invoiceNumber}-${item.loanAccountNumber}-${index}`;
+}
+
 export const DpdReportScreen: React.FC = () => {
   const navigation = useNavigation<
     CompositeNavigationProp<
@@ -125,6 +137,7 @@ export const DpdReportScreen: React.FC = () => {
   } = useReportApiFilter(fetchDpdReportRequest);
 
   const [searchText, setSearchText] = useState('');
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
 
   const filteredData = useMemo(() => {
@@ -165,6 +178,10 @@ export const DpdReportScreen: React.FC = () => {
     );
   }, [filteredData.length]);
 
+  const toggleExpanded = (rowKey: string) => {
+    setExpandedIds(prev => ({...prev, [rowKey]: !prev[rowKey]}));
+  };
+
   const {handleExport, exporting} = useReportExport({
     reportTitle: 'DPD / Overdue Report',
     filename: 'dpd-overdue-report',
@@ -175,10 +192,10 @@ export const DpdReportScreen: React.FC = () => {
 
   const renderItem: ListRenderItem<DpdReportItem> = useCallback(
     ({item, index}) => {
+      const rowKey = dpdRowKey(item, index);
+      const isExpanded = !!expandedIds[rowKey];
       const serialNo =
-        item.srNo != null && item.srNo > 0
-          ? item.srNo
-          : index + 1;
+        item.srNo != null && item.srNo > 0 ? item.srNo : index + 1;
 
       return (
         <View style={styles.cardWrapper}>
@@ -186,12 +203,25 @@ export const DpdReportScreen: React.FC = () => {
             <View style={styles.indexBadge}>
               <Text style={styles.indexText}>{serialNo}</Text>
             </View>
-            <InfoFieldGrid fields={buildListFields(item)} />
+            <InfoFieldGrid fields={buildInitialFields(item)} />
+            {isExpanded ? (
+              <View style={styles.expandedSection}>
+                <InfoFieldGrid fields={buildExpandedFields(item)} />
+              </View>
+            ) : null}
+            <TouchableOpacity
+              style={styles.expandButton}
+              onPress={() => toggleExpanded(rowKey)}
+              activeOpacity={0.7}>
+              <Text style={styles.expandButtonText}>
+                {isExpanded ? 'View Less' : 'View More'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       );
     },
-    [],
+    [expandedIds],
   );
 
   const listHeader = (
@@ -282,7 +312,7 @@ export const DpdReportScreen: React.FC = () => {
             </View>
           )
         }
-        refreshing={loading}
+        refreshing={loading && filteredData.length > 0}
         onRefresh={refetch}
       />
 
@@ -462,6 +492,19 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     color: Colors.darkblack,
     fontFamily: Fonts.GilroyMedium,
+  },
+  expandedSection: {
+    marginTop: scaleHeight(12),
+  },
+  expandButton: {
+    marginTop: scaleHeight(12),
+    alignItems: 'center',
+    paddingVertical: scaleHeight(4),
+  },
+  expandButtonText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
   },
   loader: {
     marginTop: scaleHeight(24),

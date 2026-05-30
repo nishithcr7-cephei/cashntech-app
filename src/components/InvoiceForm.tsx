@@ -71,6 +71,7 @@ type Props = {
   entityType?: 'dealer' | 'anchor'; // Role-based: 'dealer' for Anchor Maker/Checker, 'anchor' for Dealer Maker
   dealerOptions?: DropdownOption[];
   creditToOptions?: DropdownOption[];
+  tenorOptions?: DropdownOption[];
   bankOptions?: DropdownOption[];
   selectedBankId?: string;
   onBankSelect?: (bankId: string) => void;
@@ -103,6 +104,7 @@ export const InvoiceForm: React.FC<Props> = ({
   entityType,
   dealerOptions,
   creditToOptions,
+  tenorOptions,
   bankOptions,
   selectedBankId = '',
   onBankSelect,
@@ -144,6 +146,7 @@ export const InvoiceForm: React.FC<Props> = ({
   const entityInvoiceLabel = effectiveEntityType === 'anchor' ? 'Anchor Invoice' : 'Dealer Invoice';
 
   const TENURE_DAYS = defaultPaymentTermsDays;
+  const isHistoricalInvoiceMode = mode === 'edit' || mode === 'recreate';
 
   // Calculate Invoice Due Date based on Invoice Date, GRN Date, and Tenure
   const calculateInvoiceDueDate = (
@@ -169,6 +172,7 @@ export const InvoiceForm: React.FC<Props> = ({
   // Auto-calculate Invoice Due Date only when Invoice Date or GRN Date changes.
   // Do NOT include invoiceDueDate in deps – otherwise manual due date changes get overwritten.
   useEffect(() => {
+    if (isHistoricalInvoiceMode) return;
     if (value.invoiceDate) {
       const calculatedDueDate = calculateInvoiceDueDate(
         value.invoiceDate,
@@ -181,10 +185,11 @@ export const InvoiceForm: React.FC<Props> = ({
     } else if (!value.invoiceDate && value.invoiceDueDate) {
       onChange({invoiceDueDate: ''});
     }
-  }, [value.invoiceDate, value.grnDate, TENURE_DAYS]);
+  }, [value.invoiceDate, value.grnDate, TENURE_DAYS, isHistoricalInvoiceMode]);
 
   // Validate Invoice Date: up to staleInvoicePeriodDays back from today, no future dates
   const validateInvoiceDate = (dateStr: string): string | undefined => {
+    if (isHistoricalInvoiceMode) return undefined;
     if (!dateStr) return undefined;
     
     const invoiceDate = moment(dateStr, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true);
@@ -207,6 +212,7 @@ export const InvoiceForm: React.FC<Props> = ({
 
   // Validate Invoice Due Date: from today up to defaultPaymentTermsDays
   const validateInvoiceDueDate = (dateStr: string): string | undefined => {
+    if (isHistoricalInvoiceMode) return undefined;
     if (!dateStr) return undefined;
     
     const dueDate = moment(dateStr, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true);
@@ -229,6 +235,7 @@ export const InvoiceForm: React.FC<Props> = ({
 
   // Validate Payment Date: no back date, today or future only
   const validatePaymentDate = (dateStr: string, _invoiceDateStr?: string): string | undefined => {
+    if (isHistoricalInvoiceMode) return undefined;
     if (!dateStr) return undefined;
     
     const paymentDate = moment(dateStr, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true);
@@ -446,15 +453,14 @@ export const InvoiceForm: React.FC<Props> = ({
         <View style={styles.row}>
           <View style={styles.dealerNameWidth}>
             {mode === 'edit' ? (
-              <CustomDropdown
-                label={`${entityNameLabel} *`}
-                data={[{label: value.dealer || '', value: value.dealer || ''}]}
-                value={value.dealer}
-                onChange={() => {}}
-                placeholder={`Select ${entityLabel}`}
-                containerStyle={styles.dropdownContainer}
-                editable={false}
-              />
+              <View style={styles.readOnlyFieldContainer}>
+                <Text style={styles.label}>{`${entityNameLabel} *`}</Text>
+                <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
+                  <Text style={styles.readOnlyText} numberOfLines={2}>
+                    {value.dealer || '-'}
+                  </Text>
+                </View>
+              </View>
             ) : (
               <CustomDropdown
                 label={`${entityNameLabel} *`}
@@ -469,15 +475,14 @@ export const InvoiceForm: React.FC<Props> = ({
           </View>
           <View style={styles.dealerCodeWidth}>
             {mode === 'edit' ? (
-              <CustomDropdown
-                label={`${entityCodeLabel} *`}
-                data={[{label: value.dealerCode || '', value: value.dealerCode || ''}]}
-                value={value.dealerCode}
-                onChange={() => {}}
-                placeholder={entityCodeLabel}
-                containerStyle={styles.dropdownContainer}
-                editable={false}
-              />
+              <View style={styles.readOnlyFieldContainer}>
+                <Text style={styles.label}>{`${entityCodeLabel} *`}</Text>
+                <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
+                  <Text style={styles.readOnlyText} numberOfLines={1}>
+                    {value.dealerCode || '-'}
+                  </Text>
+                </View>
+              </View>
             ) : (
               <CustomDropdown
                 label={`${entityCodeLabel} *`}
@@ -495,15 +500,14 @@ export const InvoiceForm: React.FC<Props> = ({
         <View style={styles.field}>
           <Text style={styles.label}>OD Account No</Text>
           {mode === 'edit' ? (
-            <CustomDropdown
-              label=""
-              data={[{label: value.odAccountNumber || '', value: value.odAccountNumber || ''}]}
-              value={value.odAccountNumber}
-              onChange={() => {}}
-              placeholder="OD Account No"
-              containerStyle={styles.dropdownContainer}
-              editable={false}
-            />
+            <View style={styles.readOnlyFieldContainer}>
+              <Text style={styles.label}>OD Account No</Text>
+              <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
+                <Text style={styles.readOnlyText} numberOfLines={1}>
+                  {value.odAccountNumber || '-'}
+                </Text>
+              </View>
+            </View>
           ) : (
             <CustomDropdown
               label=""
@@ -580,13 +584,17 @@ export const InvoiceForm: React.FC<Props> = ({
                 datePickerProps={{
                   date: value.invoiceDate ? moment(value.invoiceDate, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true).toDate() : new Date(),
                   mode: 'date',
-                  minimumDate: moment().subtract(staleInvoicePeriodDays, 'days').toDate(),
-                  maximumDate: new Date(),
+                  ...(isHistoricalInvoiceMode
+                    ? {}
+                    : {
+                        minimumDate: moment().subtract(staleInvoicePeriodDays, 'days').toDate(),
+                        maximumDate: new Date(),
+                      }),
                 }}
                 containerStyle={styles.datePickerContainer}
               />
               {errors.invoiceDate && <Text style={styles.errorText}>{errors.invoiceDate}</Text>}
-              {value.invoiceDate && !mode && validateInvoiceDate(value.invoiceDate) && (
+              {value.invoiceDate && !isHistoricalInvoiceMode && validateInvoiceDate(value.invoiceDate) && (
                 <Text style={styles.warningText}>{validateInvoiceDate(value.invoiceDate)}</Text>
               )}
             </View>
@@ -595,15 +603,15 @@ export const InvoiceForm: React.FC<Props> = ({
         <View style={styles.row}>
           <View style={styles.halfWidth}>
             <View style={styles.fieldInRow}>
-              <L label="Tenor (days) *">
-                <TextInput
-                  style={[styles.input, errors.tenor && styles.inputError]}
-                  value={value.tenor}
-                  onChangeText={set('tenor')}
-                  placeholder="e.g. 60"
-                  keyboardType="number-pad"
-                />
-              </L>
+              <CustomDropdown
+                label="Tenor *"
+                data={tenorOptions ?? []}
+                value={value.tenor}
+                onChange={set('tenor')}
+                placeholder="Select tenor"
+                containerStyle={styles.dropdownContainer}
+                showSearch={false}
+              />
               {errors.tenor ? (
                 <Text style={styles.errorText}>{errors.tenor}</Text>
               ) : null}
@@ -631,11 +639,11 @@ export const InvoiceForm: React.FC<Props> = ({
                 datePickerProps={{
                   date: value.paymentDate ? moment(value.paymentDate, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true).toDate() : new Date(),
                   mode: 'date',
-                  minimumDate: new Date(),
+                  ...(isHistoricalInvoiceMode ? {} : {minimumDate: new Date()}),
                 }}
                 containerStyle={styles.datePickerContainer}
               />
-              {value.paymentDate && validatePaymentDate(value.paymentDate, value.invoiceDate) && (
+              {value.paymentDate && !isHistoricalInvoiceMode && validatePaymentDate(value.paymentDate, value.invoiceDate) && (
                 <Text style={styles.warningText}>{validatePaymentDate(value.paymentDate, value.invoiceDate)}</Text>
               )}
             </View>
@@ -654,13 +662,17 @@ export const InvoiceForm: React.FC<Props> = ({
                 datePickerProps={{
                   date: value.invoiceDueDate ? moment(value.invoiceDueDate, ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'], true).toDate() : new Date(),
                   mode: 'date',
-                  minimumDate: new Date(),
-                  maximumDate: moment().add(defaultPaymentTermsDays, 'days').toDate(),
+                  ...(isHistoricalInvoiceMode
+                    ? {}
+                    : {
+                        minimumDate: new Date(),
+                        maximumDate: moment().add(defaultPaymentTermsDays, 'days').toDate(),
+                      }),
                 }}
                 containerStyle={styles.datePickerContainer}
               />
               {errors.invoiceDueDate && <Text style={styles.errorText}>{errors.invoiceDueDate}</Text>}
-              {value.invoiceDueDate && validateInvoiceDueDate(value.invoiceDueDate) && (
+              {value.invoiceDueDate && !isHistoricalInvoiceMode && validateInvoiceDueDate(value.invoiceDueDate) && (
                 <Text style={styles.warningText}>{validateInvoiceDueDate(value.invoiceDueDate)}</Text>
               )}
             </View>

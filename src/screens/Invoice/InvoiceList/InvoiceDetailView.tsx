@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Linking,
   Alert,
-        Platform,
+  Platform,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
@@ -21,18 +21,39 @@ import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {invoiceApi} from '@services/api/invoice.api';
-import {formatDateDash} from './components/InvoiceDetails/types';
+import {formatStatus} from './components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
+import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
 import {FILE_DOWNLOAD_URL} from '@config/config';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 
 const fmtAmount = (n: number) =>
   n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 const fmtPercent = (n: number) => Number(n).toFixed(2);
+const displayOrDash = (val?: string | number | null) => {
+  if (val === undefined || val === null) return '-';
+  const s = String(val).trim();
+  return s !== '' ? s : '-';
+};
 
 type AttachmentItem = {id: number; attachment_url: string; fullUrl: string};
 
+type InvoiceItemRow = {
+  id: string;
+  itemName: string;
+  description: string;
+  quantity: number;
+  unit: string;
+  price: number;
+  discountAmount: number;
+  discountPercent: number;
+  taxAmount: number;
+  taxLabel: string;
+  total: number;
+};
+
 type InvoiceDetailData = {
+  invoiceRefNo: string;
   dealerName: string;
   dealerCode: string;
   odAccountNumber: string;
@@ -42,8 +63,13 @@ type InvoiceDetailData = {
   tenorDays: string;
   invoiceDate: string;
   invoiceDueDate: string;
+  paymentDate: string;
+  creditTo: string;
+  workflowMethod: string;
+  currency: string;
   earlyPaymentDiscount: number;
-  items: Array<{id: string; itemName: string; quantity: number; unit: number | string; price: number; total: number}>;
+  subTotal: number;
+  items: InvoiceItemRow[];
   discount: {percent: number; amount: number};
   tax: {percent: number; amount: number};
   total: number;
@@ -54,6 +80,7 @@ type InvoiceDetailData = {
 };
 
 const defaultInvoiceData: InvoiceDetailData = {
+  invoiceRefNo: '',
   dealerName: '',
   dealerCode: '',
   odAccountNumber: '',
@@ -63,7 +90,12 @@ const defaultInvoiceData: InvoiceDetailData = {
   tenorDays: '',
   invoiceDate: '',
   invoiceDueDate: '',
+  paymentDate: '',
+  creditTo: '',
+  workflowMethod: '',
+  currency: 'INR',
   earlyPaymentDiscount: 0,
+  subTotal: 0,
   items: [],
   discount: {percent: 0, amount: 0},
   tax: {percent: 0, amount: 0},
@@ -75,11 +107,11 @@ const defaultInvoiceData: InvoiceDetailData = {
 };
 
 const STATUS_COLORS = {
-  ATTACHMENT_PENDING: { backgroundColor: '#FFF4E5', color: '#FF8C00' },
-  CREATED: { backgroundColor: '#E3F2FD', color: '#1976D2' },
-  DISBURSED: { backgroundColor: '#E8F5E9', color: '#2E7D32' },
-  REJECTED: { backgroundColor: '#FFEBEE', color: '#D32F2F' },
-  DEFAULT: { backgroundColor: '#F7F8FB', color: Colors.darkblack },
+  ATTACHMENT_PENDING: {backgroundColor: '#FFF4E5', color: '#FF8C00'},
+  CREATED: {backgroundColor: '#E3F2FD', color: '#1976D2'},
+  DISBURSED: {backgroundColor: '#E8F5E9', color: '#2E7D32'},
+  REJECTED: {backgroundColor: '#FFEBEE', color: '#D32F2F'},
+  DEFAULT: {backgroundColor: '#F7F8FB', color: Colors.darkblack},
 };
 
 function getInvoiceStatusStyles(status: string) {
@@ -102,18 +134,28 @@ function getApprovalStatusStyles(status: string) {
 function getAdminStatusStyles(status: string) {
   const s = (status || '').toLowerCase();
   if (s === 'verify' || s === 'verified' || s === 'submitted') return STATUS_COLORS.DISBURSED;
-  if (s === 'hold') return { backgroundColor: '#E0E0E0', color: '#6B5B4F' };
+  if (s === 'hold') return {backgroundColor: '#E0E0E0', color: '#6B5B4F'};
   if (s === 'reject' || s === 'rejected') return STATUS_COLORS.REJECTED;
   return STATUS_COLORS.DEFAULT;
 }
 
-function formatStatus(str: string): string {
-  if (!str) return '';
-  return str
-    .split('_')
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ');
-}
+const DetailField: React.FC<{label: string; value: string}> = ({label, value}) => (
+  <View style={styles.detailField}>
+    <Text style={styles.detailLabel}>{label}</Text>
+    <Text style={styles.detailValue} selectable>
+      {value}
+    </Text>
+  </View>
+);
+
+const SummaryStat: React.FC<{label: string; value: string}> = ({label, value}) => (
+  <View style={styles.summaryStat}>
+    <Text style={styles.summaryStatLabel}>{label}</Text>
+    <Text style={styles.summaryStatValue} numberOfLines={1}>
+      {value}
+    </Text>
+  </View>
+);
 
 export const InvoiceDetailView: React.FC = () => {
   const navigation = useNavigation();
@@ -131,6 +173,12 @@ export const InvoiceDetailView: React.FC = () => {
   const invoiceId = route?.params?.invoiceId || '';
   const invoiceNo = route?.params?.invoiceNo || '';
 
+  const goBackToList = () => {
+    (navigation as any).navigate('InvoiceDetails', {
+      programId: programSelection?.programId,
+    });
+  };
+
   useEffect(() => {
     if (!invoiceId) {
       setLoading(false);
@@ -145,64 +193,109 @@ export const InvoiceDetailView: React.FC = () => {
         if (cancelled) return;
         const apm = data?.anchorParticipantMapping;
         const party = data?.party;
-        const dealerName =
-          decryptValue(apm?.party?.entity_name ?? '') || '';
+        const bankDetails = data.program?.bank_details;
+        const rawCreditAccount =
+          (Array.isArray(bankDetails)
+            ? bankDetails[0]?.account_number
+            : bankDetails?.account_number) ||
+          data.credit_to ||
+          '';
+        const creditTo = rawCreditAccount
+          ? decryptValue(String(rawCreditAccount)) || String(rawCreditAccount)
+          : '';
+
+        const dealerName = decryptValue(apm?.party?.entity_name ?? '') || '';
         const dealerCode = apm?.company_code_given_by_party ?? '';
-        const odAccountNumber =
-          decryptValue(apm?.od_account_no ?? '') || '';
+        const odAccountNumber = decryptValue(apm?.od_account_no ?? '') || '';
         const anchorName = decryptValue(party?.entity_name ?? '') || '';
-        const remark = data?.remark ?? '';
-        const poRef =
+        const poRefNo =
           data?.po_ref_no != null && String(data.po_ref_no).trim() !== ''
             ? String(data.po_ref_no)
             : '';
-        const poRefNo =
-          poRef ||
-          (data?.loan_ref_no != null ? String(data.loan_ref_no) : '') ||
-          (data?.invoice_ref_no != null ? String(data.invoice_ref_no) : '');
-        const invoiceDate = data?.invoice_date ? formatDateDash(data.invoice_date) : '';
-        const invoiceDueDate = data?.invoice_due_date ? formatDateDash(data.invoice_due_date) : '';
-        const tenorDays =
-          data?.tenor != null && data?.tenor !== ''
-            ? String(Math.round(Number(data.tenor)))
-            : '';
-        const earlyPaymentDiscount = Number(data?.early_payment_discount) || 0;
+
         const subTotal = Number(data?.sub_total) || 0;
         const taxTotal = Number(data?.tax_total) || 0;
         const discountTotal = Number(data?.discount_total) || 0;
         const finalTotal = Number(data?.final_total) || 0;
-        const items = (data?.invoiceItems || []).map((it: any, idx: number) => ({
-          id: it.id || `item-${idx}`,
-          itemName: it.name ?? '',
-          quantity: Number(it.quantity) || 0,
-          unit: it.unit ?? '-',
-          price: Number(it.price_per_quantity) || 0,
-          total: Number(it.total) || 0,
-        }));
+
+        const items: InvoiceItemRow[] = (data?.invoiceItems || []).map((it: any, idx: number) => {
+          const lineTotal = Number(it.total) || 0;
+          const lineDiscount = Number(it.discount_amount) || 0;
+          const taxes = Array.isArray(it.taxes) ? it.taxes : [];
+          const taxAmount = taxes.reduce(
+            (sum: number, t: any) => sum + (Number(t.tax_amount) || 0),
+            0,
+          );
+          const taxLabel =
+            taxes.length > 0
+              ? taxes
+                  .map((t: any) => `${t.tax_type || 'Tax'} ${t.tax_percentage ?? 0}%`)
+                  .join(', ')
+              : '-';
+          const qty = Number(it.quantity) || 0;
+          const price = Number(it.price_per_quantity) || 0;
+          const gross = qty * price;
+          const discountPercent = gross > 0 ? (lineDiscount / gross) * 100 : 0;
+
+          return {
+            id: it.id || `item-${idx}`,
+            itemName: it.name ?? '-',
+            description: it.description ?? '',
+            quantity: qty,
+            unit: String(it.unit ?? '-'),
+            price,
+            discountAmount: lineDiscount,
+            discountPercent,
+            taxAmount,
+            taxLabel,
+            total: lineTotal,
+          };
+        });
+
         const discountPercent = subTotal > 0 ? (discountTotal / subTotal) * 100 : 0;
         const taxPercent = subTotal > 0 ? (taxTotal / subTotal) * 100 : 0;
         const baseUrl =
           (FILE_DOWNLOAD_URL || '').trim() ||
           'https://d2wayd1he5a7q1.cloudfront.net';
-        const rawAttachments = data?.attachment ?? (data?.attachment_url ? [{attachment_url: data.attachment_url}] : []);
-        const attachments: AttachmentItem[] = (Array.isArray(rawAttachments) ? rawAttachments : []).map(
-          (a: any, idx: number) => {
+        const rawAttachments =
+          data?.attachment ??
+          (data?.attachment_url ? [{attachment_url: data.attachment_url}] : []);
+        const attachments: AttachmentItem[] = (Array.isArray(rawAttachments)
+          ? rawAttachments
+          : []
+        )
+          .map((a: any, idx: number) => {
             const url = (a?.attachment_url || '').trim();
-            const fullUrl = url ? (url.startsWith('http') ? url : `${baseUrl.replace(/\/$/, '')}/${url.replace(/^\//, '')}`) : '';
+            const fullUrl = url
+              ? url.startsWith('http')
+                ? url
+                : `${baseUrl.replace(/\/$/, '')}/${url.replace(/^\//, '')}`
+              : '';
             return {id: a?.id ?? idx, attachment_url: url, fullUrl};
-          },
-        ).filter(a => a.fullUrl);
+          })
+          .filter(a => a.fullUrl);
+
         setInvoiceData({
+          invoiceRefNo: data?.invoice_ref_no || invoiceNo || '',
           dealerName,
           dealerCode,
           odAccountNumber,
           anchorName,
-          remark,
+          remark: data?.remark ?? '',
           poRefNo,
-          tenorDays,
-          invoiceDate,
-          invoiceDueDate,
-          earlyPaymentDiscount,
+          tenorDays:
+            data?.tenor != null && data?.tenor !== ''
+              ? String(Math.round(Number(data.tenor)))
+              : '',
+          invoiceDate: formatApiInvoiceDate(data?.invoice_date) || '-',
+          invoiceDueDate: formatApiInvoiceDate(data?.invoice_due_date) || '-',
+          paymentDate: formatApiInvoiceDate(data?.payment_date) || '-',
+          creditTo,
+          workflowMethod:
+            apm?.program?.method || data?.program?.method || data?.workflow_method || '',
+          currency: data?.currency || 'INR',
+          earlyPaymentDiscount: Number(data?.early_payment_discount) || 0,
+          subTotal,
           items,
           discount: {percent: discountPercent, amount: discountTotal},
           tax: {percent: taxPercent, amount: taxTotal},
@@ -225,25 +318,22 @@ export const InvoiceDetailView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [invoiceId]);
-
-  const handleAttachment = () => {
-    setShowUploadModal(true);
-  };
+  }, [invoiceId, invoiceNo]);
 
   const handleAttachmentUpload = (_file?: DocumentPickerResponse) => {
     setShowUploadModal(false);
   };
 
-  const handleExport = () => {};
-
-  const openAttachment = async (fullUrl: string, label: string) => {
+  const openAttachment = async (fullUrl: string) => {
     try {
       await Linking.openURL(fullUrl);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to open attachment');
     }
   };
+
+  const headerTitle = invoiceData.invoiceRefNo || invoiceNo || invoiceId || 'N/A';
+  const subtitle = invoiceData.anchorName || invoiceData.dealerName || '';
 
   if (loading) {
     return (
@@ -257,18 +347,11 @@ export const InvoiceDetailView: React.FC = () => {
               <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />
             ) : undefined
           }
-          onPressLeftIcon={
-            isCheckerRole
-              ? () =>
-                  (navigation as any).navigate('InvoiceDetails', {
-                    programId: programSelection?.programId,
-                  })
-              : undefined
-          }
+          onPressLeftIcon={isCheckerRole ? goBackToList : undefined}
         />
-        <View style={styles.loadingContainer}>
+        <View style={styles.centerState}>
           <ActivityIndicator size="large" color={Colors.primaryColor} />
-          <Text style={styles.loadingText}>Loading invoice details...</Text>
+          <Text style={styles.centerStateText}>Loading invoice details...</Text>
         </View>
       </Container>
     );
@@ -286,11 +369,9 @@ export const InvoiceDetailView: React.FC = () => {
               <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />
             ) : undefined
           }
-          onPressLeftIcon={
-            isCheckerRole ? () => (navigation as any).goBack() : undefined
-          }
+          onPressLeftIcon={isCheckerRole ? () => (navigation as any).goBack() : undefined}
         />
-        <View style={styles.loadingContainer}>
+        <View style={styles.centerState}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
       </Container>
@@ -308,257 +389,267 @@ export const InvoiceDetailView: React.FC = () => {
             <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />
           ) : undefined
         }
-        onPressLeftIcon={
-          isCheckerRole
-            ? () =>
-                (navigation as any).navigate('InvoiceDetails', {
-                  programId: programSelection?.programId,
-                })
-            : undefined
-        }
+        onPressLeftIcon={isCheckerRole ? goBackToList : undefined}
       />
-
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          {!isCheckerRole && (
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() =>
-                (navigation as any).navigate('InvoiceDetails', {
-                  programId: programSelection?.programId,
-                })
-              }>
-              <LeftChevron height={scaleWidth(16)} width={scaleHeight(16)} />
-            </TouchableOpacity>
-          )}
-          <View style={styles.invoiceTitleContainer}>
-            <Text style={styles.invoiceTitle}>
-              Invoice / Unique Ref. No - {invoiceNo || invoiceId || 'N/A'}
-            </Text>
-            <View style={styles.statusBadgesRow}>
-               {invoiceData.invoiceStatus && (
-                 <View style={[styles.statusBadge, { backgroundColor: getInvoiceStatusStyles(invoiceData.invoiceStatus).backgroundColor }]}>
-                   <Text style={[styles.statusBadgeText, { color: getInvoiceStatusStyles(invoiceData.invoiceStatus).color }]}>{invoiceData.invoiceStatus}</Text>
-                 </View>
-               )}
-               {invoiceData.approvalStatus && (
-                 <View style={[styles.statusBadge, { backgroundColor: getApprovalStatusStyles(invoiceData.approvalStatus).backgroundColor }]}>
-                   <Text style={[styles.statusBadgeText, { color: getApprovalStatusStyles(invoiceData.approvalStatus).color }]}>{invoiceData.approvalStatus}</Text>
-                 </View>
-               )}
-               {invoiceData.adminStatus && (
-                 <View style={[styles.statusBadge, { backgroundColor: getAdminStatusStyles(invoiceData.adminStatus).backgroundColor }]}>
-                   <Text style={[styles.statusBadgeText, { color: getAdminStatusStyles(invoiceData.adminStatus).color }]}>{invoiceData.adminStatus}</Text>
-                 </View>
-               )}
-            </View>
-            <View style={styles.titleUnderline} />
-          </View>
-        </View>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => {}}
-            disabled>
-            <FontAwesome6
-              name="paperclip"
-              iconStyle="solid"
-              color={Colors.darkblack}
-              size={scaleWidth(18)}
-            />
-            <Text style={[styles.actionButtonText, styles.actionButtonTextDisabled]}>
-              Attachment
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => {}}
-            disabled>
-            <Download width={scaleWidth(18)} height={scaleHeight(18)} />
-            <Text style={[styles.actionButtonText, styles.actionButtonTextDisabled]}>
-              Export
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        {/* Invoice Details Section */}
-        <View style={styles.detailsSection}>
-          <View style={styles.detailsGrid}>
-            <View style={styles.detailColumn}>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Dealer Name:</Text>
-                <Text style={styles.detailValue}>{invoiceData.dealerName || '-'}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Dealer Code:</Text>
-                <Text style={styles.detailValue}>{invoiceData.dealerCode || '-'}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>OD Account Number:</Text>
-                <Text style={styles.detailValue}>
-                  {invoiceData.odAccountNumber || '-'}
+        {/* Header card */}
+        <View style={styles.card}>
+          <View style={styles.headerRow}>
+            {!isCheckerRole && (
+              <TouchableOpacity style={styles.backButton} onPress={goBackToList}>
+                <LeftChevron height={scaleWidth(16)} width={scaleHeight(16)} />
+              </TouchableOpacity>
+            )}
+            <View style={styles.headerTextBlock}>
+              <Text style={styles.invoiceRefTitle}>{headerTitle}</Text>
+              {!!subtitle && (
+                <Text style={styles.invoiceSubtitle} numberOfLines={2}>
+                  {subtitle}
                 </Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Anchor Name:</Text>
-                <Text style={styles.detailValue}>{invoiceData.anchorName || '-'}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Remark:</Text>
-                <Text style={styles.detailValue}>{invoiceData.remark || '-'}</Text>
-              </View>
+              )}
             </View>
-
-            <View style={styles.detailColumn}>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>PO Ref. No.:</Text>
-                <Text
-                  style={[styles.detailValue, styles.detailValueSmall]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.65}>
-                  {invoiceData.poRefNo || '-'}
-                </Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Invoice Date:</Text>
-                <Text style={styles.detailValue}>{invoiceData.invoiceDate || '-'}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Invoice Due Date:</Text>
-                <Text style={styles.detailValue}>
-                  {invoiceData.invoiceDueDate || '-'}
-                </Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Tenor (days):</Text>
-                <Text style={styles.detailValue}>{invoiceData.tenorDays || '-'}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Early Payment Discount (%):</Text>
-                <Text style={styles.detailValue}>
-                  {fmtPercent(invoiceData.earlyPaymentDiscount)}
-                </Text>
-              </View>
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.iconAction} disabled>
+                <FontAwesome6
+                  name="paperclip"
+                  iconStyle="solid"
+                  color={Colors.graybase}
+                  size={scaleWidth(16)}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconAction} disabled>
+                <Download width={scaleWidth(16)} height={scaleHeight(16)} />
+              </TouchableOpacity>
             </View>
           </View>
-        </View>
 
-        {/* Description Section */}
-        <View style={styles.descriptionSection}>
-          <Text style={styles.sectionTitle}>Description</Text>
-          {invoiceData.items.map((item, index) => (
-            <View key={item.id} style={styles.itemCard}>
-              <View style={styles.itemHeader}>
-                <Text style={styles.itemHeaderText}>Item {index + 1}</Text>
-              </View>
-              <View style={styles.itemDetails}>
-                <View style={styles.itemDetailRow}>
-                  <Text style={styles.itemDetailLabel}>Item Name:</Text>
-                  <Text style={styles.itemDetailValue}>{item.itemName}</Text>
-                </View>
-                <View style={styles.itemDetailRow}>
-                  <Text style={styles.itemDetailLabel}>Quantity:</Text>
-                  <Text style={styles.itemDetailValue}>{item.quantity}</Text>
-                </View>
-                <View style={styles.itemDetailRow}>
-                  <Text style={styles.itemDetailLabel}>Unit:</Text>
-                  <Text style={styles.itemDetailValue}>{item.unit}</Text>
-                </View>
-                <View style={styles.itemDetailRow}>
-                  <Text style={styles.itemDetailLabel}>Price:</Text>
-                  <Text style={styles.itemDetailValue}>
-                    {fmtAmount(item.price)}
+          {(invoiceData.invoiceStatus ||
+            invoiceData.approvalStatus ||
+            invoiceData.adminStatus) && (
+            <View style={styles.statusBadgesRow}>
+              {!!invoiceData.invoiceStatus && (
+                <View
+                  style={[
+                    styles.statusBadge,
+                    {backgroundColor: getInvoiceStatusStyles(invoiceData.invoiceStatus).backgroundColor},
+                  ]}>
+                  <Text
+                    style={[
+                      styles.statusBadgeText,
+                      {color: getInvoiceStatusStyles(invoiceData.invoiceStatus).color},
+                    ]}>
+                    {invoiceData.invoiceStatus}
                   </Text>
                 </View>
-                <View style={styles.itemDetailRow}>
-                  <Text style={styles.itemDetailLabel}>Total:</Text>
-                  <Text style={[styles.itemDetailValue, styles.itemTotalValue]}>
-                    {fmtAmount(item.total)}/-
+              )}
+              {!!invoiceData.approvalStatus && (
+                <View
+                  style={[
+                    styles.statusBadge,
+                    {backgroundColor: getApprovalStatusStyles(invoiceData.approvalStatus).backgroundColor},
+                  ]}>
+                  <Text
+                    style={[
+                      styles.statusBadgeText,
+                      {color: getApprovalStatusStyles(invoiceData.approvalStatus).color},
+                    ]}>
+                    {invoiceData.approvalStatus}
                   </Text>
                 </View>
-              </View>
+              )}
+              {!!invoiceData.adminStatus && (
+                <View
+                  style={[
+                    styles.statusBadge,
+                    {backgroundColor: getAdminStatusStyles(invoiceData.adminStatus).backgroundColor},
+                  ]}>
+                  <Text
+                    style={[
+                      styles.statusBadgeText,
+                      {color: getAdminStatusStyles(invoiceData.adminStatus).color},
+                    ]}>
+                    {invoiceData.adminStatus}
+                  </Text>
+                </View>
+              )}
             </View>
-          ))}
+          )}
         </View>
 
-        {/* Financial Summary */}
-        <View style={styles.summarySection}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Discount:</Text>
-            <Text style={styles.summaryValue}>
-              {fmtPercent(invoiceData.discount.percent)}% ({fmtAmount(invoiceData.discount.amount)}/-)
-            </Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tax Value:</Text>
-            <Text style={styles.summaryValue}>
-              {fmtPercent(invoiceData.tax.percent)}% ({fmtAmount(invoiceData.tax.amount)}/-)
-            </Text>
+        {/* Summary stats — aligned with web */}
+        <View style={styles.card}>
+          <View style={styles.summaryStatsRow}>
+            <SummaryStat label="Total Amount" value={fmtAmount(invoiceData.total)} />
+            <SummaryStat label="Items" value={String(invoiceData.items.length)} />
+            <SummaryStat label="Tax" value={fmtAmount(invoiceData.tax.amount)} />
+            <SummaryStat label="Discount" value={fmtAmount(invoiceData.discount.amount)} />
           </View>
         </View>
 
-        {/* Total */}
-        <View style={styles.totalSection}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>
-              {fmtAmount(invoiceData.total)}/-
-            </Text>
-          </View>
+        {/* Invoice details — full-width single column */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Invoice Information</Text>
+          <DetailField label="Anchor Name" value={displayOrDash(invoiceData.anchorName)} />
+          <DetailField label="Dealer Name" value={displayOrDash(invoiceData.dealerName)} />
+          <DetailField label="Dealer Code" value={displayOrDash(invoiceData.dealerCode)} />
+          <DetailField label="OD Account Number" value={displayOrDash(invoiceData.odAccountNumber)} />
+          <DetailField label="Invoice Ref No" value={displayOrDash(invoiceData.invoiceRefNo)} />
+          <DetailField label="PO Ref No" value={displayOrDash(invoiceData.poRefNo)} />
+          <DetailField label="Invoice Date" value={displayOrDash(invoiceData.invoiceDate)} />
+          <DetailField label="Invoice Due Date" value={displayOrDash(invoiceData.invoiceDueDate)} />
+          <DetailField label="Payment Date" value={displayOrDash(invoiceData.paymentDate)} />
+          <DetailField label="Tenor (days)" value={displayOrDash(invoiceData.tenorDays)} />
+          <DetailField label="Credit To" value={displayOrDash(invoiceData.creditTo)} />
+          <DetailField label="WorkFlow Method" value={displayOrDash(invoiceData.workflowMethod)} />
+          <DetailField label="Currency" value={displayOrDash(invoiceData.currency)} />
+          <DetailField
+            label="Early Payment Discount (%)"
+            value={displayOrDash(fmtPercent(invoiceData.earlyPaymentDiscount))}
+          />
+          <DetailField label="Remark" value={displayOrDash(invoiceData.remark)} />
+        </View>
+
+        {/* Items table */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Items</Text>
+          {invoiceData.items.length === 0 ? (
+            <Text style={styles.emptyHint}>No items found</Text>
+          ) : (
+            <>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View>
+                  <View style={styles.tableHeaderRow}>
+                    <Text style={[styles.tableHeadCell, styles.colItem]}>Item</Text>
+                    <Text style={[styles.tableHeadCell, styles.colQty]}>Qty</Text>
+                    <Text style={[styles.tableHeadCell, styles.colUnit]}>Unit</Text>
+                    <Text style={[styles.tableHeadCell, styles.colPrice]}>Price</Text>
+                    <Text style={[styles.tableHeadCell, styles.colDiscount]}>Discount</Text>
+                    <Text style={[styles.tableHeadCell, styles.colTax]}>Tax</Text>
+                    <Text style={[styles.tableHeadCell, styles.colTotal]}>Total</Text>
+                  </View>
+                  {invoiceData.items.map(item => (
+                    <View key={item.id} style={styles.tableDataRow}>
+                      <View style={styles.colItem}>
+                        <Text style={styles.tableCellText}>{item.itemName}</Text>
+                        {!!item.description && (
+                          <Text style={styles.tableCellSubText} numberOfLines={2}>
+                            ({item.description})
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={[styles.tableCellText, styles.colQty]}>
+                        {fmtAmount(item.quantity)}
+                      </Text>
+                      <Text style={[styles.tableCellText, styles.colUnit]}>{item.unit}</Text>
+                      <Text style={[styles.tableCellText, styles.colPrice]}>
+                        {fmtAmount(item.price)}
+                      </Text>
+                      <View style={styles.colDiscount}>
+                        <Text style={styles.tableCellText}>{fmtAmount(item.discountAmount)}</Text>
+                        {item.discountPercent > 0 && (
+                          <Text style={styles.tableCellSubText}>
+                            ({fmtPercent(item.discountPercent)}%)
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.colTax}>
+                        <Text style={styles.tableCellText}>
+                          {item.taxAmount > 0 ? fmtAmount(item.taxAmount) : '-'}
+                        </Text>
+                        {item.taxAmount > 0 && (
+                          <Text style={styles.tableCellSubText} numberOfLines={1}>
+                            {item.taxLabel}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={[styles.tableCellText, styles.colTotal, styles.tableCellBold]}>
+                        {fmtAmount(item.total)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+
+              <View style={styles.totalsBox}>
+                <View style={styles.totalsRow}>
+                  <Text style={styles.totalsLabel}>Sub Total</Text>
+                  <Text style={styles.totalsValue}>{fmtAmount(invoiceData.subTotal)}</Text>
+                </View>
+                <View style={styles.totalsRow}>
+                  <Text style={styles.totalsLabel}>Discount Total</Text>
+                  <Text style={styles.totalsValue}>{fmtAmount(invoiceData.discount.amount)}</Text>
+                </View>
+                <View style={styles.totalsRow}>
+                  <Text style={styles.totalsLabel}>Tax Total</Text>
+                  <Text style={styles.totalsValue}>{fmtAmount(invoiceData.tax.amount)}</Text>
+                </View>
+                <View style={[styles.totalsRow, styles.totalsRowFinal]}>
+                  <Text style={styles.totalsLabelFinal}>Total</Text>
+                  <Text style={styles.totalsValueFinal}>{fmtAmount(invoiceData.total)}</Text>
+                </View>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Attachments */}
-        {invoiceData.attachments.length > 0 && (
-          <View style={styles.attachmentSection}>
-            <Text style={styles.attachmentSectionTitle}>Attachments</Text>
-            {invoiceData.attachments.map((att, idx) => {
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>
+            Attachments{invoiceData.attachments.length > 0 ? ` · ${invoiceData.attachments.length}` : ''}
+          </Text>
+          {invoiceData.attachments.length === 0 ? (
+            <Text style={styles.emptyHint}>No attachments</Text>
+          ) : (
+            invoiceData.attachments.map((att, idx) => {
               const fileName = att.attachment_url?.split('/').pop() || `Attachment ${idx + 1}`;
-              const isPdf = fileName.toLowerCase().endsWith('.pdf');
+              const ext = fileName.split('.').pop()?.toUpperCase() || 'FILE';
+              const isPdf = ext === 'PDF';
               return (
                 <TouchableOpacity
                   key={att.id}
-                  style={styles.attachmentPreview}
-                  onPress={() => openAttachment(att.fullUrl, fileName)}
+                  style={styles.attachmentCard}
+                  onPress={() => openAttachment(att.fullUrl)}
                   activeOpacity={0.7}>
                   <View style={[styles.attachmentIcon, isPdf && styles.attachmentIconPdf]}>
-                    <Text style={styles.attachmentIconText}>{isPdf ? 'PDF' : 'FILE'}</Text>
+                    <Text style={styles.attachmentIconText}>{isPdf ? 'PDF' : ext.slice(0, 3)}</Text>
                   </View>
                   <View style={styles.attachmentInfo}>
-                    <Text style={styles.attachmentLabel} numberOfLines={1}
-                      ellipsizeMode="middle">{fileName}</Text>
-                    <Text style={styles.attachmentMeta}>
-                      Tap to {Platform.OS === 'ios' ? 'open in browser' : 'view'}
+                    <Text style={styles.attachmentName} numberOfLines={1}>
+                      {fileName}
                     </Text>
+                    <Text style={styles.attachmentMeta}>Tap to view</Text>
+                  </View>
+                  <View style={styles.viewButton}>
+                    <FontAwesome6 name="eye" iconStyle="regular" size={scaleWidth(14)} color={Colors.primaryColor} />
+                    <Text style={styles.viewButtonText}>View</Text>
                   </View>
                 </TouchableOpacity>
               );
-            })}
-          </View>
-        )}
+            })
+          )}
+        </View>
       </ScrollView>
 
       <UploadModal
-          visible={showUploadModal}
-          allowedFileTypes={['jpg', 'jpeg', 'png', 'pdf']}
-            onClose={handleAttachmentUpload}
-        />
+        visible={showUploadModal}
+        allowedFileTypes={['jpg', 'jpeg', 'png', 'pdf']}
+        onClose={handleAttachmentUpload}
+      />
     </Container>
   );
 };
 
 const styles = StyleSheet.create({
-  loadingContainer: {
+  centerState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: scaleWidth(24),
   },
-  loadingText: {
+  centerStateText: {
     marginTop: scaleHeight(12),
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyMedium,
@@ -570,44 +661,60 @@ const styles = StyleSheet.create({
     color: Colors.red,
     textAlign: 'center',
   },
-  header: {
-    flexDirection: 'column',
-    paddingHorizontal: scaleWidth(16),
-    paddingVertical: scaleHeight(12),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E6E6E6',
-    marginTop: scaleHeight(4),
+  content: {
+    padding: scaleWidth(16),
+    paddingBottom: scaleHeight(32),
+    gap: scaleHeight(12),
   },
-  headerTop: {
+  card: {
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(12),
+    borderWidth: 1,
+    borderColor: '#E8EAED',
+    padding: scaleWidth(14),
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: scaleHeight(12),
   },
   backButton: {
-    marginRight: scaleWidth(12),
+    marginRight: scaleWidth(10),
     marginTop: scaleHeight(2),
   },
-  invoiceTitleContainer: {
+  headerTextBlock: {
     flex: 1,
+    paddingRight: scaleWidth(8),
   },
-  invoiceTitle: {
-    fontSize: scaleFont(16),
+  invoiceRefTitle: {
+    fontSize: scaleFont(17),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-    marginBottom: scaleHeight(4),
   },
-  titleUnderline: {
-    height: 1,
-    backgroundColor: '#E6E6E6',
-    width: '100%',
-    marginTop: scaleHeight(8),
+  invoiceSubtitle: {
+    marginTop: scaleHeight(4),
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: scaleWidth(8),
+  },
+  iconAction: {
+    width: scaleWidth(34),
+    height: scaleWidth(34),
+    borderRadius: scaleWidth(8),
+    borderWidth: 1,
+    borderColor: '#E8EAED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FAFBFC',
   },
   statusBadgesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: scaleWidth(8),
-    marginTop: scaleHeight(4),
-    marginBottom: scaleHeight(4),
+    marginTop: scaleHeight(12),
   },
   statusBadge: {
     paddingHorizontal: scaleWidth(8),
@@ -618,198 +725,197 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(11),
     fontFamily: Fonts.GilroySemiBold,
   },
-  headerActions: {
+  summaryStatsRow: {
     flexDirection: 'row',
-    gap: scaleWidth(12),
-    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: scaleWidth(8),
   },
-  actionButton: {
-    flexDirection: 'row',
+  summaryStat: {
+    flexGrow: 1,
+    flexBasis: '22%',
+    minWidth: scaleWidth(72),
+    backgroundColor: '#F7F8FB',
+    borderRadius: scaleWidth(8),
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: scaleWidth(8),
     alignItems: 'center',
-    gap: scaleWidth(6),
-    paddingHorizontal: scaleWidth(12),
-    paddingVertical: scaleHeight(6),
   },
-  actionButtonText: {
-    fontSize: scaleFont(14),
+  summaryStatLabel: {
+    fontSize: scaleFont(11),
     fontFamily: Fonts.GilroyMedium,
-    color: Colors.darkblack,
-  },
-  actionButtonTextDisabled: {
     color: Colors.graybase,
+    marginBottom: scaleHeight(4),
+    textAlign: 'center',
   },
-  content: {
-    padding: scaleWidth(16),
+  summaryStatValue: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    textAlign: 'center',
   },
-  detailsSection: {
-    marginBottom: scaleHeight(24),
+  sectionTitle: {
+    fontSize: scaleFont(15),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(12),
   },
-  detailsGrid: {
-    flexDirection: 'row',
-    gap: scaleWidth(16),
-  },
-  detailColumn: {
-    flex: 1,
-  },
-  detailItem: {
-    marginBottom: scaleHeight(16),
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+  detailField: {
+    paddingVertical: scaleHeight(10),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF0F2',
   },
   detailLabel: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(12),
     fontFamily: Fonts.GilroyMedium,
-    color: Colors.darkblack,
+    color: Colors.graybase,
     marginBottom: scaleHeight(4),
   },
   detailValue: {
     fontSize: scaleFont(14),
-    fontFamily: Fonts.GilroyRegular,
-    color: Colors.darkblack,
-  },
-  detailValueSmall: {
-    fontSize: scaleFont(11),
-  },
-  descriptionSection: {
-    marginBottom: scaleHeight(24),
-  },
-  sectionTitle: {
-    fontSize: scaleFont(16),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-    marginBottom: scaleHeight(12),
+    lineHeight: scaleFont(20),
   },
-  itemCard: {
-    borderWidth: 1,
-    borderColor: '#E6E6E6',
+  emptyHint: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F7F8FB',
     borderRadius: scaleWidth(8),
-    marginBottom: scaleHeight(12),
-    overflow: 'hidden',
-    backgroundColor: Colors.white,
-  },
-  itemHeader: {
-    backgroundColor: '#4A4A4A',
     paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(12),
+    paddingHorizontal: scaleWidth(8),
+    marginBottom: scaleHeight(4),
   },
-  itemHeaderText: {
-    fontSize: scaleFont(14),
+  tableDataRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: scaleWidth(8),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#EEF0F2',
+  },
+  tableHeadCell: {
+    fontSize: scaleFont(12),
     fontFamily: Fonts.GilroySemiBold,
-    color: Colors.white,
+    color: Colors.graybase,
   },
-  itemDetails: {
+  tableCellText: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+  },
+  tableCellSubText: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyRegular,
+    color: Colors.graybase,
+    marginTop: scaleHeight(2),
+  },
+  tableCellBold: {
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  colItem: {width: scaleWidth(120)},
+  colQty: {width: scaleWidth(56), textAlign: 'right'},
+  colUnit: {width: scaleWidth(48), textAlign: 'center'},
+  colPrice: {width: scaleWidth(72), textAlign: 'right'},
+  colDiscount: {width: scaleWidth(88), alignItems: 'flex-end'},
+  colTax: {width: scaleWidth(88), alignItems: 'flex-end'},
+  colTotal: {width: scaleWidth(80), textAlign: 'right'},
+  totalsBox: {
+    marginTop: scaleHeight(12),
+    backgroundColor: '#F7F8FB',
+    borderRadius: scaleWidth(8),
     padding: scaleWidth(12),
   },
-  itemDetailRow: {
+  totalsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: scaleHeight(8),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F0F0F0',
+    paddingVertical: scaleHeight(6),
   },
-  itemDetailLabel: {
-    fontSize: scaleFont(14),
+  totalsRowFinal: {
+    marginTop: scaleHeight(4),
+    paddingTop: scaleHeight(10),
+    borderTopWidth: 1,
+    borderTopColor: '#DDE1E6',
+  },
+  totalsLabel: {
+    fontSize: scaleFont(13),
     fontFamily: Fonts.GilroyMedium,
-    color: Colors.darkblack,
-    flex: 1,
+    color: Colors.graybase,
   },
-  itemDetailValue: {
-    fontSize: scaleFont(14),
-    fontFamily: Fonts.GilroyRegular,
-    color: Colors.darkblack,
-    flex: 1,
-    textAlign: 'right',
-  },
-  itemTotalValue: {
+  totalsValue: {
+    fontSize: scaleFont(13),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
   },
-  summarySection: {
-    marginBottom: scaleHeight(16),
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: scaleHeight(8),
-  },
-  summaryLabel: {
-    fontSize: scaleFont(14),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.darkblack,
-  },
-  summaryValue: {
-    fontSize: scaleFont(14),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.darkblack,
-  },
-  totalSection: {
-    marginBottom: scaleHeight(24),
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#4A4A4A',
-    paddingVertical: scaleHeight(12),
-    paddingHorizontal: scaleWidth(12),
-    borderRadius: scaleWidth(8),
-  },
-  totalLabel: {
-    fontSize: scaleFont(16),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.white,
-  },
-  totalValue: {
-    fontSize: scaleFont(16),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.white,
-  },
-  attachmentSection: {
-    marginTop: scaleHeight(16),
-  },
-  attachmentSectionTitle: {
-    fontSize: scaleFont(16),
+  totalsLabelFinal: {
+    fontSize: scaleFont(15),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-    marginBottom: scaleHeight(12),
   },
-  attachmentPreview: {
+  totalsValueFinal: {
+    fontSize: scaleFont(15),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+  },
+  attachmentCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: scaleWidth(12),
     backgroundColor: '#F7F8FB',
-    borderRadius: scaleWidth(8),
+    borderRadius: scaleWidth(10),
+    borderWidth: 1,
+    borderColor: '#E8EAED',
     marginBottom: scaleHeight(10),
   },
   attachmentIcon: {
-    width: scaleWidth(48),
-    height: scaleWidth(48),
+    width: scaleWidth(44),
+    height: scaleWidth(44),
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(8),
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: scaleWidth(12),
   },
-  attachmentIconText: {
-    fontSize: scaleFont(12),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.darkblack,
-  },
   attachmentIconPdf: {
     backgroundColor: '#E8F4FD',
   },
+  attachmentIconText: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+  },
   attachmentInfo: {
     flex: 1,
+    marginRight: scaleWidth(8),
   },
-  attachmentLabel: {
+  attachmentName: {
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-    marginBottom: scaleHeight(4),
+    marginBottom: scaleHeight(2),
   },
   attachmentMeta: {
     fontSize: scaleFont(12),
     fontFamily: Fonts.GilroyRegular,
     color: Colors.graybase,
+  },
+  viewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(4),
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(6),
+    borderRadius: scaleWidth(6),
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: '#E8EAED',
+  },
+  viewButtonText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
   },
 });

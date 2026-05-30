@@ -154,6 +154,12 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  fullScreenLoading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: scaleHeight(40),
+  },
   loadingText: {
     marginTop: scaleHeight(12),
     fontSize: scaleFont(14),

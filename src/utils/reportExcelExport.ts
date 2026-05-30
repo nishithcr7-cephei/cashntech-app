@@ -52,7 +52,7 @@ function buildExportHeaderData(
   generatedBy: string | undefined,
 ): GenericExcelHeaderData {
   const now = new Date();
-  const generatedOn = now.toLocaleDateString('en-GB');
+  const generatedOn = formatReportDisplayDate(now);
 
   let fromDate = '';
   let toDate = '';

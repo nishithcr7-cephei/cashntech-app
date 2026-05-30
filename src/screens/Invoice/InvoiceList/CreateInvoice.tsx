@@ -1,5 +1,4 @@
 import React, {useMemo, useState, useEffect, useCallback} from 'react';
-import moment from 'moment';
 import {
   View,
   Text,
@@ -17,6 +16,7 @@ import {useDispatch, useSelector} from 'react-redux';
 import {AppBar, Container} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
 import {ensureCameraPermission} from '@services/permissions';
 import {runGSTInvoiceExtractionWithAI} from '@services/ocr';
 import {InvoiceForm} from '@components/InvoiceForm';
@@ -145,6 +145,16 @@ export const CreateInvoice: React.FC = () => {
     setSelectedAttachment(null);
     dispatch(resetCreateInvoiceState());
   }, [dispatch]);
+
+  const goToInvoiceList = useCallback(
+    (refreshList = true) => {
+      (navigation as any).navigate(
+        'InvoiceDetails',
+        refreshList ? {refreshList: true} : undefined,
+      );
+    },
+    [navigation],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -518,8 +528,16 @@ export const CreateInvoice: React.FC = () => {
           }),
         );
 
-        const formatDate = (date: string) =>
-          date ? moment(date).format('DD-MM-YYYY') : '';
+        const bankDetails = data.program?.bank_details;
+        const rawCreditAccount =
+          (Array.isArray(bankDetails)
+            ? bankDetails[0]?.account_number
+            : bankDetails?.account_number) ||
+          data.credit_to ||
+          '';
+        const creditToAccount = rawCreditAccount
+          ? decryptValue(String(rawCreditAccount)) || String(rawCreditAccount)
+          : '';
 
         const nextFields: InvoiceFields = {
           ...getInitialFields(),
@@ -532,13 +550,13 @@ export const CreateInvoice: React.FC = () => {
             data.tenor != null && data.tenor !== ''
               ? String(Math.round(Number(data.tenor)))
               : '',
-          invoiceDate: formatDate(data.invoice_date),
-          paymentDate: formatDate(data.payment_date),
-          invoiceDueDate: formatDate(data.invoice_due_date),
-          grnDate: formatDate(data.grn_date),
+          invoiceDate: formatApiInvoiceDate(data.invoice_date),
+          paymentDate: formatApiInvoiceDate(data.payment_date),
+          invoiceDueDate: formatApiInvoiceDate(data.invoice_due_date),
+          grnDate: formatApiInvoiceDate(data.grn_date),
           remark: data.remark || '',
           currency: data.currency || 'INR',
-          creditTo: data.partnerBank?.bank_name || '',
+          creditTo: creditToAccount,
           items: mappedItems,
           discountValue: String(data.discount_total || '0'),
           grandTotal: String(data.final_total || '0'),
@@ -658,7 +676,7 @@ export const CreateInvoice: React.FC = () => {
       setSelectedParticipant(null);
       setSelectedAttachment(null);
       Alert.alert('Success', mode === 'edit' ? 'Invoice updated successfully.' : 'Invoice created successfully.', [
-        {text: 'OK', onPress: () => (navigation as any).navigate('InvoiceDetails', {refreshList: true})},
+        {text: 'OK', onPress: () => goToInvoiceList(true)},
       ]);
     }
   }, [createInvoiceSuccess, dispatch, navigation]);
@@ -1215,7 +1233,7 @@ export const CreateInvoice: React.FC = () => {
           style: 'destructive',
           onPress: () => {
             resetCreateInvoiceForm();
-            (navigation as any).navigate('InvoiceDetails');
+            goToInvoiceList(true);
           },
         },
       ]
@@ -1253,13 +1271,13 @@ export const CreateInvoice: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        (navigation as any).navigate('InvoiceDetails');
+        goToInvoiceList(true);
         return true; // Prevent default behavior (going back to Home)
       };
 
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, [navigation]),
+    }, [navigation, goToInvoiceList]),
   );
 
   const hasAnyAttachment = !!selectedAttachment || (fields.attachments && fields.attachments.length > 0);
@@ -1316,6 +1334,21 @@ export const CreateInvoice: React.FC = () => {
     },
     [dealerInfo],
   );
+  const tenorOptions = useMemo(() => {
+    const standard = [30, 45, 60, 90];
+    const fromDealer = Number(dealerInfo?.basic_parameters?.default_payment_terms_days);
+    const fromInvoice = Number(fields.tenor);
+    const values = new Set(standard);
+    if (Number.isFinite(fromDealer) && fromDealer > 0) {
+      values.add(Math.round(fromDealer));
+    }
+    if (Number.isFinite(fromInvoice) && fromInvoice > 0) {
+      values.add(Math.round(fromInvoice));
+    }
+    return Array.from(values)
+      .sort((a, b) => a - b)
+      .map(days => ({label: String(days), value: String(days)}));
+  }, [dealerInfo?.basic_parameters?.default_payment_terms_days, fields.tenor]);
   if (permissionsLoading) {
     return (
       <Container>
@@ -1345,7 +1378,7 @@ export const CreateInvoice: React.FC = () => {
         navigation={navigation as any}
         hideHamburger={true}
         renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
-        onPressLeftIcon={() => (navigation as any).navigate('InvoiceDetails')}
+        onPressLeftIcon={() => goToInvoiceList(true)}
       />
       <View style={styles.pageTitleBar}>
         <View style={styles.titleContainer}>
@@ -1426,6 +1459,7 @@ export const CreateInvoice: React.FC = () => {
             productType={productType}
             dealerOptions={dealerOptions.length > 0 ? dealerOptions : undefined}
             creditToOptions={creditToOptions.length > 0 ? creditToOptions : undefined}
+            tenorOptions={tenorOptions}
             staleInvoicePeriodDays={dealerInfo?.basic_parameters?.stale_invoice_period_days != null ? Number(dealerInfo.basic_parameters.stale_invoice_period_days) : undefined}
             defaultPaymentTermsDays={dealerInfo?.basic_parameters?.default_payment_terms_days != null ? Number(dealerInfo.basic_parameters.default_payment_terms_days) : undefined}
             mode={mode}
