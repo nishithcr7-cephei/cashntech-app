@@ -21,6 +21,8 @@ export type BulkInvoiceItem = {
   dealerName: string;
   amount: string;
   dueDate?: string;
+  /** Used to derive workflow approval_level for checker bulk approve/reject */
+  rawApprovalStatus?: string;
 };
 
 type BulkReviewModalProps = {

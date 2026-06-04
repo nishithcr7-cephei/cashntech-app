@@ -13,6 +13,7 @@ import {signinOtpVerifyRequest} from '@store/auth/auth.slice';
 import {authSelector} from '@store/auth';
 import type {ILmsUser} from '@store/auth/auth.types';
 import {userActions} from '@store/user';
+import {APP_VERSION_DISPLAY} from '@constants/AppMeta';
 
 const OTP_TIMER = 60;
 const Strings = {
@@ -237,6 +238,9 @@ export const OTPInputScreen = ({
           </TouchableOpacity>
         </View>
       </View>
+      <View style={styles.versionInfoContainer}>
+        <Text style={styles.versionInfoText}>{APP_VERSION_DISPLAY}</Text>
+      </View>
       <TnCFooter navigation={navigation} />
     </Container>
   );
@@ -305,5 +309,14 @@ const styles = StyleSheet.create({
   },
   verifyButton: {
     marginTop: scaleHeight(20),
+  },
+  versionInfoContainer: {
+    alignItems: 'center',
+    paddingBottom: scaleHeight(6),
+  },
+  versionInfoText: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
   },
 });

@@ -14,6 +14,7 @@ import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-
 import {useDispatch, useSelector} from 'react-redux';
 import {signinRequest} from '@store/auth/auth.slice';
 import {authSelector} from '@store/auth';
+import {APP_VERSION_DISPLAY} from '@constants/AppMeta';
 
 type SigninProps = NativeStackScreenProps<
   AuthNavigatorType,
@@ -41,12 +42,12 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
   //const [passwordValue, setPassword] = useState('santram@123');
 
   //2.Anchor-maker
-  const [email, setEmail] = useState('sm_maker@yopmail.com');
-  const [passwordValue, setPassword] = useState('Welcome@123');
+  //const [email, setEmail] = useState('sm_maker@yopmail.com');
+  //const [passwordValue, setPassword] = useState('Welcome@123');
 
   //3.Anchor-checker
-  //const [email, setEmail] = useState('dms_checker@yopmail.com');
-  //const [passwordValue, setPassword] = useState('Welcome@123');
+  const [email, setEmail] = useState('dms_checker@yopmail.com');
+  const [passwordValue, setPassword] = useState('Welcome@123');
 
   //4.Dealer-mkaer
   //const [email, setEmail] = useState('maheshkmaker@yopmail.com');
@@ -187,6 +188,9 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
           </View>
         </View>
       </KeyboardAvoidingScrollView>
+      <View style={styles.versionInfoContainer}>
+        <Text style={styles.versionInfoText}>{APP_VERSION_DISPLAY}</Text>
+      </View>
       <TnCFooter navigation={navigation} />
     </Container>
   );
@@ -260,5 +264,14 @@ const styles = StyleSheet.create({
   icon: {
     height: scaleWidth(20),
     width: scaleWidth(20),
+  },
+  versionInfoContainer: {
+    alignItems: 'center',
+    paddingBottom: scaleHeight(6),
+  },
+  versionInfoText: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
   },
 });

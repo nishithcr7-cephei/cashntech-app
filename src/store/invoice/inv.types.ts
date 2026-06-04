@@ -3,6 +3,7 @@ export type DealerInfoParticipant = {
   company_code: string;
   company_code_given_by_party: string;
   od_account_no: string;
+  default_payment_terms_days?: number | string;
   party: {id: string; entity_name: string};
   sanctioned_limit?: number | string;
   utilized_amount?: number | string;
@@ -74,6 +75,8 @@ export type InvoiceListItemApi = {
   party?: { entity_name?: string };
   anchorParticipantMapping?: { party?: { entity_name?: string } };
   approvalLogs?: Array<{id: string}>;
+  attachment?: unknown;
+  attachments?: unknown;
 };
 
 export type InvoiceState = {
@@ -151,6 +154,7 @@ export type BulkUpdateInvoiceRequest = {
   programId?: string;
   filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]};
   onSuccess?: () => void;
+  onFailure?: () => void;
   isVerification?: boolean;
 };
 

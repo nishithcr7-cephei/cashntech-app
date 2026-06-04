@@ -80,6 +80,7 @@ export type InvoiceRow = {
   id: string;
   dealerName: string;
   dealerCode: string;
+  creditAccountNumber?: string;
   invoiceNo: string;
   invoiceAmount: string;
   invoiceDate: string;
@@ -108,10 +109,16 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
         item.anchorParticipantMapping?.party?.entity_name ??
         '',
     ) || '-';
+  const rawAccountNumber =
+    item.program?.bank_details?.[0]?.account_number ?? '';
+  const creditAccountNumber =
+    decryptValue(rawAccountNumber) || rawAccountNumber || '-';
+
   return {
     id: item.id,
     dealerName: counterParty,
     dealerCode: item.counter_party_code,
+    creditAccountNumber,
     invoiceNo: item.invoice_ref_no,
     invoiceAmount:
       item.invoice_amount ??

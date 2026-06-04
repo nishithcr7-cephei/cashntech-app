@@ -2,12 +2,14 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
   Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  Alert,
 } from 'react-native';
 import {
   DocumentPickerResponse,
@@ -19,26 +21,21 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {invoiceApi} from '@services/api/invoice.api';
 import {tryCatch} from '@utils/TryCatch';
+import {
+  fileNameFromAttachmentUrl,
+  mapInvoiceAttachmentsWithUrls,
+  type InvoiceAttachmentItem,
+} from '@utils/invoiceAttachments';
 import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 
-export type InvoiceAttachmentRow = {
-  id: number;
-  attachment_url: string;
-};
-
 const ALLOWED = ['jpg', 'jpeg', 'png', 'pdf'];
-
-function fileNameFromUrl(url: string): string {
-  const u = (url || '').trim();
-  if (!u) return 'Attachment';
-  const parts = u.split('/');
-  return parts[parts.length - 1] || 'Attachment';
-}
 
 type Props = {
   visible: boolean;
   invoiceId: string | null;
+  /** Pre-loaded attachments from invoice list row (fallback while details load). */
+  fallbackAttachments?: InvoiceAttachmentItem[];
   onClose: () => void;
   /** After upload or delete succeeds */
   onListChanged?: () => void;
@@ -47,10 +44,11 @@ type Props = {
 export const InvoiceAttachmentsModal: React.FC<Props> = ({
   visible,
   invoiceId,
+  fallbackAttachments,
   onClose,
   onListChanged,
 }) => {
-  const [attachments, setAttachments] = useState<InvoiceAttachmentRow[]>([]);
+  const [attachments, setAttachments] = useState<InvoiceAttachmentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [pendingFile, setPendingFile] = useState<DocumentPickerResponse | undefined>();
   const [submitting, setSubmitting] = useState(false);
@@ -59,37 +57,43 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
   const loadAttachments = useCallback(async () => {
     if (!invoiceId) return;
     setLoading(true);
+    if (fallbackAttachments?.length) {
+      setAttachments(fallbackAttachments);
+    }
     const {data, error} = await tryCatch(invoiceApi.getInvoiceDetails(invoiceId));
     setLoading(false);
     if (error || data == null) {
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to load attachments',
-        text2: (error as Error)?.message ?? 'Please try again',
-      });
-      setAttachments([]);
+      if (!fallbackAttachments?.length) {
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to load attachments',
+          text2: (error as Error)?.message ?? 'Please try again',
+        });
+        setAttachments([]);
+      }
       return;
     }
-    const raw = data?.attachment;
-    const list: InvoiceAttachmentRow[] = Array.isArray(raw)
-      ? raw
-          .filter((a: any) => a && (a.id != null || a.attachment_url))
-          .map((a: any) => ({
-            id: Number(a.id),
-            attachment_url: String(a.attachment_url || ''),
-          }))
-          .filter(a => a.attachment_url)
-      : [];
-    setAttachments(list);
-  }, [invoiceId]);
+    const fromDetails = mapInvoiceAttachmentsWithUrls(data);
+    setAttachments(
+      fromDetails.length > 0
+        ? fromDetails
+        : fallbackAttachments?.length
+          ? fallbackAttachments
+          : [],
+    );
+  }, [invoiceId, fallbackAttachments]);
 
   useEffect(() => {
-    if (!visible || !invoiceId) {
+    if (!visible) {
+      return;
+    }
+    if (!invoiceId) {
+      setAttachments(fallbackAttachments ?? []);
       return;
     }
     setPendingFile(undefined);
     loadAttachments();
-  }, [visible, invoiceId, loadAttachments]);
+  }, [visible, invoiceId, loadAttachments, fallbackAttachments]);
 
   const handleBrowse = async () => {
     const {data, error} = await tryCatch(
@@ -113,7 +117,7 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
     setPendingFile(file);
   };
 
-  const handleDelete = async (row: InvoiceAttachmentRow) => {
+  const handleDelete = async (row: InvoiceAttachmentItem) => {
     if (row.id == null || Number.isNaN(row.id)) {
       Toast.show({type: 'error', text1: 'Invalid attachment'});
       return;
@@ -134,6 +138,18 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
     Toast.show({type: 'success', text1: 'Attachment deleted'});
     await loadAttachments();
     onListChanged?.();
+  };
+
+  const handleView = async (row: InvoiceAttachmentItem) => {
+    if (!row.fullUrl) {
+      Toast.show({type: 'error', text1: 'Invalid attachment URL'});
+      return;
+    }
+    try {
+      await Linking.openURL(row.fullUrl);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to open attachment');
+    }
   };
 
   const handleSubmit = async () => {
@@ -160,7 +176,7 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
   const totalCount = attachments.length + (pendingFile ? 1 : 0);
   const canSubmit = !!pendingFile && !submitting && !!invoiceId;
 
-  if (!invoiceId) return null;
+  if (!visible) return null;
 
   return (
     <Modal
@@ -248,8 +264,19 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
                         size={18}
                       />
                       <Text style={styles.fileName} numberOfLines={1}>
-                        {fileNameFromUrl(item.attachment_url)}
+                        {fileNameFromAttachmentUrl(item.attachment_url)}
                       </Text>
+                      <TouchableOpacity
+                        onPress={() => handleView(item)}
+                        hitSlop={8}
+                        style={styles.viewButton}>
+                        <FontAwesome6
+                          name="eye"
+                          iconStyle="regular"
+                          color={Colors.primaryColor}
+                          size={16}
+                        />
+                      </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => handleDelete(item)}
                         disabled={deletingId === item.id}
@@ -411,6 +438,9 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
+  },
+  viewButton: {
+    paddingHorizontal: scaleWidth(4),
   },
   removePending: {
     fontSize: scaleFont(13),

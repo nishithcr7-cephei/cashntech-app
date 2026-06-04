@@ -15,6 +15,7 @@ const initialState: ProgramSelectionState = {
   method: null,
   role: null,
   status: null,
+  approvalLevel: null,
   selectedPrograms: [],
   scopeData: null,
   scopeLoading: false,
@@ -43,6 +44,7 @@ const programSelectionSlice = createSlice({
         method?: string | null;
         role?: string | null;
         status?: string | null;
+        approvalLevel?: number | null;
       }>,
     ) => {
       const p = action.payload;
@@ -57,6 +59,7 @@ const programSelectionSlice = createSlice({
       if (p.method !== undefined) state.method = p.method;
       if (p.role !== undefined) state.role = p.role;
       if (p.status !== undefined) state.status = p.status;
+      if (p.approvalLevel !== undefined) state.approvalLevel = p.approvalLevel;
     },
     clearProgramSelection: () => initialState,
     fetchUserScopeRequest: state => {
@@ -69,12 +72,24 @@ const programSelectionSlice = createSlice({
       state.scopeError = null;
       // Save all program IDs so "All Program" can pass them to invoice/summary on next page
       const ids: string[] = [];
+      let scopeApprovalLevel: number | null = null;
       action.payload?.forEach(bank =>
-        bank.products?.forEach(p =>
-          p.programs?.forEach(prog => ids.push(prog.id)),
-        ),
+        bank.products?.forEach(p => {
+          if (
+            scopeApprovalLevel == null &&
+            p.approval_level != null &&
+            Number.isFinite(Number(p.approval_level)) &&
+            Number(p.approval_level) > 0
+          ) {
+            scopeApprovalLevel = Number(p.approval_level);
+          }
+          p.programs?.forEach(prog => ids.push(prog.id));
+        }),
       );
       state.allProgramIds = ids.length ? ids : null;
+      if (scopeApprovalLevel != null) {
+        state.approvalLevel = scopeApprovalLevel;
+      }
     },
     fetchUserScopeFailure: (state, action: PayloadAction<string>) => {
       state.scopeLoading = false;
@@ -112,6 +127,7 @@ const programSelectionSlice = createSlice({
       state.method = program.method;
       state.role = program.role;
       state.status = program.status;
+      state.approvalLevel = program.approvalLevel;
     },
     
     // ============================================================================

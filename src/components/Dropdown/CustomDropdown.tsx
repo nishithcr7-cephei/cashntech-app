@@ -1,4 +1,4 @@
-import Colors from '@constants/Colors';
+import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import React, {useMemo} from 'react';
 import {
@@ -18,9 +18,11 @@ type Props = {
   onChange?: (value: string) => void;
   containerStyle?: StyleProp<ViewStyle>;
   dropdownStyle?: StyleProp<ViewStyle>;
+  itemContainerStyle?: StyleProp<ViewStyle>;
   showSearch?: boolean;
   dropdownPosition?: 'bottom' | 'top' | 'auto' | undefined;
   editable?: boolean;
+  maxHeight?: number;
 };
 
 export const CustomDropdown = ({
@@ -32,8 +34,10 @@ export const CustomDropdown = ({
   showSearch = true,
   containerStyle,
   dropdownStyle,
+  itemContainerStyle,
   dropdownPosition,
   editable = true,
+  maxHeight = scaleHeight(240),
 }: Props) => {
   const handleChange = (item: {label: string; value: string}) => {
     if (editable) {
@@ -73,8 +77,14 @@ export const CustomDropdown = ({
         search={showSearch && editable}
         searchPlaceholder="Search"
         disable={!editable}
+        maxHeight={maxHeight}
+        containerStyle={styles.listContainer}
+        itemContainerStyle={[styles.itemContainer, itemContainerStyle]}
+        activeColor={Colors.gray100}
         renderItem={(item) => (
-          <Text style={styles.itemTextStyle}>{item.label}</Text>
+          <View style={[styles.itemRow, itemContainerStyle]}>
+            <Text style={styles.itemTextStyle}>{item.label}</Text>
+          </View>
         )}
         // ✅ Custom render selected item to show label instead of value
         renderSelectedItem={(item) => (
@@ -113,8 +123,24 @@ const styles = StyleSheet.create({
     color: Colors.darkGray,
   },
   itemTextStyle: {
-    fontSize: scaleFont(16),
-    color: '#333',
+    fontSize: scaleFont(15),
+    color: Colors.darkGray,
+    fontFamily: Fonts.GilroyMedium,
+  },
+  listContainer: {
+    borderRadius: scaleWidth(8),
+    borderWidth: 1,
+    borderColor: Colors.gray200,
+    marginTop: scaleHeight(4),
+  },
+  itemContainer: {
+    paddingVertical: 0,
+  },
+  itemRow: {
+    paddingVertical: scaleHeight(12),
+    paddingHorizontal: scaleWidth(14),
+    minHeight: scaleHeight(44),
+    justifyContent: 'center',
   },
   disabledDropdown: {
     backgroundColor: Colors.gray100,

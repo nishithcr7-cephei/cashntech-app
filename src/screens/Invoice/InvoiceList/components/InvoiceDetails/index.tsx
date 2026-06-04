@@ -28,8 +28,6 @@ import {InvoiceDetailsCard} from './InvoiceDetailsCard';
 import {SendForApprovalModal} from './SendForApprovalModal';
 import {InvoiceActionMenuModal} from './InvoiceActionMenuModal';
 import {styles} from './InvoiceDetails.styles';
-import {invoiceApi} from '@services/api/invoice.api';
-import Toast from 'react-native-toast-message';
 
 export const InvoiceDetails: React.FC = () => {
   const {
@@ -77,6 +75,8 @@ export const InvoiceDetails: React.FC = () => {
     anchorCheckerDetailsLoading,
     showAttachmentModal,
     setShowAttachmentModal,
+    attachmentFallback,
+    setAttachmentFallback,
     selectedInvoiceIds,
     showSendForApprovalModal,
     setShowSendForApprovalModal,
@@ -94,6 +94,7 @@ export const InvoiceDetails: React.FC = () => {
     onVerifyApprove,
     onVerifyReject,
     onBulkApply,
+    handleBulkReviewSubmit,
     getMenuPosition,
     onCreateInvoicePress,
     isCreateInvoiceEnabled,
@@ -349,9 +350,10 @@ export const InvoiceDetails: React.FC = () => {
       <InvoiceAttachmentsModal
         visible={showAttachmentModal}
         invoiceId={selectedInvoiceId}
+        fallbackAttachments={attachmentFallback}
         onClose={() => {
           setShowAttachmentModal(false);
-          setSelectedInvoiceId(null);
+          setAttachmentFallback([]);
         }}
         onListChanged={refreshInvoiceList}
       />
@@ -415,51 +417,7 @@ export const InvoiceDetails: React.FC = () => {
         }}
         selectedInvoices={selectedInvoices}
         action={bulkAction}
-         onSubmit={(payload) => {
-          setBulkLoading(true);
-          const isChecker = isAnchorChecker || isDealerChecker;
-          const apiCall = isChecker 
-            ? invoiceApi.bulkUpdateInvoiceStatus({
-                action: (payload.action === 'Verify' || payload.action === 'Approve') ? 'Approve' : 'Reject',
-                invoices: payload.invoices.map(inv => ({
-                  invoiceId: inv.invoiceId,
-                  action: (inv.action === 'Verify' || inv.action === 'Approve') ? 'Approve' : 'Reject',
-                  approval_level: 1, // Defaulting to level 1
-                  remark: inv.remark,
-                }))
-              })
-            : invoiceApi.bulkUpdateInvoiceVerification(payload);
-
-          apiCall
-            .then(res => {
-              console.log('Bulk Action API Response:', JSON.stringify(res, null, 2));
-              if (res.statusCode === 200 || res.status === 200) {
-                Toast.show({
-                  type: 'success',
-                  text1: 'Success',
-                  text2: `Bulk ${bulkAction} completed successfully`,
-                });
-                setSelectedInvoices([]);
-                setSelectedInvoiceIds([]);
-                setShowBulkReviewModal(false);
-                refreshInvoiceList();
-              } else {
-                Toast.show({
-                  type: 'error',
-                  text1: 'Action Failed',
-                  text2: res.message || 'Something went wrong',
-                });
-              }
-            })
-            .catch(err => {
-              Toast.show({
-                type: 'error',
-                text1: 'Error',
-                text2: err.message || 'An error occurred',
-              });
-            })
-            .finally(() => setBulkLoading(false));
-        }}
+        onSubmit={handleBulkReviewSubmit}
         loading={bulkLoading}
       />
     </Container>

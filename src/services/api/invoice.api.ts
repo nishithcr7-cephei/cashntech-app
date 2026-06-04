@@ -4,6 +4,10 @@ import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import type {DocumentPickerResponse} from '@react-native-documents/picker';
 import type {InvoiceListItemApi, UpdateInvoicePayload} from '@store/invoice/inv.types';
 import {normalizeDealerInfoResponse} from '@utils/normalizeDealerInfo';
+import {
+  mapInvoiceAttachmentsWithUrls,
+} from '@utils/invoiceAttachments';
+import {transformApiResponse} from '@utils/apiTransformer';
 
 // Unit mapping: PCS=1, KG=2, LTR=3, etc. (backend accepts any number)
 const UNIT_MAP: Record<string, number> = {
@@ -328,6 +332,30 @@ export const invoiceApi = {
     return response.data;
   },
 
+  /** GET /configuration/party/tax/ — active taxes for logged-in user's party (web parity). */
+  getPartyTaxes: async (): Promise<
+    Array<{id: number; name: string; value: number; is_active?: boolean; account_no?: string}>
+  > => {
+    const response = await axiosInstance.get(ApiEndPoints.apiPartyTaxList, {
+      authRequired: true,
+    } as any);
+    const body = response?.data;
+    const list = Array.isArray(body?.data)
+      ? body.data
+      : Array.isArray(body)
+        ? body
+        : [];
+    return list
+      .filter((t: any) => t && t.is_active !== false && t.name)
+      .map((t: any) => ({
+        id: Number(t.id),
+        name: String(t.name),
+        value: Number(t.value) || 0,
+        is_active: t.is_active,
+        account_no: t.account_no,
+      }));
+  },
+
   getInvoiceSummary: async (programIds?: string[]): Promise<any> => {
     const body = {
       programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
@@ -449,17 +477,42 @@ export const invoiceApi = {
   },
 
   getInvoiceDetails: async (invoiceId: string): Promise<any> => {
-    const response = await axiosInstance.get(
-      ApiEndPoints.apiGetInvoiceDetails(invoiceId),
-      {authRequired: true} as any,
-    );
-    const data = response?.data?.data ?? response?.data;
-    if (!data) return {};
+    let response: any;
+    try {
+      response = await axiosInstance.get(
+        ApiEndPoints.apiGetInvoiceDetails(invoiceId),
+        {authRequired: true, skipResponseTransform: true} as any,
+      );
+    } catch (primaryErr) {
+      // Fallback for environments where route is registered with trailing slash.
+      response = await axiosInstance.get(
+        `${ApiEndPoints.apiGetInvoiceDetails(invoiceId)}/`,
+        {authRequired: true, skipResponseTransform: true} as any,
+      );
+    }
+    const body = response?.data;
+    const rawInvoice =
+      body?.data != null &&
+      typeof body.data === 'object' &&
+      !Array.isArray(body.data) &&
+      (body.data.invoice_ref_no != null || body.data.id != null)
+        ? body.data
+        : body?.invoice_ref_no != null || body?.id != null
+          ? body
+          : body?.data ?? body;
+    if (!rawInvoice || typeof rawInvoice !== 'object') return {};
+
+    const rawAttachments = mapInvoiceAttachmentsWithUrls(rawInvoice);
+    const data = transformApiResponse(rawInvoice);
+    const attachmentList =
+      rawAttachments.length > 0
+        ? rawAttachments
+        : mapInvoiceAttachmentsWithUrls(data);
 
     // Map backend snake_case to frontend camelCase InvoiceFields
-    // We return the merged object so callers can access both raw and mapped fields
     return {
       ...data,
+      attachment: attachmentList,
       invoiceNumber: data.invoice_ref_no,
       invoiceDate: data.invoice_date,
       invoiceDueDate: data.invoice_due_date,
@@ -492,7 +545,7 @@ export const invoiceApi = {
           taxAmount: String(t.tax_amount ?? ''),
         })),
       })),
-      attachments: data.attachment,
+      attachments: attachmentList,
     };
   },
 

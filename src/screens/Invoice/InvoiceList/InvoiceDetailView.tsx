@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useMemo} from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import {selectInvoiceList} from '@store/invoice/inv.selector';
 import {AppBar, Container, UploadModal} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -24,7 +25,7 @@ import {invoiceApi} from '@services/api/invoice.api';
 import {formatStatus} from './components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
-import {FILE_DOWNLOAD_URL} from '@config/config';
+import {mapInvoiceAttachmentsWithUrls} from '@utils/invoiceAttachments';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 
 const fmtAmount = (n: number) =>
@@ -148,10 +149,16 @@ const DetailField: React.FC<{label: string; value: string}> = ({label, value}) =
   </View>
 );
 
-const SummaryStat: React.FC<{label: string; value: string}> = ({label, value}) => (
-  <View style={styles.summaryStat}>
+const SummaryStat: React.FC<{label: string; value: string; isWide?: boolean}> = ({
+  label,
+  value,
+  isWide = false,
+}) => (
+  <View style={[styles.summaryStat, isWide && styles.summaryStatWide]}>
     <Text style={styles.summaryStatLabel}>{label}</Text>
-    <Text style={styles.summaryStatValue} numberOfLines={1}>
+    <Text
+      style={[styles.summaryStatValue, isWide && styles.summaryStatValueWide]}
+      numberOfLines={1}>
       {value}
     </Text>
   </View>
@@ -170,8 +177,29 @@ export const InvoiceDetailView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const invoiceId = route?.params?.invoiceId || '';
+  const rawInvoiceId = route?.params?.invoiceId || '';
   const invoiceNo = route?.params?.invoiceNo || '';
+  const invoiceListRaw = useSelector(selectInvoiceList) as Array<any>;
+
+  const invoiceId = useMemo(() => {
+    const trimmed = String(rawInvoiceId || '').trim();
+    const uuidLike =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    // Normal path: id is already UUID
+    if (uuidLike.test(trimmed)) return trimmed;
+
+    // Fallback: some flows can pass invoice number in invoiceId route param.
+    const byRefNo = (invoiceListRaw || []).find(
+      inv =>
+        String(inv?.invoice_ref_no || '').trim() === trimmed ||
+        String(inv?.invoice_ref_no || '').trim() === String(invoiceNo || '').trim(),
+    );
+
+    if (byRefNo?.id) return String(byRefNo.id);
+
+    return trimmed;
+  }, [rawInvoiceId, invoiceNo, invoiceListRaw]);
 
   const goBackToList = () => {
     (navigation as any).navigate('InvoiceDetails', {
@@ -254,26 +282,7 @@ export const InvoiceDetailView: React.FC = () => {
 
         const discountPercent = subTotal > 0 ? (discountTotal / subTotal) * 100 : 0;
         const taxPercent = subTotal > 0 ? (taxTotal / subTotal) * 100 : 0;
-        const baseUrl =
-          (FILE_DOWNLOAD_URL || '').trim() ||
-          'https://d2wayd1he5a7q1.cloudfront.net';
-        const rawAttachments =
-          data?.attachment ??
-          (data?.attachment_url ? [{attachment_url: data.attachment_url}] : []);
-        const attachments: AttachmentItem[] = (Array.isArray(rawAttachments)
-          ? rawAttachments
-          : []
-        )
-          .map((a: any, idx: number) => {
-            const url = (a?.attachment_url || '').trim();
-            const fullUrl = url
-              ? url.startsWith('http')
-                ? url
-                : `${baseUrl.replace(/\/$/, '')}/${url.replace(/^\//, '')}`
-              : '';
-            return {id: a?.id ?? idx, attachment_url: url, fullUrl};
-          })
-          .filter(a => a.fullUrl);
+        const attachments = mapInvoiceAttachmentsWithUrls(data);
 
         setInvoiceData({
           invoiceRefNo: data?.invoice_ref_no || invoiceNo || '',
@@ -482,7 +491,11 @@ export const InvoiceDetailView: React.FC = () => {
         {/* Summary stats — aligned with web */}
         <View style={styles.card}>
           <View style={styles.summaryStatsRow}>
-            <SummaryStat label="Total Amount" value={fmtAmount(invoiceData.total)} />
+            <SummaryStat
+              label="Total Amount"
+              value={fmtAmount(invoiceData.total)}
+              isWide
+            />
             <SummaryStat label="Items" value={String(invoiceData.items.length)} />
             <SummaryStat label="Tax" value={fmtAmount(invoiceData.tax.amount)} />
             <SummaryStat label="Discount" value={fmtAmount(invoiceData.discount.amount)} />
@@ -740,6 +753,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaleWidth(8),
     alignItems: 'center',
   },
+  summaryStatWide: {
+    flexBasis: '44%',
+    minWidth: scaleWidth(150),
+  },
   summaryStatLabel: {
     fontSize: scaleFont(11),
     fontFamily: Fonts.GilroyMedium,
@@ -752,6 +769,9 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
     textAlign: 'center',
+  },
+  summaryStatValueWide: {
+    fontSize: scaleFont(14),
   },
   sectionTitle: {
     fontSize: scaleFont(15),

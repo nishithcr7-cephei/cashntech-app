@@ -262,16 +262,17 @@ function* updateInvoiceVerificationSaga(
 function* bulkUpdateInvoiceSaga(
   action: PayloadAction<BulkUpdateInvoiceRequest>,
 ): Generator {
-  try {
-    const {
-      action: act,
-      invoices,
-      programId,
-      filters,
-      onSuccess,
-      isVerification,
-    } = action.payload;
+  const {
+    action: act,
+    invoices,
+    programId,
+    filters,
+    onSuccess,
+    onFailure,
+    isVerification,
+  } = action.payload;
 
+  try {
     let response: any;
     if (isVerification) {
       // Admin Bulk Verification API
@@ -291,7 +292,7 @@ function* bulkUpdateInvoiceSaga(
         invoices: invoices.map(inv => ({
           invoiceId: inv.invoiceId,
           action: inv.action,
-          approval_level: inv.approval_level || 1,
+          approval_level: inv.approval_level ?? 1,
           remark: inv.remark,
         })),
       });
@@ -315,6 +316,9 @@ function* bulkUpdateInvoiceSaga(
       'Failed to update bulk status';
     showActionToast('error', msg);
     yield put(bulkUpdateInvoiceFailure(msg));
+    if (onFailure) {
+      yield call(onFailure);
+    }
   }
 }
 

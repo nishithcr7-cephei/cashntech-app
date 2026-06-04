@@ -39,8 +39,28 @@ export function decryptValue(encryptedText: string): string {
     return encryptedText || '';
   }
 
+  // S3/storage relative paths (e.g. invoices/invoice_123.png) must not be AES-decrypted.
+  if (
+    encryptedText.includes('/') &&
+    /\.[a-zA-Z0-9]{2,5}$/.test(encryptedText.split('/').pop() ?? '')
+  ) {
+    return encryptedText;
+  }
+
+  // UUID-like ids must never be decrypted (prevents corruption of invoice/program ids)
+  const isUuidLike =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      encryptedText,
+    );
+  if (isUuidLike) return encryptedText;
+
+  const compact = encryptedText.replace(/\s+/g, '');
+  // Heuristic: treat as encrypted only if it looks like base64 payload, not plain ids/text.
   const isLikelyEncrypted =
-    /^[A-Za-z0-9+/=_\- ]+$/.test(encryptedText) && encryptedText.length >= 16;
+    /^[A-Za-z0-9+/=_-]+$/.test(compact) &&
+    compact.length >= 16 &&
+    compact.length % 4 === 0 &&
+    /[+/=_]/.test(compact);
   if (!isLikelyEncrypted) return encryptedText;
 
   try {
@@ -74,7 +94,9 @@ export function decryptValue(encryptedText: string): string {
       result = decrypted.toString(CryptoJS.enc.Utf8);
     }
 
-    const final = result && result.length > 0 ? result : encryptedText;
+    const hasControlChars = /[\x00-\x08\x0E-\x1F\x7F]/.test(result);
+    const final =
+      result && result.length > 0 && !hasControlChars ? result : encryptedText;
     return final;
   } catch (e) {
     return encryptedText;

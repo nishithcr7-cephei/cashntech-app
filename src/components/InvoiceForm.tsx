@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useMemo} from 'react';
 import Toast from 'react-native-toast-message';
 import {
   View,
@@ -25,6 +25,13 @@ import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 
 export type DropdownOption = {label: string; value: string};
+
+/** Party tax from GET /configuration/party/tax/ */
+export type PartyTaxOption = {
+  label: string;
+  value: string;
+  percentage: number;
+};
 
 const emptyFields: InvoiceFields = {
   dealer: '',
@@ -72,6 +79,9 @@ type Props = {
   dealerOptions?: DropdownOption[];
   creditToOptions?: DropdownOption[];
   tenorOptions?: DropdownOption[];
+  /** Active party taxes — dropdown options; percentage auto-filled & locked (web parity). */
+  partyTaxOptions?: PartyTaxOption[];
+  onLoadPartyTaxes?: () => void;
   bankOptions?: DropdownOption[];
   selectedBankId?: string;
   onBankSelect?: (bankId: string) => void;
@@ -105,6 +115,8 @@ export const InvoiceForm: React.FC<Props> = ({
   dealerOptions,
   creditToOptions,
   tenorOptions,
+  partyTaxOptions,
+  onLoadPartyTaxes,
   bankOptions,
   selectedBankId = '',
   onBankSelect,
@@ -124,6 +136,21 @@ export const InvoiceForm: React.FC<Props> = ({
   const storageBaseUrl = 'https://d2wayd1he5a7q1.cloudfront.net'; // Same as DetailView
   const dealerData = dealerOptions ?? [];
   const creditToData = creditToOptions ?? [];
+  const taxTypeDropdownData: DropdownOption[] =
+    partyTaxOptions && partyTaxOptions.length > 0
+      ? [
+          {label: 'Select', value: ''},
+          ...partyTaxOptions.map(t => ({label: t.label, value: t.value})),
+        ]
+      : [
+          {label: 'Select', value: ''},
+          {label: 'GST', value: 'GST'},
+          {label: 'CGST', value: 'CGST'},
+          {label: 'OTHER', value: 'OTHER'},
+        ];
+
+  const isPartyConfiguredTax = (taxName: string) =>
+    !!taxName && (partyTaxOptions?.some(t => t.value === taxName) ?? false);
   const [showInvoiceNumberTooltip, setShowInvoiceNumberTooltip] = useState(false);
   const [showPOTooltip, setShowPOTooltip] = useState(false);
   const [showCreditAccountTooltip, setShowCreditAccountTooltip] = useState(false);
@@ -147,6 +174,14 @@ export const InvoiceForm: React.FC<Props> = ({
 
   const TENURE_DAYS = defaultPaymentTermsDays;
   const isHistoricalInvoiceMode = mode === 'edit' || mode === 'recreate';
+
+  const selectedTenorDays = useMemo(() => {
+    const parsed = parseInt(String(value.tenor ?? '').trim(), 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    return undefined;
+  }, [value.tenor]);
+
+  const tenureDaysForDueDate = selectedTenorDays ?? TENURE_DAYS;
 
   // Calculate Invoice Due Date based on Invoice Date, GRN Date, and Tenure
   const calculateInvoiceDueDate = (
@@ -173,11 +208,12 @@ export const InvoiceForm: React.FC<Props> = ({
   // Do NOT include invoiceDueDate in deps – otherwise manual due date changes get overwritten.
   useEffect(() => {
     if (isHistoricalInvoiceMode) return;
+    if (!selectedTenorDays) return;
     if (value.invoiceDate) {
       const calculatedDueDate = calculateInvoiceDueDate(
         value.invoiceDate,
         value.grnDate || '',
-        TENURE_DAYS,
+        selectedTenorDays,
       );
       if (calculatedDueDate) {
         onChange({invoiceDueDate: calculatedDueDate});
@@ -185,7 +221,12 @@ export const InvoiceForm: React.FC<Props> = ({
     } else if (!value.invoiceDate && value.invoiceDueDate) {
       onChange({invoiceDueDate: ''});
     }
-  }, [value.invoiceDate, value.grnDate, TENURE_DAYS, isHistoricalInvoiceMode]);
+  }, [
+    value.invoiceDate,
+    value.grnDate,
+    selectedTenorDays,
+    isHistoricalInvoiceMode,
+  ]);
 
   // Validate Invoice Date: up to staleInvoicePeriodDays back from today, no future dates
   const validateInvoiceDate = (dateStr: string): string | undefined => {
@@ -221,13 +262,15 @@ export const InvoiceForm: React.FC<Props> = ({
     }
 
     const today = moment().startOf('day');
-    const maxDate = moment().add(defaultPaymentTermsDays, 'days').startOf('day');
+    const maxDate = moment()
+      .add(tenureDaysForDueDate, 'days')
+      .startOf('day');
 
     if (dueDate.isBefore(today)) {
       return 'Invoice due date cannot be in the past';
     }
     if (dueDate.isAfter(maxDate)) {
-      return `Invoice due date cannot be more than ${defaultPaymentTermsDays} days from today`;
+      return `Invoice due date cannot be more than ${tenureDaysForDueDate} days from today`;
     }
 
     return undefined;
@@ -376,6 +419,50 @@ export const InvoiceForm: React.FC<Props> = ({
     });
     newItems[itemIndex] = {...item, taxes};
     newItems[itemIndex].taxAmount = roundToTwo(taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0)).toFixed(2);
+    onChange({items: newItems});
+  };
+
+  /** Tax type from party config: auto-fill % from API and lock (matches web). */
+  const handleTaxTypeSelect = (itemIndex: number, taxIndex: number, taxName: string) => {
+    onLoadPartyTaxes?.();
+    const partyTax = partyTaxOptions?.find(t => t.value === taxName);
+    const pct =
+      taxName && partyTax != null ? String(partyTax.percentage) : '';
+
+    const newItems = [...(value.items || [])];
+    const item = newItems[itemIndex];
+    if (!item) return;
+    const taxes = [
+      ...(item.taxes?.length
+        ? item.taxes
+        : [
+            {
+              taxType: item.taxType || '',
+              taxPercentage: item.taxPercentage || '',
+              taxAmount: item.taxAmount || '',
+            },
+          ]),
+    ];
+    if (!taxes[taxIndex]) {
+      taxes[taxIndex] = {taxType: '', taxPercentage: '', taxAmount: ''};
+    }
+    taxes[taxIndex] = {...taxes[taxIndex], taxType: taxName, taxPercentage: pct};
+
+    const itemSubTotal = parseFloat(item.total) || 0;
+    const itemDiscAmount = parseFloat(item.discountAmount || '0') || 0;
+    const discountedPrice = Math.max(0, itemSubTotal - itemDiscAmount);
+
+    taxes.forEach((t, i) => {
+      const taxPct = parseFloat(t.taxPercentage || '0') || 0;
+      taxes[i] = {
+        ...t,
+        taxAmount: roundToTwo((discountedPrice * taxPct) / 100).toFixed(2),
+      };
+    });
+    newItems[itemIndex] = {...item, taxes};
+    newItems[itemIndex].taxAmount = roundToTwo(
+      taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0),
+    ).toFixed(2);
     onChange({items: newItems});
   };
 
@@ -610,7 +697,9 @@ export const InvoiceForm: React.FC<Props> = ({
                 onChange={set('tenor')}
                 placeholder="Select tenor"
                 containerStyle={styles.dropdownContainer}
+                dropdownStyle={styles.tenorDropdownField}
                 showSearch={false}
+                maxHeight={scaleHeight(280)}
               />
               {errors.tenor ? (
                 <Text style={styles.errorText}>{errors.tenor}</Text>
@@ -666,7 +755,9 @@ export const InvoiceForm: React.FC<Props> = ({
                     ? {}
                     : {
                         minimumDate: new Date(),
-                        maximumDate: moment().add(defaultPaymentTermsDays, 'days').toDate(),
+                        maximumDate: moment()
+                          .add(tenureDaysForDueDate, 'days')
+                          .toDate(),
                       }),
                 }}
                 containerStyle={styles.datePickerContainer}
@@ -859,14 +950,9 @@ export const InvoiceForm: React.FC<Props> = ({
                     <View style={styles.discountTaxDropdownVertical}>
                       <CustomDropdown
                         label=""
-                        data={[
-                          {label: 'Select', value: ''},
-                          {label: 'GST', value: 'GST'},
-                          {label: 'CGST', value: 'CGST'},
-                          {label: 'OTHER', value: 'OTHER'},
-                        ]}
+                        data={taxTypeDropdownData}
                         value={tax.taxType || ''}
-                        onChange={(val) => updateItemTax(index, taxIdx, 'taxType', val)}
+                        onChange={(val) => handleTaxTypeSelect(index, taxIdx, val)}
                         placeholder="Select"
                         containerStyle={styles.itemDropdownContainer}
                         showSearch={false}
@@ -875,13 +961,27 @@ export const InvoiceForm: React.FC<Props> = ({
                     {tax.taxType && (
                       <View style={styles.itemDiscountTaxInputsVertical}>
                         <View style={styles.taxPercentInputRow}>
-                          <TextInput
-                            style={styles.itemDiscountTaxInputVertical}
-                            value={tax.taxPercentage || ''}
-                            onChangeText={(text) => updateItemTax(index, taxIdx, 'taxPercentage', text)}
-                            placeholder="Value"
-                            keyboardType="decimal-pad"
-                          />
+                          {isPartyConfiguredTax(tax.taxType) ? (
+                            <TextInput
+                              style={[
+                                styles.itemDiscountTaxInputVertical,
+                                styles.autoCalculated,
+                              ]}
+                              value={tax.taxPercentage || '0'}
+                              editable={false}
+                              placeholder="Value"
+                            />
+                          ) : (
+                            <TextInput
+                              style={styles.itemDiscountTaxInputVertical}
+                              value={tax.taxPercentage || ''}
+                              onChangeText={(text) =>
+                                updateItemTax(index, taxIdx, 'taxPercentage', text)
+                              }
+                              placeholder="Value"
+                              keyboardType="decimal-pad"
+                            />
+                          )}
                           <Text style={styles.taxPercentSuffix}>%</Text>
                         </View>
                         <TextInput
@@ -1454,6 +1554,9 @@ const styles = StyleSheet.create({
   },
   dropdownHeight: {
     height: 42,
+  },
+  tenorDropdownField: {
+    minHeight: scaleHeight(44),
   },
   addButton: {
     backgroundColor: '#dc3545',

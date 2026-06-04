@@ -72,6 +72,7 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
                     invoiceNo: row.invoice_ref_no,
                     amount: row.final_total || '0',
                     dealerName: row.partyName || row.party?.entity_name || 'Unknown',
+                    rawApprovalStatus: row.approval_status,
                   });
                 }
               }}>

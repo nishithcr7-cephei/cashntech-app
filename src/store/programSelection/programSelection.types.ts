@@ -13,6 +13,7 @@ export type SelectedProgram = {
   method: string | null;
   role: string | null;
   status: string | null;
+  approvalLevel: number | null;
 };
 
 export type ProgramSelectionState = {
@@ -29,6 +30,8 @@ export type ProgramSelectionState = {
   method: string | null;
   role: string | null;
   status: string | null;
+  /** workflow_config.level from user scope for selected product */
+  approvalLevel: number | null;
   // Multiple program selections
   selectedPrograms: SelectedProgram[];
   // User scope (GET /user/scope) - banks, products, programs

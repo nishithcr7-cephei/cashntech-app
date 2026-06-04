@@ -201,59 +201,43 @@ export const InvoiceUploadPreview: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.detailsSection}>
-          <View style={styles.detailsGrid}>
-            <View style={styles.detailColumn}>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Dealer Name:</Text>
-                <Text style={styles.detailValue}>{invoiceData.dealerName || '-'}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Dealer Code:</Text>
-                <Text style={styles.detailValue}>{invoiceData.dealerCode || '-'}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>OD Account Number:</Text>
-                <Text style={styles.detailValue}>
-                  {invoiceData.odAccountNumber || '-'}
-                </Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Anchor Name:</Text>
-                <Text style={styles.detailValue}>{invoiceData.anchorName || '-'}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Remark:</Text>
-                <Text style={styles.detailValue}>{invoiceData.remark || '-'}</Text>
-              </View>
-            </View>
-
-            <View style={styles.detailColumn}>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>PO Ref. No.:</Text>
-                <Text
-                  style={[styles.detailValue, styles.detailValueSmall]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.65}>
-                  {invoiceData.poRefNo || '-'}
-                </Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Invoice Date:</Text>
-                <Text style={styles.detailValue}>{invoiceData.invoiceDate || '-'}</Text>
-              </View>
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Invoice Due Date:</Text>
-                <Text style={styles.detailValue}>
-                  {invoiceData.invoiceDueDate || '-'}
-                </Text>
-              </View>
-            </View>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Invoice Details</Text>
+          <View style={styles.keyValueRow}>
+            <Text style={styles.keyLabel}>Dealer Name</Text>
+            <Text style={styles.keyValue}>{invoiceData.dealerName || '-'}</Text>
+          </View>
+          <View style={styles.keyValueRow}>
+            <Text style={styles.keyLabel}>Dealer Code</Text>
+            <Text style={styles.keyValue}>{invoiceData.dealerCode || '-'}</Text>
+          </View>
+          <View style={styles.keyValueRow}>
+            <Text style={styles.keyLabel}>OD Account Number</Text>
+            <Text style={styles.keyValue}>{invoiceData.odAccountNumber || '-'}</Text>
+          </View>
+          <View style={styles.keyValueRow}>
+            <Text style={styles.keyLabel}>Anchor Name</Text>
+            <Text style={styles.keyValue}>{invoiceData.anchorName || '-'}</Text>
+          </View>
+          <View style={styles.keyValueRow}>
+            <Text style={styles.keyLabel}>PO Ref. No.</Text>
+            <Text style={styles.keyValue}>{invoiceData.poRefNo || '-'}</Text>
+          </View>
+          <View style={styles.keyValueRow}>
+            <Text style={styles.keyLabel}>Invoice Date</Text>
+            <Text style={styles.keyValue}>{invoiceData.invoiceDate || '-'}</Text>
+          </View>
+          <View style={styles.keyValueRow}>
+            <Text style={styles.keyLabel}>Invoice Due Date</Text>
+            <Text style={styles.keyValue}>{invoiceData.invoiceDueDate || '-'}</Text>
+          </View>
+          <View style={styles.keyValueRowLast}>
+            <Text style={styles.keyLabel}>Remark</Text>
+            <Text style={styles.keyValue}>{invoiceData.remark || '-'}</Text>
           </View>
         </View>
 
-        <View style={styles.descriptionSection}>
+        <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Description</Text>
           {invoiceData.items.map((item, index) => (
             <View key={item.id} style={styles.itemCard}>
@@ -277,7 +261,7 @@ export const InvoiceUploadPreview: React.FC = () => {
                   <Text style={styles.itemDetailLabel}>Price:</Text>
                   <Text style={styles.itemDetailValue}>{fmtAmount(item.price)}</Text>
                 </View>
-                <View style={styles.itemDetailRow}>
+                <View style={styles.itemDetailRowLast}>
                   <Text style={styles.itemDetailLabel}>Total:</Text>
                   <Text style={[styles.itemDetailValue, styles.itemTotalValue]}>
                     {fmtAmount(item.total)}/-
@@ -288,22 +272,20 @@ export const InvoiceUploadPreview: React.FC = () => {
           ))}
         </View>
 
-        <View style={styles.summarySection}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Discount:</Text>
-            <Text style={styles.summaryValue}>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Summary</Text>
+          <View style={styles.keyValueRow}>
+            <Text style={styles.keyLabel}>Discount</Text>
+            <Text style={styles.keyValue}>
               {fmtPercent(invoiceData.discount.percent)}% ({fmtAmount(invoiceData.discount.amount)}/-)
             </Text>
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tax Value:</Text>
-            <Text style={styles.summaryValue}>
+          <View style={styles.keyValueRowLast}>
+            <Text style={styles.keyLabel}>Tax Value</Text>
+            <Text style={styles.keyValue}>
               {fmtPercent(invoiceData.tax.percent)}% ({fmtAmount(invoiceData.tax.amount)}/-)
             </Text>
           </View>
-        </View>
-
-        <View style={styles.totalSection}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
             <Text style={styles.totalValue}>
@@ -313,7 +295,7 @@ export const InvoiceUploadPreview: React.FC = () => {
         </View>
 
         {invoiceData.attachments.length > 0 && (
-          <View style={styles.attachmentSection}>
+          <View style={styles.sectionCard}>
             <Text style={styles.attachmentSectionTitle}>Attachments</Text>
             {invoiceData.attachments.map((att) => {
               const fileName = att.attachment_url?.split('/').pop() || 'Attachment';
@@ -382,28 +364,45 @@ const styles = StyleSheet.create({
     backgroundColor: '#E6E6E6',
     width: '100%',
   },
-  content: {padding: scaleWidth(16)},
-  detailsSection: {marginBottom: scaleHeight(24)},
-  detailsGrid: {flexDirection: 'row', gap: scaleWidth(16)},
-  detailColumn: {flex: 1},
-  detailItem: {
-    marginBottom: scaleHeight(16),
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+  content: {padding: scaleWidth(16), paddingBottom: scaleHeight(28)},
+  sectionCard: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.gray200,
+    borderRadius: scaleWidth(10),
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(12),
+    marginBottom: scaleHeight(14),
   },
-  detailLabel: {
+  keyValueRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.gray200,
+    paddingVertical: scaleHeight(9),
+    columnGap: scaleWidth(10),
+  },
+  keyValueRowLast: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingTop: scaleHeight(9),
+    columnGap: scaleWidth(10),
+  },
+  keyLabel: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+    flex: 1,
+  },
+  keyValue: {
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
-    marginBottom: scaleHeight(4),
+    flex: 1,
+    textAlign: 'right',
   },
-  detailValue: {
-    fontSize: scaleFont(14),
-    fontFamily: Fonts.GilroyRegular,
-    color: Colors.darkblack,
-  },
-  detailValueSmall: {fontSize: scaleFont(11)},
-  descriptionSection: {marginBottom: scaleHeight(24)},
   sectionTitle: {
     fontSize: scaleFont(16),
     fontFamily: Fonts.GilroySemiBold,
@@ -412,7 +411,7 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     borderWidth: 1,
-    borderColor: '#E6E6E6',
+    borderColor: Colors.gray200,
     borderRadius: scaleWidth(8),
     marginBottom: scaleHeight(12),
     overflow: 'hidden',
@@ -435,42 +434,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: scaleHeight(8),
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: Colors.gray200,
+    columnGap: scaleWidth(10),
+  },
+  itemDetailRowLast: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: scaleHeight(8),
+    columnGap: scaleWidth(10),
   },
   itemDetailLabel: {
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
-    flex: 1,
+    flex: 0.9,
   },
   itemDetailValue: {
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyRegular,
     color: Colors.darkblack,
-    flex: 1,
+    flex: 1.1,
     textAlign: 'right',
   },
   itemTotalValue: {
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
   },
-  summarySection: {marginBottom: scaleHeight(16)},
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: scaleHeight(8),
-  },
-  summaryLabel: {
-    fontSize: scaleFont(14),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.darkblack,
-  },
-  summaryValue: {
-    fontSize: scaleFont(14),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.darkblack,
-  },
-  totalSection: {marginBottom: scaleHeight(24)},
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -478,6 +468,7 @@ const styles = StyleSheet.create({
     paddingVertical: scaleHeight(12),
     paddingHorizontal: scaleWidth(12),
     borderRadius: scaleWidth(8),
+    marginTop: scaleHeight(12),
   },
   totalLabel: {
     fontSize: scaleFont(16),
@@ -489,7 +480,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.white,
   },
-  attachmentSection: {marginTop: scaleHeight(16)},
   attachmentSectionTitle: {
     fontSize: scaleFont(16),
     fontFamily: Fonts.GilroySemiBold,

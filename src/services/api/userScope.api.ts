@@ -9,6 +9,7 @@ export type UserScopeApiItem = {
     id: string;
     name: string;
     permission_group?: string;
+    approval_level?: number | null;
     workflow_method: string;
     programs: Array<{ 
       id: string; 
@@ -38,6 +39,10 @@ export function mapUserScopeToBanks(data: UserScopeApiItem[]): Bank[] {
     const products: BankProgram[] = (item.products || []).map(p => ({
       id: p.id,
       name: p.name,
+      approval_level:
+        p.approval_level != null && Number.isFinite(Number(p.approval_level))
+          ? Number(p.approval_level)
+          : null,
       programs: (p.programs || []).map(pr => ({
         id: pr.id,
         name: pr.name,

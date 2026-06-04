@@ -56,7 +56,13 @@ export const InvoiceDashboard: React.FC = () => {
 
   const metrics = getCardMetrics(productTab, kpis, summaryData);
 
-  const toggleSelectInvoice = (invoice: {id: string; invoiceNo: string; amount: any; dealerName: string}) => {
+  const toggleSelectInvoice = (invoice: {
+    id: string;
+    invoiceNo: string;
+    amount: any;
+    dealerName: string;
+    rawApprovalStatus?: string;
+  }) => {
     setSelectedInvoices(prev => {
       const exists = prev.find(inv => inv.id === invoice.id);
       if (exists) {
@@ -76,6 +82,7 @@ export const InvoiceDashboard: React.FC = () => {
           invoiceNo: row.invoice_ref_no,
           amount: row.final_total || '0',
           dealerName: row.partyName || row.party?.entity_name || 'Unknown',
+          rawApprovalStatus: row.approval_status,
         }))
       );
     }

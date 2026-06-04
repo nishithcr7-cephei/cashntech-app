@@ -172,6 +172,9 @@ const Endpoints = {
   apiDeleteInvoiceItem: (itemId: string) => `/invoice/item/${itemId}`,
   apiDeleteInvoiceItemTax: (itemTaxId: string) => `/invoice/item/tax/${itemTaxId}`,
 
+  // Party tax configuration (Create Invoice line-item tax)
+  apiPartyTaxList: '/configuration/party/tax/',
+
   // User Scope (Program Selection)
   apiUserScope: '/user/scope',
   // User Permissions (feature/action access)

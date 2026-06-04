@@ -19,7 +19,7 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
 import {ensureCameraPermission} from '@services/permissions';
 import {runGSTInvoiceExtractionWithAI} from '@services/ocr';
-import {InvoiceForm} from '@components/InvoiceForm';
+import {InvoiceForm, type PartyTaxOption} from '@components/InvoiceForm';
 import {InvoiceCamera} from '@components/InvoiceCamera';
 import {UploadModal} from '@components/index';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
@@ -272,6 +272,31 @@ export const CreateInvoice: React.FC = () => {
   const hasUploadPerm = permissions.includes(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY);
   const hasAttachmentPerm = permissions.includes(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
   const canUploadFinal = hasUploadPerm && hasAttachmentPerm;
+  const [partyTaxOptions, setPartyTaxOptions] = useState<PartyTaxOption[]>([]);
+  const isOcrTemporarilyDisabled = true;
+
+  const loadPartyTaxes = useCallback(() => {
+    invoiceApi
+      .getPartyTaxes()
+      .then(taxes => {
+        setPartyTaxOptions(
+          taxes.map(t => ({
+            label: t.name,
+            value: t.name,
+            percentage: Number(t.value) || 0,
+          })),
+        );
+      })
+      .catch(() => {
+        setPartyTaxOptions([]);
+      });
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadPartyTaxes();
+    }, [loadPartyTaxes]),
+  );
 
   // Determine required permission based on mode
   const hasRequiredPerm = () => {
@@ -442,19 +467,6 @@ export const CreateInvoice: React.FC = () => {
       });
     }
   }, [dealerInfoError]);
-
-  /** Default tenor from program/dealer basic params when creating (not edit/recreate). */
-  useEffect(() => {
-    if (mode === 'edit' || mode === 'recreate') return;
-    const raw = dealerInfo?.basic_parameters?.default_payment_terms_days;
-    if (raw === undefined || raw === null) return;
-    const days = typeof raw === 'string' ? parseFloat(raw.trim()) : Number(raw);
-    if (!Number.isFinite(days) || days <= 0) return;
-    setFields(prev => {
-      if (prev.tenor?.trim()) return prev;
-      return {...prev, tenor: String(Math.round(days))};
-    });
-  }, [dealerInfo?.basic_parameters?.default_payment_terms_days, mode]);
 
   // Load last selected product type (Dealer Finance / Vendor Finance) for dynamic labels
   useEffect(() => {
@@ -847,15 +859,39 @@ export const CreateInvoice: React.FC = () => {
   const applyPatch = (patch: Partial<InvoiceFields>) => {
     if (patch.currency && patch.currency !== 'INR') patch.currency = 'INR';
     if (patch.dealer && dealerInfo?.participants) {
-      const participant = dealerInfo.participants.find(
-        p => 
-          (p.party?.entity_name && (decryptValue(p.party.entity_name) || p.party.entity_name) === patch.dealer) ||
-          p.id === selectedParticipant?.id
-      );
+      const participant = dealerInfo.participants.find(p => {
+        const raw = p.party?.entity_name ?? '';
+        const decrypted = decryptValue(raw) || raw;
+        return decrypted === patch.dealer || raw === patch.dealer;
+      });
       if (participant) {
         patch.dealerCode = decryptValue(participant.company_code ?? '') || participant.company_code;
         patch.odAccountNumber = decryptValue(participant.od_account_no ?? '') || participant.od_account_no;
+        if (mode !== 'edit' && mode !== 'recreate') {
+          // Try participant-level default first, then program-level
+          const participantDefaultTerms = Number(
+            (participant as any)?.default_payment_terms_days ??
+            (participant as any)?.basic_parameters?.default_payment_terms_days,
+          );
+          const programDefaultTerms = Number(
+            dealerInfo?.basic_parameters?.default_payment_terms_days,
+          );
+          const nextTenor =
+            Number.isFinite(participantDefaultTerms) && participantDefaultTerms > 0
+              ? Math.round(participantDefaultTerms)
+              : Number.isFinite(programDefaultTerms) && programDefaultTerms > 0
+                ? Math.round(programDefaultTerms)
+                : undefined;
+          // Always update tenor when dealer changes (even if same program)
+          patch.tenor = nextTenor ? String(nextTenor) : '';
+        }
         setSelectedParticipant(participant);
+      } else if (patch.dealer && mode !== 'edit' && mode !== 'recreate') {
+        // Participant not found in list — reset tenor to program default
+        const programDefaultTerms = Number(dealerInfo?.basic_parameters?.default_payment_terms_days);
+        patch.tenor = Number.isFinite(programDefaultTerms) && programDefaultTerms > 0
+          ? String(Math.round(programDefaultTerms))
+          : '';
       }
     }
     setFields(prev => {
@@ -1294,7 +1330,7 @@ export const CreateInvoice: React.FC = () => {
     if (!fields.invoiceDate?.trim()) return 'Invoice Date is required';
     const tenorDaysHint = parseInt(String(fields.tenor ?? '').trim(), 10);
     if (!Number.isFinite(tenorDaysHint) || tenorDaysHint <= 0) {
-      return 'Tenor (days) is required — enter a whole number greater than zero';
+      return 'Tenor is required — select from the list';
     }
     if (!fields.creditTo?.trim()) return 'Credit To is required';
     if (!fields.items || fields.items.length === 0) return 'At least one item is required';
@@ -1347,7 +1383,10 @@ export const CreateInvoice: React.FC = () => {
     }
     return Array.from(values)
       .sort((a, b) => a - b)
-      .map(days => ({label: String(days), value: String(days)}));
+      .map(days => ({
+        label: `${days} Days`,
+        value: String(days),
+      }));
   }, [dealerInfo?.basic_parameters?.default_payment_terms_days, fields.tenor]);
   if (permissionsLoading) {
     return (
@@ -1416,16 +1455,24 @@ export const CreateInvoice: React.FC = () => {
 
               <View style={styles.ocrButtons}>
                 <TouchableOpacity
-                  style={[styles.ocrButton, styles.cameraButton]}
+                  style={[
+                    styles.ocrButton,
+                    styles.cameraButton,
+                    isOcrTemporarilyDisabled && styles.ocrButtonDisabled,
+                  ]}
                   onPress={openCamera}
-                  disabled={disabled}>
+                  disabled={disabled || isOcrTemporarilyDisabled}>
                   <Camera width={scaleWidth(20)} height={scaleHeight(20)} />
                   <Text style={styles.ocrButtonText}>Capture</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.ocrButton, styles.galleryButton]}
+                  style={[
+                    styles.ocrButton,
+                    styles.galleryButton,
+                    isOcrTemporarilyDisabled && styles.ocrButtonDisabled,
+                  ]}
                   onPress={() => setIsOcrUploadModalVisible(true)}
-                  disabled={disabled}>
+                  disabled={disabled || isOcrTemporarilyDisabled}>
                   <Upload width={scaleWidth(20)} height={scaleHeight(20)} />
                   <Text style={styles.ocrButtonText}>Upload</Text>
                 </TouchableOpacity>
@@ -1460,6 +1507,8 @@ export const CreateInvoice: React.FC = () => {
             dealerOptions={dealerOptions.length > 0 ? dealerOptions : undefined}
             creditToOptions={creditToOptions.length > 0 ? creditToOptions : undefined}
             tenorOptions={tenorOptions}
+            partyTaxOptions={partyTaxOptions.length > 0 ? partyTaxOptions : undefined}
+            onLoadPartyTaxes={loadPartyTaxes}
             staleInvoicePeriodDays={dealerInfo?.basic_parameters?.stale_invoice_period_days != null ? Number(dealerInfo.basic_parameters.stale_invoice_period_days) : undefined}
             defaultPaymentTermsDays={dealerInfo?.basic_parameters?.default_payment_terms_days != null ? Number(dealerInfo.basic_parameters.default_payment_terms_days) : undefined}
             mode={mode}
@@ -1602,6 +1651,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaleWidth(16),
     borderRadius: scaleWidth(8),
     gap: scaleWidth(8),
+  },
+  ocrButtonDisabled: {
+    opacity: 0.5,
   },
   cameraButton: {
     backgroundColor: Colors.primaryColor,

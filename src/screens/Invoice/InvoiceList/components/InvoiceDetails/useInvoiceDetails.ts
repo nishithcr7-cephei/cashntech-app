@@ -15,6 +15,7 @@ import { fetchPermissionsRequest } from '@store/permissions';
 import {
   setProgramSelection,
   toggleProgramSelection,
+  fetchUserScopeRequest,
 } from '@store/programSelection/programSelection.slice';
 import {
   selectInvoiceList,
@@ -34,8 +35,15 @@ import { invoiceApi } from '@services/api/invoice.api';
 import { useHasPermission } from '@hooks/useHasPermission';
 import { PERMISSIONS } from '@constants/permissions';
 import { decryptValue } from '@utils/decrypt';
+import { mapInvoiceAttachmentsWithUrls, type InvoiceAttachmentItem } from '@utils/invoiceAttachments';
 import type { CheckerApprovalEntry } from '@components/CheckerApprovalModal/CheckerApprovalModal';
 import type { ApproveRejectInvoiceDetails } from '@components/ApproveRejectModal/ApproveRejectModal';
+import {
+  getBestWorkflowApprovalLevelFromScope,
+  getInvoiceApprovalLevel,
+  getInvoiceApprovalLevelForId,
+  getWorkflowApprovalLevelFromScope,
+} from '@utils/getInvoiceApprovalLevel';
 
 export function useInvoiceDetails() {
   const navigation = useNavigation();
@@ -107,6 +115,7 @@ export function useInvoiceDetails() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [selectedInvoiceNo, setSelectedInvoiceNo] = useState<string | null>(null);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  const [attachmentFallback, setAttachmentFallback] = useState<InvoiceAttachmentItem[]>([]);
   
   // Permission Checks
   const canApprove = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVE);
@@ -175,6 +184,24 @@ export function useInvoiceDetails() {
   const programId = isAllProgramScope ? '' : concreteProgramId ?? '';
 
   useEffect(() => {
+    if (!scopeData?.length) {
+      dispatch(fetchUserScopeRequest());
+    }
+  }, [dispatch, scopeData]);
+
+  useEffect(() => {
+    if (!scopeData?.length || !programSelection?.productId) return;
+    if (programSelection.approvalLevel != null) return;
+    const level = getBestWorkflowApprovalLevelFromScope(scopeData, {
+      productId: programSelection.productId,
+      programId: programSelection.programId,
+    });
+    if (level != null) {
+      dispatch(setProgramSelection({approvalLevel: level}));
+    }
+  }, [dispatch, scopeData, programSelection?.productId, programSelection?.approvalLevel]);
+
+  useEffect(() => {
     const isAlreadySet = programSelection?.programId === programIdFromParams && !!programSelection?.programName;
     if (!programIdFromParams || isAlreadySet) return;
     if (scopeData?.length) {
@@ -191,10 +218,11 @@ export function useInvoiceDetails() {
                 programId: program.id,
                 programName: program.name,
                 userType: (product.name || '').toLowerCase().includes('dealer') ? 'dealer' : 'vendor',
-                partyId: bank.id,
+                partyId: bank.partyId,
                 method: program.method,
                 role: program.role,
                 status: program.status,
+                approvalLevel: product.approval_level ?? null,
               }),
             );
             return;
@@ -257,25 +285,49 @@ export function useInvoiceDetails() {
     }
     let cancelled = false;
     setAnchorCheckerDetailsLoading(true);
-    setAnchorCheckerInvoiceDetails(null);
     invoiceApi
       .getInvoiceDetails(selectedInvoiceId)
       .then((data: any) => {
         if (cancelled) return;
+        const selectedListRow =
+          filteredData.find(r => r.id === selectedInvoiceId) ??
+          invoiceData.find(r => r.id === selectedInvoiceId);
         const apm = data?.anchorParticipantMapping;
         const party = data?.party;
+        const rawDealerName =
+          apm?.party?.entity_name ??
+          apm?.party?.name ??
+          data?.counter_party_name ??
+          '';
         const dealerName =
-          decryptValue(apm?.party?.entity_name ?? apm?.party?.name ?? '') ||
+          decryptValue(rawDealerName) ||
+          rawDealerName ||
+          selectedListRow?.dealerName ||
+          selectedListRow?.counterParty ||
           '-';
+
+        const rawAnchorName =
+          party?.entity_name ??
+          party?.name ??
+          data?.primary_party_name ??
+          '';
         const anchorName =
-          decryptValue(party?.entity_name ?? party?.name ?? '') || '-';
-        const invoiceDate = data?.invoice_date ? formatDateDash(data.invoice_date) : 'DD / MM / YYYY';
-        const invoiceDueDate = data?.invoice_due_date ? formatDateDash(data.invoice_due_date) : 'DD / MM / YYYY';
+          decryptValue(rawAnchorName) ||
+          rawAnchorName ||
+          selectedListRow?.primaryParty ||
+          '-';
+
+        const invoiceDate = data?.invoice_date
+          ? formatDateDash(data.invoice_date)
+          : selectedListRow?.invoiceDate || 'DD / MM / YYYY';
+        const invoiceDueDate = data?.invoice_due_date
+          ? formatDateDash(data.invoice_due_date)
+          : selectedListRow?.dueDate || 'DD / MM / YYYY';
         const totalAmount = data?.final_total ?? data?.sub_total;
         const invoiceAmount =
           totalAmount != null
             ? `Rs. ${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /-`
-            : 'Rs. 0 /-';
+            : selectedListRow?.invoiceAmount || 'Rs. 0 /-';
         const programName = data?.program?.program_name || '';
 
         // getInvoiceDetails API only returns {id, program_name} — no bank_details.
@@ -285,7 +337,10 @@ export function useInvoiceDetails() {
           rawInvoice?.program?.bank_details?.[0] ??
           data?.program?.bank_details?.[0];
 
-        const rawAccNumber = bankDetails?.account_number ?? '';
+        const rawAccNumber =
+          bankDetails?.account_number ??
+          data?.credit_to ??
+          '';
         const decryptedAcc = rawAccNumber ? decryptValue(rawAccNumber) : '';
 
         let creditAccountNumber = '-';
@@ -293,6 +348,8 @@ export function useInvoiceDetails() {
           creditAccountNumber = `(${decryptedAcc}) ${programName}`;
         } else if (decryptedAcc && decryptedAcc !== rawAccNumber) {
           creditAccountNumber = decryptedAcc;
+        } else if (rawAccNumber) {
+          creditAccountNumber = String(rawAccNumber);
         } else if (programName) {
           creditAccountNumber = programName;
         }
@@ -307,7 +364,7 @@ export function useInvoiceDetails() {
         });
       })
       .catch(() => {
-        if (!cancelled) setAnchorCheckerInvoiceDetails(null);
+        // Keep prefilled row-level details when API detail fetch fails
       })
       .finally(() => {
         if (!cancelled) setAnchorCheckerDetailsLoading(false);
@@ -399,14 +456,18 @@ export function useInvoiceDetails() {
 
   const handleInvoiceNoPress = useCallback(
     (invoiceId: string, invoiceNo: string) => {
+      const idFromList =
+        filteredData.find(r => r.invoiceNo === invoiceNo)?.id ??
+        invoiceData.find(r => r.invoiceNo === invoiceNo)?.id;
+      const resolvedInvoiceId = idFromList || invoiceId;
       (navigation as any).navigate('InvoiceDetailView', {
-        invoiceId,
+        invoiceId: resolvedInvoiceId,
         invoiceNo,
         programId,
         fromInvoiceDashboard,
       });
     },
-    [navigation, programId, fromInvoiceDashboard],
+    [navigation, programId, fromInvoiceDashboard, filteredData, invoiceData],
   );
 
   const handleMenuAction = (action: string, invoiceId: string) => {
@@ -417,6 +478,9 @@ export function useInvoiceDetails() {
       filteredData.find(item => item.id === invoiceId)?.invoiceNo ??
       invoiceData.find(item => item.id === invoiceId)?.invoiceNo ??
       invoiceId;
+    const rowForAction =
+      filteredData.find(item => item.id === invoiceId) ??
+      invoiceData.find(item => item.id === invoiceId);
 
     switch (action) {
       case 'viewDetails':
@@ -490,19 +554,38 @@ export function useInvoiceDetails() {
         );
         break;
       case 'approveReject':
+        setAnchorCheckerInvoiceDetails({
+          dealerName: rowForAction?.dealerName || rowForAction?.counterParty || '-',
+          anchorName: rowForAction?.primaryParty || '-',
+          creditAccountNumber: rowForAction?.creditAccountNumber || '-',
+          invoiceDate: rowForAction?.invoiceDate || 'DD / MM / YYYY',
+          invoiceDueDate: rowForAction?.dueDate || 'DD / MM / YYYY',
+          invoiceAmount: rowForAction?.invoiceAmount || 'Rs. 0 /-',
+        });
         setSelectedInvoiceId(invoiceId);
         setSelectedInvoiceNo(invoiceNo);
         setShowApproveRejectModal(true);
         break;
       case 'invoiceVerification':
+        setAnchorCheckerInvoiceDetails({
+          dealerName: rowForAction?.dealerName || rowForAction?.counterParty || '-',
+          anchorName: rowForAction?.primaryParty || '-',
+          creditAccountNumber: rowForAction?.creditAccountNumber || '-',
+          invoiceDate: rowForAction?.invoiceDate || 'DD / MM / YYYY',
+          invoiceDueDate: rowForAction?.dueDate || 'DD / MM / YYYY',
+          invoiceAmount: rowForAction?.invoiceAmount || 'Rs. 0 /-',
+        });
         setSelectedInvoiceId(invoiceId);
         setSelectedInvoiceNo(invoiceNo);
         setShowApproveRejectModal(true);
         break;
-      case 'attachment':
+      case 'attachment': {
+        const listItem = invoiceListRaw.find(inv => inv.id === invoiceId);
+        setAttachmentFallback(mapInvoiceAttachmentsWithUrls(listItem ?? {}));
         setSelectedInvoiceId(invoiceId);
         setShowAttachmentModal(true);
         break;
+      }
       case 'print':
         break;
       case 'payMeEarly':
@@ -620,16 +703,49 @@ export function useInvoiceDetails() {
     );
   })();
 
-  const approvalLevel = (() => {
-    const row = filteredData.find(r => r.id === selectedInvoiceId) || invoiceData.find(r => r.id === selectedInvoiceId);
-    const s = (row?.rawApprovalStatus || '').toUpperCase();
-    if (s.includes('ANCHOR_CHECKER')) return 1;
-    if (s.includes('DEALER_MAKER')) return 2;
-    if (s.includes('DEALER_CHECKER')) return 3;
+  const checkerRoleContext = {
+    isAnchorChecker,
+    isDealerMaker,
+    isDealerChecker,
+  };
 
-    // Fallback to static role-based logic
-    return isAnchorChecker ? 1 : isDealerMaker ? 2 : isDealerChecker ? 3 : 1;
-  })();
+  const resolveWorkflowLevelForInvoice = useCallback(
+    (_invoiceId?: string) =>
+      getBestWorkflowApprovalLevelFromScope(scopeData, {
+        productId: programSelection?.productId,
+        programId: concreteProgramId || programId || undefined,
+      }) ?? programSelection?.approvalLevel ?? null,
+    [
+      scopeData,
+      programSelection?.productId,
+      programSelection?.approvalLevel,
+      concreteProgramId,
+      programId,
+    ],
+  );
+
+  const resolveApprovalLevelForInvoice = useCallback(
+    (invoiceId: string) => {
+      const row =
+        filteredData.find(r => r.id === invoiceId) ||
+        invoiceData.find(r => r.id === invoiceId);
+      return getInvoiceApprovalLevel({
+        workflowLevelFromScope: resolveWorkflowLevelForInvoice(invoiceId),
+        rawApprovalStatus: row?.rawApprovalStatus,
+        ...checkerRoleContext,
+      });
+    },
+    [
+      filteredData,
+      invoiceData,
+      resolveWorkflowLevelForInvoice,
+      checkerRoleContext,
+    ],
+  );
+
+  const approvalLevel = selectedInvoiceId
+    ? resolveApprovalLevelForInvoice(selectedInvoiceId)
+    : resolveApprovalLevelForInvoice('');
 
   const toggleSelectAllVisible = () => {
     if (!isDealerChecker && !isAnchorChecker && !isCashnTechUser) return;
@@ -659,6 +775,7 @@ export function useInvoiceDetails() {
         dealerName: row.dealerName || row.counterParty,
         amount: row.invoiceAmount,
         dueDate: row.dueDate,
+        rawApprovalStatus: row.rawApprovalStatus,
       }));
       setSelectedInvoices(prev => [...prev, ...newItems]);
     }
@@ -677,7 +794,7 @@ export function useInvoiceDetails() {
       updateInvoiceStatusRequest({
         invoiceId,
         action: 'Approve',
-        approvalLevel,
+        approvalLevel: resolveApprovalLevelForInvoice(invoiceId),
         remark: remarks,
         programId,
         filters: apiFilters,
@@ -702,7 +819,7 @@ export function useInvoiceDetails() {
       updateInvoiceStatusRequest({
         invoiceId,
         action: 'Reject',
-        approvalLevel,
+        approvalLevel: resolveApprovalLevelForInvoice(invoiceId),
         remark: remarks,
         programId,
         filters: apiFilters,
@@ -770,6 +887,24 @@ export function useInvoiceDetails() {
     setAnchorCheckerInvoiceDetails(null);
   };
 
+  const [bulkAction, setBulkAction] = useState<'Verify' | 'Reject' | 'On Hold' | 'Approve'>('Verify');
+  const [showBulkReviewModal, setShowBulkReviewModal] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
+
+  const lookupRawApprovalStatus = useCallback(
+    (invoiceId: string) => {
+      const fromRow =
+        invoiceData.find(r => r.id === invoiceId)?.rawApprovalStatus ||
+        filteredData.find(r => r.id === invoiceId)?.rawApprovalStatus;
+      if (fromRow) return fromRow;
+      const fromSelection = selectedInvoices.find(
+        (inv: {id?: string; rawApprovalStatus?: string}) => inv.id === invoiceId,
+      ) as {rawApprovalStatus?: string} | undefined;
+      return fromSelection?.rawApprovalStatus;
+    },
+    [invoiceData, filteredData, selectedInvoices],
+  );
+
   const onBulkApply = (payload: {
     action: 'Verify' | 'Approve' | 'Reject' | 'On Hold';
     invoices: {
@@ -787,6 +922,7 @@ export function useInvoiceDetails() {
       (payload.action === 'On Hold' && (canVerify || canApprove));
 
     if (!hasPermission) {
+      setBulkLoading(false);
       Toast.show({
         type: 'error',
         text1: 'Permission Denied',
@@ -795,10 +931,24 @@ export function useInvoiceDetails() {
       return;
     }
 
+    const isCheckerBulk =
+      !isCashnTechUser &&
+      (payload.action === 'Approve' || payload.action === 'Reject');
+
     dispatch(
       bulkUpdateInvoiceRequest({
         action: payload.action,
-        invoices: payload.invoices,
+        invoices: payload.invoices.map(inv => ({
+          ...inv,
+          approval_level: isCheckerBulk
+            ? getInvoiceApprovalLevelForId(
+                inv.invoiceId,
+                lookupRawApprovalStatus,
+                checkerRoleContext,
+                resolveWorkflowLevelForInvoice(inv.invoiceId),
+              )
+            : undefined,
+        })),
         programId: programId || '',
         filters: apiFilters,
         isVerification: isCashnTechUser, // Admin users use verification API
@@ -806,14 +956,17 @@ export function useInvoiceDetails() {
           setShowBulkReviewModal(false);
           setSelectedInvoiceIds([]);
           setSelectedInvoices([]);
+          setBulkLoading(false);
         },
+        onFailure: () => setBulkLoading(false),
       }),
     );
   };
 
-  const [bulkAction, setBulkAction] = useState<'Verify' | 'Reject' | 'On Hold' | 'Approve'>('Verify');
-  const [showBulkReviewModal, setShowBulkReviewModal] = useState(false);
-  const [bulkLoading, setBulkLoading] = useState(false);
+  const handleBulkReviewSubmit = (payload: Parameters<typeof onBulkApply>[0]) => {
+    setBulkLoading(true);
+    onBulkApply(payload);
+  };
 
   const handleBulkAction = (action: 'Verify' | 'Reject' | 'On Hold' | 'Approve') => {
     if (selectedInvoices.length === 0) {
@@ -1017,6 +1170,8 @@ export function useInvoiceDetails() {
     anchorCheckerDetailsLoading,
     showAttachmentModal,
     setShowAttachmentModal,
+    attachmentFallback,
+    setAttachmentFallback,
     selectedInvoiceIds,
     setSelectedInvoiceIds,
     showSendForApprovalModal,
@@ -1038,6 +1193,7 @@ export function useInvoiceDetails() {
     onVerifyApprove,
     onVerifyReject,
     onBulkApply,
+    handleBulkReviewSubmit,
     getMenuPosition,
     onCreateInvoicePress,
     isCreateInvoiceEnabled,

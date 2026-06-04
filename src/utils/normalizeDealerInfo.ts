@@ -107,6 +107,11 @@ export function normalizeDealerInfoResponse(
         pick(r, 'company_code_given_by_party', 'companyCodeGivenByParty') ?? '',
       ),
       od_account_no: String(pick(r, 'od_account_no', 'odAccountNo') ?? ''),
+      default_payment_terms_days: pick(
+        r,
+        'default_payment_terms_days',
+        'defaultPaymentTermsDays',
+      ) as number | string | undefined,
       party: {
         id: String(pick(r, 'party_id', 'partyId') ?? ''),
         entity_name: String(pick(r, 'entity_name', 'entityName') ?? ''),

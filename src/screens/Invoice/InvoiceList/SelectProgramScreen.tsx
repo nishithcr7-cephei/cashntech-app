@@ -152,6 +152,7 @@ export const SelectProgramScreen: React.FC = () => {
         method: program.method,
         role: program.role,
         status: program.status,
+        approvalLevel: product.approval_level ?? null,
       }),
     );
     if (fromScreen) {

@@ -18,6 +18,8 @@ export type Program = {
 export type BankProgram = {
   id: string;
   name: string;
+  /** workflow_config.level for current user on this product (from GET /user/scope) */
+  approval_level?: number | null;
   programs: Program[];
 };
 

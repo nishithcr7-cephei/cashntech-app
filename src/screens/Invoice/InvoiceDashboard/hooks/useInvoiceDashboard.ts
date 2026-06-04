@@ -29,6 +29,7 @@ import {selectPermissionsLoading} from '@store/permissions';
 import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
 import {invoiceApi} from '@services/api/invoice.api';
+import {getBestWorkflowApprovalLevelFromScope, getInvoiceApprovalLevelForId} from '@utils/getInvoiceApprovalLevel';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
 import type {Bank} from '@constants/programSelection';
 import type {ProductTabType} from '../types';
@@ -54,10 +55,17 @@ export const useInvoiceDashboard = () => {
   const kpisLoading = useSelector(selectInvoiceOverviewKpisLoading);
 
   // Role-based visibility flags
-  const isAnchorMaker = userRole === 'anchor_maker';
-  const isDealerMaker = userRole === 'dealer_maker';
-  const isAnchorChecker = userRole === 'anchor_checker';
-  const isDealerChecker = userRole === 'dealer_checker';
+  const isAnchorAllAccess = userRole === 'anchor_all_access';
+  const isDealerAllAccess = userRole === 'dealer_all_access';
+  const isAnchorMaker = userRole === 'anchor_maker' || isAnchorAllAccess;
+  const isDealerMaker = userRole === 'dealer_maker' || isDealerAllAccess;
+  const isAnchorChecker = userRole === 'anchor_checker' || isAnchorAllAccess;
+  const isDealerChecker = userRole === 'dealer_checker' || isDealerAllAccess;
+  const checkerRoleContext = {
+    isAnchorChecker,
+    isDealerMaker,
+    isDealerChecker,
+  };
   const isCashnTechUser = !!(
     userRole === 'cashntech_user' || 
     (userRole && ROLE_LABELS[userRole] === 'CashnTech User')
@@ -157,13 +165,34 @@ export const useInvoiceDashboard = () => {
       let response: any;
 
       if (isChecker) {
-        // Regular User Bulk Status API (Approve/Reject)
+        const workflowLevelFromScope =
+          getBestWorkflowApprovalLevelFromScope(scopeData, {
+            productId: programSelection?.productId,
+            programId: programSelection?.programId,
+          }) ?? programSelection?.approvalLevel ?? null;
+
+        const lookupApprovalStatus = (invoiceId: string) => {
+          const fromLatest = (latestData as {id?: string; approval_status?: string}[]).find(
+            r => r.id === invoiceId,
+          )?.approval_status;
+          if (fromLatest) return fromLatest;
+          const fromSelection = selectedInvoices.find(inv => inv.id === invoiceId) as
+            | {rawApprovalStatus?: string}
+            | undefined;
+          return fromSelection?.rawApprovalStatus;
+        };
+
         const checkerPayload = {
           action: (payload.action === 'Approve' ? 'Approve' : 'Reject') as 'Approve' | 'Reject',
           invoices: payload.invoices.map(inv => ({
             invoiceId: inv.invoiceId,
             action: inv.action === 'Approve' ? 'Approve' : 'Reject',
-            approval_level: 1, // Defaulting to level 1 for now
+            approval_level: getInvoiceApprovalLevelForId(
+              inv.invoiceId,
+              lookupApprovalStatus,
+              checkerRoleContext,
+              workflowLevelFromScope,
+            ),
             remark: inv.remark,
           })),
         };

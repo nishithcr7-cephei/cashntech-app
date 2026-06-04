@@ -17,6 +17,7 @@ import {signupRequest} from '@store/auth/auth.slice';
 import {authSelector} from '@store/auth';
 import {setStorage} from '@services/localStorage';
 import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
+import {APP_VERSION_DISPLAY} from '@constants/AppMeta';
 
 const Strings = {
   welcomeTitle: 'Welcome to CashnTech',
@@ -214,6 +215,9 @@ export const SignupScreen: React.FC<Props> = ({
           </View>
         </View>
       </KeyboardAvoidingScrollView>
+      <View style={styles.versionInfoContainer}>
+        <Text style={styles.versionInfoText}>{APP_VERSION_DISPLAY}</Text>
+      </View>
       <TnCFooter navigation={navigation} />
     </Container>
   );
@@ -256,5 +260,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.gray300,
     height: '100%',
     flexDirection: 'row',
+  },
+  versionInfoContainer: {
+    alignItems: 'center',
+    paddingBottom: scaleHeight(6),
+  },
+  versionInfoText: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
   },
 });
