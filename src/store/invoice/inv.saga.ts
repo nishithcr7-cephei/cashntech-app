@@ -292,7 +292,10 @@ function* bulkUpdateInvoiceSaga(
         invoices: invoices.map(inv => ({
           invoiceId: inv.invoiceId,
           action: inv.action,
-          approval_level: inv.approval_level ?? 1,
+          approval_level:
+            inv.approval_level != null && Number.isFinite(Number(inv.approval_level))
+              ? Number(inv.approval_level)
+              : 1,
           remark: inv.remark,
         })),
       });

@@ -1,6 +1,7 @@
 import axiosInstance from './api';
 import ApiEndPoints from '@constants/ApiEndPoints';
 import type {Bank, BankProgram, Program} from '@constants/programSelection';
+import {parseWorkflowLevel} from '@utils/getInvoiceApprovalLevel';
 
 export type UserScopeApiItem = {
   partner_bank: { id: string; name: string };
@@ -39,10 +40,7 @@ export function mapUserScopeToBanks(data: UserScopeApiItem[]): Bank[] {
     const products: BankProgram[] = (item.products || []).map(p => ({
       id: p.id,
       name: p.name,
-      approval_level:
-        p.approval_level != null && Number.isFinite(Number(p.approval_level))
-          ? Number(p.approval_level)
-          : null,
+      approval_level: parseWorkflowLevel(p.approval_level),
       programs: (p.programs || []).map(pr => ({
         id: pr.id,
         name: pr.name,

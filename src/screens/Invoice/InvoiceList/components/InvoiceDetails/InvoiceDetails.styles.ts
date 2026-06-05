@@ -194,6 +194,23 @@ export const styles = StyleSheet.create({
     color: Colors.red,
     fontFamily: Fonts.GilroyMedium,
     textAlign: 'center',
+    marginBottom: scaleHeight(16),
+  },
+  errorRefreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scaleWidth(8),
+    backgroundColor: Colors.primaryColor,
+    paddingHorizontal: scaleWidth(20),
+    paddingVertical: scaleHeight(12),
+    borderRadius: scaleWidth(10),
+    minWidth: scaleWidth(120),
+  },
+  errorRefreshButtonText: {
+    color: Colors.white,
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,

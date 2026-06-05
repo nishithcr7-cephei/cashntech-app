@@ -65,11 +65,13 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
     ? ROLE_HEADER_COLORS[userRole]
     : ROLE_HEADER_COLORS.anchor_maker;
   
-  // Role-based menu visibility
-  const isAnchorMaker = userRole === 'anchor_maker';
-  const isAnchorChecker = userRole === 'anchor_checker';
-  const isDealerMaker = userRole === 'dealer_maker';
-  const isDealerChecker = userRole === 'dealer_checker';
+  // Role-based menu visibility (All Access = same transaction menu as maker/checker on web)
+  const isAnchorAllAccess = userRole === 'anchor_all_access';
+  const isDealerAllAccess = userRole === 'dealer_all_access';
+  const isAnchorMaker = userRole === 'anchor_maker' || isAnchorAllAccess;
+  const isAnchorChecker = userRole === 'anchor_checker' || isAnchorAllAccess;
+  const isDealerMaker = userRole === 'dealer_maker' || isDealerAllAccess;
+  const isDealerChecker = userRole === 'dealer_checker' || isDealerAllAccess;
   const isCashnTechUser = userRole === 'cashntech_user';
 
   // Show TRANSACTIONS menu for all roles (including CashnTech User - same menu)

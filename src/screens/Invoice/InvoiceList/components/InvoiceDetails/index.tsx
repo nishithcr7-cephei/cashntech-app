@@ -173,6 +173,25 @@ export const InvoiceDetails: React.FC = () => {
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           <View style={styles.emptyState}>
             <Text style={styles.errorStateText}>{invoiceListError}</Text>
+            <TouchableOpacity
+              style={styles.errorRefreshButton}
+              onPress={refreshInvoiceList}
+              disabled={invoiceListLoading}
+              activeOpacity={0.8}>
+              {invoiceListLoading ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : (
+                <>
+                  <FontAwesome6
+                    name="arrow-rotate-right"
+                    iconStyle="solid"
+                    size={16}
+                    color={Colors.white}
+                  />
+                  <Text style={styles.errorRefreshButtonText}>Refresh</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         </ScrollView>
       ) : invoiceListLoading && invoiceData.length === 0 ? (
@@ -218,6 +237,8 @@ export const InvoiceDetails: React.FC = () => {
                   onBulkAction={handleBulkAction}
                   canEdit={canEdit}
                   canImport={canImport}
+                  onRefresh={refreshInvoiceList}
+                  listRefreshing={invoiceListLoading}
                 />
                 <View style={styles.listTopSeparator} />
               </>

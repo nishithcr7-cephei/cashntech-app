@@ -1,6 +1,7 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {ProgramSelectionState, SelectedProgram} from './programSelection.types';
 import type {Bank, UserType} from '@constants/programSelection';
+import {parseWorkflowLevel} from '@utils/getInvoiceApprovalLevel';
 
 const initialState: ProgramSelectionState = {
   programScope: 'selected',
@@ -75,13 +76,8 @@ const programSelectionSlice = createSlice({
       let scopeApprovalLevel: number | null = null;
       action.payload?.forEach(bank =>
         bank.products?.forEach(p => {
-          if (
-            scopeApprovalLevel == null &&
-            p.approval_level != null &&
-            Number.isFinite(Number(p.approval_level)) &&
-            Number(p.approval_level) > 0
-          ) {
-            scopeApprovalLevel = Number(p.approval_level);
+          if (scopeApprovalLevel == null) {
+            scopeApprovalLevel = parseWorkflowLevel(p.approval_level);
           }
           p.programs?.forEach(prog => ids.push(prog.id));
         }),

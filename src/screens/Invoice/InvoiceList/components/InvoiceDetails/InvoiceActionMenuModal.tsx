@@ -272,7 +272,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
             </>
           )}
           {/* Anchor checker: 3-step menu — Verification (Approve/Reject), Checker Approval (History), Attachments */}
-          {isAnchorChecker && !isCashnTechUser && (
+          {isAnchorChecker && !isAnchorAllAccess && !isCashnTechUser && (
             <>
               {canShowApproveReject && (
                 <TouchableOpacity
@@ -327,7 +327,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
             </>
           )}
           {/* Dealer checker: Invoice Verification, Approval History, Attachments */}
-          {isDealerChecker && !isAnchorChecker && !isCashnTechUser && (
+          {isDealerChecker && !isDealerAllAccess && !isAnchorChecker && !isCashnTechUser && (
             <>
               {canShowApproveReject && (
                 <TouchableOpacity

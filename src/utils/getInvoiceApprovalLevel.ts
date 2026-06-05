@@ -1,6 +1,6 @@
 import type {Bank} from '@constants/programSelection';
 
-/** Matches backend workflow_config.level for invoice approve/reject APIs. */
+/** Matches backend workflow_config.level for invoice approve/reject APIs (0 is valid). */
 export type InvoiceApprovalLevelContext = {
   /** From GET /user/scope → products[].approval_level (same as web). */
   workflowLevelFromScope?: number | null;
@@ -10,6 +10,14 @@ export type InvoiceApprovalLevelContext = {
   isDealerChecker?: boolean;
 };
 
+/** workflow_config.level from API; includes 0 (e.g. Dealer All Access entry level). */
+export function parseWorkflowLevel(level: unknown): number | null {
+  if (level == null) return null;
+  const n = Number(level);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
 export function getWorkflowApprovalLevelFromScope(
   scopeData: Bank[] | null | undefined,
   productId: string | null | undefined,
@@ -18,10 +26,7 @@ export function getWorkflowApprovalLevelFromScope(
   for (const bank of scopeData) {
     for (const product of bank.products || []) {
       if (product.id === productId) {
-        const level = product.approval_level;
-        if (level != null && Number.isFinite(Number(level)) && Number(level) > 0) {
-          return Number(level);
-        }
+        return parseWorkflowLevel(product.approval_level);
       }
     }
   }
@@ -37,10 +42,7 @@ export function getWorkflowApprovalLevelForProgram(
     for (const product of bank.products || []) {
       const program = product.programs?.find(p => p.id === programId);
       if (program) {
-        const level = product.approval_level;
-        if (level != null && Number.isFinite(Number(level)) && Number(level) > 0) {
-          return Number(level);
-        }
+        return parseWorkflowLevel(product.approval_level);
       }
     }
   }
@@ -59,10 +61,8 @@ export function getBestWorkflowApprovalLevelFromScope(
   if (!scopeData?.length) return null;
   for (const bank of scopeData) {
     for (const product of bank.products || []) {
-      const level = product.approval_level;
-      if (level != null && Number.isFinite(Number(level)) && Number(level) > 0) {
-        return Number(level);
-      }
+      const level = parseWorkflowLevel(product.approval_level);
+      if (level != null) return level;
     }
   }
   return null;
@@ -70,19 +70,15 @@ export function getBestWorkflowApprovalLevelFromScope(
 
 /**
  * Resolves approval_level for PATCH /invoice/status and bulk checker APIs.
- * Prefer workflow level from user scope (web parity); then status text; then role.
+ * Prefer workflow level from user scope (web parity, including 0); then role fallback.
  */
 export function getInvoiceApprovalLevel(ctx: InvoiceApprovalLevelContext): number {
-  const scopeLevel = ctx.workflowLevelFromScope;
-  if (
-    scopeLevel != null &&
-    Number.isFinite(Number(scopeLevel)) &&
-    Number(scopeLevel) > 0
-  ) {
-    return Number(scopeLevel);
+  const scopeLevel = parseWorkflowLevel(ctx.workflowLevelFromScope);
+  if (scopeLevel != null) {
+    return scopeLevel;
   }
 
-  // Legacy label fallbacks only when scope has no workflow level (tenant-specific; avoid ANCHOR_CHECKER→1).
+  // Only when scope has no level — last resort (tenant-specific).
   if (ctx.isDealerChecker) return 3;
   if (ctx.isDealerMaker) return 2;
   if (ctx.isAnchorChecker) return 2;

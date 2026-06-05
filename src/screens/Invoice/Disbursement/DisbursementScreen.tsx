@@ -152,6 +152,7 @@ function mapToDisbursementRow(item: any): DisbursementRow {
       : '-';
   const bankName =
     item.bank_name ??
+    item.partnerBank?.bank_name ??
     item.program?.productConfig?.partnerBank?.bank_name ??
     '-';
   const productName =

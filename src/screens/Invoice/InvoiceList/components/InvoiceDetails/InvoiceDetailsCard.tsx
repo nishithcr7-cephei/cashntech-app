@@ -171,7 +171,8 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
             </Text>
           </View>
           <View style={styles.cardHeaderContainer}>
-            {isSelectable && !isDealerMaker ? (
+            {(isSelectable || isSelected) &&
+            (isDealerChecker || isAnchorChecker || isCashnTechUser) ? (
               <TouchableOpacity
                 activeOpacity={0.8}
                 style={styles.dmCardHeaderRow}
@@ -180,6 +181,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
                   style={[
                     styles.checkboxBox,
                     isSelected && styles.checkboxBoxSelected,
+                    !isSelectable && isSelected && styles.checkboxBoxStale,
                   ]}>
                   {isSelected && <Text style={styles.checkboxTick}>✓</Text>}
                 </View>
@@ -571,6 +573,10 @@ const styles = StyleSheet.create({
   checkboxBoxSelected: {
     backgroundColor: Colors.primaryColor,
     borderColor: Colors.primaryColor,
+  },
+  checkboxBoxStale: {
+    backgroundColor: Colors.white,
+    borderColor: '#F59E0B',
   },
   checkboxTick: {
     color: Colors.white,

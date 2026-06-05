@@ -254,6 +254,7 @@ export function useInvoiceDetails() {
 
   const refreshInvoiceList = useCallback(() => {
     if (!hasAnyProgramContext) return;
+    setVisibleCount(30);
     dispatch(fetchInvoiceListRequest({ programId, filters: apiFilters }));
   }, [hasAnyProgramContext, programId, apiFilters, dispatch]);
 
@@ -641,33 +642,51 @@ export function useInvoiceDetails() {
     const item = filteredData.find(r => r.id === invoiceId) || invoiceData.find(r => r.id === invoiceId);
     if (!item) return;
 
+    const isSelected = selectedInvoiceIds.includes(invoiceId);
+    // Allow clearing stale selections after refresh/status change.
+    if (isSelected) {
+      setSelectedInvoiceIds(prev => prev.filter(id => id !== invoiceId));
+      setSelectedInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+      return;
+    }
+
     if (!isInvoiceSelectable(item)) {
       Toast.show({
         type: 'info',
-        text1: 'Restricted',
-        text2: 'This invoice is not in an actionable state for your role.',
+        text1: 'Not eligible',
+        text2: 'Invoice not ready for bulk action.',
       });
       return;
     }
 
-    const isSelected = selectedInvoiceIds.includes(invoiceId);
-    if (isSelected) {
-      setSelectedInvoiceIds(prev => prev.filter(id => id !== invoiceId));
-      setSelectedInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
-    } else {
-      setSelectedInvoiceIds(prev => [...prev, invoiceId]);
-      setSelectedInvoices(prev => [
-        ...prev,
-        {
-          id: item.id,
-          invoiceNo: item.invoiceNo,
-          dealerName: item.dealerName || item.counterParty,
-          amount: item.invoiceAmount,
-          dueDate: item.dueDate,
-        },
-      ]);
-    }
+    setSelectedInvoiceIds(prev => [...prev, invoiceId]);
+    setSelectedInvoices(prev => [
+      ...prev,
+      {
+        id: item.id,
+        invoiceNo: item.invoiceNo,
+        dealerName: item.dealerName || item.counterParty,
+        amount: item.invoiceAmount,
+        dueDate: item.dueDate,
+        rawApprovalStatus: item.rawApprovalStatus,
+      },
+    ]);
   };
+
+  // Drop selections that are no longer bulk-eligible (e.g. after refresh or status change).
+  useEffect(() => {
+    const eligibleIds = new Set(
+      filteredData.filter(row => isInvoiceSelectable(row)).map(row => row.id),
+    );
+    setSelectedInvoiceIds(prev => {
+      const next = prev.filter(id => eligibleIds.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+    setSelectedInvoices(prev => {
+      const next = prev.filter(inv => eligibleIds.has(inv.id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [filteredData, isInvoiceSelectable]);
 
   const selectedRowsForModal = invoiceData.filter(row =>
     selectedInvoiceIds.includes(row.id),
@@ -696,10 +715,10 @@ export function useInvoiceDetails() {
       );
       return pendingItems.length > 0 && pendingItems.every(row => selectedInvoiceIds.includes(row.id));
     }
+    const selectableItems = filteredData.filter(row => isInvoiceSelectable(row));
     return (
-      (isDealerChecker || isAnchorChecker) &&
-      filteredData.length > 0 &&
-      filteredData.every(row => !isInvoiceSelectable(row) || selectedInvoiceIds.includes(row.id))
+      selectableItems.length > 0 &&
+      selectableItems.every(row => selectedInvoiceIds.includes(row.id))
     );
   })();
 
@@ -748,20 +767,37 @@ export function useInvoiceDetails() {
     : resolveApprovalLevelForInvoice('');
 
   const toggleSelectAllVisible = () => {
-    if (!isDealerChecker && !isAnchorChecker && !isCashnTechUser) return;
-
-    let visibleItems = filteredData.filter(row => isInvoiceSelectable(row));
-    if (visibleItems.length === 0 && filteredData.length > 0) {
-      Toast.show({
-        type: 'info',
-        text1: 'No Eligible Invoices',
-        text2: `There are no invoices in an actionable state for your role on this screen.`,
-      });
+    if (
+      !isDealerChecker &&
+      !isAnchorChecker &&
+      !isCashnTechUser &&
+      !isAnchorAllAccess &&
+      !isDealerAllAccess
+    ) {
       return;
     }
 
+    const visibleItems = filteredData.filter(row => isInvoiceSelectable(row));
     const visibleIds = visibleItems.map(row => row.id);
-    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedInvoiceIds.includes(id));
+
+    if (visibleItems.length === 0) {
+      if (selectedInvoiceIds.length > 0) {
+        setSelectedInvoiceIds([]);
+        setSelectedInvoices([]);
+        return;
+      }
+      if (filteredData.length > 0) {
+        Toast.show({
+          type: 'info',
+          text1: 'No eligible invoices',
+          text2: 'None ready for bulk action.',
+        });
+      }
+      return;
+    }
+
+    const allVisibleSelected =
+      visibleIds.length > 0 && visibleIds.every(id => selectedInvoiceIds.includes(id));
 
     if (allVisibleSelected) {
       setSelectedInvoiceIds(prev => prev.filter(id => !visibleIds.includes(id)));
@@ -807,7 +843,8 @@ export function useInvoiceDetails() {
   };
 
   const onApproveRejectReject = (invoiceId: string, remarks?: string) => {
-    if (!canReject) {
+    // Maker/checker workflow reject uses PATCH /invoice/status (same as approve); web often grants only approve permission.
+    if (!canReject && !canApprove) {
       Toast.show({
         type: 'error',
         text1: 'Permission Denied',
@@ -914,11 +951,16 @@ export function useInvoiceDetails() {
       approvalRemark?: string;
     }[];
   }) => {
-    // 1. Functional Permission Guard for Bulk
-    const hasPermission = 
+    // Workflow bulk approve/reject → PATCH /invoice/bulk/status (web: approve permission is enough for maker reject).
+    const isWorkflowApproveRejectBulk =
+      !isCashnTechUser &&
+      (payload.action === 'Approve' || payload.action === 'Reject');
+
+    const hasPermission =
       (payload.action === 'Verify' && canVerify) ||
       (payload.action === 'Approve' && canApprove) ||
-      (payload.action === 'Reject' && canReject) ||
+      (payload.action === 'Reject' &&
+        (canReject || (isWorkflowApproveRejectBulk && canApprove))) ||
       (payload.action === 'On Hold' && (canVerify || canApprove));
 
     if (!hasPermission) {
@@ -931,9 +973,7 @@ export function useInvoiceDetails() {
       return;
     }
 
-    const isCheckerBulk =
-      !isCashnTechUser &&
-      (payload.action === 'Approve' || payload.action === 'Reject');
+    const isCheckerBulk = isWorkflowApproveRejectBulk;
 
     dispatch(
       bulkUpdateInvoiceRequest({

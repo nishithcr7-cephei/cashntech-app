@@ -217,7 +217,7 @@ export const InvoiceDashboard: React.FC = () => {
                 <Text style={styles.bulkBtnText}>Verify</Text>
               </TouchableOpacity>
             )}
-            {canReject && (
+            {(canReject || canApprove) && (isAnchorChecker || isDealerChecker) && (
               <TouchableOpacity 
                 style={[styles.bulkBtn, styles.bulkBtnReject]}
                 onPress={() => handleBulkAction('Reject')}>

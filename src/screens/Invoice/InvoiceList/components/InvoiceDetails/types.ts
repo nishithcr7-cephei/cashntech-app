@@ -137,6 +137,7 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
     loanRefNo: item.loan_ref_no ?? '-',
     bankName:
       item.bank_name ??
+      item.partnerBank?.bank_name ??
       item.program?.productConfig?.partnerBank?.bank_name ??
       '-',
     productName:

@@ -1,9 +1,13 @@
 import * as React from 'react';
 import {
+  ActivityIndicator,
+  Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import {Colors, Fonts} from '@constants/index';
@@ -46,6 +50,8 @@ type Props = {
   onBulkAction?: (action: 'Verify' | 'Reject' | 'On Hold') => void;
   canEdit?: boolean;
   canImport?: boolean;
+  onRefresh?: () => void;
+  listRefreshing?: boolean;
 };
 
 export const InvoiceDetailsControls: React.FC<Props> = ({
@@ -77,7 +83,10 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   onBulkAction,
   canEdit = false,
   canImport = false,
+  onRefresh,
+  listRefreshing = false,
 }) => {
+  const [showSearchHelp, setShowSearchHelp] = React.useState(false);
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canCreateInvoice = useHasPermission(PERMISSIONS.CREATE_INVOICE);
   const canUploadInvoice = useHasPermission(PERMISSIONS.INVOICE_LIST_IMPORT);
@@ -206,11 +215,29 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
           <Search width={scaleWidth(18)} height={scaleHeight(18)} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search Invoice / Program / Party"
+            placeholder="Search Invoices"
             placeholderTextColor={Colors.graybase}
             value={searchText}
             onChangeText={setSearchText}
+            returnKeyType="search"
+            multiline={false}
+            numberOfLines={1}
+            accessibilityLabel="Search invoices"
+            accessibilityHint="Search by invoice number, program, or party. Tap the info button for details."
           />
+          <TouchableOpacity
+            onPress={() => setShowSearchHelp(true)}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            activeOpacity={0.7}
+            accessibilityLabel="Search help"
+            accessibilityRole="button">
+            <FontAwesome6
+              name="circle-info"
+              iconStyle="solid"
+              size={17}
+              color={Colors.graybase}
+            />
+          </TouchableOpacity>
           {searchText.length > 0 && (
             <TouchableOpacity 
               onPress={() => setSearchText('')}
@@ -221,12 +248,65 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
           )}
         </View>
         <TouchableOpacity
+          style={[
+            styles.refreshButton,
+            listRefreshing && styles.refreshButtonDisabled,
+          ]}
+          onPress={onRefresh}
+          disabled={!onRefresh || listRefreshing}
+          activeOpacity={0.8}
+          accessibilityLabel="Refresh invoice list"
+          accessibilityRole="button">
+          {listRefreshing ? (
+            <ActivityIndicator size="small" color={Colors.primaryColor} />
+          ) : (
+            <FontAwesome6
+              name="arrow-rotate-right"
+              iconStyle="solid"
+              size={18}
+              color={Colors.primaryColor}
+            />
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.filterButton}
           onPress={onOpenFilterModal}>
           <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
           <Text style={styles.filterButtonText}>Filters</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        transparent
+        visible={showSearchHelp}
+        animationType="fade"
+        onRequestClose={() => setShowSearchHelp(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowSearchHelp(false)}>
+          <View style={styles.searchHelpOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <View style={styles.searchHelpCard}>
+                <View style={styles.searchHelpHeader}>
+                  <Text style={styles.searchHelpTitle}>Search help</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowSearchHelp(false)}
+                    hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                    accessibilityLabel="Close search help">
+                    <FontAwesome6
+                      name="circle-xmark"
+                      iconStyle="solid"
+                      size={22}
+                      color={Colors.graybase}
+                    />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.searchHelpText}>
+                  Search by Invoice, Program, or Party.
+                </Text>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
 
       <View style={styles.listHeader}>
         <Text style={styles.listHeaderLabel}>
@@ -360,6 +440,8 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.white,
@@ -367,36 +449,89 @@ const styles = StyleSheet.create({
     borderColor: '#E6E4DC',
     borderRadius: scaleWidth(12),
     paddingHorizontal: scaleWidth(10),
-    paddingVertical: scaleHeight(12),
+    paddingVertical: scaleHeight(8),
+    minHeight: scaleHeight(44),
     gap: scaleWidth(6),
   },
   searchInput: {
     flex: 1,
-    fontSize: scaleFont(14),
+    minWidth: 0,
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
     padding: 0,
+    margin: 0,
+    height: scaleHeight(22),
+    lineHeight: scaleHeight(18),
+    ...(Platform.OS === 'android'
+      ? {includeFontPadding: false, textAlignVertical: 'center' as const}
+      : {}),
   },
   searchFilterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scaleWidth(12),
+    gap: scaleWidth(8),
     marginTop: scaleHeight(4),
+  },
+  refreshButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: '#E6E4DC',
+    width: scaleWidth(44),
+    height: scaleWidth(44),
+    borderRadius: scaleWidth(12),
+    flexShrink: 0,
+  },
+  refreshButtonDisabled: {
+    opacity: 0.6,
   },
   filterButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primaryColor,
-    paddingHorizontal: scaleWidth(12),
+    paddingHorizontal: scaleWidth(10),
     paddingVertical: scaleHeight(12),
     borderRadius: scaleWidth(12),
-    gap: scaleWidth(6),
+    gap: scaleWidth(4),
     justifyContent: 'center',
-    minWidth: scaleWidth(90),
+    minWidth: scaleWidth(76),
+    flexShrink: 0,
   },
   filterButtonText: {
     color: Colors.white,
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
+  },
+  searchHelpOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: scaleWidth(24),
+  },
+  searchHelpCard: {
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(12),
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(14),
+  },
+  searchHelpHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: scaleHeight(8),
+  },
+  searchHelpTitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
+  searchHelpText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+    lineHeight: scaleHeight(20),
   },
   primaryActionsRow: {
     flexDirection: 'row',

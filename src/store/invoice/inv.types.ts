@@ -60,6 +60,8 @@ export type InvoiceListItemApi = {
   /** Web columns: Loan Ref No., Bank Name, Product Name, Program Name, Primary Party, Counter Party */
   loan_ref_no?: string;
   bank_name?: string;
+  /** Populated on invoice list / approval APIs */
+  partnerBank?: { id?: string; bank_name?: string };
   product_name?: string;
   program_name?: string;
   primary_party_name?: string;
