@@ -84,42 +84,30 @@ const getInitialFields = (): InvoiceFields => ({
   grandTotal: '',
 });
 
-const convertGSTItemsToInvoiceItems = (
+const convertOcrLineItems = (
   gstItems: GSTInvoiceJSON['line_items'],
 ): InvoiceLineItem[] =>
-  gstItems.map(item => ({
-    itemName: item.description || '',
-    quantity: item.quantity.toString(),
-    unit: item.unit || 'PCS',
-    pricePerQuantity: item.rate_per_unit.toString(),
-    total: item.taxable_amount.toString(),
-    discountType:
-      item.discount_type && item.discount_value != null && item.discount_value > 0
-        ? item.discount_type === 'value'
-          ? 'value'
-          : 'percentage'
-        : '',
-    discountValue:
-      item.discount_value != null && item.discount_value > 0
-        ? String(item.discount_value)
-        : '',
-    discountAmount:
-      item.discount_amount != null && item.discount_amount > 0
-        ? String(item.discount_amount)
-        : '',
-    taxType:
-      item.tax_type &&
-      ((item.tax_percentage != null && item.tax_percentage > 0) ||
-        (item.tax_amount != null && item.tax_amount > 0))
-        ? item.tax_type || 'GST'
-        : '',
-    taxPercentage:
-      item.tax_percentage != null && item.tax_percentage > 0
-        ? String(item.tax_percentage)
-        : '',
-    taxAmount:
-      item.tax_amount != null && item.tax_amount > 0 ? String(item.tax_amount) : '',
-  }));
+  gstItems.map(item => {
+    const hasTax = (item.tax_amount || 0) > 0
+      && (item.tax_percentage || 0) > 0;
+    return {
+      itemName: item.description || '',
+      quantity: item.quantity.toString(),
+      unit: item.unit || 'PCS',
+      pricePerQuantity: item.rate_per_unit.toString(),
+      total: item.taxable_amount.toString(),
+      taxType: hasTax ? (item.tax_type || 'GST') : '',
+      taxPercentage: hasTax
+        ? item.tax_percentage.toString() : '',
+      taxAmount: hasTax
+        ? item.tax_amount.toFixed(2) : '',
+      taxes: hasTax ? [{
+        taxType: item.tax_type || 'GST',
+        taxPercentage: item.tax_percentage.toString(),
+        taxAmount: item.tax_amount.toFixed(2),
+      }] : [{taxType: '', taxPercentage: '', taxAmount: ''}],
+    };
+  });
 
 interface ValidationErrors {
   invoiceNumber?: string;
@@ -230,6 +218,7 @@ export const CreateInvoice: React.FC = () => {
 
   const [fields, setFields] = useState<InvoiceFields>(() => getInitialFields());
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [isOcrPopulated, setIsOcrPopulated] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [isOcrUploadModalVisible, setIsOcrUploadModalVisible] = useState(false);
   const [isProofUploadModalVisible, setIsProofUploadModalVisible] = useState(false);
@@ -273,7 +262,56 @@ export const CreateInvoice: React.FC = () => {
   const hasAttachmentPerm = permissions.includes(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
   const canUploadFinal = hasUploadPerm && hasAttachmentPerm;
   const [partyTaxOptions, setPartyTaxOptions] = useState<PartyTaxOption[]>([]);
-  const isOcrTemporarilyDisabled = true;
+  const isOcrPrerequisitesMet = useMemo(() => {
+    const tenorDays = parseInt(String(fields.tenor ?? '').trim(), 10);
+    return !!(
+      fields.dealer?.trim() &&
+      fields.dealerCode?.trim() &&
+      fields.odAccountNumber?.trim() &&
+      fields.invoiceDate?.trim() &&
+      fields.invoiceDueDate?.trim() &&
+      Number.isFinite(tenorDays) &&
+      tenorDays > 0 &&
+      fields.creditTo?.trim()
+    );
+  }, [
+    fields.dealer,
+    fields.dealerCode,
+    fields.odAccountNumber,
+    fields.invoiceDate,
+    fields.invoiceDueDate,
+    fields.tenor,
+    fields.creditTo,
+  ]);
+
+  const showOcrPrerequisitesToast = useCallback(() => {
+    const missing: string[] = [];
+    if (!fields.dealer?.trim()) missing.push('Dealer');
+    if (!fields.dealerCode?.trim()) missing.push('Code');
+    if (!fields.odAccountNumber?.trim()) missing.push('OD Account');
+    if (!fields.invoiceDate?.trim()) missing.push('Inv. Date');
+    if (!fields.invoiceDueDate?.trim()) missing.push('Due Date');
+    const tenorDays = parseInt(String(fields.tenor ?? '').trim(), 10);
+    if (!Number.isFinite(tenorDays) || tenorDays <= 0) missing.push('Tenor');
+    if (!fields.creditTo?.trim()) missing.push('Credit To');
+
+    Toast.show({
+      type: 'info',
+      text1: 'Fill required fields before OCR',
+      text2: `Missing: ${missing.join(', ')}`,
+      visibilityTime: 4500,
+    });
+  }, [
+    fields.dealer,
+    fields.dealerCode,
+    fields.odAccountNumber,
+    fields.invoiceDate,
+    fields.invoiceDueDate,
+    fields.tenor,
+    fields.creditTo,
+  ]);
+
+  const isOcrTemporarilyDisabled = false;
 
   const loadPartyTaxes = useCallback(() => {
     invoiceApi
@@ -687,6 +725,7 @@ export const CreateInvoice: React.FC = () => {
       setFields(getInitialFields());
       setSelectedParticipant(null);
       setSelectedAttachment(null);
+      setIsOcrPopulated(false);
       Alert.alert('Success', mode === 'edit' ? 'Invoice updated successfully.' : 'Invoice created successfully.', [
         {text: 'OK', onPress: () => goToInvoiceList(true)},
       ]);
@@ -930,28 +969,100 @@ export const CreateInvoice: React.FC = () => {
     setShowCamera(true);
   };
 
+  const handleOcrCapturePress = async () => {
+    if (!isOcrPrerequisitesMet) {
+      showOcrPrerequisitesToast();
+      return;
+    }
+    await openCamera();
+  };
+
+  const handleOcrUploadPress = () => {
+    if (!isOcrPrerequisitesMet) {
+      showOcrPrerequisitesToast();
+      return;
+    }
+    setIsOcrUploadModalVisible(true);
+  };
+
   const runOcrAndPatchForm = async (uriOrPath: string | null) => {
     if (!uriOrPath) return;
     try {
       setOcrLoading(true);
       const {gstInvoice} = await runGSTInvoiceExtractionWithAI(uriOrPath);
       const header = gstInvoice?.invoice_header;
+      const summary = gstInvoice?.financial_summary;
+      const gstLineItems = gstInvoice?.line_items ?? [];
       const extractedItems =
-        gstInvoice?.line_items?.length > 0
-          ? convertGSTItemsToInvoiceItems(gstInvoice.line_items)
-          : [];
-
+        gstLineItems.length > 0 ? convertOcrLineItems(gstLineItems) : [];
+      let cgst = '';
+      let sgst = '';
+      let taxTotal = '';
+      let grandTotal = '';
+      if (summary) {
+        const cgstAmt = summary.total_cgst_amount || 0;
+        const sgstAmt = summary.total_sgst_amount || 0;
+        const hasIgst = gstLineItems.some(
+          line => (line.tax_type || '').toUpperCase() === 'IGST',
+        );
+        if (cgstAmt > 0 || sgstAmt > 0) {
+          cgst = cgstAmt > 0 ? cgstAmt.toFixed(2) : '';
+          sgst = sgstAmt > 0 ? sgstAmt.toFixed(2) : '';
+        } else if (gstLineItems.some(
+          line => (line.tax_type || '').toUpperCase() === 'GST'
+          && (line.tax_amount || 0) > 0
+        )) {
+          // Invoice uses "GST" type (not split CGST/SGST)
+          const totalGST = gstLineItems.reduce(
+            (s, line) => s + ((line.tax_type || '').toUpperCase() === 'GST'
+              ? (line.tax_amount || 0) : 0), 0,
+          );
+          if (totalGST > 0) taxTotal = totalGST.toFixed(2);
+        } else if (hasIgst) {
+          const itemSubtotal = extractedItems.reduce(
+            (s, i) => s + (parseFloat(i.total) || 0), 0,
+          );
+          const grand = summary.grand_total_amount || 0;
+          const igstAmt = Math.max(0, grand - itemSubtotal);
+          if (igstAmt > 0) taxTotal = igstAmt.toFixed(2);
+        } else if (extractedItems.length > 0) {
+          const subtotal = extractedItems.reduce(
+            (s, i) => s + (parseFloat(i.total) || 0), 0,
+          );
+          const dealerTax = partyTaxOptions[0];
+          if (dealerTax && dealerTax.percentage > 0 && subtotal > 0) {
+            const gstAmt = Math.round(
+              (subtotal * dealerTax.percentage) / 100 * 100,
+            ) / 100;
+            cgst = (gstAmt / 2).toFixed(2);
+            sgst = (gstAmt / 2).toFixed(2);
+          }
+        }
+        if (summary.grand_total_amount > 0) {
+          grandTotal = summary.grand_total_amount.toFixed(2);
+        }
+      }
+      console.log('[OCR DEBUG]', JSON.stringify({
+        summary: gstInvoice?.financial_summary,
+        lineItems: gstInvoice?.line_items,
+        cgst,
+        sgst,
+        taxTotal,
+        grandTotal,
+      }));
       setFields(prev => ({
         ...prev,
         invoiceNumber: header?.invoice_number || prev.invoiceNumber,
-        invoiceDate: header?.invoice_date || prev.invoiceDate,
         associatedPO: header?.order_no || prev.associatedPO,
         earlyPaymentDiscount:
           header?.early_payment_discount || prev.earlyPaymentDiscount || '',
-        grnDate: header?.grn_date || prev.grnDate || '',
         items: extractedItems.length > 0 ? extractedItems : prev.items,
+        cgst,
+        sgst,
+        taxTotal,
+        grandTotal,
       }));
-
+      setIsOcrPopulated(true);
       Toast.show({
         type: 'success',
         text1: `OCR completed (${extractedItems.length} item${
@@ -998,10 +1109,15 @@ export const CreateInvoice: React.FC = () => {
       if (apmAvailableLimit !== null) {
         const subTotalCalc = fields.items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
         const discCalc = fields.items.reduce((s, i) => s + (parseFloat(i.discountAmount || '0') || 0), 0);
-        const taxCalc = fields.items.reduce((s, i) => {
+        const itemTaxCalc = fields.items.reduce((s, i) => {
           if (i.taxes?.length) return s + i.taxes.reduce((ts, t) => ts + (parseFloat(t.taxAmount || '0') || 0), 0);
           return s + (parseFloat(i.taxAmount || '0') || 0);
         }, 0);
+        const ocrTaxTotal =
+          (parseFloat(fields.cgst || '0') || 0) +
+          (parseFloat(fields.sgst || '0') || 0) +
+          (parseFloat(fields.taxTotal || '0') || 0);
+        const taxCalc = itemTaxCalc > 0 ? itemTaxCalc : ocrTaxTotal;
         const invoiceTotal = Math.max(0, subTotalCalc - discCalc + taxCalc);
 
         console.log('[EditMode] Limit check: invoiceTotal=', invoiceTotal, 'availableLimit=', apmAvailableLimit);
@@ -1055,10 +1171,15 @@ export const CreateInvoice: React.FC = () => {
     // sum(items.total) - sum(items.discount) + sum(items.tax) must match final_total
     const subTotalCalc = fields.items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
     const discCalc = fields.items.reduce((s, i) => s + (parseFloat(i.discountAmount || '0') || 0), 0);
-    const taxCalc = fields.items.reduce((s, i) => {
+    const itemTaxCalc = fields.items.reduce((s, i) => {
       if (i.taxes?.length) return s + i.taxes.reduce((ts, t) => ts + (parseFloat(t.taxAmount || '0') || 0), 0);
       return s + (parseFloat(i.taxAmount || '0') || 0);
     }, 0);
+    const ocrTaxTotal =
+      (parseFloat(fields.cgst || '0') || 0) +
+      (parseFloat(fields.sgst || '0') || 0) +
+      (parseFloat(fields.taxTotal || '0') || 0);
+    const taxCalc = itemTaxCalc > 0 ? itemTaxCalc : ocrTaxTotal;
     
     const calculatedGrandTotal = Math.max(0, subTotalCalc - discCalc + taxCalc);
     const reportedGrandTotal = parseFloat(fields.grandTotal || '0') || calculatedGrandTotal;
@@ -1284,6 +1405,8 @@ export const CreateInvoice: React.FC = () => {
     setShowCamera(false);
     setIsOcrUploadModalVisible(false);
     setIsProofUploadModalVisible(false);
+    setIsOcrPopulated(false);
+    setOcrLoading(false);
   }, []);
 
   useEffect(() => {
@@ -1307,13 +1430,22 @@ export const CreateInvoice: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
+        if (ocrLoading) {
+          Toast.show({
+            type: 'info',
+            text1: 'OCR in progress',
+            text2: 'Please wait for extraction to finish or tap Cancel.',
+            visibilityTime: 3000,
+          });
+          return true;
+        }
         goToInvoiceList(true);
         return true; // Prevent default behavior (going back to Home)
       };
 
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, [navigation, goToInvoiceList]),
+    }, [navigation, goToInvoiceList, ocrLoading]),
   );
 
   const hasAnyAttachment = !!selectedAttachment || (fields.attachments && fields.attachments.length > 0);
@@ -1417,7 +1549,18 @@ export const CreateInvoice: React.FC = () => {
         navigation={navigation as any}
         hideHamburger={true}
         renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
-        onPressLeftIcon={() => goToInvoiceList(true)}
+        onPressLeftIcon={() => {
+          if (ocrLoading) {
+            Toast.show({
+              type: 'info',
+              text1: 'OCR in progress',
+              text2: 'Please wait for extraction to finish or tap Cancel.',
+              visibilityTime: 3000,
+            });
+            return;
+          }
+          goToInvoiceList(true);
+        }}
       />
       <View style={styles.pageTitleBar}>
         <View style={styles.titleContainer}>
@@ -1432,10 +1575,10 @@ export const CreateInvoice: React.FC = () => {
           
         </View>
       </View>
-      <View style={styles.container}>
+      <View style={styles.container} pointerEvents={ocrLoading ? 'box-none' : 'auto'}>
         {/* OCR Section - Only shown in Create mode */}
         {!mode && hasCreatePerm && (
-          <>
+          <View pointerEvents={ocrLoading ? 'none' : 'auto'}>
             {/* OCR Badge */}
             <View style={styles.aiBadge}>
               <AI
@@ -1458,9 +1601,10 @@ export const CreateInvoice: React.FC = () => {
                   style={[
                     styles.ocrButton,
                     styles.cameraButton,
-                    isOcrTemporarilyDisabled && styles.ocrButtonDisabled,
+                    (isOcrTemporarilyDisabled || !isOcrPrerequisitesMet || ocrLoading) &&
+                      styles.ocrButtonDisabled,
                   ]}
-                  onPress={openCamera}
+                  onPress={handleOcrCapturePress}
                   disabled={disabled || isOcrTemporarilyDisabled}>
                   <Camera width={scaleWidth(20)} height={scaleHeight(20)} />
                   <Text style={styles.ocrButtonText}>Capture</Text>
@@ -1469,9 +1613,10 @@ export const CreateInvoice: React.FC = () => {
                   style={[
                     styles.ocrButton,
                     styles.galleryButton,
-                    isOcrTemporarilyDisabled && styles.ocrButtonDisabled,
+                    (isOcrTemporarilyDisabled || !isOcrPrerequisitesMet || ocrLoading) &&
+                      styles.ocrButtonDisabled,
                   ]}
-                  onPress={() => setIsOcrUploadModalVisible(true)}
+                  onPress={handleOcrUploadPress}
                   disabled={disabled || isOcrTemporarilyDisabled}>
                   <Upload width={scaleWidth(20)} height={scaleHeight(20)} />
                   <Text style={styles.ocrButtonText}>Upload</Text>
@@ -1485,7 +1630,7 @@ export const CreateInvoice: React.FC = () => {
                 </View>
               )}
             </View>
-          </>
+          </View>
         )}
 
         {/* Invoice Form */}
@@ -1518,6 +1663,8 @@ export const CreateInvoice: React.FC = () => {
             canUploadFinal={canUploadFinal}
             onAddAttachment={() => setIsProofUploadModalVisible(true)}
             selectedAttachment={selectedAttachment}
+            isOcrMode={isOcrPopulated}
+            ocrLoading={ocrLoading}
           />
         </ScrollView>
       </View>

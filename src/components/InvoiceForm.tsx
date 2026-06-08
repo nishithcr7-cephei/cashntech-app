@@ -100,6 +100,10 @@ type Props = {
   canUploadFinal?: boolean;
   onAddAttachment?: () => void;
   selectedAttachment?: any; // To avoid import complexity now, using any for DocumentPickerResponse
+  /** When true, item discount/tax dropdowns and delete actions are locked (OCR-filled invoice). */
+  isOcrMode?: boolean;
+  /** When true, form inputs are locked; Cancel remains available. */
+  ocrLoading?: boolean;
 };
 
 export const InvoiceForm: React.FC<Props> = ({
@@ -131,6 +135,8 @@ export const InvoiceForm: React.FC<Props> = ({
   canUploadFinal = false,
   onAddAttachment,
   selectedAttachment,
+  isOcrMode = false,
+  ocrLoading = false,
 }) => {
   const insets = useSafeAreaInsets(); // Not available here but can use view padding
   const storageBaseUrl = 'https://d2wayd1he5a7q1.cloudfront.net'; // Same as DetailView
@@ -532,6 +538,9 @@ export const InvoiceForm: React.FC<Props> = ({
 
   return (
     <View style={styles.container}>
+      <View
+        pointerEvents={ocrLoading ? 'none' : 'auto'}
+        style={ocrLoading ? styles.ocrLockedContent : undefined}>
       {/* Party Information Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
@@ -823,16 +832,22 @@ export const InvoiceForm: React.FC<Props> = ({
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Add Details</Text>
-          <TouchableOpacity style={styles.addButton} onPress={addMoreItems}>
-            <Text style={styles.addButtonText}>+ Add more Items</Text>
-          </TouchableOpacity>
+          {!isOcrMode && (
+            <TouchableOpacity style={styles.addButton} onPress={addMoreItems}>
+              <Text style={styles.addButtonText}>+ Add more Items</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {items.length === 0 && (
           <>
-            <TouchableOpacity style={styles.addFirstItem} onPress={addMoreItems}>
-              <Text style={styles.addFirstItemText}>Click to add first item</Text>
-            </TouchableOpacity>
+            {!isOcrMode ? (
+              <TouchableOpacity style={styles.addFirstItem} onPress={addMoreItems}>
+                <Text style={styles.addFirstItemText}>Click to add first item</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.addFirstItemText}>Items are filled from OCR scan</Text>
+            )}
             {errors.items && <Text style={styles.errorText}>{errors.items}</Text>}
           </>
         )}
@@ -841,9 +856,11 @@ export const InvoiceForm: React.FC<Props> = ({
           <View key={index} style={styles.itemRow}>
             <View style={styles.itemHeader}>
               <Text style={styles.itemIndex}>Item {index + 1}</Text>
-              <TouchableOpacity onPress={() => removeItem(index)} style={styles.removeButton}>
-                <FontAwesome6 name="trash" iconStyle="solid" color="#dc3545" size={16} />
-              </TouchableOpacity>
+              {!isOcrMode && (
+                <TouchableOpacity onPress={() => removeItem(index)} style={styles.removeButton}>
+                  <FontAwesome6 name="trash" iconStyle="solid" color="#dc3545" size={16} />
+                </TouchableOpacity>
+              )}
             </View>
             <L label="Item Name *">
               <TextInput 
@@ -903,8 +920,15 @@ export const InvoiceForm: React.FC<Props> = ({
             </L>
             
             {/* Item-level Discount */}
-            <View style={styles.itemDiscountTaxContainer}>
-              <Text style={styles.itemDiscountTaxLabelText}>Discount (Optional)</Text>
+            <View
+              style={[
+                styles.itemDiscountTaxContainer,
+                isOcrMode && styles.ocrDisabledDiscountTax,
+              ]}
+              pointerEvents={isOcrMode ? 'none' : 'auto'}>
+              <Text style={[styles.itemDiscountTaxLabelText, isOcrMode && styles.ocrDisabledLabel]}>
+                Discount (Optional)
+              </Text>
               <View style={styles.itemDiscountTaxVertical}>
                 <View style={styles.discountTaxDropdownVertical}>
                   <CustomDropdown
@@ -919,16 +943,18 @@ export const InvoiceForm: React.FC<Props> = ({
                     placeholder="Select"
                     containerStyle={styles.itemDropdownContainer}
                     showSearch={false}
+                    editable={!isOcrMode}
                   />
                 </View>
                 {item.discountType && (
                   <View style={styles.itemDiscountTaxInputsVertical}>
                     <TextInput
-                      style={styles.itemDiscountTaxInputVertical}
+                      style={[styles.itemDiscountTaxInputVertical, isOcrMode && styles.ocrDisabledInput]}
                       value={item.discountValue || ''}
                       onChangeText={(text) => updateItem(index, 'discountValue', text)}
                       placeholder="Value"
                       keyboardType="decimal-pad"
+                      editable={!isOcrMode}
                     />
                     <TextInput
                       style={[styles.itemDiscountTaxInputVertical, styles.autoCalculated]}
@@ -942,8 +968,15 @@ export const InvoiceForm: React.FC<Props> = ({
             </View>
             
             {/* Item-level Tax (multiple) */}
-            <View style={styles.itemDiscountTaxContainer}>
-              <Text style={styles.itemDiscountTaxLabelText}>Tax</Text>
+            <View
+              style={[
+                styles.itemDiscountTaxContainer,
+                isOcrMode && styles.ocrDisabledDiscountTax,
+              ]}
+              pointerEvents={isOcrMode ? 'none' : 'auto'}>
+              <Text style={[styles.itemDiscountTaxLabelText, isOcrMode && styles.ocrDisabledLabel]}>
+                Tax
+              </Text>
               {((item.taxes && item.taxes.length > 0) ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}]).map((tax, taxIdx) => (
                 <View key={taxIdx} style={styles.taxRowWithActions}>
                   <View style={[styles.itemDiscountTaxVertical, styles.taxContentWrapper]}>
@@ -956,6 +989,7 @@ export const InvoiceForm: React.FC<Props> = ({
                         placeholder="Select"
                         containerStyle={styles.itemDropdownContainer}
                         showSearch={false}
+                        editable={!isOcrMode}
                       />
                     </View>
                     {tax.taxType && (
@@ -973,13 +1007,17 @@ export const InvoiceForm: React.FC<Props> = ({
                             />
                           ) : (
                             <TextInput
-                              style={styles.itemDiscountTaxInputVertical}
+                              style={[
+                                styles.itemDiscountTaxInputVertical,
+                                isOcrMode && styles.ocrDisabledInput,
+                              ]}
                               value={tax.taxPercentage || ''}
                               onChangeText={(text) =>
                                 updateItemTax(index, taxIdx, 'taxPercentage', text)
                               }
                               placeholder="Value"
                               keyboardType="decimal-pad"
+                              editable={!isOcrMode}
                             />
                           )}
                           <Text style={styles.taxPercentSuffix}>%</Text>
@@ -993,16 +1031,18 @@ export const InvoiceForm: React.FC<Props> = ({
                       </View>
                     )}
                   </View>
-                  <View style={styles.taxActionButtons}>
-                    <TouchableOpacity onPress={() => addItemTax(index)} style={[styles.addTaxButton, {marginRight: 8}]}>
-                      <FontAwesome6 name="plus" iconStyle="solid" size={14} color="#333" />
-                    </TouchableOpacity>
-                    {(((item.taxes && item.taxes.length > 0) ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}]).length > 1) && (
-                      <TouchableOpacity onPress={() => removeItemTax(index, taxIdx)} style={styles.removeTaxButton}>
-                        <FontAwesome6 name="trash" iconStyle="solid" size={14} color="#dc3545" />
+                  {!isOcrMode && (
+                    <View style={styles.taxActionButtons}>
+                      <TouchableOpacity onPress={() => addItemTax(index)} style={[styles.addTaxButton, {marginRight: 8}]}>
+                        <FontAwesome6 name="plus" iconStyle="solid" size={14} color="#333" />
                       </TouchableOpacity>
-                    )}
-                  </View>
+                      {(((item.taxes && item.taxes.length > 0) ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}]).length > 1) && (
+                        <TouchableOpacity onPress={() => removeItemTax(index, taxIdx)} style={styles.removeTaxButton}>
+                          <FontAwesome6 name="trash" iconStyle="solid" size={14} color="#dc3545" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                 </View>
               ))}
             </View>
@@ -1022,12 +1062,17 @@ export const InvoiceForm: React.FC<Props> = ({
           }, 0);
           
           // Calculate Tax Total (sum of all item-level taxes - from taxes array or legacy taxAmount)
-          const taxTotal = items.reduce((sum, item) => {
+          const itemTaxSum = items.reduce((sum, item) => {
             if (item.taxes?.length) {
               return sum + item.taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0);
             }
             return sum + (parseFloat(item.taxAmount || '0') || 0);
           }, 0);
+          const ocrTaxFallback =
+            (parseFloat(value.cgst || '0') || 0) +
+            (parseFloat(value.sgst || '0') || 0) +
+            (parseFloat(value.taxTotal || '0') || 0);
+          const taxTotal = itemTaxSum > 0 ? itemTaxSum : ocrTaxFallback;
           
           // Calculate Final Total (Sub Total - Discount Total + Tax Total)
           const total = Math.max(0, subTotal - discountTotal + taxTotal);
@@ -1337,6 +1382,8 @@ export const InvoiceForm: React.FC<Props> = ({
         </View>
       )}
 
+      </View>
+
       {/* Submit and Cancel Buttons */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity
@@ -1346,8 +1393,8 @@ export const InvoiceForm: React.FC<Props> = ({
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.button, styles.submitButton, (loading || submitButtonAppearsDisabled) && styles.submitButtonDisabled]}
-          disabled={loading}
+          style={[styles.button, styles.submitButton, (loading || ocrLoading || submitButtonAppearsDisabled) && styles.submitButtonDisabled]}
+          disabled={loading || ocrLoading}
           onPress={() => {
             console.log('[InvoiceForm] Submit pressed, disabledInternally:', submitButtonAppearsDisabled);
             if (submitButtonAppearsDisabled) {
@@ -1379,6 +1426,8 @@ export const InvoiceForm: React.FC<Props> = ({
           }}>
           {loading ? (
             <Text style={styles.submitButtonText}>Submitting...</Text>
+          ) : ocrLoading ? (
+            <Text style={styles.submitButtonText}>Extracting OCR...</Text>
           ) : (
             <Text style={styles.submitButtonText}>{mode === 'edit' ? 'Update Invoice' : 'Submit'}</Text>
           )}
@@ -1387,7 +1436,9 @@ export const InvoiceForm: React.FC<Props> = ({
 
       {/* Attachments Section (Edit Mode) */}
       {mode === 'edit' && value.attachments && value.attachments.length > 0 && (
-        <View style={styles.attachmentSection}>
+        <View
+          pointerEvents={ocrLoading ? 'none' : 'auto'}
+          style={[styles.attachmentSection, ocrLoading && styles.ocrLockedContent]}>
           <Text style={styles.attachmentSectionTitle}>Attachments</Text>
           {value.attachments.map((att, idx) => {
             const fileName = att.attachment_url?.split('/').pop() || `Attachment ${idx + 1}`;
@@ -1444,6 +1495,9 @@ const L: React.FC<{label: string; children: React.ReactNode}> = ({label, childre
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  ocrLockedContent: {
+    opacity: 0.65,
   },
   section: {
     marginBottom: 24,
@@ -1675,6 +1729,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 12,
     color: '#555',
+  },
+  ocrDisabledDiscountTax: {
+    opacity: 0.42,
+    backgroundColor: '#ececec',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  ocrDisabledLabel: {
+    color: '#999',
+  },
+  ocrDisabledInput: {
+    backgroundColor: '#e8e8e8',
+    color: '#888',
   },
   itemDiscountTaxVertical: {
     gap: 8,
