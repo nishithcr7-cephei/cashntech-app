@@ -21,12 +21,37 @@ function* fetchDailyInterestWorker(action: PayloadAction<FetchDailyInterestReque
   }
 }
 
+function getApiErrorMessage(error: any, fallback: string): string {
+  const responseMessage = error?.response?.data?.message;
+  if (typeof responseMessage === 'string' && responseMessage.trim()) {
+    return responseMessage;
+  }
+  if (
+    error?.message?.includes('fetch') ||
+    error?.message === 'Network Error' ||
+    error?.code === 'ECONNABORTED'
+  ) {
+    return 'Network error. Check connection.';
+  }
+  return error?.message || fallback;
+}
+
 function* fetchInterestAccrualListWorker(action: PayloadAction<FetchInterestAccrualListRequest>): Generator<any, void, any> {
   try {
-    const response = yield call(invoiceApi.getDisbursedList as any, action.payload.programIds);
+    const response = yield call(
+      invoiceApi.getDisbursedList,
+      action.payload.programIds,
+      {
+        byInvoiceStatus: action.payload.byInvoiceStatus ?? ['Disbursed', 'Closed'],
+      },
+    );
     yield put(fetchInterestAccrualListSuccess(response || []));
   } catch (error: any) {
-    yield put(fetchInterestAccrualListFailure(error?.message || 'Failed to fetch interest accruals'));
+    yield put(
+      fetchInterestAccrualListFailure(
+        getApiErrorMessage(error, 'Failed to fetch interest accruals'),
+      ),
+    );
   }
 }
 

@@ -30,13 +30,13 @@ import {Search, Filter, Dots} from '@assets/Icons';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
-import {selectProgramSelection, selectAllProgramIds} from '@store/programSelection/programSelection.selector';
+import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {decryptValue} from '@utils/decrypt';
 import Endpoints from '@constants/ApiEndPoints';
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import {PaymentHistoryModal} from '../DPDPenalInterest/components/PaymentHistoryModal';
 import {RequestWaiverModal} from '../DPDPenalInterest/components/RequestWaiverModal';
-import {invoiceApi} from '@services/api/invoice.api';
+import {invoiceApi, RepaymentKpisResponse} from '@services/api/invoice.api';
 
 // Summary metrics for Repayment & Settlement will be dynamically built inside the component
 
@@ -53,7 +53,6 @@ export const RepaymentSettlementScreen: React.FC = () => {
   >>();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const programSelection = useSelector(selectProgramSelection);
-  const allProgramIds = useSelector(selectAllProgramIds);
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
 
@@ -118,27 +117,41 @@ export const RepaymentSettlementScreen: React.FC = () => {
     return {position: 'absolute' as const, top: anchor.y + anchor.height + topPadding, left};
   };
 
-  const [apiKpis, setApiKpis] = useState<any>(null);
+  const [apiKpis, setApiKpis] = useState<RepaymentKpisResponse | null>(null);
+
+  /** Web parity: KPI endpoint uses [] unless a specific program is selected */
+  const kpiProgramIds = useMemo(() => {
+    if (
+      programSelection?.programScope === 'selected' &&
+      programSelection?.programId
+    ) {
+      return [programSelection.programId];
+    }
+    return [];
+  }, [programSelection?.programScope, programSelection?.programId]);
 
   useEffect(() => {
-    const programIds = programSelection?.programScope === 'all'
-      ? allProgramIds || undefined
-      : programSelection?.programId
-        ? [programSelection.programId]
-        : undefined;
+    const listPayload =
+      programSelection?.programScope === 'selected' && programSelection?.programId
+        ? {programIds: [programSelection.programId]}
+        : {};
 
-    const payload = programSelection?.programScope === 'all'
-      ? {}
-      : {programIds};
+    dispatch(repaymentActions.fetchRepaymentListRequest(listPayload));
 
-    dispatch(repaymentActions.fetchRepaymentListRequest(payload));
-    
-    invoiceApi.getRepaymentKpis(programIds).then(res => {
-      setApiKpis(res);
-    }).catch(e => console.log('Error fetching repayment kpis', e));
-  }, [programSelection?.programScope, programSelection?.programId, allProgramIds, dispatch]);
+    invoiceApi
+      .getRepaymentKpis(kpiProgramIds)
+      .then(res => {
+        setApiKpis(res);
+      })
+      .catch(() => {
+        setApiKpis(null);
+      });
+  }, [programSelection?.programScope, programSelection?.programId, kpiProgramIds, dispatch]);
 
-  const getVal = (val: string | undefined | null) => val ? `₹ ${Number(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}` : '-';
+  const getVal = (val: string | number | undefined | null) =>
+    val != null && val !== ''
+      ? `₹ ${Number(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}`
+      : '-';
 
   const repaymentMetrics = useMemo(() => [
     {
@@ -156,9 +169,18 @@ export const RepaymentSettlementScreen: React.FC = () => {
     {
       label: 'Total Outstanding Amount',
       subValues: [
-        { label: 'Principal Amount', value: '-' },
-        { label: 'Interest Amount', value: '-' },
-        { label: 'Penal Interest Amount', value: '-' },
+        {
+          label: 'Principal Amount',
+          value: getVal(apiKpis?.totalOs?.totalPrincipalOutstanding),
+        },
+        {
+          label: 'Interest Amount',
+          value: getVal(apiKpis?.totalOs?.totalBaseInterestOutstanding),
+        },
+        {
+          label: 'Penal Interest Amount',
+          value: getVal(apiKpis?.totalOs?.totalPenalOutstanding),
+        },
       ],
     },
     {
@@ -168,9 +190,18 @@ export const RepaymentSettlementScreen: React.FC = () => {
     {
       label: 'Overdue Amount',
       subValues: [
-        { label: 'Principal Amount', value: '-' },
-        { label: 'Interest Amount', value: '-' },
-        { label: 'Penal Interest Amount', value: '-' },
+        {
+          label: 'Principal Amount',
+          value: getVal(apiKpis?.overDueSum?.total_principal_outstanding),
+        },
+        {
+          label: 'Interest Amount',
+          value: getVal(apiKpis?.overDueSum?.total_base_interest_outstanding),
+        },
+        {
+          label: 'Penal Interest Amount',
+          value: getVal(apiKpis?.overDueSum?.total_penal_outstanding),
+        },
       ],
     },
     {
@@ -179,7 +210,10 @@ export const RepaymentSettlementScreen: React.FC = () => {
     },
     {
       label: 'Total Closed Invoices',
-      value: apiKpis?.totalClosedInvoices ?? '-',
+      value:
+        apiKpis?.totalClosedInvoices != null && apiKpis.totalClosedInvoices !== ''
+          ? String(apiKpis.totalClosedInvoices)
+          : '-',
     },
     {
       label: 'Average Settlement TAT',

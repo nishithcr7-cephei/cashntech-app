@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback, useMemo} from 'react';
+import React, {useState, useEffect, useCallback, useMemo, useRef} from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,8 +12,7 @@ import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useSelector, useDispatch} from 'react-redux';
-import {interestAccrualActions, interestAccrualSelectors} from '@store/interestAccrual';
+import {useSelector} from 'react-redux';
 import {AppBar, Container, ProgramBreadcrumb, FilterModal} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -21,10 +20,10 @@ import {HomeNavigatorType} from '@type/NavigatorTypes';
 import {Search, Filter} from '@assets/Icons';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
-import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import {selectProgramSelection, selectAllProgramIds} from '@store/programSelection/programSelection.selector';
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
-import {invoiceApi} from '@services/api/invoice.api';
+import {invoiceApi, InterestAccrualKpisResponse} from '@services/api/invoice.api';
 
 type InterestAccrualInvoiceRow = {
   id: string;
@@ -55,42 +54,114 @@ export const InterestAccrualsScreen: React.FC = () => {
   >>();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const programSelection = useSelector(selectProgramSelection);
+  const allProgramIds = useSelector(selectAllProgramIds);
   const programName = programSelection?.programName ?? '';
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
 
-  const dispatch = useDispatch();
-  const rawInterestData = useSelector(interestAccrualSelectors.selectInterestAccrualList);
-  const loading = useSelector(interestAccrualSelectors.selectInterestAccrualLoading);
-  const apiError = useSelector(interestAccrualSelectors.selectInterestAccrualError);
-  
   const [searchText, setSearchText] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
-  const programIds =
-    programSelection?.programScope === 'all' &&
-    programSelection?.allProgramIds?.length
-      ? programSelection.allProgramIds
-      : programSelection?.programId
-      ? [programSelection.programId]
-      : undefined;
-  // Stable dependency key so useEffect doesn't loop due to new array instances
+  const programIds = useMemo(
+    () =>
+      programSelection?.programScope === 'all' &&
+      (allProgramIds?.length || programSelection?.allProgramIds?.length)
+        ? allProgramIds?.length
+          ? allProgramIds
+          : programSelection?.allProgramIds ?? undefined
+        : programSelection?.programId
+          ? [programSelection.programId]
+          : undefined,
+    [
+      programSelection?.programScope,
+      programSelection?.programId,
+      programSelection?.allProgramIds,
+      allProgramIds,
+    ],
+  );
+  /** Web parity: KPI endpoint uses [] unless a specific program is selected */
+  const kpiProgramIds = useMemo(() => {
+    if (
+      programSelection?.programScope === 'selected' &&
+      programSelection?.programId
+    ) {
+      return [programSelection.programId];
+    }
+    return [];
+  }, [programSelection?.programScope, programSelection?.programId]);
   const programIdsKey = JSON.stringify(programIds ?? []);
+  const kpiProgramIdsKey = JSON.stringify(kpiProgramIds);
 
-  const [apiKpis, setApiKpis] = useState<any>(null);
+  const [apiKpis, setApiKpis] = useState<InterestAccrualKpisResponse | null>(null);
+  const [interestList, setInterestList] = useState<any[]>([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [kpisLoading, setKpisLoading] = useState(true);
+  const fetchRequestId = useRef(0);
+
+  const getRequestErrorMessage = (error: any, fallback: string) => {
+    const responseMessage = error?.response?.data?.message;
+    if (typeof responseMessage === 'string' && responseMessage.trim()) {
+      return responseMessage;
+    }
+    if (
+      error?.message?.includes('fetch') ||
+      error?.message === 'Network Error' ||
+      error?.code === 'ECONNABORTED'
+    ) {
+      return 'Network error. Check connection.';
+    }
+    return error?.message || fallback;
+  };
+
+  const fetchInterestAccrualData = useCallback(async () => {
+    const requestId = ++fetchRequestId.current;
+    setListLoading(true);
+    setKpisLoading(true);
+    setListError(null);
+
+    const listPromise = invoiceApi
+      .getDisbursedList(programIds)
+      .then(res => {
+        if (requestId !== fetchRequestId.current) return;
+        setInterestList(Array.isArray(res) ? res : []);
+      })
+      .catch(error => {
+        if (requestId !== fetchRequestId.current) return;
+        setInterestList([]);
+        setListError(getRequestErrorMessage(error, 'Failed to load interest accruals'));
+      })
+      .finally(() => {
+        if (requestId === fetchRequestId.current) {
+          setListLoading(false);
+        }
+      });
+
+    const kpisPromise = invoiceApi
+      .getInterestAccrualKpis(kpiProgramIds)
+      .then(res => {
+        if (requestId !== fetchRequestId.current) return;
+        setApiKpis(res);
+      })
+      .catch(() => {
+        if (requestId !== fetchRequestId.current) return;
+        setApiKpis(null);
+      })
+      .finally(() => {
+        if (requestId === fetchRequestId.current) {
+          setKpisLoading(false);
+        }
+      });
+
+    await Promise.allSettled([listPromise, kpisPromise]);
+  }, [programIds, kpiProgramIds]);
 
   useEffect(() => {
-    dispatch(interestAccrualActions.fetchInterestAccrualListRequest({programIds}));
-    
-    // Fetch real KPIs
-    invoiceApi.getInterestAccrualKpis(programIds).then(res => {
-      setApiKpis(res);
-    }).catch(e => console.log('Error fetching interest kpis', e));
-  }, [programIdsKey, dispatch]);
+    fetchInterestAccrualData();
+  }, [fetchInterestAccrualData, programIdsKey, kpiProgramIdsKey]);
 
   const rows = useMemo(() => {
-    return (rawInterestData || []).map((item: any) => {
+    return (interestList || []).map((item: any) => {
       const fmtMoney = (v: any) =>
         v != null
           ? `${Number(v).toLocaleString('en-IN', {
@@ -125,7 +196,7 @@ export const InterestAccrualsScreen: React.FC = () => {
         cumulativeInterestRaw,
       };
     });
-  }, [rawInterestData]);
+  }, [interestList]);
 
   // Client-side filter + search
   const filteredBySearch = !searchText.trim()
@@ -190,8 +261,13 @@ export const InterestAccrualsScreen: React.FC = () => {
       sum + Math.max(0, (r.finalTotalRaw || 0) - (r.disbursedAmountRaw || 0)),
     0,
   );
-  // Placeholder: overdue interest = total accrual interest (until backend provides separate field)
-  const overdueInterest = totalAccrualInterest;
+
+  const formatKpiCurrency = (value?: string | number | null) => {
+    if (value === undefined || value === null || value === '') return '-';
+    const num = Number(value);
+    if (Number.isNaN(num)) return String(value);
+    return `₹ ${num.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+  };
 
   const renderRow = ({item: row}: {item: InterestAccrualInvoiceRow}) => (
     <View style={styles.cardWrapper}>
@@ -277,7 +353,7 @@ export const InterestAccrualsScreen: React.FC = () => {
       <FlatList
         style={styles.scroll}
         contentContainerStyle={styles.content}
-        data={loading ? [] : paginatedData}
+        data={listLoading ? [] : paginatedData}
         keyExtractor={row => row.id}
         ListHeaderComponent={
           <>
@@ -290,17 +366,24 @@ export const InterestAccrualsScreen: React.FC = () => {
               {[
                 { 
                   label: 'Total Interest Accrued Daily', 
-                  value: apiKpis?.total_interest_accrued_daily 
-                    ? `₹ ${Number(apiKpis.total_interest_accrued_daily).toLocaleString('en-IN', {minimumFractionDigits: 2})}` 
-                    : '-' 
+                  value: kpisLoading
+                    ? '...'
+                    : formatKpiCurrency(apiKpis?.total_interest_accrued_daily),
                 },
                 { 
                   label: 'Accrual vs Expected', 
-                  value: apiKpis?.accrual_vs_expected != null 
-                    ? `${Number(apiKpis.accrual_vs_expected).toFixed(2)}%` 
-                    : '-' 
+                  value: kpisLoading
+                    ? '...'
+                    : apiKpis?.accrual_vs_expected != null
+                      ? `${Number(apiKpis.accrual_vs_expected).toFixed(2)}%`
+                      : '-',
                 },
-                { label: 'Overdue Interest', value: '-' },
+                {
+                  label: 'Overdue Interest',
+                  value: kpisLoading
+                    ? '...'
+                    : formatKpiCurrency(apiKpis?.overdue_interest),
+                },
                 { label: 'Loans Not Accruing Interest', value: '-' },
                 { label: 'Days Accrued vs Days Elapsed', value: '-' },
               ].map((m, i) => (
@@ -312,17 +395,20 @@ export const InterestAccrualsScreen: React.FC = () => {
                 </View>
               ))}
             </View>
-            {loading ? (
+            {listLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={Colors.primaryColor} />
                 <Text style={styles.loadingText}>Loading interest accruals...</Text>
               </View>
-            ) : (error || apiError) ? (
+            ) : listError ? (
               <View style={styles.loadingContainer}>
-                <Text style={styles.errorText}>{error || apiError}</Text>
+                <Text style={styles.errorText}>{listError}</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={fetchInterestAccrualData}>
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
               </View>
             ) : null}
-            {!loading && (
+            {!listLoading && (
               <>
                 {!(isDealerMaker || isDealerChecker) && (
                   <View style={styles.invoicesHeader}>
@@ -365,16 +451,16 @@ export const InterestAccrualsScreen: React.FC = () => {
         ItemSeparatorComponent={() => <View style={{height: scaleHeight(12)}} />}
         renderItem={renderRow}
         ListEmptyComponent={
-          !loading && !error && filteredData.length === 0 ? (
+          !listLoading && !listError && filteredData.length === 0 ? (
             <View style={styles.loadingContainer}>
               <Text style={styles.loadingText}>No interest accruals found</Text>
             </View>
           ) : null
         }
-        onEndReached={!loading && hasMore ? loadMore : undefined}
+        onEndReached={!listLoading && hasMore ? loadMore : undefined}
         onEndReachedThreshold={0.3}
         ListFooterComponent={
-          !loading && hasMore ? (
+          !listLoading && hasMore ? (
             <View style={styles.loadMoreFooter}>
               <ActivityIndicator size="small" color={Colors.primaryColor} />
               <Text style={styles.loadMoreText}>Loading more...</Text>
@@ -458,6 +544,18 @@ const styles = StyleSheet.create({
     color: Colors.red,
     fontFamily: Fonts.GilroyMedium,
     textAlign: 'center',
+    marginBottom: scaleHeight(12),
+  },
+  retryButton: {
+    backgroundColor: Colors.primaryColor,
+    paddingHorizontal: scaleWidth(24),
+    paddingVertical: scaleHeight(10),
+    borderRadius: scaleWidth(8),
+  },
+  retryButtonText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.white,
   },
   pageTitleBar: {
     paddingHorizontal: scaleWidth(16),

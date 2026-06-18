@@ -24,8 +24,10 @@ type SigninProps = NativeStackScreenProps<
 const Strings = {
   welcomeBackTitle: 'Welcome to CashnTech',
   loginSubtitle: 'Login to your account',
-  emailLabel: 'Email Address',
+  emailLabel: 'Username',
   passwordLabel: 'Password',
+  emailPlaceholder: 'Enter Email',
+  passwordPlaceholder: 'Enter Password',
   rememberMe: 'Remember me for faster login',
   forgotPassword: 'Forgot Password?',
   getVerificationCode: 'Get Verification Code',
@@ -38,12 +40,12 @@ const Strings = {
 export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
   
   //1.Cashntech-user
-  //const [email, setEmail] = useState('itsupport@cashntech.com');
-  //const [passwordValue, setPassword] = useState('santram@123');
+  //const [email, setEmail] = useState('piyush.sharma@cepheiinfotech.com');
+  //const [passwordValue, setPassword] = useState('admin@123');
 
   //2.Anchor-maker
-  const [email, setEmail] = useState('sm_maker@yopmail.com');
-  const [passwordValue, setPassword] = useState('Welcome@123');
+  //const [email, setEmail] = useState('sm_maker@yopmail.com');
+  //const [passwordValue, setPassword] = useState('Welcome@123');
 
   //3.Anchor-checker
   //const [email, setEmail] = useState('dms_checker@yopmail.com');
@@ -56,6 +58,9 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
   //5.Dealer-cheker
   //const [email, setEmail] = useState('dl_chcker21@yopmail.com');
   //const [passwordValue, setPassword] = useState('Welcome@123');
+
+  const [email, setEmail] = useState('');
+  const [passwordValue, setPassword] = useState('');
 
 
   const [showPassword, setShowPassword] = useState(false);
@@ -131,6 +136,7 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
         <View style={styles.inputContainer}>
           <Input
             label={Strings.emailLabel}
+            placeholder={Strings.emailPlaceholder}
             leftIconStyle={styles.leftIcon}
             maxLength={80}
             value={email}
@@ -140,6 +146,7 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
           />
           <Input
             label={Strings.passwordLabel}
+            placeholder={Strings.passwordPlaceholder}
             onChangeText={setPassword}
             value={passwordValue}
             editable={!isLoading}

@@ -414,7 +414,19 @@ export const DisbursementScreen: React.FC = () => {
     ? Number(apiKpis.pending_disbursed_amount)
     : disbursementRows.reduce((sum, r) => sum + Math.max(0, (r.finalTotal ?? 0) - (r.disbursedAmount ?? 0)), 0);
 
+  const formatKpiPercent = (value?: string) => {
+    if (value === undefined || value === null || value === '') return '-';
+    const num = Number(value);
+    if (Number.isNaN(num)) return value;
+    return `${num.toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 2})}%`;
+  };
 
+  const formatKpiDays = (value?: string) => {
+    if (value === undefined || value === null || value === '') return '-';
+    const num = Number(value);
+    if (Number.isNaN(num)) return value;
+    return `${num.toLocaleString('en-IN', {maximumFractionDigits: 2})} days`;
+  };
 
   const disbursementMetrics = [
     {
@@ -431,15 +443,15 @@ export const DisbursementScreen: React.FC = () => {
     },
     {
       label: 'Repeat usage',
-      value: '-',
+      value: formatKpiPercent(apiKpis?.repeat_usage_rate),
     },
     {
       label: 'TAT (Turn Around Time)',
-      value: '-',
+      value: formatKpiDays(apiKpis?.turn_around_time),
     },
     {
       label: 'DSO (Days Sales Outstanding)',
-      value: '-',
+      value: formatKpiDays(apiKpis?.days_sales_outstanding),
     },
   ];
 

@@ -3,12 +3,14 @@ import React from 'react';
 import {HomeNavigator} from './HomeNavigator';
 import {useAuth} from '@hooks/index';
 import {AuthNavigator} from './AuthNavigator';
+import {API_URL} from '@config/config';
 
 export const MainNavigator = () => {
   const {isInitialized, isLoggedIn} = useAuth();
+  const webPrefix = API_URL ? `${API_URL.replace(/\/+$/, '')}/` : undefined;
 
   const linking = {
-    prefixes: ['cashntech://', 'https://losapidev.cashntech.com/'],
+    prefixes: ['cashntech://', webPrefix].filter(Boolean) as string[],
     config: {
       screens: {
         PasswordScreen: {

@@ -257,11 +257,15 @@ export type DisbursementKpisResponse = {
   total_uploaded_amount: string;
   total_disbursed_amount: string;
   pending_disbursed_amount: string;
+  repeat_usage_rate?: string;
+  turn_around_time?: string;
+  days_sales_outstanding?: string;
 };
 
 export type InterestAccrualKpisResponse = {
   total_interest_accrued_daily: string;
   accrual_vs_expected: number;
+  overdue_interest?: string;
 };
 
 export type RepaymentKpisResponse = {
@@ -269,22 +273,39 @@ export type RepaymentKpisResponse = {
   principal_repaid: string;
   interest_repaid: string;
   penal_repaid: string;
-  totalClosedInvoices: string;
+  totalClosedInvoices: string | number;
+  totalOs?: {
+    totalPrincipalOutstanding?: string;
+    totalBaseInterestOutstanding?: string;
+    totalPenalOutstanding?: string;
+  };
+  overDueSum?: {
+    total_principal_outstanding?: string;
+    total_base_interest_outstanding?: string;
+    total_penal_outstanding?: string;
+  };
 };
 
 export type DpdKpisResponse = {
-  dpd_bucket_movement: {
-    "0_30_days": string;
-    "31_60_days": string;
-    "61_90_days": string;
-  };
-  top_10_overdue_accounts: {
-    by_amount: string;
-    by_dpd: string;
-  };
-  gross_npa_percent: string;
-  total_outstanding_amount: string;
-  total_overdue_amount: string;
+  disbursedInvoices?: Array<{
+    overdue_invoice_ids?: string[];
+    dpd_1_30?: string;
+    dpd_31_60?: string;
+    dpd_61_90?: string;
+    average_dpd?: string;
+  }>;
+  overdueSum?: Array<{
+    total_principal_outstanding?: string;
+    total_base_interest_outstanding?: string;
+    total_penal_outstanding?: string;
+  }>;
+  gross_npa_percent?: string;
+  total_outstanding_amount?: string;
+  totalOsResult?: Array<{
+    totalPrincipalOutstanding?: string;
+    totalBaseInterestOutstanding?: string;
+    totalPenalOutstanding?: string;
+  }>;
 };
 
 export const invoiceApi = {
@@ -418,6 +439,9 @@ export const invoiceApi = {
       total_uploaded_amount: raw.total_uploaded_amount ?? '0.00',
       total_disbursed_amount: raw.total_disbursed_amount ?? '0.00',
       pending_disbursed_amount: raw.pending_disbursed_amount ?? '0.00',
+      repeat_usage_rate: raw.repeat_usage_rate,
+      turn_around_time: raw.turn_around_time,
+      days_sales_outstanding: raw.days_sales_outstanding,
     };
   },
 
@@ -432,6 +456,7 @@ export const invoiceApi = {
     return {
       total_interest_accrued_daily: raw.total_interest_accrued_daily ?? '0.00',
       accrual_vs_expected: raw.accrual_vs_expected ?? 0,
+      overdue_interest: raw.overdue_interest,
     };
   },
 
@@ -449,6 +474,8 @@ export const invoiceApi = {
       interest_repaid: raw.interest_repaid ?? '0.00',
       penal_repaid: raw.penal_repaid ?? '0.00',
       totalClosedInvoices: raw.totalClosedInvoices ?? '0',
+      totalOs: raw.totalOs,
+      overDueSum: raw.overDueSum,
     };
   },
 
@@ -461,18 +488,11 @@ export const invoiceApi = {
     } as any);
     const raw = response?.data?.data ?? {};
     return {
-      dpd_bucket_movement: raw.dpd_bucket_movement ?? {
-        "0_30_days": "0.00",
-        "31_60_days": "0.00",
-        "61_90_days": "0.00"
-      },
-      top_10_overdue_accounts: raw.top_10_overdue_accounts ?? {
-        by_amount: "0.00",
-        by_dpd: "0 Days"
-      },
-      gross_npa_percent: raw.gross_npa_percent ?? "0.00%",
-      total_outstanding_amount: raw.total_outstanding_amount ?? "0.00",
-      total_overdue_amount: raw.total_overdue_amount ?? "0.00",
+      disbursedInvoices: raw.disbursedInvoices,
+      overdueSum: raw.overdueSum,
+      gross_npa_percent: raw.gross_npa_percent ?? '0.00%',
+      total_outstanding_amount: raw.total_outstanding_amount ?? '0.00',
+      totalOsResult: raw.totalOsResult,
     };
   },
 
@@ -702,14 +722,19 @@ export const invoiceApi = {
     return [];
   },
 
-  /** Disbursed invoices (invoice_status=Disbursed) */
-  getDisbursedList: async (programIds?: string[]): Promise<any[]> => {
-    const body: Record<string, unknown> = {};
-    if (programIds?.length) (body as any).programIds = programIds; // Backend uses program: body.programIds
+  /** Disbursed / closed invoices for interest accrual list */
+  getDisbursedList: async (
+    programIds?: string[],
+    options?: {byInvoiceStatus?: string[]},
+  ): Promise<any[]> => {
+    const body: Record<string, unknown> = {
+      byInvoiceStatus: options?.byInvoiceStatus ?? ['Disbursed', 'Closed'],
+    };
+    if (programIds?.length) (body as any).programIds = programIds;
     const response = await axiosInstance.post(
       ApiEndPoints.apiDisbursedList,
       body,
-      {authRequired: true} as any,
+      {authRequired: true, timeout: 60000} as any,
     );
     const data = response?.data;
     if (Array.isArray(data)) return data;

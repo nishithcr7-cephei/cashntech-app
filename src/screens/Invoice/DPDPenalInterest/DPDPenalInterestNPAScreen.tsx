@@ -35,7 +35,7 @@ import Endpoints from '@constants/ApiEndPoints';
 import {RecordRepaymentModal} from './components/RecordRepaymentModal';
 import {PaymentHistoryModal} from './components/PaymentHistoryModal';
 import {RequestWaiverModal} from './components/RequestWaiverModal';
-import {invoiceApi} from '@services/api/invoice.api';
+import {invoiceApi, DpdKpisResponse} from '@services/api/invoice.api';
 
 // DPD Metrics will be dynamically populated in the component
 
@@ -85,18 +85,25 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
   const dpdRows = useSelector(dpdSelectors.selectDPDList);
   const loading = useSelector(dpdSelectors.selectDPDLoading);
 
-  const [apiKpis, setApiKpis] = useState<any>(null);
+  const [apiKpis, setApiKpis] = useState<DpdKpisResponse | null>(null);
+
+  const kpiProgramIds = useMemo(() => {
+    if (
+      programSelection?.programScope === 'selected' &&
+      programSelection?.programId
+    ) {
+      return [programSelection.programId];
+    }
+    return [];
+  }, [programSelection?.programScope, programSelection?.programId]);
 
   useEffect(() => {
     let payload: any = {};
-    let pIds: string[] | undefined = undefined;
 
-    if (programSelection?.programScope !== 'all' && programSelection?.programId) {
+    if (programSelection?.programScope === 'selected' && programSelection?.programId) {
       payload.programIds = [programSelection.programId];
-      pIds = [programSelection.programId];
     }
 
-    // Map selected UI bucket labels to backend values
     const selectedBuckets = appliedFilters['DPD Buckets'] || [];
     if (selectedBuckets.length > 0) {
       payload.buckets = selectedBuckets.map(label => BUCKET_VALUE_MAP[label]);
@@ -104,42 +111,88 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
 
     dispatch(dpdActions.fetchDPDListRequest(payload));
 
-    invoiceApi.getDpdKpis(pIds).then(res => {
-      setApiKpis(res);
-    }).catch(e => console.log('Error fetching dpd kpis', e));
-  }, [programSelection, appliedFilters, dispatch]);
+    invoiceApi
+      .getDpdKpis(kpiProgramIds)
+      .then(res => {
+        setApiKpis(res);
+      })
+      .catch(() => {
+        setApiKpis(null);
+      });
+  }, [programSelection, appliedFilters, kpiProgramIds, dispatch]);
 
-  const getVal = (val: string | undefined | null) => val ? `₹ ${Number(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}` : '-';
+  const getVal = (val: string | number | undefined | null) =>
+    val != null && val !== ''
+      ? `₹ ${Number(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}`
+      : '-';
 
-  const dpdMetrics = useMemo(() => [
-    {
-      label: 'DPD Bucket Movement',
-      subValues: [
-        { label: '0-30 Days', value: getVal(apiKpis?.dpd_bucket_movement?.['0_30_days']) },
-        { label: '31-60 Days', value: getVal(apiKpis?.dpd_bucket_movement?.['31_60_days']) },
-        { label: '61-90 Days', value: getVal(apiKpis?.dpd_bucket_movement?.['61_90_days']) },
-      ],
-    },
-    {
-      label: 'Top 10 Overdue Accounts',
-      subValues: [
-        { label: 'By Amount', value: getVal(apiKpis?.top_10_overdue_accounts?.by_amount) },
-        { label: 'By DPD', value: apiKpis?.top_10_overdue_accounts?.by_dpd ?? '-' },
-      ],
-    },
-    {
-      label: 'Gross NPA % (DPD > 90 D)',
-      value: apiKpis?.gross_npa_percent ?? '-',
-    },
-    {
-      label: 'Total Outstanding Amount',
-      value: getVal(apiKpis?.total_outstanding_amount),
-    },
-    {
-      label: 'Total Overdue Amount',
-      value: getVal(apiKpis?.total_overdue_amount),
-    },
-  ], [apiKpis]);
+  const dpdMetrics = useMemo(() => {
+    const dpdRow = apiKpis?.disbursedInvoices?.[0];
+    const overdueRow = apiKpis?.overdueSum?.[0];
+    const osRow = apiKpis?.totalOsResult?.[0];
+
+    return [
+      {
+        label: 'DPD Bucket Movement',
+        subValues: [
+          {label: '0-30 Days', value: dpdRow?.dpd_1_30 ?? '-'},
+          {label: '31-60 Days', value: dpdRow?.dpd_31_60 ?? '-'},
+          {label: '61-90 Days', value: dpdRow?.dpd_61_90 ?? '-'},
+        ],
+      },
+      {
+        label: 'Top 10 Overdue Accounts',
+        subValues: [
+          {
+            label: 'By Amount',
+            value: getVal(overdueRow?.total_principal_outstanding),
+          },
+          {
+            label: 'By DPD',
+            value: dpdRow?.average_dpd ? `${dpdRow.average_dpd} Days` : '-',
+          },
+        ],
+      },
+      {
+        label: 'Gross NPA % (DPD > 90 D)',
+        value: apiKpis?.gross_npa_percent ?? '-',
+      },
+      {
+        label: 'Total Outstanding Amount',
+        subValues: [
+          {
+            label: 'Principal Amount',
+            value: getVal(osRow?.totalPrincipalOutstanding),
+          },
+          {
+            label: 'Interest Amount',
+            value: getVal(osRow?.totalBaseInterestOutstanding),
+          },
+          {
+            label: 'Penal Interest Amount',
+            value: getVal(osRow?.totalPenalOutstanding),
+          },
+        ],
+      },
+      {
+        label: 'Total Overdue Amount',
+        subValues: [
+          {
+            label: 'Principal Amount',
+            value: getVal(overdueRow?.total_principal_outstanding),
+          },
+          {
+            label: 'Interest Amount',
+            value: getVal(overdueRow?.total_base_interest_outstanding),
+          },
+          {
+            label: 'Penal Interest Amount',
+            value: getVal(overdueRow?.total_penal_outstanding),
+          },
+        ],
+      },
+    ];
+  }, [apiKpis]);
 
   const filteredData = useMemo(() => {
     let data = dpdRows;

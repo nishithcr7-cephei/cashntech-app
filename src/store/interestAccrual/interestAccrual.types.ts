@@ -50,4 +50,5 @@ export type FetchDailyInterestRequest = {
 
 export type FetchInterestAccrualListRequest = {
   programIds?: string[];
+  byInvoiceStatus?: string[];
 };

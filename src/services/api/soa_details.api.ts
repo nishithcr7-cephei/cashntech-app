@@ -1,6 +1,5 @@
 import axiosInstance from './api';
 import ApiEndPoints from '@constants/ApiEndPoints';
-import {API_URL} from '@config/config';
 import {decryptValue} from '@utils/decrypt';
 
 export interface ProgramSummaryApi {
@@ -92,12 +91,12 @@ export interface RepaymentApi {
   invoice_no?: string;
 }
 
-const BASE_URL = API_URL || 'https://losapidev.cashntech.com';
+const asRelativeEndpoint = (path: string) =>
+  path.startsWith('/') ? path : `/${path}`;
 
 export const soaDetailsApi = {
   getProgramSummary: async (id: string): Promise<ProgramSummaryApi | null> => {
-    const endpoint = ApiEndPoints.apiProgramSummary(id);
-    const url = `${BASE_URL}/${endpoint}`.replace(/([^:]\/)\/+/g, "$1");
+    const url = asRelativeEndpoint(ApiEndPoints.apiProgramSummary(id));
     // eslint-disable-next-line no-console
     console.log('[soaDetailsApi] GET ProgramSummary URL:', url);
     const response = await axiosInstance.get(url, {
@@ -123,8 +122,7 @@ export const soaDetailsApi = {
   },
 
   getDealersDetails: async (id: string): Promise<DealerListItemApi[]> => {
-    const endpoint = ApiEndPoints.apiProgramDealersDetails(id);
-    const url = `${BASE_URL}/${endpoint}`.replace(/([^:]\/)\/+/g, "$1");
+    const url = asRelativeEndpoint(ApiEndPoints.apiProgramDealersDetails(id));
     // eslint-disable-next-line no-console
     console.log('[soaDetailsApi] GET DealersDetails URL:', url);
     const response = await axiosInstance.post(url, {}, {
@@ -145,7 +143,7 @@ export const soaDetailsApi = {
   },
 
   getTransactionDetails: async (id: string): Promise<TransactionDetailsApi[]> => {
-    const url = `${BASE_URL}/transactions/bank-statement/${id}`;
+    const url = `/transactions/bank-statement/${id}`;
     // eslint-disable-next-line no-console
     console.log('[soaDetailsApi] POST TransactionDetails URL:', url);
     const response = await axiosInstance.post(url, {}, {
@@ -160,7 +158,7 @@ export const soaDetailsApi = {
   },
 
   getOpenInvoices: async (id: string): Promise<{invoices: OpenInvoiceApi[]; message: string}> => {
-    const url = `${BASE_URL}/transactions/od-accounts/${id}/invoices?invoiceType=open`;
+    const url = `/transactions/od-accounts/${id}/invoices?invoiceType=open`;
     // eslint-disable-next-line no-console
     console.log('[soaDetailsApi] GET OpenInvoices URL:', url);
     const response = await axiosInstance.get(url, {
@@ -176,7 +174,7 @@ export const soaDetailsApi = {
   },
 
   getClosedInvoices: async (id: string): Promise<{invoices: ClosedInvoiceApi[]; message: string}> => {
-    const url = `${BASE_URL}/transactions/od-accounts/${id}/invoices?invoiceType=closed`;
+    const url = `/transactions/od-accounts/${id}/invoices?invoiceType=closed`;
     // eslint-disable-next-line no-console
     console.log('[soaDetailsApi] GET ClosedInvoices URL:', url);
     const response = await axiosInstance.get(url, {
@@ -192,7 +190,7 @@ export const soaDetailsApi = {
   },
 
   getRepayments: async (id: string): Promise<{repayments: RepaymentApi[]; message: string}> => {
-    const url = `${BASE_URL}/transactions/od-accounts/${id}/repayments`;
+    const url = `/transactions/od-accounts/${id}/repayments`;
     // eslint-disable-next-line no-console
     console.log('[soaDetailsApi] GET Repayments URL:', url);
     const response = await axiosInstance.get(url, {

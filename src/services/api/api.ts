@@ -20,8 +20,13 @@ const GENERAL_TIMEOUT = 10000;
 console.log('🌐 [api.ts] Creating axios instance...');
 console.log('🌐 [api.ts] Config.API_URL:', Config.API_URL);
 
-const BASE_URL = Config.API_URL || 'https://losapidev.cashntech.com';
+const BASE_URL = (Config.API_URL || '').trim().replace(/\/+$/, '');
 console.log('🌐 [api.ts] Using BASE_URL:', BASE_URL);
+if (!BASE_URL) {
+  console.warn(
+    '⚠️ [api.ts] API_URL is missing. Please set API_URL in the active environment file.',
+  );
+}
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
