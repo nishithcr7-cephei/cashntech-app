@@ -9,9 +9,8 @@
 #                        (defaults are set in ios_env vars below)
 #
 # Additional secrets (Codemagic dashboard or workflow env):
-#   • APPETIZE_TOKEN   – Appetize.io API token (ios-appetize-testing)
-#   • TEST_USERNAME    – Simulator auto-login username
-#   • TEST_PASSWORD    – Simulator auto-login password
+#   • TEST_USERNAME    – Simulator auto-login username (optional)
+#   • TEST_PASSWORD    – Simulator auto-login password (optional)
 #
 # =============================================================================
 
@@ -55,10 +54,10 @@ definitions:
 
 workflows:
   # ===========================================================================
-  # Workflow 1: Simulator .app → Appetize.io (Debug / iphonesimulator)
+  # Workflow 1: Simulator .app build (Debug / iphonesimulator) – manual Appetize upload
   # ===========================================================================
   ios-appetize-testing:
-    name: iOS Appetize Testing
+    name: iOS Simulator Build
     max_build_duration: 90
     instance_type: mac_mini_m2
 
@@ -124,10 +123,9 @@ workflows:
               exit 1
             }
 
-      - name: Upload to Appetize.io
+      - name: Package simulator .app as zip
         script: |
           set -euo pipefail
-          : "${APPETIZE_TOKEN:?APPETIZE_TOKEN is not set – add it in Codemagic}"
 
           APP_PATH="$(find "${DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name '*.app' -type d | head -n 1)"
           if [ -z "${APP_PATH}" ]; then
@@ -137,28 +135,13 @@ workflows:
 
           APP_DIR="$(dirname "${APP_PATH}")"
           APP_NAME="$(basename "${APP_PATH}")"
-          ZIP_PATH="${CM_BUILD_DIR}/appetize-app.zip"
+          ZIP_PATH="${CM_BUILD_DIR}/simulator-app.zip"
 
           (cd "${APP_DIR}" && zip -r -q "${ZIP_PATH}" "${APP_NAME}")
-
-          RESPONSE="$(curl --silent --show-error --fail --http1.1 \
-            -X POST "https://${APPETIZE_TOKEN}@api.appetize.io/v1/apps" \
-            -F "file=@${ZIP_PATH}" \
-            -F "platform=ios" \
-            -F "note=CashnTech SCF – Codemagic ${CM_BUILD_ID:-local}")"
-
-          echo "${RESPONSE}"
-          echo "${RESPONSE}" | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          key = data.get('publicKey') or data.get('public_key')
-          if key:
-              print('Appetize public key:', key)
-              print('Viewer URL: https://appetize.io/app/' + key)
-          " 2>/dev/null || true
+          echo "Packaged ${APP_NAME} → ${ZIP_PATH} (upload to Appetize manually)"
 
     artifacts:
-      - $CM_BUILD_DIR/appetize-app.zip
+      - $CM_BUILD_DIR/simulator-app.zip
       - $CM_BUILD_DIR/xcodebuild.log
       - $DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/**/*.app
 
