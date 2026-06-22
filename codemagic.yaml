@@ -110,6 +110,7 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
             EXCLUDED_ARCHS[sdk=iphonesimulator*]=x86_64 \
+            ENABLE_DEBUG_DYLIB=NO \
             build
 
       - name: Upload to Appetize.io
