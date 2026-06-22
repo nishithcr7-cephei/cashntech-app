@@ -17,7 +17,7 @@
 definitions:
   ios_env: &ios_env
     node: 20
-    xcode: latest
+    xcode: 16.2
     cocoapods: default
     vars:
       BUNDLE_ID: com.lms.cashntech

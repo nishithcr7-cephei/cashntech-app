@@ -36,11 +36,32 @@ target 'CashNTech' do
       # :ccache_enabled => true
     )
 
-    # Align pods + build arm64 simulator only on Apple Silicon CI (avoids fmt x86_64 failures)
+    # RN 0.78 fmt pod fails on newer Xcode (consteval / C++20) – force C++17 + disable consteval
+    fmt_base = File.join(installer.sandbox.root, 'fmt', 'include', 'fmt', 'base.h')
+    if File.exist?(fmt_base)
+      content = File.read(fmt_base)
+      unless content.include?('Codemagic CI workaround')
+        patched = content.gsub(
+          /(#elif defined\(__cpp_consteval\)\s*\n#\s*define FMT_USE_CONSTEVAL)\s+1/,
+          "// Codemagic CI workaround: disable consteval\n\\1 0"
+        )
+        if patched != content
+          File.chmod(0o644, fmt_base)
+          File.write(fmt_base, patched)
+        end
+      end
+    end
+
+    # Align pods + build arm64 simulator only on Apple Silicon CI
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |build_config|
         build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
         build_config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'i386 x86_64'
+
+        if target.name == 'fmt'
+          build_config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+          build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = '$(inherited) FMT_USE_CONSTEVAL=0'
+        end
       end
     end
 
