@@ -5,9 +5,10 @@
 #   • IOS_Credentials  – CM_CERTIFICATE, CM_CERTIFICATE_PASSWORD,
 #                        CM_PROVISIONING_PROFILE, APP_STORE_CONNECT_KEY_IDENTIFIER,
 #                        APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_PRIVATE_KEY
-#   • Dev Group        – API_URL, FILE_DOWNLOAD_URL, RK_ENCRYPTION_KEY, RK_ENCRYPTION_IV
+#   • Dev Group        – optional override for API_URL, FILE_DOWNLOAD_URL, etc.
+#                        (defaults are set in ios_env vars below)
 #
-# Additional secrets (recommended: Dev Group):
+# Additional secrets (Codemagic dashboard or workflow env):
 #   • APPETIZE_TOKEN   – Appetize.io API token (ios-appetize-testing)
 #   • TEST_USERNAME    – Simulator auto-login username
 #   • TEST_PASSWORD    – Simulator auto-login password
@@ -25,6 +26,10 @@ definitions:
       XCODE_SCHEME: "CashnTech SCF"
       XCODE_PROJECT: "ios/CashNTech.xcodeproj"
       DERIVED_DATA_PATH: $CM_BUILD_DIR/ios_derived
+      API_URL: https://losapidev.cashntech.com
+      FILE_DOWNLOAD_URL: https://d2wayd1he5a7q1.cloudfront.net
+      RK_ENCRYPTION_KEY: "u/Gu5posvwDsXUnV5Zaq4g=="
+      RK_ENCRYPTION_IV: "5D9r9ZVzEYYgha93/aUK2w=="
 
   rn_cache: &rn_cache
     cache_paths:
@@ -59,8 +64,6 @@ workflows:
 
     environment:
       <<: *ios_env
-      groups:
-        - Dev Group
 
     cache:
       <<: *rn_cache
@@ -81,11 +84,6 @@ workflows:
       - name: Generate .env for Appetize simulator build
         script: |
           set -euo pipefail
-
-          : "${API_URL:?API_URL is not set – add it to the Dev Group}"
-          : "${FILE_DOWNLOAD_URL:?FILE_DOWNLOAD_URL is not set – add it to the Dev Group}"
-          : "${RK_ENCRYPTION_KEY:?RK_ENCRYPTION_KEY is not set – add it to the Dev Group}"
-          : "${RK_ENCRYPTION_IV:?RK_ENCRYPTION_IV is not set – add it to the Dev Group}"
 
           cat > .env <<EOF
           API_URL=${API_URL}
@@ -176,7 +174,6 @@ workflows:
       <<: *ios_env
       groups:
         - IOS_Credentials
-        - Dev Group
 
     cache:
       <<: *rn_cache
@@ -194,14 +191,9 @@ workflows:
             echo "Copying .env.prod → .env"
             cp .env.prod .env
           else
-            echo "WARNING: .env.prod not in repo – creating .env from Dev Group"
+            echo "Creating .env from codemagic.yaml vars"
             : > .env
           fi
-
-          : "${API_URL:?API_URL is not set – add it to the Dev Group}"
-          : "${FILE_DOWNLOAD_URL:?FILE_DOWNLOAD_URL is not set – add it to the Dev Group}"
-          : "${RK_ENCRYPTION_KEY:?RK_ENCRYPTION_KEY is not set – add it to the Dev Group}"
-          : "${RK_ENCRYPTION_IV:?RK_ENCRYPTION_IV is not set – add it to the Dev Group}"
 
           upsert_env() {
             local key="$1" value="$2"
