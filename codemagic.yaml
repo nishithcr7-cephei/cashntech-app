@@ -67,7 +67,15 @@ workflows:
 
     scripts:
       - *install_js_dependencies
-      - *install_pods
+
+      # ML Kit has no arm64-simulator binaries – exclude before pod install (see react-native.config.js)
+      - name: Install CocoaPods dependencies (Appetize simulator)
+        script: |
+          set -e
+          export APPETIZE_BUILD=true
+          cd ios
+          rm -rf Pods
+          pod install
 
       # react-native-config reads .env at build time – use standard .env (not .env.prod)
       - name: Generate .env for Appetize simulator build
@@ -108,10 +116,15 @@ workflows:
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
             EXCLUDED_ARCHS[sdk=iphonesimulator*]=x86_64 \
             ENABLE_DEBUG_DYLIB=NO \
-            build
+            build 2>&1 | tee "${CM_BUILD_DIR}/xcodebuild.log" || {
+              echo "=== xcodebuild failed – last 80 lines of linker output ==="
+              grep -E 'error:|undefined symbol|library not found|ld:' "${CM_BUILD_DIR}/xcodebuild.log" | tail -n 80 || tail -n 80 "${CM_BUILD_DIR}/xcodebuild.log"
+              exit 1
+            }
 
       - name: Upload to Appetize.io
         script: |
@@ -148,6 +161,7 @@ workflows:
 
     artifacts:
       - $CM_BUILD_DIR/appetize-app.zip
+      - $CM_BUILD_DIR/xcodebuild.log
       - $DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/**/*.app
 
   # ===========================================================================
