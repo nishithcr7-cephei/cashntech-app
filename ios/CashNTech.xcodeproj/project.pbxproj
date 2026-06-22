@@ -371,7 +371,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.cashntech.los;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lms.cashntech;
 				PRODUCT_NAME = CashNTech;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -405,7 +405,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.cashntech.los;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lms.cashntech;
 				PRODUCT_NAME = CashNTech;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;

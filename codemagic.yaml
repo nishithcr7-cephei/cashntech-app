@@ -1,0 +1,253 @@
+# =============================================================================
+# CashnTech SCF – React Native iOS CI/CD (Codemagic)
+# =============================================================================
+# Required Codemagic environment groups (configure in dashboard UI):
+#   • IOS_Credentials  – CM_CERTIFICATE, CM_CERTIFICATE_PASSWORD,
+#                        CM_PROVISIONING_PROFILE, APP_STORE_CONNECT_KEY_IDENTIFIER,
+#                        APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_PRIVATE_KEY
+#   • Dev Group        – API_URL, FILE_DOWNLOAD_URL, RK_ENCRYPTION_KEY, RK_ENCRYPTION_IV
+#
+# Additional secrets (recommended: Dev Group):
+#   • APPETIZE_TOKEN   – Appetize.io API token (ios-appetize-testing)
+#   • TEST_USERNAME    – Simulator auto-login username
+#   • TEST_PASSWORD    – Simulator auto-login password
+#
+# =============================================================================
+
+definitions:
+  ios_env: &ios_env
+    node: 20
+    xcode: latest
+    cocoapods: default
+    vars:
+      BUNDLE_ID: com.lms.cashntech
+      XCODE_WORKSPACE: "ios/CashnTech SCF.xcworkspace"
+      XCODE_SCHEME: "CashnTech SCF"
+      XCODE_PROJECT: "ios/CashNTech.xcodeproj"
+      DERIVED_DATA_PATH: $CM_BUILD_DIR/ios_derived
+
+  rn_cache: &rn_cache
+    cache_paths:
+      - $HOME/.npm
+      - $HOME/Library/Caches/Yarn
+      - $CM_BUILD_DIR/node_modules
+      - $CM_BUILD_DIR/ios/Pods
+
+  scripts:
+    - &install_js_dependencies
+      name: Install JavaScript dependencies
+      script: |
+        set -e
+        yarn install --frozen-lockfile
+
+    - &install_pods
+      name: Install CocoaPods dependencies
+      script: |
+        set -e
+        cd ios
+        pod install
+
+workflows:
+  # ===========================================================================
+  # Workflow 1: Simulator .app → Appetize.io (Debug / iphonesimulator)
+  # ===========================================================================
+  ios-appetize-testing:
+    name: iOS Appetize Testing
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+
+    environment:
+      <<: *ios_env
+      groups:
+        - Dev Group
+
+    cache:
+      <<: *rn_cache
+
+    scripts:
+      - *install_js_dependencies
+      - *install_pods
+
+      # react-native-config reads .env at build time – use standard .env (not .env.prod)
+      - name: Generate .env for Appetize simulator build
+        script: |
+          set -euo pipefail
+
+          : "${API_URL:?API_URL is not set – add it to the Dev Group}"
+          : "${FILE_DOWNLOAD_URL:?FILE_DOWNLOAD_URL is not set – add it to the Dev Group}"
+          : "${RK_ENCRYPTION_KEY:?RK_ENCRYPTION_KEY is not set – add it to the Dev Group}"
+          : "${RK_ENCRYPTION_IV:?RK_ENCRYPTION_IV is not set – add it to the Dev Group}"
+
+          cat > .env <<EOF
+          API_URL=${API_URL}
+          FILE_DOWNLOAD_URL=${FILE_DOWNLOAD_URL}
+          RK_ENCRYPTION_KEY=${RK_ENCRYPTION_KEY}
+          RK_ENCRYPTION_IV=${RK_ENCRYPTION_IV}
+          IS_APPETIZE_BUILD=true
+          TEST_USERNAME=${TEST_USERNAME:-your_test_user}
+          TEST_PASSWORD=${TEST_PASSWORD:-your_password}
+          EOF
+          sed -i '' 's/^[[:space:]]*//' .env 2>/dev/null || sed -i 's/^[[:space:]]*//' .env
+
+          echo ".env ready for Appetize:"
+          grep -E '^(API_URL|IS_APPETIZE_BUILD|TEST_USERNAME)=' .env || true
+
+      - name: Build iOS Simulator .app
+        script: |
+          set -euo pipefail
+
+          # Quote paths – workspace name contains spaces
+          xcodebuild \
+            -workspace "${XCODE_WORKSPACE}" \
+            -scheme "${XCODE_SCHEME}" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -derivedDataPath "${DERIVED_DATA_PATH}" \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            build
+
+      - name: Upload to Appetize.io
+        script: |
+          set -euo pipefail
+          : "${APPETIZE_TOKEN:?APPETIZE_TOKEN is not set – add it in Codemagic}"
+
+          APP_PATH="$(find "${DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name '*.app' -type d | head -n 1)"
+          if [ -z "${APP_PATH}" ]; then
+            echo "ERROR: No .app found in ${DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator"
+            exit 1
+          fi
+
+          APP_DIR="$(dirname "${APP_PATH}")"
+          APP_NAME="$(basename "${APP_PATH}")"
+          ZIP_PATH="${CM_BUILD_DIR}/appetize-app.zip"
+
+          (cd "${APP_DIR}" && zip -r -q "${ZIP_PATH}" "${APP_NAME}")
+
+          RESPONSE="$(curl --silent --show-error --fail --http1.1 \
+            -X POST "https://${APPETIZE_TOKEN}@api.appetize.io/v1/apps" \
+            -F "file=@${ZIP_PATH}" \
+            -F "platform=ios" \
+            -F "note=CashnTech SCF – Codemagic ${CM_BUILD_ID:-local}")"
+
+          echo "${RESPONSE}"
+          echo "${RESPONSE}" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          key = data.get('publicKey') or data.get('public_key')
+          if key:
+              print('Appetize public key:', key)
+              print('Viewer URL: https://appetize.io/app/' + key)
+          " 2>/dev/null || true
+
+    artifacts:
+      - $CM_BUILD_DIR/appetize-app.zip
+      - $DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/**/*.app
+
+  # ===========================================================================
+  # Workflow 2: Release .ipa → TestFlight (Release / iphoneos)
+  # ===========================================================================
+  ios-testflight-distribution:
+    name: iOS TestFlight Distribution
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      <<: *ios_env
+      groups:
+        - IOS_Credentials
+        - Dev Group
+
+    cache:
+      <<: *rn_cache
+
+    scripts:
+      - *install_js_dependencies
+      - *install_pods
+
+      # Copy .env.prod → .env so react-native-config picks up production values
+      - name: Prepare production .env from .env.prod
+        script: |
+          set -euo pipefail
+
+          if [ -f ".env.prod" ]; then
+            echo "Copying .env.prod → .env"
+            cp .env.prod .env
+          else
+            echo "WARNING: .env.prod not in repo – creating .env from Dev Group"
+            : > .env
+          fi
+
+          : "${API_URL:?API_URL is not set – add it to the Dev Group}"
+          : "${FILE_DOWNLOAD_URL:?FILE_DOWNLOAD_URL is not set – add it to the Dev Group}"
+          : "${RK_ENCRYPTION_KEY:?RK_ENCRYPTION_KEY is not set – add it to the Dev Group}"
+          : "${RK_ENCRYPTION_IV:?RK_ENCRYPTION_IV is not set – add it to the Dev Group}"
+
+          upsert_env() {
+            local key="$1" value="$2"
+            if grep -q "^${key}=" .env 2>/dev/null; then
+              sed -i '' "s|^${key}=.*|${key}=${value}|" .env 2>/dev/null \
+                || sed -i "s|^${key}=.*|${key}=${value}|" .env
+            else
+              echo "${key}=${value}" >> .env
+            fi
+          }
+
+          upsert_env API_URL "${API_URL}"
+          upsert_env FILE_DOWNLOAD_URL "${FILE_DOWNLOAD_URL}"
+          upsert_env RK_ENCRYPTION_KEY "${RK_ENCRYPTION_KEY}"
+          upsert_env RK_ENCRYPTION_IV "${RK_ENCRYPTION_IV}"
+
+          echo "Production .env ready:"
+          grep -E '^(API_URL|FILE_DOWNLOAD_URL)=' .env || true
+
+      # Decode IOS_Credentials and bind profile to com.lms.cashntech
+      - name: Set up iOS code signing
+        script: |
+          set -euo pipefail
+
+          : "${CM_CERTIFICATE:?CM_CERTIFICATE missing in IOS_Credentials}"
+          : "${CM_CERTIFICATE_PASSWORD:?CM_CERTIFICATE_PASSWORD missing in IOS_Credentials}"
+          : "${CM_PROVISIONING_PROFILE:?CM_PROVISIONING_PROFILE missing in IOS_Credentials}"
+
+          keychain initialize
+
+          echo "${CM_CERTIFICATE}" | base64 --decode > "${CM_BUILD_DIR}/distribution.p12"
+          echo "${CM_PROVISIONING_PROFILE}" | base64 --decode > "${CM_BUILD_DIR}/profile.mobileprovision"
+
+          keychain add-certificates \
+            --certificate "${CM_BUILD_DIR}/distribution.p12" \
+            --certificate-password "${CM_CERTIFICATE_PASSWORD}"
+
+          mkdir -p "${HOME}/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_UUID="$(
+            grep -aA1 UUID "${CM_BUILD_DIR}/profile.mobileprovision" \
+              | grep -io '[-A-F0-9]\{36\}' | head -n 1
+          )"
+          cp "${CM_BUILD_DIR}/profile.mobileprovision" \
+            "${HOME}/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+
+          xcode-project use-profiles \
+            --project "${XCODE_PROJECT}" \
+            --profile "${HOME}/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+
+          echo "Signing ready for bundle ID ${BUNDLE_ID}"
+
+      - name: Build release .ipa
+        script: |
+          set -euo pipefail
+
+          xcode-project build-ipa \
+            --workspace "${XCODE_WORKSPACE}" \
+            --scheme "${XCODE_SCHEME}" \
+            --config Release
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true

@@ -98,13 +98,13 @@ const convertOcrLineItems = (
       total: item.taxable_amount.toString(),
       taxType: hasTax ? (item.tax_type || 'GST') : '',
       taxPercentage: hasTax
-        ? item.tax_percentage.toString() : '',
+        ? (item.tax_percentage ?? 0).toString() : '',
       taxAmount: hasTax
-        ? item.tax_amount.toFixed(2) : '',
+        ? (item.tax_amount ?? 0).toFixed(2) : '',
       taxes: hasTax ? [{
         taxType: item.tax_type || 'GST',
-        taxPercentage: item.tax_percentage.toString(),
-        taxAmount: item.tax_amount.toFixed(2),
+        taxPercentage: (item.tax_percentage ?? 0).toString(),
+        taxAmount: (item.tax_amount ?? 0).toFixed(2),
       }] : [{taxType: '', taxPercentage: '', taxAmount: ''}],
     };
   });
@@ -636,6 +636,7 @@ export const CreateInvoice: React.FC = () => {
               method: data.program?.method || null,
               role: data.program?.role || null,
               status: data.program?.status || null,
+              approvalLevel: null
             }),
           );
         }
