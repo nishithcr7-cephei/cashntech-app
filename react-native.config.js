@@ -1,8 +1,6 @@
 module.exports = {
   project: {
-    ios: {
-      project: 'ios/CashnTech SCF.xcworkspace',
-    },
+    ios: {},
     android: {},
   },
   assets: ['././assets/fonts'],

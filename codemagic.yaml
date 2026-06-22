@@ -38,7 +38,8 @@ definitions:
       name: Install JavaScript dependencies
       script: |
         set -e
-        yarn install --frozen-lockfile
+        # Install devDependencies too (required for @react-native-community/cli-platform-ios autolinking)
+        yarn install --frozen-lockfile --production=false
 
     - &install_pods
       name: Install CocoaPods dependencies
