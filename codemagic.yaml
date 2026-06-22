@@ -97,15 +97,19 @@ workflows:
         script: |
           set -euo pipefail
 
-          # Quote paths – workspace name contains spaces
+          # mac_mini_m2 is Apple Silicon – build arm64 simulator only (x86_64 fmt pod often fails)
           xcodebuild \
             -workspace "${XCODE_WORKSPACE}" \
             -scheme "${XCODE_SCHEME}" \
             -configuration Debug \
             -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "${DERIVED_DATA_PATH}" \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
+            EXCLUDED_ARCHS[sdk=iphonesimulator*]=x86_64 \
             build
 
       - name: Upload to Appetize.io
