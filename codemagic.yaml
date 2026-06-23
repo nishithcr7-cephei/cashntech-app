@@ -79,12 +79,17 @@ workflows:
           rm -rf Pods
           pod install
 
-      # react-native-config reads .env at build time – use standard .env (not .env.prod)
-      - name: Generate .env for Appetize simulator build
+      # react-native-config reads .env at Xcode build time (iOS does not use .env.prod by default)
+      - name: Prepare .env for simulator build
         script: |
           set -euo pipefail
 
-          cat > .env <<EOF
+          if [ -f ".env.prod" ]; then
+            echo "Using .env.prod → .env"
+            cp .env.prod .env
+          else
+            echo "Generating .env from codemagic.yaml vars"
+            cat > .env <<EOF
           API_URL=${API_URL}
           FILE_DOWNLOAD_URL=${FILE_DOWNLOAD_URL}
           RK_ENCRYPTION_KEY=${RK_ENCRYPTION_KEY}
@@ -93,14 +98,19 @@ workflows:
           TEST_USERNAME=${TEST_USERNAME:-your_test_user}
           TEST_PASSWORD=${TEST_PASSWORD:-your_password}
           EOF
-          sed -i '' 's/^[[:space:]]*//' .env 2>/dev/null || sed -i 's/^[[:space:]]*//' .env
+            sed -i '' 's/^[[:space:]]*//' .env 2>/dev/null || sed -i 's/^[[:space:]]*//' .env
+          fi
 
-          echo ".env ready for Appetize:"
-          grep -E '^(API_URL|IS_APPETIZE_BUILD|TEST_USERNAME)=' .env || true
+          echo ".env ready:"
+          grep -E '^(API_URL|FILE_DOWNLOAD_URL|IS_APPETIZE_BUILD)=' .env || true
 
       - name: Build iOS Simulator .app
         script: |
           set -euo pipefail
+
+          export ENVFILE=.env
+          # Debug simulator skips JS bundling by default; bundle is required without Metro (Appetize).
+          export FORCE_BUNDLING=1
 
           # mac_mini_m2 is Apple Silicon – build arm64 simulator only (x86_64 fmt pod often fails)
           xcodebuild \
@@ -231,6 +241,8 @@ workflows:
       - name: Build release .ipa
         script: |
           set -euo pipefail
+
+          export ENVFILE=.env
 
           xcode-project build-ipa \
             --workspace "${XCODE_WORKSPACE}" \

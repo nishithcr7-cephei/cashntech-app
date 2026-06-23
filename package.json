@@ -11,8 +11,9 @@
     }
   },
   "scripts": {
-    "android": "npx react-native run-android",
-    "ios": "npx react-native run-ios --scheme \"CashnTech SCF\"",
+    "env:copy": "node script/copy-env.js",
+    "android": "npm run env:copy && npx react-native run-android",
+    "ios": "npm run env:copy && npx react-native run-ios --scheme \"CashnTech SCF\"",
     "lint": "eslint .",
     "start": "npx react-native start",
     "test": "jest",

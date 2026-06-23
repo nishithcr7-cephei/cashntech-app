@@ -21,10 +21,14 @@ class AppDelegate: RCTAppDelegate {
   }
 
   override func bundleURL() -> URL? {
+    // Standalone simulator builds (CI / Appetize) ship main.jsbundle – don't use Metro.
+    if let bundled = Bundle.main.url(forResource: "main", withExtension: "jsbundle") {
+      return bundled
+    }
 #if DEBUG
-    RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
 #else
-    Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
   }
 }
