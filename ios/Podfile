@@ -21,10 +21,14 @@ end
 target 'CashNTech' do
   config = use_native_modules!
 
+  # Appetize arm64-simulator CI: disable New Architecture (avoids nil Fabric component crash)
+  new_arch = ENV['APPETIZE_BUILD'] != 'true'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
-    :app_path => "#{Pod::Config.instance.installation_root}/.."
+    :app_path => "#{Pod::Config.instance.installation_root}/..",
+    :new_arch_enabled => new_arch,
   )
 
   post_install do |installer|
@@ -69,6 +73,12 @@ target 'CashNTech' do
       aggregate_target.user_project.native_targets.each do |target|
         target.build_configurations.each do |build_config|
           build_config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'i386 x86_64'
+          if ENV['APPETIZE_BUILD'] == 'true'
+            build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+            unless build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'].to_s.include?('RCT_NEW_ARCH_ENABLED=0')
+              build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'RCT_NEW_ARCH_ENABLED=0'
+            end
+          end
         end
       end
       aggregate_target.user_project.save

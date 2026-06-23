@@ -54,13 +54,18 @@ definitions:
         yarn install --frozen-lockfile --production=false
 
     - &install_pods_appetize
-      name: Install CocoaPods (simulator – ML Kit excluded)
+      name: Install CocoaPods (simulator – ML Kit excluded, Old Architecture)
       script: |
         set -e
         export APPETIZE_BUILD=true
+        export RCT_NEW_ARCH_ENABLED=0
         cd ios
-        rm -rf Pods
+        rm -rf Pods Podfile.lock build
+        printf '%s\n' '{"newArchEnabled":"false"}' > Podfile.properties.json
+        echo "=== Podfile.properties.json ==="
+        cat Podfile.properties.json
         pod install
+        echo "=== Pod install done (APPETIZE_BUILD=true, New Arch off) ==="
 
     - &bundle_js_ios
       name: Bundle JavaScript for iOS (no Metro)
@@ -165,6 +170,7 @@ workflows:
             COMPILER_INDEX_STORE_ENABLE=NO \
             EXCLUDED_ARCHS[sdk=iphonesimulator*]=x86_64 \
             ENABLE_DEBUG_DYLIB=NO \
+            RCT_NEW_ARCH_ENABLED=NO \
             build 2>&1 | tee "${CM_BUILD_DIR}/xcodebuild.log" || {
               echo "=== xcodebuild failed ==="
               grep -E 'error:|undefined symbol|library not found|ld:|ENVFILE|API_URL' "${CM_BUILD_DIR}/xcodebuild.log" | tail -n 100 \
