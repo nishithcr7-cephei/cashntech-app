@@ -23,7 +23,7 @@ import {
 import Colors from '@constants/Colors';
 import fontWeight from '@constants/FontWeight';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
+import {KeyboardAwareScrollView} from '@components/index';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import Toast from 'react-native-toast-message';
 import {AuthScreens} from '@constants/Screens';
@@ -332,7 +332,7 @@ export const ApplyView: React.FC = () => {
         </View>
       </View>
       
-      <KeyboardAvoidingScrollView style={{flexGrow: 1}}>
+      <KeyboardAwareScrollView style={{flexGrow: 1}}>
         <View style={styles.container}>
           {/* Instruction Text */}
           <Text style={styles.instructionText}>
@@ -520,7 +520,7 @@ export const ApplyView: React.FC = () => {
             />
           </View>
         </View>
-      </KeyboardAvoidingScrollView>
+      </KeyboardAwareScrollView>
 
       {/* Footer Buttons */}
       <View style={styles.footerContainer}>

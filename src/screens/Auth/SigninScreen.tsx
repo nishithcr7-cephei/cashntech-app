@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import {EyeClose, EyeOpen} from '@assets/Icons';
-import {Button, Container, Header, Input, TnCFooter} from '@components/index';
+import {Button, Container, Header, Input, KeyboardAwareScrollView, TnCFooter} from '@components/index';
 import {AuthScreens, Colors, Fonts, StorageKeys} from '@constants/index';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
@@ -10,7 +10,6 @@ import {handleEmailVerification} from '@utils/Utils';
 import Toast from 'react-native-toast-message';
 import {Feather} from '@react-native-vector-icons/feather';
 import {setStorage} from '@services/localStorage';
-import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
 import {useDispatch, useSelector} from 'react-redux';
 import {signinRequest} from '@store/auth/auth.slice';
 import {authSelector} from '@store/auth';
@@ -128,7 +127,7 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
 
   return (
     <Container>
-      <KeyboardAvoidingScrollView>
+      <KeyboardAwareScrollView>
         <Header
           title={Strings.welcomeBackTitle}
           subtitle={Strings.loginSubtitle}
@@ -194,7 +193,7 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
             </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingScrollView>
+      </KeyboardAwareScrollView>
       <View style={styles.versionInfoContainer}>
         <Text style={styles.versionInfoText}>{APP_VERSION_DISPLAY}</Text>
       </View>

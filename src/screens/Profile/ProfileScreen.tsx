@@ -1,5 +1,12 @@
 import React from 'react';
-import {View, Text, StyleSheet, ScrollView} from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
 import {useSelector} from 'react-redux';
 import {Container, AppBar} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
@@ -12,6 +19,7 @@ import type {HomeNavigatorType} from '@type/NavigatorTypes';
 import {useNavigation, type CompositeNavigationProp} from '@react-navigation/native';
 import type {DrawerNavigationProp} from '@react-navigation/drawer';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {logoutUser} from '@services/api/api';
 
 type ProfileNavigation = CompositeNavigationProp<
   DrawerNavigationProp<HomeNavigatorType, 'Profile'>,
@@ -31,6 +39,21 @@ export const ProfileScreen: React.FC = () => {
   const emailToShow = userInfo?.email || '-';
   const entityName = userInfo?.entity_name || userInfo?.partner_name || 'Ambica Medical Corporation';
   const workflowName = 'Dealer Finance > Push > Dealer-workflow';
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to delete account?',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Yes',
+          style: 'destructive',
+          onPress: () => logoutUser(),
+        },
+      ],
+    );
+  };
 
   return (
     <Container style={styles.container}>
@@ -111,6 +134,13 @@ export const ProfileScreen: React.FC = () => {
             </View>
           </View>
         </View>
+
+        <TouchableOpacity
+          style={styles.deleteAccountButton}
+          activeOpacity={0.8}
+          onPress={handleDeleteAccount}>
+          <Text style={styles.deleteAccountText}>Delete Account</Text>
+        </TouchableOpacity>
       </ScrollView>
     </Container>
   );
@@ -124,8 +154,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
+    flexGrow: 1,
     paddingHorizontal: scaleWidth(16),
     paddingVertical: scaleHeight(20),
+    paddingBottom: scaleHeight(32),
   },
   headerSection: {
     flexDirection: 'row',
@@ -206,6 +238,19 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
+  },
+  deleteAccountButton: {
+    marginTop: scaleHeight(32),
+    backgroundColor: Colors.red,
+    borderRadius: scaleWidth(12),
+    paddingVertical: scaleHeight(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteAccountText: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.white,
   },
 });
 

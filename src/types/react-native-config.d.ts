@@ -3,6 +3,7 @@ declare module 'react-native-config' {
     API_URL: string;
     RK_ENCRYPTION_KEY: string;
     RK_ENCRYPTION_IV: string;
+    IS_APPETIZE_BUILD?: string;
   }
 
   export const Config: NativeConfig;

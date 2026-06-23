@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import {Button, Container, Header, Input, TnCFooter} from '@components/index';
+import {Button, Container, Header, Input, KeyboardAwareScrollView, TnCFooter} from '@components/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {AuthScreens, Colors, Fonts} from '@constants/index';
 import CountryPicker, {Country} from 'react-native-country-picker-modal';
@@ -16,7 +16,6 @@ import {useDispatch, useSelector} from 'react-redux';
 import {signupRequest} from '@store/auth/auth.slice';
 import {authSelector} from '@store/auth';
 import {setStorage} from '@services/localStorage';
-import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
 import {APP_VERSION_DISPLAY} from '@constants/AppMeta';
 
 const Strings = {
@@ -135,7 +134,7 @@ export const SignupScreen: React.FC<Props> = ({
 
   return (
     <Container>
-      <KeyboardAvoidingScrollView>
+      <KeyboardAwareScrollView>
         <View style={styles.flex1}>
           <Header title={Strings.welcomeTitle} subtitle={Strings.subtitle} />
           <View style={styles.inputContainer}>
@@ -214,7 +213,7 @@ export const SignupScreen: React.FC<Props> = ({
             </View>
           </View>
         </View>
-      </KeyboardAvoidingScrollView>
+      </KeyboardAwareScrollView>
       <View style={styles.versionInfoContainer}>
         <Text style={styles.versionInfoText}>{APP_VERSION_DISPLAY}</Text>
       </View>

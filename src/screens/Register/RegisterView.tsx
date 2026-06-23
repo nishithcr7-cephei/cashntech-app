@@ -25,7 +25,7 @@ import {
 import Colors from '@constants/Colors';
 import fontWeight from '@constants/FontWeight';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
+import {KeyboardAwareScrollView} from '@components/index';
 import Cities from '@constants/Cities';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {SectorType} from '@type/common.types';
@@ -290,7 +290,7 @@ export const RegisterView: React.FC = () => {
           <Text style={styles.subheader}>Company Registration</Text>
         </View>
       </View>
-      <KeyboardAvoidingScrollView style={{flexGrow: 1}}>
+      <KeyboardAwareScrollView style={{flexGrow: 1}}>
         <View style={styles.inputContainer}>
           {/* Select Sector */}
           <CustomDropdown
@@ -575,7 +575,7 @@ export const RegisterView: React.FC = () => {
             />
           </View>
         </View>
-      </KeyboardAvoidingScrollView>
+      </KeyboardAwareScrollView>
 
       {/* Footer Buttons */}
       <View style={styles.footerContainer}>
