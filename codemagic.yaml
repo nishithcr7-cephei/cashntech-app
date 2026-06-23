@@ -1,17 +1,11 @@
 # =============================================================================
-# CashnTech SCF – React Native iOS CI/CD (Codemagic)
+# CashnTech – iOS CI/CD (Codemagic)
 # =============================================================================
-# Required Codemagic environment groups (configure in dashboard UI):
-#   • IOS_Credentials  – CM_CERTIFICATE, CM_CERTIFICATE_PASSWORD,
-#                        CM_PROVISIONING_PROFILE, APP_STORE_CONNECT_KEY_IDENTIFIER,
-#                        APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_PRIVATE_KEY
-#   • Dev Group        – optional override for API_URL, FILE_DOWNLOAD_URL, etc.
-#                        (defaults are set in ios_env vars below)
+# IMPORTANT: Codemagic dashboard → use "codemagic.yaml" as config source.
+# Do NOT use the old UI workflow (CashNTech.xcworkspace / scheme CashNTech).
+# Correct paths: ios/CashnTech SCF.xcworkspace + scheme "CashnTech SCF"
 #
-# Additional secrets (Codemagic dashboard or workflow env):
-#   • TEST_USERNAME    – Simulator auto-login username (optional)
-#   • TEST_PASSWORD    – Simulator auto-login password (optional)
-#
+# All API/env values are below – DevGroup is NOT required for simulator build.
 # =============================================================================
 
 definitions:
@@ -20,30 +14,53 @@ definitions:
     xcode: 16.2
     cocoapods: default
     vars:
+      API_URL: https://losapidev.cashntech.com
+      FILE_DOWNLOAD_URL: https://d2wayd1he5a7q1.cloudfront.net
+      RK_ENCRYPTION_KEY: "u/Gu5posvwDsXUnV5Zaq4g=="
+      RK_ENCRYPTION_IV: "5D9r9ZVzEYYgha93/aUK2w=="
       BUNDLE_ID: com.lms.cashntech
       XCODE_WORKSPACE: "ios/CashnTech SCF.xcworkspace"
       XCODE_SCHEME: "CashnTech SCF"
       XCODE_PROJECT: "ios/CashNTech.xcodeproj"
       DERIVED_DATA_PATH: $CM_BUILD_DIR/ios_derived
-      API_URL: https://losapidev.cashntech.com
-      FILE_DOWNLOAD_URL: https://d2wayd1he5a7q1.cloudfront.net
-      RK_ENCRYPTION_KEY: "u/Gu5posvwDsXUnV5Zaq4g=="
-      RK_ENCRYPTION_IV: "5D9r9ZVzEYYgha93/aUK2w=="
+      APPETIZE_ZIP_NAME: CashNTech-appetize-simulator
 
   rn_cache: &rn_cache
     cache_paths:
       - $HOME/.npm
       - $HOME/Library/Caches/Yarn
       - $CM_BUILD_DIR/node_modules
-      - $CM_BUILD_DIR/ios/Pods
 
   scripts:
+    - &write_env_file
+      name: Write .env for react-native-config
+      script: |
+        set -euo pipefail
+        cat > .env <<EOF
+        API_URL=${API_URL}
+        FILE_DOWNLOAD_URL=${FILE_DOWNLOAD_URL}
+        RK_ENCRYPTION_KEY=${RK_ENCRYPTION_KEY}
+        RK_ENCRYPTION_IV=${RK_ENCRYPTION_IV}
+        IS_APPETIZE_BUILD=true
+        EOF
+        sed -i '' 's/^[[:space:]]*//' .env 2>/dev/null || sed -i 's/^[[:space:]]*//' .env
+        echo "=== .env written ==="
+        cat .env
+
     - &install_js_dependencies
       name: Install JavaScript dependencies
       script: |
         set -e
-        # Install devDependencies too (required for @react-native-community/cli-platform-ios autolinking)
         yarn install --frozen-lockfile --production=false
+
+    - &install_pods_appetize
+      name: Install CocoaPods (simulator – ML Kit excluded)
+      script: |
+        set -e
+        export APPETIZE_BUILD=true
+        cd ios
+        rm -rf Pods
+        pod install
 
     - &install_pods
       name: Install CocoaPods dependencies
@@ -54,10 +71,10 @@ definitions:
 
 workflows:
   # ===========================================================================
-  # Workflow 1: Simulator .app build (Debug / iphonesimulator) – manual Appetize upload
+  # Simulator .app → download zip → manual Appetize upload
   # ===========================================================================
-  ios-appetize-testing:
-    name: iOS Simulator Build
+  ios-simulator-appetize:
+    name: CashnTech iOS Simulator (Appetize)
     max_build_duration: 90
     instance_type: mac_mini_m2
 
@@ -69,50 +86,22 @@ workflows:
 
     scripts:
       - *install_js_dependencies
-
-      # ML Kit has no arm64-simulator binaries – exclude before pod install (see react-native.config.js)
-      - name: Install CocoaPods dependencies (Appetize simulator)
-        script: |
-          set -e
-          export APPETIZE_BUILD=true
-          cd ios
-          rm -rf Pods
-          pod install
-
-      # react-native-config reads .env at Xcode build time (iOS does not use .env.prod by default)
-      - name: Prepare .env for simulator build
-        script: |
-          set -euo pipefail
-
-          if [ -f ".env.prod" ]; then
-            echo "Using .env.prod → .env"
-            cp .env.prod .env
-          else
-            echo "Generating .env from codemagic.yaml vars"
-            cat > .env <<EOF
-          API_URL=${API_URL}
-          FILE_DOWNLOAD_URL=${FILE_DOWNLOAD_URL}
-          RK_ENCRYPTION_KEY=${RK_ENCRYPTION_KEY}
-          RK_ENCRYPTION_IV=${RK_ENCRYPTION_IV}
-          IS_APPETIZE_BUILD=true
-          TEST_USERNAME=${TEST_USERNAME:-your_test_user}
-          TEST_PASSWORD=${TEST_PASSWORD:-your_password}
-          EOF
-            sed -i '' 's/^[[:space:]]*//' .env 2>/dev/null || sed -i 's/^[[:space:]]*//' .env
-          fi
-
-          echo ".env ready:"
-          grep -E '^(API_URL|FILE_DOWNLOAD_URL|IS_APPETIZE_BUILD)=' .env || true
+      - *write_env_file
+      - *install_pods_appetize
 
       - name: Build iOS Simulator .app
         script: |
           set -euo pipefail
 
-          export ENVFILE=.env
-          # Debug simulator skips JS bundling by default; bundle is required without Metro (Appetize).
+          export ENVFILE="$CM_BUILD_DIR/.env"
+          cp .env "$ENVFILE"
+          # Without Metro on Appetize – must embed JS bundle + read .env at build time
           export FORCE_BUNDLING=1
+          export SKIP_BUNDLING=0
 
-          # mac_mini_m2 is Apple Silicon – build arm64 simulator only (x86_64 fmt pod often fails)
+          echo "ENVFILE=$ENVFILE"
+          echo "FORCE_BUNDLING=$FORCE_BUNDLING"
+
           xcodebuild \
             -workspace "${XCODE_WORKSPACE}" \
             -scheme "${XCODE_SCHEME}" \
@@ -128,35 +117,42 @@ workflows:
             EXCLUDED_ARCHS[sdk=iphonesimulator*]=x86_64 \
             ENABLE_DEBUG_DYLIB=NO \
             build 2>&1 | tee "${CM_BUILD_DIR}/xcodebuild.log" || {
-              echo "=== xcodebuild failed – last 80 lines of linker output ==="
-              grep -E 'error:|undefined symbol|library not found|ld:' "${CM_BUILD_DIR}/xcodebuild.log" | tail -n 80 || tail -n 80 "${CM_BUILD_DIR}/xcodebuild.log"
+              echo "=== xcodebuild failed ==="
+              grep -E 'error:|undefined symbol|library not found|ld:|ENVFILE|API_URL' "${CM_BUILD_DIR}/xcodebuild.log" | tail -n 100 \
+                || tail -n 100 "${CM_BUILD_DIR}/xcodebuild.log"
               exit 1
             }
+
+          # Verify bundle + env were baked in
+          APP_PATH="$(find "${DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name '*.app' -type d | head -n 1)"
+          if [ -z "${APP_PATH}" ]; then
+            echo "ERROR: No .app in derived data"
+            exit 1
+          fi
+          if [ ! -f "${APP_PATH}/main.jsbundle" ]; then
+            echo "ERROR: main.jsbundle missing – app will try localhost:8081 (Metro). Check FORCE_BUNDLING."
+            exit 1
+          fi
+          echo "OK: main.jsbundle present in ${APP_PATH}"
 
       - name: Package simulator .app as zip
         script: |
           set -euo pipefail
-
           APP_PATH="$(find "${DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator" -maxdepth 1 -name '*.app' -type d | head -n 1)"
-          if [ -z "${APP_PATH}" ]; then
-            echo "ERROR: No .app found in ${DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator"
-            exit 1
-          fi
-
           APP_DIR="$(dirname "${APP_PATH}")"
           APP_NAME="$(basename "${APP_PATH}")"
-          ZIP_PATH="${CM_BUILD_DIR}/simulator-app.zip"
-
+          ZIP_PATH="${CM_BUILD_DIR}/${APPETIZE_ZIP_NAME}.zip"
           (cd "${APP_DIR}" && zip -r -q "${ZIP_PATH}" "${APP_NAME}")
-          echo "Packaged ${APP_NAME} → ${ZIP_PATH} (upload to Appetize manually)"
+          echo "Download: ${ZIP_PATH}"
 
     artifacts:
-      - $CM_BUILD_DIR/simulator-app.zip
+      - $CM_BUILD_DIR/${APPETIZE_ZIP_NAME}.zip
+      - $CM_BUILD_DIR/.env
       - $CM_BUILD_DIR/xcodebuild.log
       - $DERIVED_DATA_PATH/Build/Products/Debug-iphonesimulator/**/*.app
 
   # ===========================================================================
-  # Workflow 2: Release .ipa → TestFlight (Release / iphoneos)
+  # Release .ipa → TestFlight
   # ===========================================================================
   ios-testflight-distribution:
     name: iOS TestFlight Distribution
@@ -170,53 +166,25 @@ workflows:
 
     cache:
       <<: *rn_cache
+      cache_paths:
+        - $HOME/.npm
+        - $HOME/Library/Caches/Yarn
+        - $CM_BUILD_DIR/node_modules
+        - $CM_BUILD_DIR/ios/Pods
 
     scripts:
       - *install_js_dependencies
+      - *write_env_file
       - *install_pods
 
-      # Copy .env.prod → .env so react-native-config picks up production values
-      - name: Prepare production .env from .env.prod
-        script: |
-          set -euo pipefail
-
-          if [ -f ".env.prod" ]; then
-            echo "Copying .env.prod → .env"
-            cp .env.prod .env
-          else
-            echo "Creating .env from codemagic.yaml vars"
-            : > .env
-          fi
-
-          upsert_env() {
-            local key="$1" value="$2"
-            if grep -q "^${key}=" .env 2>/dev/null; then
-              sed -i '' "s|^${key}=.*|${key}=${value}|" .env 2>/dev/null \
-                || sed -i "s|^${key}=.*|${key}=${value}|" .env
-            else
-              echo "${key}=${value}" >> .env
-            fi
-          }
-
-          upsert_env API_URL "${API_URL}"
-          upsert_env FILE_DOWNLOAD_URL "${FILE_DOWNLOAD_URL}"
-          upsert_env RK_ENCRYPTION_KEY "${RK_ENCRYPTION_KEY}"
-          upsert_env RK_ENCRYPTION_IV "${RK_ENCRYPTION_IV}"
-
-          echo "Production .env ready:"
-          grep -E '^(API_URL|FILE_DOWNLOAD_URL)=' .env || true
-
-      # Decode IOS_Credentials and bind profile to com.lms.cashntech
       - name: Set up iOS code signing
         script: |
           set -euo pipefail
-
           : "${CM_CERTIFICATE:?CM_CERTIFICATE missing in IOS_Credentials}"
           : "${CM_CERTIFICATE_PASSWORD:?CM_CERTIFICATE_PASSWORD missing in IOS_Credentials}"
           : "${CM_PROVISIONING_PROFILE:?CM_PROVISIONING_PROFILE missing in IOS_Credentials}"
 
           keychain initialize
-
           echo "${CM_CERTIFICATE}" | base64 --decode > "${CM_BUILD_DIR}/distribution.p12"
           echo "${CM_PROVISIONING_PROFILE}" | base64 --decode > "${CM_BUILD_DIR}/profile.mobileprovision"
 
@@ -236,14 +204,11 @@ workflows:
             --project "${XCODE_PROJECT}" \
             --profile "${HOME}/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
 
-          echo "Signing ready for bundle ID ${BUNDLE_ID}"
-
       - name: Build release .ipa
         script: |
           set -euo pipefail
-
-          export ENVFILE=.env
-
+          export ENVFILE="$CM_BUILD_DIR/.env"
+          cp .env "$ENVFILE"
           xcode-project build-ipa \
             --workspace "${XCODE_WORKSPACE}" \
             --scheme "${XCODE_SCHEME}" \
