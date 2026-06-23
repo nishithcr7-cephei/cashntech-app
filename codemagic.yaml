@@ -67,10 +67,14 @@ definitions:
       script: |
         set -euo pipefail
 
+        # Match native Appetize build (New Architecture off)
+        export APPETIZE_BUILD=true
+        export RCT_NEW_ARCH_ENABLED=0
+
         JS_BUNDLE_DIR="${CM_BUILD_DIR}/jsbundle"
         mkdir -p "${JS_BUNDLE_DIR}/assets"
 
-        echo "=== react-native bundle ==="
+        echo "=== react-native bundle (RCT_NEW_ARCH_ENABLED=0) ==="
         npx react-native bundle \
           --platform ios \
           --dev false \
@@ -131,15 +135,21 @@ workflows:
           cat > ios/.xcode.env.local <<EOF
           export ENVFILE=${ENV_PATH}
           export SKIP_BUNDLING=1
+          export RCT_NEW_ARCH_ENABLED=0
+          export APPETIZE_BUILD=true
           EOF
           sed -i '' 's/^[[:space:]]*//' ios/.xcode.env.local 2>/dev/null \
             || sed -i 's/^[[:space:]]*//' ios/.xcode.env.local
 
           export ENVFILE="${ENV_PATH}"
           export SKIP_BUNDLING=1
+          export RCT_NEW_ARCH_ENABLED=0
+          export APPETIZE_BUILD=true
 
           echo "ENVFILE=${ENVFILE}"
           cat ios/.xcode.env.local
+
+          rm -rf "${DERIVED_DATA_PATH}"
 
           xcodebuild \
             -workspace "${XCODE_WORKSPACE}" \
