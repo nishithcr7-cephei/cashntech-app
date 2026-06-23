@@ -93,9 +93,8 @@ workflows:
         script: |
           set -euo pipefail
 
-          export ENVFILE="$CM_BUILD_DIR/.env"
-          cp .env "$ENVFILE"
-          # Without Metro on Appetize – must embed JS bundle + read .env at build time
+          export ENVFILE="${CM_BUILD_DIR}/.env"
+          # .env already written in project root (same as CM_BUILD_DIR) – no cp needed
           export FORCE_BUNDLING=1
           export SKIP_BUNDLING=0
 
@@ -207,8 +206,7 @@ workflows:
       - name: Build release .ipa
         script: |
           set -euo pipefail
-          export ENVFILE="$CM_BUILD_DIR/.env"
-          cp .env "$ENVFILE"
+          export ENVFILE="${CM_BUILD_DIR}/.env"
           xcode-project build-ipa \
             --workspace "${XCODE_WORKSPACE}" \
             --scheme "${XCODE_SCHEME}" \
