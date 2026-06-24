@@ -5,10 +5,17 @@
 # Do NOT use the old UI workflow (CashNTech.xcworkspace / scheme CashNTech).
 # Correct paths: ios/CashnTech SCF.xcworkspace + scheme "CashnTech SCF"
 #
-# Release build: iPhone only (TARGETED_DEVICE_FAMILY=1), portrait only – see Info.plist.
-# Run workflow: ios-testflight-distribution
+# Codemagic dashboard groups (your setup):
+#   Dev Group → API_URL, FILE_DOWNLOAD_URL, RK_ENCRYPTION_KEY, RK_ENCRYPTION_IV
+#   IOS_Credentials → App Store Connect publish + (legacy CM_* vars optional)
 #
-# All API/env values are below – DevGroup is NOT required.
+# Release / TestFlight signing uses ios_signing (NOT CM_CERTIFICATE env vars):
+#   1. Team settings → Code signing identities → upload:
+#        - iOS Distribution certificate (.p12)
+#        - App Store provisioning profile for com.lms.cashntech
+#   2. IOS_Credentials → APP_STORE_CONNECT_ISSUER_ID, KEY_IDENTIFIER, PRIVATE_KEY
+#   CM_CERTIFICATE / CM_PROVISIONING_PROFILE / CM_CERTIFICATE_PASSWORD in
+#   IOS_Credentials are ignored by this yaml (safe to leave or remove).
 # =============================================================================
 
 definitions:
@@ -16,7 +23,10 @@ definitions:
     node: 20
     xcode: 16.2
     cocoapods: default
+    groups:
+      - Dev Group
     vars:
+      # API/env from Dev Group; fallbacks only if group var missing:
       API_URL: https://losapidev.cashntech.com
       FILE_DOWNLOAD_URL: https://d2wayd1he5a7q1.cloudfront.net
       RK_ENCRYPTION_KEY: "u/Gu5posvwDsXUnV5Zaq4g=="
@@ -264,7 +274,11 @@ workflows:
     environment:
       <<: *ios_env
       groups:
+        - Dev Group
         - IOS_Credentials
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.lms.cashntech
 
     cache:
       <<: *rn_cache
@@ -280,32 +294,11 @@ workflows:
       - *verify_iphone_portrait
       - *install_pods
 
-      - name: Set up iOS code signing
+      - name: Set up code signing (from Codemagic Code signing identities)
         script: |
           set -euo pipefail
-          : "${CM_CERTIFICATE:?CM_CERTIFICATE missing in IOS_Credentials}"
-          : "${CM_CERTIFICATE_PASSWORD:?CM_CERTIFICATE_PASSWORD missing in IOS_Credentials}"
-          : "${CM_PROVISIONING_PROFILE:?CM_PROVISIONING_PROFILE missing in IOS_Credentials}"
-
-          keychain initialize
-          echo "${CM_CERTIFICATE}" | base64 --decode > "${CM_BUILD_DIR}/distribution.p12"
-          echo "${CM_PROVISIONING_PROFILE}" | base64 --decode > "${CM_BUILD_DIR}/profile.mobileprovision"
-
-          keychain add-certificates \
-            --certificate "${CM_BUILD_DIR}/distribution.p12" \
-            --certificate-password "${CM_CERTIFICATE_PASSWORD}"
-
-          mkdir -p "${HOME}/Library/MobileDevice/Provisioning Profiles"
-          PROFILE_UUID="$(
-            grep -aA1 UUID "${CM_BUILD_DIR}/profile.mobileprovision" \
-              | grep -io '[-A-F0-9]\{36\}' | head -n 1
-          )"
-          cp "${CM_BUILD_DIR}/profile.mobileprovision" \
-            "${HOME}/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
-
-          xcode-project use-profiles \
-            --project "${XCODE_PROJECT}" \
-            --profile "${HOME}/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+          echo "Using ios_signing: app_store + ${BUNDLE_ID}"
+          xcode-project use-profiles
 
       - name: Build release .ipa (iPhone device, portrait only)
         script: |
