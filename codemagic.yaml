@@ -19,7 +19,7 @@
 definitions:
   ios_env: &ios_env
     node: 20
-    xcode: 16.2
+    xcode: latest
     cocoapods: default
     groups:
       - Dev Group
