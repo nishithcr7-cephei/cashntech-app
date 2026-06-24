@@ -7,15 +7,13 @@
 #
 # Codemagic dashboard groups (your setup):
 #   Dev Group → API_URL, FILE_DOWNLOAD_URL, RK_ENCRYPTION_KEY, RK_ENCRYPTION_IV
-#   IOS_Credentials → App Store Connect publish + (legacy CM_* vars optional)
+#   IOS_Credentials → APP_STORE_CONNECT_* + CM_CERTIFICATE_* + CM_PROVISIONING_PROFILE
 #
-# Release / TestFlight signing uses ios_signing (NOT CM_CERTIFICATE env vars):
-#   1. Team settings → Code signing identities → upload:
-#        - iOS Distribution certificate (.p12)
-#        - App Store provisioning profile for com.lms.cashntech
-#   2. IOS_Credentials → APP_STORE_CONNECT_ISSUER_ID, KEY_IDENTIFIER, PRIVATE_KEY
-#   CM_CERTIFICATE / CM_PROVISIONING_PROFILE / CM_CERTIFICATE_PASSWORD in
-#   IOS_Credentials are ignored by this yaml (safe to leave or remove).
+# Release / TestFlight signing uses dashboard variables:
+#   - CM_CERTIFICATE               → base64 .p12 distribution certificate
+#   - CM_CERTIFICATE_PASSWORD      → .p12 password
+#   - CM_PROVISIONING_PROFILE      → base64 App Store .mobileprovision
+#   - APP_STORE_CONNECT_*          → TestFlight publish credentials
 # =============================================================================
 
 definitions:
@@ -276,9 +274,6 @@ workflows:
       groups:
         - Dev Group
         - IOS_Credentials
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.lms.cashntech
 
     cache:
       <<: *rn_cache
@@ -294,11 +289,53 @@ workflows:
       - *verify_iphone_portrait
       - *install_pods
 
-      - name: Set up code signing (from Codemagic Code signing identities)
+      - name: Set up code signing from dashboard variables
         script: |
           set -euo pipefail
-          echo "Using ios_signing: app_store + ${BUNDLE_ID}"
-          xcode-project use-profiles
+          keychain initialize
+
+          : "${CM_CERTIFICATE:?Missing CM_CERTIFICATE}"
+          : "${CM_CERTIFICATE_PASSWORD:?Missing CM_CERTIFICATE_PASSWORD}"
+          : "${CM_PROVISIONING_PROFILE:?Missing CM_PROVISIONING_PROFILE}"
+
+          echo "$CM_CERTIFICATE" | base64 --decode > /tmp/certificate.p12
+          echo "$CM_PROVISIONING_PROFILE" | base64 --decode > /tmp/profile.mobileprovision
+
+          if [ ! -s /tmp/certificate.p12 ]; then
+            echo "Decoded /tmp/certificate.p12 is empty."
+            exit 1
+          fi
+
+          if [ ! -s /tmp/profile.mobileprovision ]; then
+            echo "Decoded /tmp/profile.mobileprovision is empty."
+            exit 1
+          fi
+
+          openssl pkcs12 -in /tmp/certificate.p12 -nokeys -passin pass:"$CM_CERTIFICATE_PASSWORD" >/dev/null || {
+            echo "Unable to open p12 with CM_CERTIFICATE_PASSWORD. Check certificate content/password."
+            exit 1
+          }
+
+          security cms -D -i /tmp/profile.mobileprovision >/tmp/profile.plist || {
+            echo "Unable to decode provisioning profile. Check CM_PROVISIONING_PROFILE content."
+            exit 1
+          }
+
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/profile.plist)
+          PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/profile.plist || true)
+          echo "Installed provisioning profile UUID: $PROFILE_UUID"
+          echo "Provisioning profile app identifier: $PROFILE_APP_ID"
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp /tmp/profile.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          keychain add-certificates \
+            --certificate /tmp/certificate.p12 \
+            --certificate-password "$CM_CERTIFICATE_PASSWORD"
+
+          xcode-project use-profiles \
+            --project "${XCODE_PROJECT}" \
+            --profile /tmp/profile.mobileprovision
 
       - name: Build release .ipa (iPhone device, portrait only)
         script: |
