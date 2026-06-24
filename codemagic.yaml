@@ -5,7 +5,10 @@
 # Do NOT use the old UI workflow (CashNTech.xcworkspace / scheme CashNTech).
 # Correct paths: ios/CashnTech SCF.xcworkspace + scheme "CashnTech SCF"
 #
-# All API/env values are below – DevGroup is NOT required for simulator build.
+# Release build: iPhone only (TARGETED_DEVICE_FAMILY=1), portrait only – see Info.plist.
+# Run workflow: ios-testflight-distribution
+#
+# All API/env values are below – DevGroup is NOT required.
 # =============================================================================
 
 definitions:
@@ -24,6 +27,8 @@ definitions:
       XCODE_PROJECT: "ios/CashNTech.xcodeproj"
       DERIVED_DATA_PATH: $CM_BUILD_DIR/ios_derived
       APPETIZE_ZIP_NAME: CashNTech-appetize-simulator
+      # iPhone only – do not build for iPad (TARGETED_DEVICE_FAMILY=1 in Xcode project)
+      TARGETED_DEVICE_FAMILY: "1"
 
   rn_cache: &rn_cache
     cache_paths:
@@ -32,8 +37,8 @@ definitions:
       - $CM_BUILD_DIR/node_modules
 
   scripts:
-    - &write_env_file
-      name: Write .env for react-native-config
+    - &write_env_appetize
+      name: Write .env for Appetize simulator build
       script: |
         set -euo pipefail
         cat > .env <<EOF
@@ -44,8 +49,42 @@ definitions:
         IS_APPETIZE_BUILD=true
         EOF
         sed -i '' 's/^[[:space:]]*//' .env 2>/dev/null || sed -i 's/^[[:space:]]*//' .env
-        echo "=== .env written ==="
+        echo "=== .env (Appetize) ==="
         cat .env
+
+    - &write_env_release
+      name: Write production .env for release build
+      script: |
+        set -euo pipefail
+        cat > .env <<EOF
+        API_URL=${API_URL}
+        FILE_DOWNLOAD_URL=${FILE_DOWNLOAD_URL}
+        RK_ENCRYPTION_KEY=${RK_ENCRYPTION_KEY}
+        RK_ENCRYPTION_IV=${RK_ENCRYPTION_IV}
+        EOF
+        sed -i '' 's/^[[:space:]]*//' .env 2>/dev/null || sed -i 's/^[[:space:]]*//' .env
+        echo "=== .env (Release / iPhone) ==="
+        cat .env
+
+    - &verify_iphone_portrait
+      name: Verify iPhone-only portrait configuration
+      script: |
+        set -euo pipefail
+        echo "=== Info.plist orientations ==="
+        /usr/libexec/PlistBuddy -c "Print :UISupportedInterfaceOrientations" ios/CashNTech/Info.plist
+        if /usr/libexec/PlistBuddy -c "Print :UISupportedInterfaceOrientations~ipad" ios/CashNTech/Info.plist 2>/dev/null; then
+          echo "ERROR: iPad orientations must not be defined (iPhone-only app)"
+          exit 1
+        fi
+        if grep -q UIInterfaceOrientationLandscape ios/CashNTech/Info.plist; then
+          echo "ERROR: Landscape orientation found in Info.plist"
+          exit 1
+        fi
+        if ! grep -q 'TARGETED_DEVICE_FAMILY = 1' ios/CashNTech.xcodeproj/project.pbxproj; then
+          echo "ERROR: TARGETED_DEVICE_FAMILY must be 1 (iPhone only)"
+          exit 1
+        fi
+        echo "OK: iPhone-only, portrait-only verified"
 
     - &install_js_dependencies
       name: Install JavaScript dependencies
@@ -125,7 +164,8 @@ workflows:
 
     scripts:
       - *install_js_dependencies
-      - *write_env_file
+      - *write_env_appetize
+      - *verify_iphone_portrait
       - *install_pods_appetize
       - *bundle_js_ios
 
@@ -163,6 +203,7 @@ workflows:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "${DERIVED_DATA_PATH}" \
+            TARGETED_DEVICE_FAMILY="${TARGETED_DEVICE_FAMILY}" \
             ARCHS=arm64 \
             ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
@@ -235,7 +276,8 @@ workflows:
 
     scripts:
       - *install_js_dependencies
-      - *write_env_file
+      - *write_env_release
+      - *verify_iphone_portrait
       - *install_pods
 
       - name: Set up iOS code signing
@@ -265,10 +307,11 @@ workflows:
             --project "${XCODE_PROJECT}" \
             --profile "${HOME}/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
 
-      - name: Build release .ipa
+      - name: Build release .ipa (iPhone device, portrait only)
         script: |
           set -euo pipefail
           export ENVFILE="${CM_BUILD_DIR}/.env"
+          # iphoneos release – TARGETED_DEVICE_FAMILY=1 and portrait set in Xcode project
           xcode-project build-ipa \
             --workspace "${XCODE_WORKSPACE}" \
             --scheme "${XCODE_SCHEME}" \
