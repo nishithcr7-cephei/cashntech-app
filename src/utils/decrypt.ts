@@ -1,28 +1,28 @@
 import CryptoJS from 'crypto-js';
-import Config from 'react-native-config';
-import {Config as AppConfig} from '@config/index';
+import {
+  RK_ENCRYPTION_IV,
+  RK_ENCRYPTION_KEY,
+} from '@config/config';
 
-// Fallback when react-native-config native module is not linked or .env not loaded.
-// react-native-config is excluded from Android autolinking (react-native.config.js),
-// so Config.* values are undefined at JS runtime in bundled APKs.
+// Fallback when environment-backed config values are unavailable at runtime.
 // These must match backend .env values.
 const FALLBACK_KEY = 'u/Gu5posvwDsXUnV5Zaq4g==';
 const FALLBACK_IV = '5D9r9ZVzEYYgha93/aUK2w==';
 
+const hasAsciiControlChars = (value: string): boolean =>
+  Array.from(value).some(char => {
+    const code = char.charCodeAt(0);
+    return (code >= 0 && code <= 8) || (code >= 14 && code <= 31) || code === 127;
+  });
+
 function getEncryptionKeys(): {key: string; iv: string} {
-  const key =
-    Config?.RK_ENCRYPTION_KEY ||
-    AppConfig?.RK_ENCRYPTION_KEY ||
-    FALLBACK_KEY;
-  const iv =
-    Config?.RK_ENCRYPTION_IV ||
-    AppConfig?.RK_ENCRYPTION_IV ||
-    FALLBACK_IV;
-  
+  const key = RK_ENCRYPTION_KEY || FALLBACK_KEY;
+  const iv = RK_ENCRYPTION_IV || FALLBACK_IV;
+
   if (__DEV__ && (!key || !iv)) {
     console.warn('[crypto] RK_ENCRYPTION_KEY or RK_ENCRYPTION_IV is missing in .env! Using fallbacks for development.');
   }
-  
+
   return {key, iv};
 }
 
@@ -52,7 +52,9 @@ export function decryptValue(encryptedText: string): string {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       encryptedText,
     );
-  if (isUuidLike) return encryptedText;
+  if (isUuidLike) {
+    return encryptedText;
+  }
 
   const compact = encryptedText.replace(/\s+/g, '');
   // Heuristic: treat as encrypted only if it looks like base64 payload, not plain ids/text.
@@ -61,11 +63,15 @@ export function decryptValue(encryptedText: string): string {
     compact.length >= 16 &&
     compact.length % 4 === 0 &&
     /[+/=_]/.test(compact);
-  if (!isLikelyEncrypted) return encryptedText;
+  if (!isLikelyEncrypted) {
+    return encryptedText;
+  }
 
   try {
     const {key: keyStr, iv: ivStr} = getEncryptionKeys();
-    if (!keyStr || !ivStr) return encryptedText;
+    if (!keyStr || !ivStr) {
+      return encryptedText;
+    }
 
     const key = CryptoJS.enc.Base64.parse(keyStr);
     const iv = CryptoJS.enc.Base64.parse(ivStr);
@@ -94,7 +100,7 @@ export function decryptValue(encryptedText: string): string {
       result = decrypted.toString(CryptoJS.enc.Utf8);
     }
 
-    const hasControlChars = /[\x00-\x08\x0E-\x1F\x7F]/.test(result);
+    const hasControlChars = hasAsciiControlChars(result);
     const final =
       result && result.length > 0 && !hasControlChars ? result : encryptedText;
     return final;

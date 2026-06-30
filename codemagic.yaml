@@ -155,6 +155,21 @@ definitions:
         cd ios
         pod install
 
+    - &install_pods_release_hotfix
+      name: Install CocoaPods (release hotfix – Old Architecture)
+      script: |
+        set -euo pipefail
+        # Hotfix: align release pod graph/runtime mode with the stable Appetize path.
+        export APPETIZE_BUILD=true
+        export RCT_NEW_ARCH_ENABLED=0
+        cd ios
+        rm -rf Pods Podfile.lock build
+        printf '%s\n' '{"newArchEnabled":"false"}' > Podfile.properties.json
+        echo "=== Podfile.properties.json (release hotfix) ==="
+        cat Podfile.properties.json
+        pod install
+        echo "=== Pod install done (APPETIZE_BUILD=true, New Arch off) ==="
+
 workflows:
   # ===========================================================================
   # Simulator .app → download zip → manual Appetize upload
@@ -287,7 +302,7 @@ workflows:
       - *install_js_dependencies
       - *write_env_release
       - *verify_iphone_portrait
-      - *install_pods
+      - *install_pods_release_hotfix
 
       - name: Set up code signing from dashboard variables
         script: |
@@ -355,7 +370,17 @@ workflows:
       - name: Build release .ipa (iPhone device, portrait only)
         script: |
           set -euo pipefail
+          # Hotfix: force old architecture in release until iPad launch crash is resolved.
+          export APPETIZE_BUILD=true
+          export RCT_NEW_ARCH_ENABLED=0
           export ENVFILE="${CM_BUILD_DIR}/.env"
+          cat > ios/.xcode.env.local <<EOF
+          export ENVFILE=${CM_BUILD_DIR}/.env
+          export RCT_NEW_ARCH_ENABLED=0
+          export APPETIZE_BUILD=true
+          EOF
+          sed -i '' 's/^[[:space:]]*//' ios/.xcode.env.local 2>/dev/null \
+            || sed -i 's/^[[:space:]]*//' ios/.xcode.env.local
           # iphoneos release – TARGETED_DEVICE_FAMILY=1 and portrait set in Xcode project
           xcode-project build-ipa \
             --workspace "${XCODE_WORKSPACE}" \

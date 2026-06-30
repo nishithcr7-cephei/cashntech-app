@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ViewStyle,
 } from 'react-native';
-import Config from 'react-native-config';
+import {IS_APPETIZE_BUILD} from '@config/config';
 import {KeyboardAvoidingScrollView} from 'react-native-keyboard-avoiding-scroll-view';
 
 type KeyboardAwareScrollViewProps = {
@@ -15,8 +15,6 @@ type KeyboardAwareScrollViewProps = {
   style?: StyleProp<ViewStyle>;
   contentContainerStyle?: StyleProp<ViewStyle>;
 };
-
-const isAppetizeBuild = Config.IS_APPETIZE_BUILD === 'true';
 
 /**
  * Appetize / standalone simulator builds cannot use measureInWindow inside
@@ -27,7 +25,7 @@ export const KeyboardAwareScrollView: React.FC<KeyboardAwareScrollViewProps> = (
   style,
   contentContainerStyle,
 }) => {
-  if (isAppetizeBuild) {
+  if (IS_APPETIZE_BUILD) {
     return (
       <KeyboardAvoidingView
         style={[styles.flex, style]}
