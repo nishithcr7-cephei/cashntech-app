@@ -102,11 +102,10 @@ export const getCardMetrics = (
 
   const utilizedRateVal = kpis?.utilized_rate ? `${parseFloat(kpis.utilized_rate).toFixed(2)}%` : (finalTotalLimit > 0 ? formatPercentage((finalUtilizedAmount / finalTotalLimit) * 100) : '-');
   
-  // Always show these, default to '-' if not present or 0
-  const overdueAmountVal = (parseFloat(kpis?.overdue_amount ?? '0') > 0) ? formatCurrency(parseFloat(kpis!.overdue_amount)) : (sumOverdueAmount > 0 ? formatCurrency(sumOverdueAmount) : '-');
-  const principalOverdueVal = (parseFloat(kpis?.principal_overdue ?? '0') > 0) ? formatCurrency(parseFloat(kpis!.principal_overdue)) : (sumPrincipalOverdue > 0 ? formatCurrency(sumPrincipalOverdue) : '-');
-  const interestOverdueVal = (parseFloat(kpis?.interest_overdue ?? '0') > 0) ? formatCurrency(parseFloat(kpis!.interest_overdue)) : (sumInterestOverdue > 0 ? formatCurrency(sumInterestOverdue) : '-');
-  const penalOverdueVal = (parseFloat(kpis?.penal_overdue ?? '0') > 0) ? formatCurrency(parseFloat(kpis!.penal_overdue)) : (sumPenalOverdue > 0 ? formatCurrency(sumPenalOverdue) : '-');
+  const overdueAmountVal = formatCurrency(finalOverdueAmount);
+  const principalOverdueVal = formatCurrency(finalPrincipalOverdue);
+  const interestOverdueVal = formatCurrency(finalInterestOverdue);
+  const penalOverdueVal = formatCurrency(finalPenalOverdue);
   
   const dpdDaysVal = kpis?.dpd_days ? kpis.dpd_days : '-';
 

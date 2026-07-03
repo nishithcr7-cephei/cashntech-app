@@ -320,8 +320,10 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
         </View>
 
         {/* Buttons */}
-        <View style={styles.buttonContainer}>
-          <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.menuScroll}
+          contentContainerStyle={styles.menuScrollContent}>
             <View>
               {/* PRODUCTS Root Menu */}
               <TouchableOpacity
@@ -786,39 +788,38 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                 )}
               </View>
             ) : null}
-          </ScrollView>
-        </View>
-        {/* Bottom actions: Profile & Logout */}
-        <TouchableOpacity
-          onPress={() => {
-            navigation.closeDrawer();
-            navigation.navigate('Profile' as never);
-          }}>
-          <View
-            style={[
-              styles.bottomButton,
-              currentRoute === 'Profile' && styles.activeButton,
-            ]}>
-            <View style={styles.row}>
-              <Text
+
+            {/* Bottom actions: Profile & Logout */}
+            <TouchableOpacity
+              onPress={() => {
+                navigation.closeDrawer();
+                navigation.navigate('Profile' as never);
+              }}>
+              <View
                 style={[
-                  styles.buttonText,
-                  currentRoute === 'Profile' && styles.activeButtonText,
+                  styles.bottomButton,
+                  currentRoute === 'Profile' && styles.activeButton,
                 ]}>
-                Profile
-              </Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-        {/* Logout Button*/}
-        <TouchableOpacity onPress={handleLogout}>
-          <View style={styles.logOut}>
-            <View style={styles.row}>
-              <Logout height={scaleHeight(24)} width={scaleWidth(24)} />
-              <Text style={styles.buttonText}>Log Out</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+                <View style={styles.row}>
+                  <Text
+                    style={[
+                      styles.buttonText,
+                      currentRoute === 'Profile' && styles.activeButtonText,
+                    ]}>
+                    Profile
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout}>
+              <View style={styles.logOut}>
+                <View style={styles.row}>
+                  <Logout height={scaleHeight(24)} width={scaleWidth(24)} />
+                  <Text style={styles.buttonText}>Log Out</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+        </ScrollView>
       </View>
     </View>
   );
@@ -908,17 +909,21 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.primaryColor,
   },
-  buttonContainer: {
+  menuScroll: {
     flex: 1,
-    marginTop: scaleHeight(24),
+    marginTop: scaleHeight(12),
     marginHorizontal: scaleWidth(16),
+  },
+  menuScrollContent: {
+    paddingBottom: scaleHeight(16),
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: scaleWidth(8),
-    marginBottom: scaleHeight(12),
+    paddingVertical: scaleHeight(4),
+    paddingHorizontal: scaleWidth(8),
+    marginBottom: scaleHeight(2),
     borderRadius: scaleWidth(4),
   },
   activeButton: {
@@ -957,7 +962,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
   },
   reportingSection: {
-    marginTop: scaleHeight(8),
+    marginTop: scaleHeight(4),
   },
   reportingSubMenu: {
     marginLeft: scaleWidth(16),
@@ -967,13 +972,13 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(15),
   },
   logOut: {
-    marginHorizontal: scaleWidth(16),
-    marginBottom: scaleHeight(64),
+    marginBottom: scaleHeight(4),
   },
   bottomButton: {
-    marginHorizontal: scaleWidth(16),
-    marginBottom: scaleHeight(12),
-    padding: scaleWidth(8),
+    marginTop: scaleHeight(8),
+    marginBottom: scaleHeight(2),
+    paddingVertical: scaleHeight(4),
+    paddingHorizontal: scaleWidth(8),
     borderRadius: scaleWidth(4),
   },
 });
