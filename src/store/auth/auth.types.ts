@@ -88,6 +88,12 @@ export interface ILmsUser {
   role?: string;
   scope?: { program_ids?: string[] };
   final_user_permission?: unknown;
+  /** CWF additive claim — optional; full consumption is PR3. */
+  product_roles?: Array<{
+    product_id: string;
+    role: string;
+    level?: number | null;
+  }> | null;
 }
 
 export interface ILmsVerifyOtpData {
@@ -104,6 +110,17 @@ export interface ISigninOtpVerifySuccessResponse {
 export type SigninOtpVerifyPayloadWithCallback = PayloadWithCallback<
   ISigninOtpVerifyPayload,
   [ILmsUser],
+  [string]
+>;
+
+/** Result of post-login product context bootstrap (PR2). */
+export type ProductBootstrapResult = {
+  needsSelection: boolean;
+};
+
+export type BootstrapProductContextPayloadWithCallback = PayloadWithCallback<
+  null,
+  [ProductBootstrapResult],
   [string]
 >;
 

@@ -6,10 +6,12 @@ import {
 } from './programSelection.slice';
 import {fetchPermissionsRequest} from '@store/permissions';
 import {
+  extractResolvedProductsFromScope,
   userScopeApi,
   mapUserScopeToBanks,
 } from '@services/api/userScope.api';
 import {userSelector} from '@store/user';
+import {setAvailableProducts} from '@store/product/product.slice';
 
 function* fetchUserScopeSaga() {
   try {
@@ -20,6 +22,8 @@ function* fetchUserScopeSaga() {
     if (Array.isArray(data) && data.length > 0) {
       const banks = mapUserScopeToBanks(data);
       yield put(fetchUserScopeSuccess(banks));
+      // Keep product.availableProducts in sync when scope reloads (e.g. HomeNavigator)
+      yield put(setAvailableProducts(extractResolvedProductsFromScope(data)));
       yield put(fetchPermissionsRequest());
     } else {
       yield put(

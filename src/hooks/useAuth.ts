@@ -2,7 +2,8 @@ import StorageKeys from '@constants/StorageKeys';
 import {getStorage, setStorage} from '@services/localStorage';
 import {authActions, authSelector} from '@store/auth';
 import {userActions} from '@store/user';
-import {decodeJWT, isTokenExpired} from '@utils/Utils';
+import {hydrateProductRequest} from '@store/product/product.slice';
+import {isTokenExpired} from '@utils/Utils';
 import {useEffect, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 
@@ -13,18 +14,18 @@ export function useAuth() {
   const dispatch = useDispatch();
 
   useEffect(() => {
-    const storedLoginStatus = getStorage(StorageKeys.IS_LOGGED_IN, true);
     const storedToken = getStorage(StorageKeys.TOKEN);
     const rememberMe = getStorage(StorageKeys.REMEMBER_ME, true);
-    
-    if(!rememberMe){
+
+    if (!rememberMe) {
       setStorage(StorageKeys.TOKEN, null);
       setStorage(StorageKeys.IS_LOGGED_IN, false);
       return;
     }
-    
+
     // Check if token exists and is not expired
     if (storedToken && !isTokenExpired(storedToken)) {
+      dispatch(hydrateProductRequest());
       dispatch(userActions.loadInfoFromToken(storedToken));
       dispatch(authActions.setIsLoggedIn(true));
     } else if (storedToken && isTokenExpired(storedToken)) {

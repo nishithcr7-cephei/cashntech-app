@@ -18,6 +18,10 @@ export type AuthNavigatorType = {
     firstName: string;
     lastName: string;
   };
+  ProductSelectionScreen: {
+    firstName?: string;
+    lastName?: string;
+  };
   OcrInvoice: undefined;
   SelectUserTypeScreen: undefined;
   SelectProgramScreen: {fromScreen?: string} | undefined;

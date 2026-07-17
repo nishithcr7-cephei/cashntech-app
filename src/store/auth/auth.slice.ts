@@ -8,6 +8,7 @@ import {
   ResetLinkPayloadWithCallback,
   SigninPayloadWithCallback,
   SigninOtpVerifyPayloadWithCallback,
+  BootstrapProductContextPayloadWithCallback,
 } from './auth.types';
 
 const initialState: IAuthState = {
@@ -81,6 +82,16 @@ const authSlice = createSlice({
     ) => {
       state.globalLoader = true;
     },
+    /**
+     * Resolve available products from /user/scope and set/persist active product.
+     * Does not toggle isLoggedIn — SuccessScreen / ProductSelectionScreen do that.
+     */
+    bootstrapProductContextRequest: (
+      state,
+      _action: PayloadAction<BootstrapProductContextPayloadWithCallback>,
+    ) => {
+      state.globalLoader = true;
+    },
     // Reset Auth State
     resetAuthState: (state) => {
       state.isLoggedIn = false;
@@ -101,6 +112,7 @@ export const {
   sendResetLinkRequest,
   resetPassword,
   signinRequest,
+  bootstrapProductContextRequest,
   resetAuthState,
 } = authSlice.actions;
 export default authSlice.reducer;

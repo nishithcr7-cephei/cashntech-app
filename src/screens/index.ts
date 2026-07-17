@@ -4,6 +4,7 @@ export * from './Auth/PasswordScreen';
 export * from './Auth/SigninScreen';
 export * from './Auth/SignupScreen';
 export * from './Auth/SuccessScreen';
+export * from './Auth/ProductSelectionScreen';
 export * from './Auth/SelectRoleScreen';
 
 // SplashScreen exports

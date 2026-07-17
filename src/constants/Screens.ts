@@ -11,6 +11,7 @@ enum AuthScreens {
   PasswordScreen = 'PasswordScreen',
   TermsOfService = 'TermsOfService',
   SuccessScreen = 'SuccessScreen',
+  ProductSelectionScreen = 'ProductSelectionScreen',
   OcrInvoice = 'OcrInvoice',
   HomeNavigator = 'HomeNavigator',
 }

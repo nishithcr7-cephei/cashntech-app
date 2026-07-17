@@ -13,6 +13,7 @@ import {signinOtpVerifyRequest} from '@store/auth/auth.slice';
 import {authSelector} from '@store/auth';
 import type {ILmsUser} from '@store/auth/auth.types';
 import {userActions} from '@store/user';
+import {clearProductContext} from '@store/product/product.slice';
 import {APP_VERSION_DISPLAY} from '@constants/AppMeta';
 
 const OTP_TIMER = 60;
@@ -127,6 +128,8 @@ export const OTPInputScreen = ({
         return;
       }
       const mobileNumber = params.data?.mobileNumber || params.data?.mobile || '';
+      // Fresh sign-in: drop any stale product context before OTP verify completes
+      dispatch(clearProductContext());
       dispatch(
         signinOtpVerifyRequest({
           payload: { mobile_number: mobileNumber, otp },
@@ -136,7 +139,7 @@ export const OTPInputScreen = ({
               text1: 'OTP verified successfully',
               visibilityTime: 2000,
             });
-            navigation.replace('SuccessScreen', {
+            navigation.replace(AuthScreens.SuccessScreen, {
               authMode: 'signin',
               firstName: user.first_name,
               lastName: user.last_name,

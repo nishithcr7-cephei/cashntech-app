@@ -1,14 +1,12 @@
 import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {
-  ApplyView,
-  ContactUs,
   OTPInputScreen,
   PasswordScreen,
-  RegisterView,
   SigninScreen,
   SignupScreen,
   SuccessScreen,
+  ProductSelectionScreen,
   TermsOfService,
   OcrInvoiceScreen,
   SelectUserTypeScreen,
@@ -16,7 +14,6 @@ import {
   SelectRoleScreen,
 } from '@screens/index';
 import {SplashScreen} from '@screens/SplashScreen/SplashScreen';
-import MenuPageView from '@screens/SplashScreen/MenuPageView';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
 import {AuthScreens} from '@constants/Screens';
 import {HomeNavigator} from './HomeNavigator';
@@ -52,6 +49,10 @@ export const AuthNavigator = () => {
       <AuthStack.Screen
         name={AuthScreens.SuccessScreen}
         component={SuccessScreen}
+      />
+      <AuthStack.Screen
+        name={AuthScreens.ProductSelectionScreen}
+        component={ProductSelectionScreen}
       />
       <AuthStack.Screen
         name={AuthScreens.TermsOfService}

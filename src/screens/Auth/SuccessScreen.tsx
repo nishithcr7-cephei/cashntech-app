@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Container, Header} from '@components/index';
 import {BackHandler, StyleSheet, Text, View} from 'react-native';
 import {AuthScreens, Colors, Fonts, StorageKeys} from '@constants/index';
@@ -10,8 +10,10 @@ import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {useDispatch} from 'react-redux';
 import moment from 'moment';
 import {authActions} from '@store/auth';
+import {bootstrapProductContextRequest} from '@store/auth/auth.slice';
 import {setStorage} from '@services/localStorage';
-import {fetchUserScopeRequest, setProgramScope} from '@store/programSelection/programSelection.slice';
+import {setProgramScope} from '@store/programSelection/programSelection.slice';
+import type {ProductBootstrapResult} from '@store/auth/auth.types';
 
 const Strings = {
   copyright: `Copyright ${moment().year()}, CashnTech Pvt Ltd., All Rights Reserved`,
@@ -26,6 +28,10 @@ export const SuccessScreen = ({
   route: {params},
 }: SuccessScreenProps) => {
   const dispatch = useDispatch();
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [bootstrapResult, setBootstrapResult] =
+    useState<ProductBootstrapResult | null>(null);
+  const didNavigateRef = useRef(false);
 
   const message = useMemo(() => {
     const firstName = (params.firstName ?? '').trim();
@@ -36,17 +42,36 @@ export const SuccessScreen = ({
       case 'signin': {
         return fullName
           ? `Welcome back, ${fullName}\nYou are now signed in.`
-          : `Welcome back,\nYou are now signed in.`;
+          : 'Welcome back,\nYou are now signed in.';
       }
       case 'signup': {
         return fullName
           ? `Welcome aboard, ${fullName}\nYour account is now created.`
-          : `Welcome aboard,\nYour account is now created.`;
+          : 'Welcome aboard,\nYour account is now created.';
       }
       case 'password':
         return 'Your password has been updated.';
     }
   }, [params.authMode, params.firstName, params.lastName]);
+
+  // Start product bootstrap while the success animation plays (signin only).
+  useEffect(() => {
+    if (params.authMode !== 'signin') {
+      return;
+    }
+    dispatch(
+      bootstrapProductContextRequest({
+        payload: null,
+        callbackSuccess: result => {
+          setBootstrapResult(result);
+        },
+        callbackError: () => {
+          // Scope failure must not block DF login
+          setBootstrapResult({needsSelection: false});
+        },
+      }),
+    );
+  }, [dispatch, params.authMode]);
 
   useEffect(() => {
     const backHandler = BackHandler.addEventListener(
@@ -54,41 +79,63 @@ export const SuccessScreen = ({
       () => true,
     );
     const timer = setTimeout(() => {
-      if (params.authMode === 'signin') {
-        dispatch(authActions.setIsLoggedIn(true));
-        setStorage(StorageKeys.IS_LOGGED_IN, true);
-        // Default to All Program; user can change via breadcrumb when needed
-        dispatch(setProgramScope('all'));
-        dispatch(fetchUserScopeRequest());
-        // Navigate directly to Home (skip role/program selection)
-        navigation.reset({
-          index: 0,
-          routes: [
-            {
-              name: 'HomeNavigator',
-            },
-          ],
-        });
-        clearTimeout(timer);
+      setMinTimeElapsed(true);
+    }, 2500);
+
+    return () => {
+      backHandler.remove();
+      clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (params.authMode !== 'signin') {
+      if (!minTimeElapsed || didNavigateRef.current) {
         return;
       }
+      didNavigateRef.current = true;
       if (params.authMode === 'signup') {
         navigation.reset({
-          routes: [
-            {
-              name: 'SigninScreen',
-            },
-          ],
+          routes: [{name: AuthScreens.SigninScreen}],
           index: 0,
         });
         return;
       }
       navigation.goBack();
-      clearTimeout(timer);
-    }, 2500);
+      return;
+    }
 
-    return () => backHandler.remove();
-  }, [params.authMode]);
+    if (!minTimeElapsed || bootstrapResult == null || didNavigateRef.current) {
+      return;
+    }
+    didNavigateRef.current = true;
+
+    dispatch(setProgramScope('all'));
+
+    if (bootstrapResult.needsSelection) {
+      navigation.replace(AuthScreens.ProductSelectionScreen, {
+        firstName: params.firstName,
+        lastName: params.lastName,
+      });
+      return;
+    }
+
+    // DF-only / single product / restored match — same home entry as before
+    dispatch(authActions.setIsLoggedIn(true));
+    setStorage(StorageKeys.IS_LOGGED_IN, true);
+    navigation.reset({
+      index: 0,
+      routes: [{name: AuthScreens.HomeNavigator}],
+    });
+  }, [
+    bootstrapResult,
+    dispatch,
+    minTimeElapsed,
+    navigation,
+    params.authMode,
+    params.firstName,
+    params.lastName,
+  ]);
 
   return (
     <Container>

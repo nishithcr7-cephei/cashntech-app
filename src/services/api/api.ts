@@ -6,7 +6,8 @@ import {authActions} from '@store/auth';
 import {userActions} from '@store/user';
 import {clearProgramSelection} from '@store/programSelection/programSelection.slice';
 import {clearPermissions} from '@store/permissions';
-import {decodeJWT, isTokenExpired} from '@utils/Utils';
+import {clearProductContext} from '@store/product/product.slice';
+import {isTokenExpired} from '@utils/Utils';
 import {transformApiResponse} from '@utils/apiTransformer';
 import axios, {
   AxiosError,
@@ -68,12 +69,12 @@ const AUTH_ENDPOINTS_WHITELIST = [
 /**
  * Checks if the given URL is an authentication endpoint that should be excluded
  * from triggering logout on 401 errors.
- * 
+ *
  * @param {string} url - The request URL to check
  * @returns {boolean} True if the URL is an auth endpoint, false otherwise
  */
 const isAuthEndpoint = (url: string): boolean => {
-  if (!url) return false;
+  if (!url) {return false;}
   // Use simple string matching — new URL().pathname is not available in React Native
   return AUTH_ENDPOINTS_WHITELIST.some(endpoint =>
     url.includes(endpoint),
@@ -123,9 +124,9 @@ axiosInstance.interceptors.request.use(
     }
     if (__DEV__) {
       const url = config.url || '';
-      const skipLogging = 
-        url.includes('user/permissions') || 
-        url.includes('invoice/summary') || 
+      const skipLogging =
+        url.includes('user/permissions') ||
+        url.includes('invoice/summary') ||
         url.includes('invoice/latest');
 
       if (!skipLogging) {
@@ -160,9 +161,9 @@ axiosInstance.interceptors.response.use(
 
     if (__DEV__) {
       const url = response.config.url || '';
-      const skipLogging = 
-        url.includes('user/permissions') || 
-        url.includes('invoice/summary') || 
+      const skipLogging =
+        url.includes('user/permissions') ||
+        url.includes('invoice/summary') ||
         url.includes('invoice/latest');
 
       if (!skipLogging) {
@@ -236,6 +237,7 @@ export const logoutUser = () => {
   store.dispatch(userActions.clearUserInfo());
   store.dispatch(clearProgramSelection());
   store.dispatch(clearPermissions());
+  store.dispatch(clearProductContext());
 };
 
 export default axiosInstance;

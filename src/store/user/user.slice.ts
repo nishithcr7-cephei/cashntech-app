@@ -19,6 +19,7 @@ const initialState: UserState = {
   scope: undefined,
   final_user_permission: undefined,
   party_name: null,
+  product_roles: null,
 };
 
 const userSlice = createSlice({
@@ -32,18 +33,18 @@ const userSlice = createSlice({
       state.first_name = decryptValue(payload.first_name || '');
       state.last_name = decryptValue(payload.last_name || '');
       state.mobile_number = decryptValue(payload.mobile_number || '');
-      
+
       const userType = payload.user_type ?? state.user_type;
       state.user_type = userType;
-      
+
       // Backward compatibility mapping
       state.is_client = userType === 'SCF' ? true : (payload.is_client ?? state.is_client);
       state.is_internal = userType === 'Cashntech' ? true : (payload.is_internal ?? state.is_internal);
-      
+
       // Permission Group & Role Logic
       const pg = payload.permission_group ?? state.permission_group;
       state.permission_group = pg;
-      
+
       if (userType === 'Cashntech') {
         state.role = '';
       } else if (pg && pg.length > 0) {
@@ -67,6 +68,9 @@ const userSlice = createSlice({
       state.scope = payload.scope ?? state.scope;
       state.final_user_permission = payload.final_user_permission ?? state.final_user_permission;
       state.party_name = payload.party_name ?? state.party_name;
+      if (payload.product_roles !== undefined) {
+        state.product_roles = payload.product_roles;
+      }
     },
     setUserRole: (state, action: PayloadAction<AppRole | null>) => {
       state.appRole = action.payload;
@@ -96,6 +100,7 @@ const userSlice = createSlice({
       state.final_user_permission = undefined;
       state.permission_group = undefined;
       state.party_name = null;
+      state.product_roles = null;
     },
   },
 });

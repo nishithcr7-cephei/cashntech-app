@@ -182,3 +182,35 @@ export function getEffectiveProductCode(
 ): ProductCode {
   return code ?? DEFAULT_PRODUCT_CODE;
 }
+
+/**
+ * One entry per ProductCode for selection UI (DF / VF), DF first then VF.
+ * Prefer the first occurrence's backend id/name.
+ */
+export function uniqueProductsByCode(
+  products: ResolvedProduct[],
+): ResolvedProduct[] {
+  const byCode = new Map<ProductCode, ResolvedProduct>();
+  for (const product of products) {
+    if (!byCode.has(product.code)) {
+      byCode.set(product.code, product);
+    }
+  }
+
+  const ordered: ProductCode[] = [
+    PRODUCT_CODES.DEALER_FINANCE,
+    PRODUCT_CODES.VENDOR_FINANCE,
+  ];
+  const result: ResolvedProduct[] = [];
+  for (const code of ordered) {
+    const match = byCode.get(code);
+    if (match) {
+      result.push(match);
+      byCode.delete(code);
+    }
+  }
+  byCode.forEach(product => {
+    result.push(product);
+  });
+  return result;
+}

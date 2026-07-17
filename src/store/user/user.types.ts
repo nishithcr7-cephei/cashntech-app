@@ -1,5 +1,11 @@
 import {AppRole} from '@constants/roles';
 
+export type UserProductRole = {
+  product_id: string;
+  role: string;
+  level?: number | null;
+};
+
 export interface UserState {
   id: number;
   email: string;
@@ -18,4 +24,8 @@ export interface UserState {
   party_name?: string | null;
   /** From OTP verify - used for /user/permissions groupId */
   permission_group?: Array<{ id?: number; department?: string; business_role?: string; functional_role?: string }>;
+  /**
+   * CWF additive JWT/login claim (optional). Stored for future PR3; not used for gating in PR2.
+   */
+  product_roles?: UserProductRole[] | null;
 }
