@@ -4,6 +4,7 @@ import {contactSaga, registerSaga, gstLookupSaga, applySaga} from '@store/regist
 import invoiceSaga from '@store/invoice/inv.saga';
 import invoiceOverviewSaga from '@store/invoiceOverview/invOverview.saga';
 import {programSelectionSaga} from '@store/programSelection';
+import {productSaga} from '@store/product';
 import {permissionsSaga} from '@store/permissions';
 import {repaymentSaga} from '@store/repayment';
 import {dpdSaga} from '@store/dpd';
@@ -24,6 +25,7 @@ export default function* rootSaga() {
     invoiceSaga(),
     invoiceOverviewSaga(),
     programSelectionSaga(),
+    productSaga(),
     permissionsSaga(),
     repaymentSaga(),
     dpdSaga(),

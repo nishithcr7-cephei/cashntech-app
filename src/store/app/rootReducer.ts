@@ -3,6 +3,7 @@ import {authReducer} from '@store/auth';
 import {userReducer} from '@store/user';
 import registerwebReducer from '@store/registerweb/register.slice';
 import {programSelectionReducer} from '@store/programSelection';
+import {productReducer} from '@store/product';
 import {invoiceReducer} from '@store/invoice';
 import {invoiceOverviewReducer} from '@store/invoiceOverview';
 import {permissionsReducer} from '@store/permissions';
@@ -18,6 +19,7 @@ const rootReducer = combineReducers({
   auth: authReducer,
   user: userReducer,
   programSelection: programSelectionReducer,
+  product: productReducer,
   invoice: invoiceReducer,
   invoiceOverview: invoiceOverviewReducer,
   permissions: permissionsReducer,
