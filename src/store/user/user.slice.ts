@@ -3,7 +3,11 @@ import {UserState} from './user.types';
 import { decodeJWT } from '@utils/Utils';
 import {AppRole} from '@constants/roles';
 import {decryptValue} from '@utils/decrypt';
-import {deriveAppRoleFromUser} from '@utils/deriveAppRole';
+import {
+  deriveCapabilityFromUser,
+  toLegacyAppRole,
+  type NormalizedCapability,
+} from '@utils/roleNormalizer';
 
 const initialState: UserState = {
   id: 0,
@@ -16,11 +20,34 @@ const initialState: UserState = {
   user_type: null,
   role: '',
   appRole: null,
+  capability: null,
   scope: undefined,
   final_user_permission: undefined,
   party_name: null,
   product_roles: null,
 };
+
+function deriveRoleFields(user: {
+  first_name?: string;
+  user_type?: string | null;
+  email?: string;
+  role?: string | null;
+  permission_group?: UserState['permission_group'];
+  product_roles?: UserState['product_roles'];
+}): {appRole: AppRole; capability: NormalizedCapability} {
+  const capability = deriveCapabilityFromUser({
+    first_name: user.first_name || '',
+    user_type: user.user_type || '',
+    email: user.email || '',
+    role: user.role || '',
+    permission_group: user.permission_group || [],
+    product_roles: user.product_roles || null,
+  });
+  return {
+    capability,
+    appRole: toLegacyAppRole(capability),
+  };
+}
 
 const userSlice = createSlice({
   name: 'user',
@@ -45,6 +72,10 @@ const userSlice = createSlice({
       const pg = payload.permission_group ?? state.permission_group;
       state.permission_group = pg;
 
+      if (payload.product_roles !== undefined) {
+        state.product_roles = payload.product_roles;
+      }
+
       if (userType === 'Cashntech') {
         state.role = '';
       } else if (pg && pg.length > 0) {
@@ -58,19 +89,21 @@ const userSlice = createSlice({
         state.role = payload.role ?? state.role;
       }
 
-      // Derive appRole (for UI/Navigation)
-      state.appRole = deriveAppRoleFromUser({
+      // Derive capability + legacy appRole (Vendor → dealer_* categories)
+      const derived = deriveRoleFields({
         first_name: state.first_name,
         user_type: userType || '',
+        email: state.email,
+        role: state.role,
         permission_group: pg || [],
+        product_roles: state.product_roles,
       });
+      state.capability = derived.capability;
+      state.appRole = derived.appRole;
 
       state.scope = payload.scope ?? state.scope;
       state.final_user_permission = payload.final_user_permission ?? state.final_user_permission;
       state.party_name = payload.party_name ?? state.party_name;
-      if (payload.product_roles !== undefined) {
-        state.product_roles = payload.product_roles;
-      }
     },
     setUserRole: (state, action: PayloadAction<AppRole | null>) => {
       state.appRole = action.payload;
@@ -96,6 +129,7 @@ const userSlice = createSlice({
       state.user_type = null;
       state.role = '';
       state.appRole = null;
+      state.capability = null;
       state.scope = undefined;
       state.final_user_permission = undefined;
       state.permission_group = undefined;

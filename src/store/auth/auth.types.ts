@@ -88,7 +88,10 @@ export interface ILmsUser {
   role?: string;
   scope?: { program_ids?: string[] };
   final_user_permission?: unknown;
-  /** CWF additive claim — optional; full consumption is PR3. */
+  /**
+   * CWF additive claim — optional.
+   * PR3 roleNormalizer may use as fallback when permission_group has no party role.
+   */
   product_roles?: Array<{
     product_id: string;
     role: string;

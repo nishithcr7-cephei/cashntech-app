@@ -18,6 +18,12 @@ const getUserRole = createSelector(
   (user) => user.appRole
 );
 
+/** Normalized capability from PR3 roleNormalizer (Vendor ≡ Dealer categories). */
+const getUserCapability = createSelector(
+  _selectState,
+  (user) => user.capability ?? null,
+);
+
 const getIsClient = createSelector(
   _selectState,
   (user) => user.is_client
@@ -34,7 +40,9 @@ export const getPrimaryPermissionGroupId = createSelector(
   _selectState,
   (user) => {
     const pg = user.permission_group;
-    if (!Array.isArray(pg) || pg.length === 0) return null;
+    if (!Array.isArray(pg) || pg.length === 0) {
+      return null;
+    }
     return pg[0]?.id ?? null;
   }
 );
@@ -43,6 +51,7 @@ export default {
   getUserInfo,
   getFullName,
   getUserRole,
+  getUserCapability,
   getIsClient,
   getIsCashntechUserType,
   getPrimaryPermissionGroupId,

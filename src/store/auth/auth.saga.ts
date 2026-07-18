@@ -38,7 +38,10 @@ import {
 import {setStorage} from '@services/localStorage';
 import StorageKeys from '@constants/StorageKeys';
 import {userActions, userSelector} from '@store/user';
-import {deriveAppRoleFromUser} from '@utils/deriveAppRole';
+import {
+  deriveCapabilityFromUser,
+  toLegacyAppRole,
+} from '@utils/roleNormalizer';
 import {
   fetchUserScopeSuccess,
   fetchUserScopeFailure,
@@ -109,11 +112,20 @@ function* handleSignInOtpVerify(
     const {token: tokenVal, user: userData} = data.data || {};
     setStorage(StorageKeys.TOKEN, tokenVal);
     setStorage(StorageKeys.USER_INFO, JSON.stringify(userData));
-    const appRole = userData ? deriveAppRoleFromUser(userData) : null;
+    // Role normalization (PR3): capability + legacy appRole; setUserInfo re-derives
+    // from permission_group / product_roles for a single source of truth.
+    const capability = userData
+      ? deriveCapabilityFromUser({
+          ...userData,
+          product_roles: userData.product_roles ?? null,
+        })
+      : null;
+    const appRole = capability ? toLegacyAppRole(capability) : null;
     yield put(
       userActions.setUserInfo({
         ...userData,
         appRole,
+        capability,
         product_roles: userData?.product_roles ?? null,
       }),
     );
