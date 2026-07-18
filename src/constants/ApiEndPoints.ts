@@ -138,7 +138,12 @@ const Endpoints = {
   // apiRemarkReportTask:
 
   // Invoice APIs
+  /** Main DF backend — Anchor/internal create bootstrap */
   apiDealerInfo: (programId: string) => `/invoice/dealer-info/${programId}`,
+  /** Main DF backend — counterparty (Dealer) create bootstrap */
+  apiAnchorInfo: (programId: string) => `/invoice/anchor-info/${programId}`,
+  /** VF / CWF backends — unified party bootstrap (product/method dispatch server-side) */
+  apiPartyInfo: (programId: string) => `/invoice/party-info/${programId}`,
   apiBankProductList: '/master-data-management/bank-product/list',
   apiCreateInvoice: '/invoice',
   apiInvoiceList: '/invoice/list',

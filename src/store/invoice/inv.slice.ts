@@ -1,6 +1,5 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {
-  InvoiceState,
   initialInvoiceState,
   DealerInfoResponse,
   PartnerBank,
@@ -17,6 +16,8 @@ const invoiceSlice = createSlice({
   initialState: initialInvoiceState,
   reducers: {
     fetchDealerInfoRequest: (state, _action: PayloadAction<string>) => {
+      // programId only — saga resolves dealer-info / anchor-info / party-info
+      // from active product + capability (PR4).
       state.dealerInfoLoading = true;
       state.dealerInfoError = null;
     },

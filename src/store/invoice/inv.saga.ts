@@ -1,4 +1,4 @@
-import {call, put, takeLatest} from 'redux-saga/effects';
+import {call, put, select, takeLatest} from 'redux-saga/effects';
 import {PayloadAction} from '@reduxjs/toolkit';
 import Toast from 'react-native-toast-message';
 import {
@@ -11,7 +11,6 @@ import {
   createInvoiceRequest,
   createInvoiceSuccess,
   createInvoiceFailure,
-  resetCreateInvoiceState,
   updateInvoiceRequest,
   updateInvoiceSuccess,
   updateInvoiceFailure,
@@ -43,6 +42,13 @@ import type {
   BulkUpdateInvoiceRequest,
   BulkDisbursementRequest,
 } from './inv.types';
+import {
+  selectActiveProductCode,
+  selectActiveProductId,
+  selectIsVendorFinanceActive,
+} from '@store/product/product.selectors';
+import {getUserCapability} from '@store/user/user.selector';
+import type {InvoicePartyInfoRouteOptions} from '@utils/invoicePartyInfoRoute';
 
 function showActionToast(
   type: 'success' | 'error',
@@ -57,9 +63,45 @@ function showActionToast(
   });
 }
 
+function* selectPartyInfoRouteOptions(): Generator<
+  any,
+  InvoicePartyInfoRouteOptions,
+  any
+> {
+  const productCode = yield select(selectActiveProductCode);
+  const capability = yield select(getUserCapability);
+  return {
+    productCode: productCode ?? null,
+    partySide: capability?.party ?? null,
+  };
+}
+
+/**
+ * Optional productId for VF/CWF list/KPI bodies only.
+ * DF (or unset product) returns null so request shape stays unchanged.
+ */
+function* selectOptionalProductId(): Generator<any, string | null, any> {
+  const isVf = yield select(selectIsVendorFinanceActive);
+  if (!isVf) {
+    return null;
+  }
+  const productId = yield select(selectActiveProductId);
+  if (typeof productId === 'string' && productId.trim()) {
+    return productId.trim();
+  }
+  return null;
+}
+
 function* fetchDealerInfoSaga(action: PayloadAction<string>): Generator {
   try {
-    const response = yield call(invoiceApi.getDealerInfo, action.payload);
+    const routeOptions: InvoicePartyInfoRouteOptions = yield call(
+      selectPartyInfoRouteOptions,
+    );
+    const response = yield call(
+      invoiceApi.getDealerInfo,
+      action.payload,
+      routeOptions,
+    );
     if (response?.data) {
       yield put(fetchDealerInfoSuccess(response.data));
     } else {
@@ -96,7 +138,9 @@ function* fetchBankListSaga(): Generator {
 }
 
 function getErrorMessage(response: any, defaultMsg: string): string {
-  if (!response) return defaultMsg;
+  if (!response) {
+    return defaultMsg;
+  }
   const statusCode = response.statusCode;
   const message = response.message;
   if (statusCode === 409) {
@@ -105,7 +149,9 @@ function getErrorMessage(response: any, defaultMsg: string): string {
   if (statusCode === 400 && Array.isArray(message)) {
     return message.join(', ');
   }
-  if (typeof message === 'string') return message;
+  if (typeof message === 'string') {
+    return message;
+  }
   return defaultMsg;
 }
 
@@ -170,7 +216,14 @@ function* fetchInvoiceListSaga(
 ): Generator {
   try {
     const {programId, filters} = action.payload;
-    const data = yield call(invoiceApi.getInvoiceList, programId, filters);
+    // Optional productId — included only when set (VF/CWF); DF omits and stays unchanged
+    const productId: string | null = yield call(selectOptionalProductId);
+    const data = yield call(
+      invoiceApi.getInvoiceList,
+      programId,
+      filters,
+      productId ? {productId} : undefined,
+    );
     yield put(fetchInvoiceListSuccess(data));
   } catch (error: any) {
     const msg =
@@ -332,8 +385,10 @@ function* bulkDisbursementSaga(
     const {invoices, onSuccess} = action.payload;
     const formattedInvoices = invoices.map(inv => ({
       ...inv,
-      disbursement_date: toYYYYMMDD(inv.disbursement_date),
-      expected_release_date: inv.expected_release_date ? toYYYYMMDD(inv.expected_release_date) : undefined,
+      disbursement_date: toYYYYMMDD(inv.disbursement_date ?? ''),
+      expected_release_date: inv.expected_release_date
+        ? toYYYYMMDD(inv.expected_release_date)
+        : undefined,
     }));
     const response = yield call(invoiceApi.bulkDisbursement, {
       invoices: formattedInvoices,

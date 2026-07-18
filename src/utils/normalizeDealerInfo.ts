@@ -42,6 +42,77 @@ function toNumber(val: unknown): number {
 }
 
 /**
+ * Parse VF/CWF `bankAccounts` JSON aggregate (array or JSON string) into
+ * PartyBankDetail[]. Prefers real UUID `id` when present (needed for
+ * credit_to_account_id on create). Falls back to account number as id for DF.
+ */
+function parseBankAccounts(val: unknown): PartyBankDetail[] {
+  if (val == null || val === '') {
+    return [];
+  }
+
+  let list: unknown = val;
+  if (typeof val === 'string') {
+    try {
+      list = JSON.parse(val);
+    } catch {
+      return [];
+    }
+  }
+
+  if (!Array.isArray(list)) {
+    return [];
+  }
+
+  const out: PartyBankDetail[] = [];
+  for (const entry of list) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const row = entry as Record<string, unknown>;
+    const account = String(
+      pick(row, 'account_number', 'accountNumber') ?? '',
+    ).trim();
+    if (!account) {
+      continue;
+    }
+    const idRaw = pick(row, 'id');
+    const id = idRaw != null && String(idRaw).trim() !== ''
+      ? String(idRaw)
+      : account;
+    out.push({id, account_number: account});
+  }
+  return out;
+}
+
+function collectBankDetails(
+  row: Record<string, unknown>,
+  bankMap: Map<string, PartyBankDetail>,
+): void {
+  const fromAgg = parseBankAccounts(
+    pick(row, 'bankAccounts', 'bank_accounts'),
+  );
+  if (fromAgg.length > 0) {
+    for (const b of fromAgg) {
+      // Prefer UUID id when the same account appears with only account-number id
+      const existing = bankMap.get(b.account_number);
+      if (!existing || (existing.id === existing.account_number && b.id !== b.account_number)) {
+        bankMap.set(b.account_number, b);
+      }
+    }
+    return;
+  }
+
+  // Main DF flat rows: one account_number column per row
+  const account = String(pick(row, 'account_number', 'accountNumber') ?? '').trim();
+  if (account) {
+    if (!bankMap.has(account)) {
+      bankMap.set(account, {id: account, account_number: account});
+    }
+  }
+}
+
+/**
  * Available limit aligned with backend: sanctioned - utilized - pipeline_requests.
  */
 export function getParticipantAvailableLimit(
@@ -57,7 +128,8 @@ export function getParticipantAvailableLimit(
 }
 
 /**
- * Maps flat SQL rows from GET /invoice/dealer-info/:programId to nested DealerInfoResponse.
+ * Maps flat SQL rows from dealer-info / anchor-info / party-info to nested
+ * DealerInfoResponse. Accepts VF/CWF `bankAccounts` aggregates with UUID ids.
  */
 export function normalizeDealerInfoResponse(
   programId: string,
@@ -93,10 +165,7 @@ export function normalizeDealerInfoResponse(
 
   const participants: DealerInfoParticipant[] = rows.map((row, index) => {
     const r = row as Record<string, unknown>;
-    const account = String(pick(r, 'account_number', 'accountNumber') ?? '');
-    if (account) {
-      bankMap.set(account, {id: account, account_number: account});
-    }
+    collectBankDetails(r, bankMap);
 
     const pipelineRaw = pick(r, 'pipeline_requests', 'pipelineRequests');
 

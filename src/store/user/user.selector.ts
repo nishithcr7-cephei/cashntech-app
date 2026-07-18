@@ -19,7 +19,7 @@ const getUserRole = createSelector(
 );
 
 /** Normalized capability from PR3 roleNormalizer (Vendor ≡ Dealer categories). */
-const getUserCapability = createSelector(
+export const getUserCapability = createSelector(
   _selectState,
   (user) => user.capability ?? null,
 );

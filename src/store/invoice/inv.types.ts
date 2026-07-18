@@ -12,6 +12,11 @@ export type DealerInfoParticipant = {
 };
 
 export type PartyBankDetail = {
+  /**
+   * Bank account row id.
+   * - VF/CWF party-info: UUID (pass as credit_to_account_id on create)
+   * - Main DF dealer/anchor-info: often the account number string
+   */
   id: string;
   account_number: string;
 };
@@ -32,8 +37,17 @@ export type DealerInfoResponse = {
     party_bank_details: PartyBankDetail[];
   };
   participants: DealerInfoParticipant[];
-  /** Program bank accounts for credit-to (aggregated from flat dealer-info rows). */
+  /** Program / counterparty bank accounts for credit-to (dealer-info / party-info). */
   bank_details?: PartyBankDetail[];
+};
+
+/** CWF list/detail additive step marker (ignored by DF UI until PR5). */
+export type InvoiceCurrentStep = {
+  role: string;
+  level: number | null;
+  id?: string;
+  sequence_no?: number;
+  action_type?: string;
 };
 
 export type PartnerBank = {
@@ -79,6 +93,18 @@ export type InvoiceListItemApi = {
   approvalLogs?: Array<{id: string}>;
   attachment?: unknown;
   attachments?: unknown;
+  /**
+   * CWF additive: whether the current user can act on this invoice now.
+   * Undefined on DF / VF list responses — ignored until PR5.
+   */
+  actionable?: boolean;
+  /**
+   * CWF additive workflow pointer. Undefined on DF / VF — ignored until PR5.
+   */
+  current_step?: InvoiceCurrentStep | null;
+  /** VF/CWF create/detail: UUID of credit-to bank account row */
+  credit_to_account_id?: string;
+  credit_to_account_type?: string;
 };
 
 export type InvoiceState = {
@@ -142,6 +168,8 @@ export type UpdateInvoicePayload = {
   createdBy: string;
   attachment?: any;
   approval_level: number;
+  /** VF/CWF optional pass-through; omitted for DF */
+  creditToAccountId?: string;
 };
 
 export type BulkUpdateInvoiceRequest = {

@@ -8,6 +8,10 @@ import {
   mapInvoiceAttachmentsWithUrls,
 } from '@utils/invoiceAttachments';
 import {transformApiResponse} from '@utils/apiTransformer';
+import {
+  resolveInvoicePartyInfoPath,
+  type InvoicePartyInfoRouteOptions,
+} from '@utils/invoicePartyInfoRoute';
 
 // Unit mapping: PCS=1, KG=2, LTR=3, etc. (backend accepts any number)
 const UNIT_MAP: Record<string, number> = {
@@ -36,29 +40,21 @@ const Ue = (val: number | string): number => {
   return Math.round((num + Number.EPSILON) * 100) / 100;
 };
 
-function toIsoString(dateStr: string): string {
-  if (!dateStr?.trim()) return '';
-  const ymd = toYYYYMMDD(dateStr);
-  if (!ymd) return '';
-  try {
-    const d = new Date(ymd);
-    // Explicitly set time to noon to avoid day-shifts across timezones
-    d.setHours(12, 0, 0, 0); 
-    return d.toISOString();
-  } catch {
-    return dateStr;
-  }
-}
-
 export function toYYYYMMDD(dateStr: string): string {
-  if (!dateStr?.trim()) return '';
+  if (!dateStr?.trim()) {
+    return '';
+  }
   const parts = dateStr.split(/[-/]/);
   if (parts.length === 3) {
     const d = parseInt(parts[0], 10);
     const m = parseInt(parts[1], 10);
     const y = parseInt(parts[2], 10);
-    if (y > 1000) return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    if (d <= 31 && m <= 12) return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    if (y > 1000) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+    if (d <= 31 && m <= 12) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
   }
   return dateStr;
 }
@@ -75,6 +71,11 @@ export type CreateInvoicePayloadInput = {
   counterPartyCode: string;
   counterPartyOdAccount: string;
   attachment?: DocumentPickerResponse | null;
+  /**
+   * VF/CWF: UUID of the credit-to bank account row (party-info bankAccounts.id).
+   * Optional — omitted for main DF create (credit_to account number only).
+   */
+  creditToAccountId?: string;
 };
 
 function parseTenorDays(raw: string | undefined): number {
@@ -83,7 +84,19 @@ function parseTenorDays(raw: string | undefined): number {
 }
 
 function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<string, unknown> {
-  const {fields, createdBy, partnerBank, program, product, anchorParticipantMapping, party, counterPartyName, counterPartyCode, counterPartyOdAccount} = input;
+  const {
+    fields,
+    createdBy,
+    partnerBank,
+    program,
+    product,
+    anchorParticipantMapping,
+    party,
+    counterPartyName,
+    counterPartyCode,
+    counterPartyOdAccount,
+    creditToAccountId,
+  } = input;
 
   // Align with InvoiceForm: use item-level discount and tax (same as form summary)
   const subtotal = fields.items.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0);
@@ -157,6 +170,14 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     items,
   };
 
+  // VF/CWF: pass-through UUID when provided (PR6 will wire UI selection).
+  // Never required for DF — omit when unset.
+  const accountId =
+    creditToAccountId?.trim() || fields.creditToAccountId?.trim() || '';
+  if (accountId) {
+    payload.credit_to_account_id = accountId;
+  }
+
   if (fields.grnDate?.trim()) {
     payload.grn_date = toYYYYMMDD(fields.grnDate);
   }
@@ -176,13 +197,30 @@ export type InvoiceListFilters = {
   byApprovalStatus?: string[];
 };
 
+/** Optional product filter for VF/CWF list & KPI bodies. Omit for DF. */
+export type InvoiceProductContext = {
+  productId?: string | null;
+};
+
 export type InvoiceSummaryRequest = {
   programIds?: string[];
+  productId?: string | null;
 };
 
 export type InvoiceLatestRequest = {
   programIds?: string[];
+  productId?: string | null;
 };
+
+function appendOptionalProductId(
+  body: Record<string, unknown>,
+  productId?: string | null,
+): void {
+  const id = typeof productId === 'string' ? productId.trim() : '';
+  if (id) {
+    body.productId = id;
+  }
+}
 
 export type UpdateInvoiceStatusPayload = {
   invoiceId: string;
@@ -312,6 +350,7 @@ export const invoiceApi = {
   getInvoiceList: async (
     programId: string,
     filters?: InvoiceListFilters,
+    productContext?: InvoiceProductContext,
   ): Promise<InvoiceListItemApi[]> => {
     const body: Record<string, unknown> = {
       ...(filters ?? {}),
@@ -320,6 +359,7 @@ export const invoiceApi = {
     if (programId) {
       (body as any).programIds = [programId];
     }
+    appendOptionalProductId(body, productContext?.productId);
 
     const response = await axiosInstance.post(
       ApiEndPoints.apiInvoiceList,
@@ -332,8 +372,17 @@ export const invoiceApi = {
     return [];
   },
 
-  getDealerInfo: async (programId: string): Promise<any> => {
-    const response = await axiosInstance.get(ApiEndPoints.apiDealerInfo(programId), {
+  /**
+   * Create-invoice party bootstrap.
+   * Route is backend-aware via options (VF → party-info; DF → dealer/anchor-info).
+   * When options omitted, defaults to main-DF `/invoice/dealer-info` (current behavior).
+   */
+  getDealerInfo: async (
+    programId: string,
+    options?: InvoicePartyInfoRouteOptions,
+  ): Promise<any> => {
+    const path = resolveInvoicePartyInfoPath(programId, options);
+    const response = await axiosInstance.get(path, {
       authRequired: true,
     } as any);
     const body = response.data;
@@ -377,10 +426,14 @@ export const invoiceApi = {
       }));
   },
 
-  getInvoiceSummary: async (programIds?: string[]): Promise<any> => {
-    const body = {
+  getInvoiceSummary: async (
+    programIds?: string[],
+    productContext?: InvoiceProductContext,
+  ): Promise<any> => {
+    const body: Record<string, unknown> = {
       programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
+    appendOptionalProductId(body, productContext?.productId);
     const response = await axiosInstance.post(
       ApiEndPoints.apiInvoiceSummary,
       body,
@@ -391,10 +444,14 @@ export const invoiceApi = {
     return {data};
   },
 
-  getLatestInvoices: async (programIds?: string[]): Promise<any> => {
-    const body = {
+  getLatestInvoices: async (
+    programIds?: string[],
+    productContext?: InvoiceProductContext,
+  ): Promise<any> => {
+    const body: Record<string, unknown> = {
       programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
+    appendOptionalProductId(body, productContext?.productId);
     const response = await axiosInstance.post(
       ApiEndPoints.apiInvoiceLatest,
       body,
@@ -405,10 +462,14 @@ export const invoiceApi = {
     return {data};
   },
 
-  getInvoiceKpis: async (programIds?: string[]): Promise<InvoiceKpisResponse> => {
-    const body = {
+  getInvoiceKpis: async (
+    programIds?: string[],
+    productContext?: InvoiceProductContext,
+  ): Promise<InvoiceKpisResponse> => {
+    const body: Record<string, unknown> = {
       programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
+    appendOptionalProductId(body, productContext?.productId);
     const response = await axiosInstance.post(ApiEndPoints.apiInvoiceKpis, body, {
       authRequired: true,
     } as any);
@@ -427,10 +488,14 @@ export const invoiceApi = {
     };
   },
 
-  getDisbursementKpis: async (programIds?: string[]): Promise<DisbursementKpisResponse> => {
-    const body = {
+  getDisbursementKpis: async (
+    programIds?: string[],
+    productContext?: InvoiceProductContext,
+  ): Promise<DisbursementKpisResponse> => {
+    const body: Record<string, unknown> = {
       programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
+    appendOptionalProductId(body, productContext?.productId);
     const response = await axiosInstance.post(ApiEndPoints.apiDisbursementKpis, body, {
       authRequired: true,
     } as any);
@@ -445,10 +510,14 @@ export const invoiceApi = {
     };
   },
 
-  getInterestAccrualKpis: async (programIds?: string[]): Promise<InterestAccrualKpisResponse> => {
-    const body = {
+  getInterestAccrualKpis: async (
+    programIds?: string[],
+    productContext?: InvoiceProductContext,
+  ): Promise<InterestAccrualKpisResponse> => {
+    const body: Record<string, unknown> = {
       programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
+    appendOptionalProductId(body, productContext?.productId);
     const response = await axiosInstance.post(ApiEndPoints.apiInterestAccrualKpis, body, {
       authRequired: true,
     } as any);
@@ -460,10 +529,14 @@ export const invoiceApi = {
     };
   },
 
-  getRepaymentKpis: async (programIds?: string[]): Promise<RepaymentKpisResponse> => {
-    const body = {
+  getRepaymentKpis: async (
+    programIds?: string[],
+    productContext?: InvoiceProductContext,
+  ): Promise<RepaymentKpisResponse> => {
+    const body: Record<string, unknown> = {
       programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
+    appendOptionalProductId(body, productContext?.productId);
     const response = await axiosInstance.post(ApiEndPoints.apiRepaymentKpis, body, {
       authRequired: true,
     } as any);
@@ -479,10 +552,14 @@ export const invoiceApi = {
     };
   },
 
-  getDpdKpis: async (programIds?: string[]): Promise<DpdKpisResponse> => {
-    const body = {
+  getDpdKpis: async (
+    programIds?: string[],
+    productContext?: InvoiceProductContext,
+  ): Promise<DpdKpisResponse> => {
+    const body: Record<string, unknown> = {
       programIds: Array.isArray(programIds) ? programIds : programIds ? [programIds] : [],
     };
+    appendOptionalProductId(body, productContext?.productId);
     const response = await axiosInstance.post(ApiEndPoints.apiDpdKpis, body, {
       authRequired: true,
     } as any);
@@ -696,6 +773,8 @@ export const invoiceApi = {
       bankIds?: string[];
       programIds?: string[];
       productIds?: string[];
+      /** VF/CWF singular productId (also accepted alongside productIds) */
+      productId?: string | null;
       partyIds?: string[];
       counterPartyIds?: string[];
       byInvoiceStatus?: string[];
@@ -706,6 +785,7 @@ export const invoiceApi = {
     if (progIds?.length) (body as any).programIds = progIds;
     if (filters?.bankIds?.length) (body as any).bankIds = filters.bankIds;
     if (filters?.productIds?.length) (body as any).productIds = filters.productIds;
+    appendOptionalProductId(body, filters?.productId);
     if (filters?.partyIds?.length) (body as any).partyIds = filters.partyIds;
     if (filters?.counterPartyIds?.length)
       (body as any).counterPartyIds = filters.counterPartyIds;
@@ -725,12 +805,13 @@ export const invoiceApi = {
   /** Disbursed / closed invoices for interest accrual list */
   getDisbursedList: async (
     programIds?: string[],
-    options?: {byInvoiceStatus?: string[]},
+    options?: {byInvoiceStatus?: string[]; productId?: string | null},
   ): Promise<any[]> => {
     const body: Record<string, unknown> = {
       byInvoiceStatus: options?.byInvoiceStatus ?? ['Disbursed', 'Closed'],
     };
     if (programIds?.length) (body as any).programIds = programIds;
+    appendOptionalProductId(body, options?.productId);
     const response = await axiosInstance.post(
       ApiEndPoints.apiDisbursedList,
       body,
@@ -948,6 +1029,14 @@ export const invoiceApi = {
       credit_to: fields.creditTo || '',
       items,
     };
+
+    const creditAccountId =
+      input.creditToAccountId?.trim() ||
+      fields.creditToAccountId?.trim() ||
+      '';
+    if (creditAccountId) {
+      payload.credit_to_account_id = creditAccountId;
+    }
 
     if (fields.grnDate?.trim()) {
       payload.grn_date = toYYYYMMDD(fields.grnDate);

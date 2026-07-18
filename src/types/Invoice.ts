@@ -43,7 +43,13 @@ export type InvoiceFields = {
   // Additional Invoice Information
   earlyPaymentDiscount: string; // Percentage
   currency: string;
-  creditTo: string; // Credit To (bank account)
+  /** Credit To (bank account number / display value) */
+  creditTo: string;
+  /**
+   * VF/CWF: UUID of selected credit-to bank account (party-info bankAccounts.id).
+   * Optional — DF create does not send credit_to_account_id. Wired in PR6 UI.
+   */
+  creditToAccountId?: string;
   remark: string;
 
   // Line Items
