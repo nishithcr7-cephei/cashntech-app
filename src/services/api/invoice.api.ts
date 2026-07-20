@@ -200,7 +200,7 @@ export type InvoiceListFilters = {
   byAdminStatus?: string[];
 };
 
-/** Optional product filter for VF/CWF list & KPI bodies. Omit for DF. */
+/** Optional product filter for list & KPI bodies. Omit when unset — DF default unchanged. */
 export type InvoiceProductContext = {
   productId?: string | null;
 };

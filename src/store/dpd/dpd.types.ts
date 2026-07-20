@@ -31,4 +31,7 @@ export const initialDPDState: DPDState = {
 
 export type FetchDPDListRequest = {
   programIds?: string[];
+  /** Optional — included when VF product context is active (PR7); omitted for DF default. */
+  productId?: string | null;
+  buckets?: string[];
 };

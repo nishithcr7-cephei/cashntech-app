@@ -18,6 +18,11 @@ type RecordRepaymentModalProps = {
   onClose: () => void;
   accountNo?: string;
   totalOutstanding?: string;
+  /**
+   * When false (default), Submit is hidden — mobile has no repayment posting
+   * flow (PR7 read-only parity for DF + VF alike).
+   */
+  submitEnabled?: boolean;
   onSubmit?: (data: {
     repaymentMode: string;
     invoicesList: string;
@@ -50,6 +55,7 @@ export const RecordRepaymentModal: React.FC<RecordRepaymentModalProps> = ({
   onClose,
   accountNo = '(Account No.)',
   totalOutstanding = '25,10,556',
+  submitEnabled = false,
   onSubmit,
 }) => {
   const [repaymentMode, setRepaymentMode] = useState('invoice_level');
@@ -73,6 +79,9 @@ export const RecordRepaymentModal: React.FC<RecordRepaymentModalProps> = ({
   }, [visible]);
 
   const handleSubmit = () => {
+    if (!submitEnabled) {
+      return;
+    }
     if (!repaymentAmount.trim() || !debitFrom || !creditTo || !paymentReceiveDate) return;
     if (onSubmit) {
       onSubmit({
@@ -253,9 +262,11 @@ export const RecordRepaymentModal: React.FC<RecordRepaymentModalProps> = ({
                 <TouchableOpacity style={[styles.actionButton, styles.cancelButton]} onPress={onClose}>
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.actionButton, styles.submitButton]} onPress={handleSubmit}>
-                  <Text style={styles.submitButtonText}>Submit</Text>
-                </TouchableOpacity>
+                {submitEnabled ? (
+                  <TouchableOpacity style={[styles.actionButton, styles.submitButton]} onPress={handleSubmit}>
+                    <Text style={styles.submitButtonText}>Submit</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
           </TouchableWithoutFeedback>

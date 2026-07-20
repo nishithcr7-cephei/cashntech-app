@@ -33,4 +33,6 @@ export const initialRepaymentState: RepaymentState = {
 
 export type FetchRepaymentListRequest = {
   programIds?: string[];
+  /** Optional — included when VF product context is active (PR7); omitted for DF default. */
+  productId?: string | null;
 };

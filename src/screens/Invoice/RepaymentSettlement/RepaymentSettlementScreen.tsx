@@ -31,8 +31,14 @@ import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import {
+  selectActiveProductId,
+  selectActiveProductName,
+  selectEffectiveProductCode,
+} from '@store/product/product.selectors';
+import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {FetchRepaymentListRequest} from '@store/repayment/repayment.types';
 import {decryptValue} from '@utils/decrypt';
-import Endpoints from '@constants/ApiEndPoints';
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import {PaymentHistoryModal} from '../DPDPenalInterest/components/PaymentHistoryModal';
 import {RequestWaiverModal} from '../DPDPenalInterest/components/RequestWaiverModal';
@@ -53,6 +59,9 @@ export const RepaymentSettlementScreen: React.FC = () => {
   >>();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const programSelection = useSelector(selectProgramSelection);
+  const effectiveCode = useSelector(selectEffectiveProductCode);
+  const activeProductId = useSelector(selectActiveProductId);
+  const activeProductName = useSelector(selectActiveProductName);
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
 
@@ -63,6 +72,32 @@ export const RepaymentSettlementScreen: React.FC = () => {
   const dispatch = useDispatch();
   const repaymentData = useSelector(repaymentSelectors.selectRepaymentList);
   const loading = useSelector(repaymentSelectors.selectRepaymentLoading);
+
+  /** PR5/PR7 pattern: optional productId for VF list/KPI filters; omitted for DF default. */
+  const overviewProductId = useMemo(() => {
+    if (
+      programSelection?.programScope === 'selected' &&
+      programSelection?.productId
+    ) {
+      return programSelection.productId;
+    }
+    if (effectiveCode === PRODUCT_CODES.VENDOR_FINANCE && activeProductId) {
+      return activeProductId;
+    }
+    return null;
+  }, [
+    programSelection?.programScope,
+    programSelection?.productId,
+    effectiveCode,
+    activeProductId,
+  ]);
+
+  const productBreadcrumbLabel = useMemo(() => {
+    if (activeProductName) {
+      return activeProductName;
+    }
+    return PRODUCT_DISPLAY_NAMES[effectiveCode];
+  }, [activeProductName, effectiveCode]);
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<{x: number; y: number; width: number; height: number} | null>(null);
@@ -131,22 +166,37 @@ export const RepaymentSettlementScreen: React.FC = () => {
   }, [programSelection?.programScope, programSelection?.programId]);
 
   useEffect(() => {
-    const listPayload =
-      programSelection?.programScope === 'selected' && programSelection?.programId
-        ? {programIds: [programSelection.programId]}
-        : {};
+    const listPayload: FetchRepaymentListRequest = {};
+    if (
+      programSelection?.programScope === 'selected' &&
+      programSelection?.programId
+    ) {
+      listPayload.programIds = [programSelection.programId];
+    }
+    if (overviewProductId) {
+      listPayload.productId = overviewProductId;
+    }
 
     dispatch(repaymentActions.fetchRepaymentListRequest(listPayload));
 
     invoiceApi
-      .getRepaymentKpis(kpiProgramIds)
+      .getRepaymentKpis(
+        kpiProgramIds,
+        overviewProductId ? {productId: overviewProductId} : undefined,
+      )
       .then(res => {
         setApiKpis(res);
       })
       .catch(() => {
         setApiKpis(null);
       });
-  }, [programSelection?.programScope, programSelection?.programId, kpiProgramIds, dispatch]);
+  }, [
+    programSelection?.programScope,
+    programSelection?.programId,
+    kpiProgramIds,
+    overviewProductId,
+    dispatch,
+  ]);
 
   const getVal = (val: string | number | undefined | null) =>
     val != null && val !== ''
@@ -264,7 +314,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
       <ProgramBreadcrumb />
       <View style={styles.navPathContainer}>
         <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
-          Products {'>'} Dealer Finance {'>'} Transactions
+          Products {'>'} {productBreadcrumbLabel} {'>'} Transactions
         </Text>
       </View>
       <ScrollView 

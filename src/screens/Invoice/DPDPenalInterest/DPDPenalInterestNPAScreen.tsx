@@ -1,4 +1,4 @@
-import React, {useMemo, useState, useRef, useEffect} from 'react';
+import React, {useMemo, useState, useEffect} from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -6,17 +6,13 @@ import {
   TouchableOpacity,
   View,
   TextInput,
-  Modal,
-  Pressable,
-  Dimensions,
-  Alert,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector, useDispatch} from 'react-redux';
-import {dpdActions, dpdSelectors, DPDRecord} from '@store/dpd';
+import {dpdActions, dpdSelectors} from '@store/dpd';
 import {
   AppBar,
   Container,
@@ -26,15 +22,17 @@ import {
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
-import {Search, Filter, Dots} from '@assets/Icons';
-import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
+import {Search, Filter} from '@assets/Icons';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
-import Endpoints from '@constants/ApiEndPoints';
-import {RecordRepaymentModal} from './components/RecordRepaymentModal';
-import {PaymentHistoryModal} from './components/PaymentHistoryModal';
-import {RequestWaiverModal} from './components/RequestWaiverModal';
+import {
+  selectActiveProductId,
+  selectActiveProductName,
+  selectEffectiveProductCode,
+} from '@store/product/product.selectors';
+import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {FetchDPDListRequest} from '@store/dpd/dpd.types';
 import {invoiceApi, DpdKpisResponse} from '@services/api/invoice.api';
 
 // DPD Metrics will be dynamically populated in the component
@@ -72,20 +70,46 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
   >>();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const programSelection = useSelector(selectProgramSelection);
-  const programName = programSelection?.programName ?? 'Sun Pharma PGM';
+  const effectiveCode = useSelector(selectEffectiveProductCode);
+  const activeProductId = useSelector(selectActiveProductId);
+  const activeProductName = useSelector(selectActiveProductName);
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
-  const [selectedRow, setSelectedRow] = useState<DPDRecord | null>(null);
 
   const dispatch = useDispatch();
   const dpdRows = useSelector(dpdSelectors.selectDPDList);
-  const loading = useSelector(dpdSelectors.selectDPDLoading);
 
   const [apiKpis, setApiKpis] = useState<DpdKpisResponse | null>(null);
+
+  /** PR5/PR7 pattern: optional productId for VF list/KPI filters; omitted for DF default. */
+  const overviewProductId = useMemo(() => {
+    if (
+      programSelection?.programScope === 'selected' &&
+      programSelection?.productId
+    ) {
+      return programSelection.productId;
+    }
+    if (effectiveCode === PRODUCT_CODES.VENDOR_FINANCE && activeProductId) {
+      return activeProductId;
+    }
+    return null;
+  }, [
+    programSelection?.programScope,
+    programSelection?.productId,
+    effectiveCode,
+    activeProductId,
+  ]);
+
+  const productBreadcrumbLabel = useMemo(() => {
+    if (activeProductName) {
+      return activeProductName;
+    }
+    return PRODUCT_DISPLAY_NAMES[effectiveCode];
+  }, [activeProductName, effectiveCode]);
 
   const kpiProgramIds = useMemo(() => {
     if (
@@ -98,10 +122,17 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
   }, [programSelection?.programScope, programSelection?.programId]);
 
   useEffect(() => {
-    let payload: any = {};
+    const payload: FetchDPDListRequest = {};
 
-    if (programSelection?.programScope === 'selected' && programSelection?.programId) {
+    if (
+      programSelection?.programScope === 'selected' &&
+      programSelection?.programId
+    ) {
       payload.programIds = [programSelection.programId];
+    }
+
+    if (overviewProductId) {
+      payload.productId = overviewProductId;
     }
 
     const selectedBuckets = appliedFilters['DPD Buckets'] || [];
@@ -112,14 +143,24 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
     dispatch(dpdActions.fetchDPDListRequest(payload));
 
     invoiceApi
-      .getDpdKpis(kpiProgramIds)
+      .getDpdKpis(
+        kpiProgramIds,
+        overviewProductId ? {productId: overviewProductId} : undefined,
+      )
       .then(res => {
         setApiKpis(res);
       })
       .catch(() => {
         setApiKpis(null);
       });
-  }, [programSelection, appliedFilters, kpiProgramIds, dispatch]);
+  }, [
+    programSelection?.programScope,
+    programSelection?.programId,
+    appliedFilters,
+    kpiProgramIds,
+    overviewProductId,
+    dispatch,
+  ]);
 
   const getVal = (val: string | number | undefined | null) =>
     val != null && val !== ''
@@ -219,7 +260,7 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
       <ProgramBreadcrumb />
       <View style={styles.navPathContainer}>
         <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
-          Products {'>'} Dealer Finance {'>'} Transactions
+          Products {'>'} {productBreadcrumbLabel} {'>'} Transactions
         </Text>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
