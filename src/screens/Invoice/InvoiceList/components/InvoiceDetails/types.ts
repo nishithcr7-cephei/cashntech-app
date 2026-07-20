@@ -100,6 +100,9 @@ export type InvoiceRow = {
   counterParty: string;
   approvalLogsCount: number;
   absoluteIndex?: number;
+  /** From list API — drives Approve/Reject when present */
+  actionable?: boolean;
+  currentStepRole?: string;
 };
 
 export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
@@ -151,6 +154,8 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
       ) || '-',
     counterParty,
     approvalLogsCount: Array.isArray(item.approvalLogs) ? item.approvalLogs.length : 0,
+    actionable: typeof item.actionable === 'boolean' ? item.actionable : undefined,
+    currentStepRole: item.current_step?.role,
   };
 }
 

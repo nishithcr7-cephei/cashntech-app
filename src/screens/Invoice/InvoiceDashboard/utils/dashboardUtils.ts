@@ -1,6 +1,8 @@
 import type {Bank} from '@constants/programSelection';
 import type {InvoiceOverviewSummaryItem} from '@store/invoiceOverview';
 import type {ProductTabType, MetricItem, DashboardKpis} from '../types';
+import {PRODUCT_CODES} from '@store/product/product.types';
+import {resolveProductCode} from '@store/product/product.resolver';
 
 /**
  * Format date as DD MMM YYYY (e.g., 15 Apr 2026)
@@ -31,7 +33,13 @@ export const getProgramIdsForTab = (
   const ids: string[] = [];
   banks.forEach(bank => {
     bank.products.forEach(product => {
-      const isDFProduct = product.name.toLowerCase().includes('dealer finance');
+      const scopeCode = resolveProductCode({id: product.id, name: product.name});
+      const isDFProduct =
+        scopeCode === PRODUCT_CODES.DEALER_FINANCE ||
+        product.name.toLowerCase().includes('dealer finance');
+      const isVFProduct =
+        scopeCode === PRODUCT_CODES.VENDOR_FINANCE ||
+        product.name.toLowerCase().includes('vendor finance');
       product.programs.forEach(program => {
         const isDFProgram =
           program.name.toLowerCase().includes('df') ||
@@ -39,7 +47,9 @@ export const getProgramIdsForTab = (
         const includeInAll = tab === 'all_product';
         const includeInDF =
           tab === 'dealer_finance' && (isDFProduct || isDFProgram);
-        if (includeInAll || includeInDF) {
+        const includeInVF =
+          tab === 'vendor_finance' && isVFProduct;
+        if (includeInAll || includeInDF || includeInVF) {
           ids.push(program.id);
         }
       });
@@ -71,7 +81,6 @@ export const getCardMetrics = (
 
   const sumTotalLimit = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.sanctioned_limit) || 0), 0);
   const sumUtilizedAmount = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.utilized_amount) || 0), 0);
-  const sumOverdueAmount = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.overdue_amount) || 0), 0);
   const sumPrincipalOverdue = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.principal_overdue) || 0), 0);
   const sumInterestOverdue = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.interest_overdue) || 0), 0);
   const sumPenalOverdue = (summaryData || []).reduce((acc, curr) => acc + (Number(curr.penal_overdue) || 0), 0);
@@ -80,7 +89,6 @@ export const getCardMetrics = (
 
   const finalTotalLimit = parsed.totalLimit || sumTotalLimit;
   const finalUtilizedAmount = parsed.utilizedAmount || sumUtilizedAmount;
-  const finalOverdueAmount = parsed.overdueAmount || sumOverdueAmount;
   const finalPrincipalOverdue = parsed.principalOverdue || sumPrincipalOverdue;
   const finalInterestOverdue = parsed.interestOverdue || sumInterestOverdue;
   const finalPenalOverdue = parsed.penalOverdue || sumPenalOverdue;
@@ -102,12 +110,9 @@ export const getCardMetrics = (
 
   const utilizedRateVal = kpis?.utilized_rate ? `${parseFloat(kpis.utilized_rate).toFixed(2)}%` : (finalTotalLimit > 0 ? formatPercentage((finalUtilizedAmount / finalTotalLimit) * 100) : '-');
   
-  const overdueAmountVal = formatCurrency(finalOverdueAmount);
   const principalOverdueVal = formatCurrency(finalPrincipalOverdue);
   const interestOverdueVal = formatCurrency(finalInterestOverdue);
   const penalOverdueVal = formatCurrency(finalPenalOverdue);
-  
-  const dpdDaysVal = kpis?.dpd_days ? kpis.dpd_days : '-';
 
   const metrics: MetricItem[] = [
     {label: 'Total Program Limit', value: totalLimitVal},

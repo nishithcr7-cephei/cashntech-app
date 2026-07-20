@@ -22,6 +22,9 @@ import {ImgDashboard} from '@assets/Images';
 import {useSelector} from 'react-redux';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
+import {selectActiveProductName} from '@store/product/product.selectors';
+import {PRODUCT_DISPLAY_NAMES, PRODUCT_CODES} from '@store/product/product.types';
+import {getEffectiveProductCode} from '@store/product/product.resolver';
 
 // Key figure cards for Dealer Maker
 const cardMetrics = [
@@ -93,6 +96,10 @@ export const DealerMakerDashboardScreen: React.FC = () => {
   const mode = route?.params?.mode ?? 'landing'; // 'landing' | 'dashboard'
   const isLanding = mode === 'landing';
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const activeProductName = useSelector(selectActiveProductName);
+  const productLabel =
+    activeProductName ||
+    PRODUCT_DISPLAY_NAMES[getEffectiveProductCode(PRODUCT_CODES.DEALER_FINANCE)];
 
   // Dealer Maker now uses Anchor Maker InvoiceDashboard screen (Dealer Finance flow).
   // Keep this screen visible but disabled (overlay) for now.
@@ -453,7 +460,7 @@ export const DealerMakerDashboardScreen: React.FC = () => {
     <Container>
       {/* Keep AppBar usable (hamburger + title NOT covered) */}
       <AppBar 
-        title={isLanding ? 'LMS System' : 'Invoice Dashboard'} 
+        title={isLanding ? 'LMS System' : `Invoice Dashboard — ${productLabel}`} 
         navigation={navigation as any}
       />
 

@@ -1,9 +1,9 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {
-  InvoiceOverviewState,
   initialInvoiceOverviewState,
   InvoiceOverviewSummaryItem,
   InvoiceOverviewLatestItem,
+  InvoiceOverviewRequest,
 } from './invOverview.types';
 
 const invoiceOverviewSlice = createSlice({
@@ -12,7 +12,7 @@ const invoiceOverviewSlice = createSlice({
   reducers: {
     fetchInvoiceSummaryRequest: (
       state,
-      _action: PayloadAction<{programIds: string[]}>,
+      _action: PayloadAction<InvoiceOverviewRequest>,
     ) => {
       state.summaryLoading = true;
       state.summaryError = null;
@@ -32,7 +32,7 @@ const invoiceOverviewSlice = createSlice({
 
     fetchLatestInvoicesRequest: (
       state,
-      _action: PayloadAction<{programIds: string[]}>,
+      _action: PayloadAction<InvoiceOverviewRequest>,
     ) => {
       state.latestLoading = true;
       state.latestError = null;
@@ -52,7 +52,7 @@ const invoiceOverviewSlice = createSlice({
 
     fetchInvoiceKpisRequest: (
       state,
-      _action: PayloadAction<{programIds: string[]}>,
+      _action: PayloadAction<InvoiceOverviewRequest>,
     ) => {
       state.kpisLoading = true;
     },

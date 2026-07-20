@@ -9,6 +9,7 @@ import {
   UpdateInvoicePayload,
   BulkUpdateInvoiceRequest,
   BulkDisbursementRequest,
+  InvoiceListFilters,
 } from './inv.types';
 
 const invoiceSlice = createSlice({
@@ -16,8 +17,7 @@ const invoiceSlice = createSlice({
   initialState: initialInvoiceState,
   reducers: {
     fetchDealerInfoRequest: (state, _action: PayloadAction<string>) => {
-      // programId only — saga resolves dealer-info / anchor-info / party-info
-      // from active product + capability (PR4).
+      // programId only — saga resolves unified party-info route (PR4/PR5).
       state.dealerInfoLoading = true;
       state.dealerInfoError = null;
     },
@@ -86,7 +86,7 @@ const invoiceSlice = createSlice({
     },
     fetchInvoiceListRequest: (
       state,
-      _action: PayloadAction<{programId: string; filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]}}>,
+      _action: PayloadAction<{programId: string; filters?: InvoiceListFilters}>,
     ) => {
       state.invoiceListLoading = true;
       state.invoiceListError = null;

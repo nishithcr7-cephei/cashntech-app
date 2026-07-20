@@ -47,7 +47,9 @@ import {
   selectActiveProductId,
   selectIsVendorFinanceActive,
 } from '@store/product/product.selectors';
+import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {getUserCapability} from '@store/user/user.selector';
+import type {InvoiceListFilters} from './inv.types';
 import type {InvoicePartyInfoRouteOptions} from '@utils/invoicePartyInfoRoute';
 
 function showActionToast(
@@ -77,10 +79,20 @@ function* selectPartyInfoRouteOptions(): Generator<
 }
 
 /**
- * Optional productId for VF/CWF list/KPI bodies only.
- * DF (or unset product) returns null so request shape stays unchanged.
+ * Optional productId for list/KPI bodies.
+ * VF: active product or selected program product.
+ * DF: omitted when no product context (preserves legacy requests).
  */
 function* selectOptionalProductId(): Generator<any, string | null, any> {
+  const programSelection = yield select(selectProgramSelection);
+  if (
+    programSelection?.programScope === 'selected' &&
+    typeof programSelection?.productId === 'string' &&
+    programSelection.productId.trim()
+  ) {
+    return programSelection.productId.trim();
+  }
+
   const isVf = yield select(selectIsVendorFinanceActive);
   if (!isVf) {
     return null;
@@ -212,7 +224,7 @@ function* updateInvoiceSaga(action: PayloadAction<UpdateInvoicePayload>): Genera
 }
 
 function* fetchInvoiceListSaga(
-  action: PayloadAction<{programId: string; filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]}}>,
+  action: PayloadAction<{programId: string; filters?: InvoiceListFilters}>,
 ): Generator {
   try {
     const {programId, filters} = action.payload;

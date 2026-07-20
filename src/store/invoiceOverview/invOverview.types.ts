@@ -47,6 +47,11 @@ export type InvoiceOverviewLatestItem = {
   party?: { entity_name?: string };
 };
 
+export type InvoiceOverviewRequest = {
+  programIds: string[];
+  productId?: string | null;
+};
+
 export type InvoiceOverviewState = {
   summary: InvoiceOverviewSummaryItem[];
   summaryLoading: boolean;

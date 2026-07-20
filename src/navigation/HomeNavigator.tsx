@@ -5,10 +5,9 @@ import {scaleWidth} from '@utils/Scale';
 import React, {useEffect} from 'react';
 import {Dimensions} from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
-import {getIsCashntechUserType, userSelector} from '@store/user';
+import {getIsCashntechUserType} from '@store/user';
 import {fetchUserScopeRequest} from '@store/programSelection/programSelection.slice';
 import {fetchPermissionsRequest} from '@store/permissions';
-import {AppRole} from '@constants/roles';
 import {
   OcrInvoiceScreen,
   InvoiceDashboard,
@@ -56,11 +55,11 @@ const Drawer = createDrawerNavigator<HomeNavigatorType>();
 
 export const HomeNavigator = () => {
   const dispatch = useDispatch();
-  const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const canViewReports = useSelector(getIsCashntechUserType);
   const initialRoute = 'InvoiceDashboard';
 
-  // Pre-load user scope and permissions when entering home
+  // Pre-load user scope and permissions when entering home.
+  // Scope saga re-syncs active product when a program is already selected.
   useEffect(() => {
     dispatch(fetchUserScopeRequest());
     dispatch(fetchPermissionsRequest());

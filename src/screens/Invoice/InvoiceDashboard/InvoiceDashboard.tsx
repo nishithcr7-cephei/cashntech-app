@@ -19,7 +19,6 @@ import {styles} from './InvoiceDashboard.styles';
 import {useInvoiceDashboard} from './hooks/useInvoiceDashboard';
 import {getCardMetrics} from './utils/dashboardUtils';
 import {MetricsCard} from './components/MetricsCard';
-import {ProductTabs} from './components/ProductTabs';
 import {DealerSummaryList} from './components/DealerSummaryList';
 import {LatestInvoicesList} from './components/LatestInvoicesList';
 
@@ -40,7 +39,6 @@ export const InvoiceDashboard: React.FC = () => {
     activeTab,
     setActiveTab,
     productTab,
-    setProductTab,
     selectedInvoices,
     setSelectedInvoices,
     showBulkReviewModal,
@@ -52,6 +50,7 @@ export const InvoiceDashboard: React.FC = () => {
     canReject,
     handleBulkAction,
     onBulkSubmit,
+    productBreadcrumbLabel,
   } = useInvoiceDashboard();
 
   const metrics = getCardMetrics(productTab, kpis, summaryData);
@@ -94,7 +93,7 @@ export const InvoiceDashboard: React.FC = () => {
       <ProgramBreadcrumb />
       <View style={styles.breadcrumb}>
         <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">
-          Products {'>'} Dealer Finance {'>'} Transactions
+          Products {'>'} {productBreadcrumbLabel} {'>'} Transactions
         </Text>
       </View>
 

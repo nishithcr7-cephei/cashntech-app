@@ -107,6 +107,7 @@ export const InvoiceDetails: React.FC = () => {
     selectedInvoiceRawAdminStatus,
     selectedInvoiceRawApprovalStatus,
     selectedInvoiceRawInvoiceStatus,
+    selectedInvoiceActionable,
     selectedInvoiceApprovalLogsCount,
     userDepartment,
     storedUserRole,
@@ -408,6 +409,7 @@ export const InvoiceDetails: React.FC = () => {
         rawAdminStatus={selectedInvoiceRawAdminStatus}
         rawApprovalStatus={selectedInvoiceRawApprovalStatus}
         rawInvoiceStatus={selectedInvoiceRawInvoiceStatus}
+        listActionable={selectedInvoiceActionable}
         userDepartment={userDepartment}
         approvalLogsCount={selectedInvoiceApprovalLogsCount}
       />

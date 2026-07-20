@@ -30,6 +30,9 @@ import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
 import {invoiceApi} from '@services/api/invoice.api';
 import {getBestWorkflowApprovalLevelFromScope, getInvoiceApprovalLevelForId} from '@utils/getInvoiceApprovalLevel';
+import {selectActiveProductCode, selectActiveProductName, selectActiveProductId} from '@store/product/product.selectors';
+import {PRODUCT_DISPLAY_NAMES, PRODUCT_CODES} from '@store/product/product.types';
+import {getEffectiveProductCode} from '@store/product/product.resolver';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
 import type {Bank} from '@constants/programSelection';
 import type {ProductTabType} from '../types';
@@ -47,6 +50,9 @@ export const useInvoiceDashboard = () => {
   const scopeData = useSelector(selectScopeData) as Bank[] | null;
   const programSelection = useSelector(selectProgramSelection);
   const allProgramIds = useSelector(selectAllProgramIds);
+  const activeProductCode = useSelector(selectActiveProductCode);
+  const activeProductName = useSelector(selectActiveProductName);
+  const activeProductId = useSelector(selectActiveProductId);
   const summaryData = useSelector(selectInvoiceOverviewSummary);
   const summaryLoading = useSelector(selectInvoiceOverviewSummaryLoading);
   const latestData = useSelector(selectInvoiceOverviewLatest);
@@ -72,7 +78,10 @@ export const useInvoiceDashboard = () => {
   );
 
   const [activeTab, setActiveTab] = useState<'dealers' | 'unpaid'>('dealers');
-  const [productTab, setProductTab] = useState<ProductTabType>('all_product');
+  const effectiveCode = getEffectiveProductCode(activeProductCode);
+  const [productTab, setProductTab] = useState<ProductTabType>(
+    effectiveCode === PRODUCT_CODES.VENDOR_FINANCE ? 'vendor_finance' : 'dealer_finance',
+  );
   const [showCheckerApprovalModal, setShowCheckerApprovalModal] = useState(false);
   const [showApproveRejectModal, setShowApproveRejectModal] = useState(false);
   const [selectedDealerId, setSelectedDealerId] = useState<string | null>(null);
@@ -96,6 +105,29 @@ export const useInvoiceDashboard = () => {
   const canViewApprovalHistory = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVAL_HISTORY);
 
   const canShowApproveReject = canApprove || canReject;
+
+  const overviewProductId = useMemo(() => {
+    if (
+      programSelection?.programScope === 'selected' &&
+      programSelection?.productId
+    ) {
+      return programSelection.productId;
+    }
+    if (effectiveCode === PRODUCT_CODES.VENDOR_FINANCE && activeProductId) {
+      return activeProductId;
+    }
+    return null;
+  }, [
+    programSelection?.programScope,
+    programSelection?.productId,
+    effectiveCode,
+    activeProductId,
+  ]);
+
+  const productBreadcrumbLabel = useMemo(() => {
+    if (activeProductName) return activeProductName;
+    return PRODUCT_DISPLAY_NAMES[effectiveCode];
+  }, [activeProductName, effectiveCode]);
 
   const programIds = useMemo(() => {
     if (
@@ -138,10 +170,10 @@ export const useInvoiceDashboard = () => {
       return;
     }
 
-    dispatch(fetchInvoiceSummaryRequest({programIds: programIds}));
-    dispatch(fetchLatestInvoicesRequest({programIds: programIds}));
-    dispatch(fetchInvoiceKpisRequest({programIds: programIds}));
-  }, [dispatch, programIds, scopeData, programSelection?.programScope, productTab]);
+    dispatch(fetchInvoiceSummaryRequest({programIds, productId: overviewProductId}));
+    dispatch(fetchLatestInvoicesRequest({programIds, productId: overviewProductId}));
+    dispatch(fetchInvoiceKpisRequest({programIds, productId: overviewProductId}));
+  }, [dispatch, programIds, scopeData, programSelection?.programScope, productTab, overviewProductId]);
 
   const handleBulkAction = useCallback((action: 'Verify' | 'Approve' | 'Reject' | 'On Hold') => {
     setBulkAction(action);
@@ -211,8 +243,8 @@ export const useInvoiceDashboard = () => {
         setSelectedInvoices([]);
         setShowBulkReviewModal(false);
         // Refresh data
-        dispatch(fetchLatestInvoicesRequest({programIds: programIds}));
-        dispatch(fetchInvoiceSummaryRequest({programIds: programIds}));
+        dispatch(fetchLatestInvoicesRequest({programIds, productId: overviewProductId}));
+        dispatch(fetchInvoiceSummaryRequest({programIds, productId: overviewProductId}));
       }
     } catch (error: any) {
       Toast.show({
@@ -272,5 +304,8 @@ export const useInvoiceDashboard = () => {
     programIds,
     handleBulkAction,
     onBulkSubmit,
+    productBreadcrumbLabel,
+    overviewProductId,
+    activeProductCode,
   };
 };

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Dimensions, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { scaleWidth, scaleHeight } from '@utils/Scale';
@@ -42,8 +42,9 @@ import {
   getBestWorkflowApprovalLevelFromScope,
   getInvoiceApprovalLevel,
   getInvoiceApprovalLevelForId,
-  getWorkflowApprovalLevelFromScope,
 } from '@utils/getInvoiceApprovalLevel';
+import {isInvoiceBulkSelectable} from '@utils/invoiceListActionable';
+import type {InvoiceListFilters} from '@store/invoice/inv.types';
 
 export function useInvoiceDetails() {
   const navigation = useNavigation();
@@ -199,7 +200,7 @@ export function useInvoiceDetails() {
     if (level != null) {
       dispatch(setProgramSelection({approvalLevel: level}));
     }
-  }, [dispatch, scopeData, programSelection?.productId, programSelection?.approvalLevel]);
+  }, [dispatch, scopeData, programSelection?.productId, programSelection?.programId, programSelection?.approvalLevel]);
 
   useEffect(() => {
     const isAlreadySet = programSelection?.programId === programIdFromParams && !!programSelection?.programName;
@@ -242,11 +243,11 @@ export function useInvoiceDetails() {
   }, [programIdFromParams, programSelection, scopeData, dispatch, routeParams]);
 
   const inv = appliedFilters['Invoice Status'];
-  const appr = appliedFilters['Approval Status'];
-  const apiFilters: { byInvoiceStatus?: string[]; byApprovalStatus?: string[] } | undefined = (() => {
-    const body: { byInvoiceStatus?: string[]; byApprovalStatus?: string[] } = {};
+  const admin = appliedFilters['Admin Status'];
+  const apiFilters: InvoiceListFilters | undefined = (() => {
+    const body: InvoiceListFilters = {};
     if (inv?.length) body.byInvoiceStatus = inv;
-    if (appr?.length) body.byApprovalStatus = appr;
+    if (admin?.length) body.byAdminStatus = admin;
     return Object.keys(body).length ? body : undefined;
   })();
 
@@ -290,9 +291,10 @@ export function useInvoiceDetails() {
       .getInvoiceDetails(selectedInvoiceId)
       .then((data: any) => {
         if (cancelled) return;
-        const selectedListRow =
-          filteredData.find(r => r.id === selectedInvoiceId) ??
-          invoiceData.find(r => r.id === selectedInvoiceId);
+        const selectedListRow = (() => {
+          const raw = invoiceListRaw.find((inv: InvoiceListItemApi) => inv.id === selectedInvoiceId);
+          return raw ? mapApiToRow(raw) : undefined;
+        })();
         const apm = data?.anchorParticipantMapping;
         const party = data?.party;
         const rawDealerName =
@@ -373,7 +375,7 @@ export function useInvoiceDetails() {
     return () => {
       cancelled = true;
     };
-  }, [isAnchorChecker, isCashnTechUser, showApproveRejectModal, selectedInvoiceId]);
+  }, [isAnchorChecker, isCashnTechUser, showApproveRejectModal, selectedInvoiceId, invoiceListRaw]);
 
   useEffect(() => {
     if (!showCheckerApprovalModal || !selectedInvoiceId) {
@@ -416,7 +418,7 @@ export function useInvoiceDetails() {
   const primaryParties = [...new Set(invoiceData.map(r => r.primaryParty).filter(Boolean))].sort();
   const counterParties = [...new Set(invoiceData.map(r => r.counterParty).filter(Boolean))].sort();
   const invoiceStatuses = [...new Set(invoiceData.map(r => r.invoiceStatus).filter(Boolean))].sort();
-  const approvalStatuses = [...new Set(invoiceData.map(r => r.approvalStatus).filter(Boolean))].sort();
+  const adminStatuses = [...new Set(invoiceData.map(r => r.adminStatus).filter(Boolean))].sort();
   const invoiceFilterData = {
     Bank: banks.length ? banks : ['No data'],
     Product: products.length ? products : ['No data'],
@@ -424,7 +426,7 @@ export function useInvoiceDetails() {
     'Primary Party': primaryParties.length ? primaryParties : ['No data'],
     'Counter Party': counterParties.length ? counterParties : ['No data'],
     'Invoice Status': invoiceStatuses.length ? invoiceStatuses : ['No data'],
-    'Approval Status': approvalStatuses.length ? approvalStatuses : ['No data'],
+    'Admin Status': adminStatuses.length ? adminStatuses : ['No data'],
   };
 
   useEffect(() => {
@@ -457,15 +459,19 @@ export function useInvoiceDetails() {
 
   const handleInvoiceNoPress = useCallback(
     (invoiceId: string, invoiceNo: string) => {
-      const idFromList =
-        filteredData.find(r => r.invoiceNo === invoiceNo)?.id ??
-        invoiceData.find(r => r.invoiceNo === invoiceNo)?.id;
-      const resolvedInvoiceId = idFromList || invoiceId;
+      const row =
+        filteredData.find(r => r.invoiceNo === invoiceNo || r.id === invoiceId) ??
+        invoiceData.find(r => r.invoiceNo === invoiceNo || r.id === invoiceId);
+      const resolvedInvoiceId = row?.id || invoiceId;
       (navigation as any).navigate('InvoiceDetailView', {
         invoiceId: resolvedInvoiceId,
         invoiceNo,
         programId,
         fromInvoiceDashboard,
+        listInvoiceStatus: row?.rawInvoiceStatus,
+        listApprovalStatus: row?.rawApprovalStatus,
+        listAdminStatus: row?.rawAdminStatus,
+        listActionable: row?.actionable,
       });
     },
     [navigation, programId, fromInvoiceDashboard, filteredData, invoiceData],
@@ -490,6 +496,10 @@ export function useInvoiceDetails() {
           invoiceNo,
           programId,
           fromInvoiceDashboard,
+          listInvoiceStatus: rowForAction?.rawInvoiceStatus,
+          listApprovalStatus: rowForAction?.rawApprovalStatus,
+          listAdminStatus: rowForAction?.rawAdminStatus,
+          listActionable: rowForAction?.actionable,
         });
         break;
       case 'edit':
@@ -595,6 +605,17 @@ export function useInvoiceDetails() {
   };
 
   const isInvoiceSelectable = useCallback((item: any) => {
+    if (typeof item.actionable === 'boolean') {
+      if (isCashnTechUser) {
+        return isInvoiceBulkSelectable(item, {
+          isCashnTechUser,
+          hasFunctionalPermission,
+          canVerify,
+        });
+      }
+      return item.actionable && hasFunctionalPermission;
+    }
+
     const programMethod = programSelection?.method;
     const userRoleInternal = programSelection?.role?.toLowerCase().replace(' ', '_');
 
@@ -636,7 +657,7 @@ export function useInvoiceDetails() {
     }
 
     return false;
-  }, [isCashnTechUser, storedUserRole, hasFunctionalPermission]);
+  }, [isCashnTechUser, storedUserRole, hasFunctionalPermission, canVerify, programSelection?.method, programSelection?.role, isAnchorAllAccess, isDealerAllAccess]);
 
   const toggleInvoiceSelection = (invoiceId: string) => {
     const item = filteredData.find(r => r.id === invoiceId) || invoiceData.find(r => r.id === invoiceId);
@@ -722,11 +743,14 @@ export function useInvoiceDetails() {
     );
   })();
 
-  const checkerRoleContext = {
-    isAnchorChecker,
-    isDealerMaker,
-    isDealerChecker,
-  };
+  const checkerRoleContext = useMemo(
+    () => ({
+      isAnchorChecker,
+      isDealerMaker,
+      isDealerChecker,
+    }),
+    [isAnchorChecker, isDealerMaker, isDealerChecker],
+  );
 
   const resolveWorkflowLevelForInvoice = useCallback(
     (_invoiceId?: string) =>
@@ -1129,16 +1153,22 @@ export function useInvoiceDetails() {
         }
       } else {
         const isActionable = canApprove || canReject;
-        
-        // Exact stage matching to avoid broad .includes() leaks
-        const isMyLevel = 
-          (approvalStatus === myApprovalLevel) ||
-          (isAnchorChecker && approvalS.includes('pending anchor checker')) ||
-          (isDealerMaker && approvalS.includes('pending dealer maker')) ||
-          (isDealerChecker && approvalS.includes('pending dealer checker'));
 
-        if (isActionable && isMyLevel && iStatusRaw === 'Created') {
-          pending++;
+        if (typeof row.actionable === 'boolean') {
+          if (isActionable && row.actionable && iStatusRaw === 'Created') {
+            pending++;
+          }
+        } else {
+          // Legacy: approval_status stage matching when actionable not in list response
+          const isMyLevel =
+            approvalStatus === myApprovalLevel ||
+            (isAnchorChecker && approvalS.includes('pending anchor checker')) ||
+            (isDealerMaker && approvalS.includes('pending dealer maker')) ||
+            (isDealerChecker && approvalS.includes('pending dealer checker'));
+
+          if (isActionable && isMyLevel && iStatusRaw === 'Created') {
+            pending++;
+          }
         }
       }
     });
@@ -1244,6 +1274,7 @@ export function useInvoiceDetails() {
     selectedInvoiceRawAdminStatus: selectedRowForMenu?.rawAdminStatus,
     selectedInvoiceRawApprovalStatus: selectedRowForMenu?.rawApprovalStatus,
     selectedInvoiceRawInvoiceStatus: selectedRowForMenu?.rawInvoiceStatus,
+    selectedInvoiceActionable: selectedRowForMenu?.actionable,
     selectedInvoiceApprovalLogsCount: selectedRowForMenu?.approvalLogsCount || 0,
     userDepartment,
     storedUserRole,

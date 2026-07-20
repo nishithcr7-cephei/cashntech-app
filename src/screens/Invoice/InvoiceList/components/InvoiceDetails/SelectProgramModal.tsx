@@ -23,6 +23,8 @@ import {
 } from '@store/programSelection/programSelection.selector';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
+import {selectActiveProductCode} from '@store/product/product.selectors';
+import {isProgramSelectableForProduct} from '@utils/programProductFilter';
 
 const FolderIcon = ({size = 20, color = '#7A7C82'}: {size?: number; color?: string}) => (
   <View style={{width: size, height: size, justifyContent: 'center', alignItems: 'center'}}>
@@ -55,6 +57,7 @@ export const SelectProgramModal: React.FC<SelectProgramModalProps> = ({
   const scopeLoading = useSelector(selectScopeLoading);
   const scopeError = useSelector(selectScopeError);
   const selectedPrograms = useSelector(selectSelectedPrograms);
+  const activeProductCode = useSelector(selectActiveProductCode);
 
   const banksData = useMemo(() => {
     if (!scopeData) return [];
@@ -64,15 +67,12 @@ export const SelectProgramModal: React.FC<SelectProgramModalProps> = ({
     }));
   }, [scopeData]);
 
-  const isDFProgram = (bank: Bank, product: BankProgram, program: Program): boolean => {
-    if (canUseAllProgramScope) return true;
-    if (bank.name.toLowerCase() === 'ugro') return true;
-    const isDFProduct = product.name.toLowerCase().includes('dealer finance');
-    const isDFProgramName =
-      program.name.toLowerCase().includes('df') ||
-      program.name.toLowerCase().includes('dealer finance');
-    return isDFProduct || isDFProgramName;
-  };
+  const isProgramSelectable = (bank: Bank, product: BankProgram, program: Program): boolean =>
+    isProgramSelectableForProduct(bank.name, product, program, {
+      activeProductCode,
+      allowAllPrograms: canUseAllProgramScope,
+      bankName: bank.name,
+    });
 
   useEffect(() => {
     if (visible) {
@@ -108,7 +108,7 @@ export const SelectProgramModal: React.FC<SelectProgramModalProps> = ({
   };
 
   const handleProgramSelect = (bank: Bank, product: BankProgram, program: Program) => {
-    if (!isDFProgram(bank, product, program)) return;
+    if (!isProgramSelectable(bank, product, program)) return;
     dispatch(
       toggleProgramSelection({
         bankId: bank.id,
@@ -133,8 +133,6 @@ export const SelectProgramModal: React.FC<SelectProgramModalProps> = ({
     expandedProducts.has(`${bankId}_${productId}`);
   const isProgramSelected = (programId: string) =>
     selectedPrograms.some(p => p.programId === programId);
-  const isProgramSelectable = (bank: Bank, product: BankProgram, program: Program) =>
-    isDFProgram(bank, product, program);
 
   const renderBankItem = (bank: Bank, index: number) => {
     const isExpanded = isBankExpanded(bank.id);

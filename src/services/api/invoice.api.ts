@@ -194,7 +194,7 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
 
 export type InvoiceListFilters = {
   byInvoiceStatus?: string[];
-  byApprovalStatus?: string[];
+  byAdminStatus?: string[];
 };
 
 /** Optional product filter for VF/CWF list & KPI bodies. Omit for DF. */
@@ -374,8 +374,7 @@ export const invoiceApi = {
 
   /**
    * Create-invoice party bootstrap.
-   * Route is backend-aware via options (VF → party-info; DF → dealer/anchor-info).
-   * When options omitted, defaults to main-DF `/invoice/dealer-info` (current behavior).
+   * Unified backend: always `GET /invoice/party-info/:programId` (DF + VF).
    */
   getDealerInfo: async (
     programId: string,

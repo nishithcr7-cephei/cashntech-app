@@ -13,9 +13,8 @@ export type DealerInfoParticipant = {
 
 export type PartyBankDetail = {
   /**
-   * Bank account row id.
-   * - VF/CWF party-info: UUID (pass as credit_to_account_id on create)
-   * - Main DF dealer/anchor-info: often the account number string
+   * Bank account row id (party-info `bankAccounts.id`).
+   * Pass as `credit_to_account_id` on create (PR6).
    */
   id: string;
   account_number: string;
@@ -37,7 +36,7 @@ export type DealerInfoResponse = {
     party_bank_details: PartyBankDetail[];
   };
   participants: DealerInfoParticipant[];
-  /** Program / counterparty bank accounts for credit-to (dealer-info / party-info). */
+  /** Program / counterparty bank accounts for credit-to (party-info). */
   bank_details?: PartyBankDetail[];
 };
 
@@ -93,14 +92,9 @@ export type InvoiceListItemApi = {
   approvalLogs?: Array<{id: string}>;
   attachment?: unknown;
   attachments?: unknown;
-  /**
-   * CWF additive: whether the current user can act on this invoice now.
-   * Undefined on DF / VF list responses — ignored until PR5.
-   */
+  /** Whether the current user can act on this invoice now (unified backend list). */
   actionable?: boolean;
-  /**
-   * CWF additive workflow pointer. Undefined on DF / VF — ignored until PR5.
-   */
+  /** Workflow pointer populated on unified backend list responses. */
   current_step?: InvoiceCurrentStep | null;
   /** VF/CWF create/detail: UUID of credit-to bank account row */
   credit_to_account_id?: string;
@@ -149,7 +143,7 @@ export type UpdateInvoiceStatusRequest = {
   approvalLevel: number;
   remark?: string;
   programId?: string;
-  filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]};
+  filters?: InvoiceListFilters;
   onSuccess?: () => void;
 };
 
@@ -159,7 +153,7 @@ export type UpdateInvoiceVerificationRequest = {
   action: 'Verify' | 'Reject';
   remark?: string;
   programId?: string;
-  filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]};
+  filters?: InvoiceListFilters;
   onSuccess?: () => void;
 };
 export type UpdateInvoicePayload = {
@@ -182,10 +176,16 @@ export type BulkUpdateInvoiceRequest = {
     approvalRemark?: string;
   }[];
   programId?: string;
-  filters?: {byInvoiceStatus?: string[]; byApprovalStatus?: string[]};
+  filters?: InvoiceListFilters;
   onSuccess?: () => void;
   onFailure?: () => void;
   isVerification?: boolean;
+};
+
+/** Server-side list filters — unified backend honors byInvoiceStatus / byAdminStatus. */
+export type InvoiceListFilters = {
+  byInvoiceStatus?: string[];
+  byAdminStatus?: string[];
 };
 
 export type BulkDisbursementRequest = {

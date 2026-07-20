@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Linking,
   Alert,
-  Platform,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
@@ -179,7 +178,19 @@ export const InvoiceDetailView: React.FC = () => {
 
   const rawInvoiceId = route?.params?.invoiceId || '';
   const invoiceNo = route?.params?.invoiceNo || '';
+  const listInvoiceStatus = route?.params?.listInvoiceStatus as string | undefined;
+  const listApprovalStatus = route?.params?.listApprovalStatus as string | undefined;
+  const listAdminStatus = route?.params?.listAdminStatus as string | undefined;
   const invoiceListRaw = useSelector(selectInvoiceList) as Array<any>;
+
+  const listRowForInvoice = useMemo(() => {
+    const trimmed = String(rawInvoiceId || '').trim();
+    return (invoiceListRaw || []).find(
+      inv =>
+        String(inv?.id || '').trim() === trimmed ||
+        String(inv?.invoice_ref_no || '').trim() === String(invoiceNo || '').trim(),
+    );
+  }, [invoiceListRaw, rawInvoiceId, invoiceNo]);
 
   const invoiceId = useMemo(() => {
     const trimmed = String(rawInvoiceId || '').trim();
@@ -310,9 +321,18 @@ export const InvoiceDetailView: React.FC = () => {
           tax: {percent: taxPercent, amount: taxTotal},
           total: finalTotal,
           attachments,
-          invoiceStatus: formatStatus(data?.invoice_status || ''),
-          approvalStatus: formatStatus(data?.approval_status || ''),
-          adminStatus: formatStatus(data?.admin_status || ''),
+          invoiceStatus: formatStatus(
+            data?.invoice_status || listInvoiceStatus || listRowForInvoice?.invoice_status || '',
+          ),
+          approvalStatus: formatStatus(
+            data?.approval_status ||
+              listApprovalStatus ||
+              listRowForInvoice?.approval_status ||
+              '',
+          ),
+          adminStatus: formatStatus(
+            data?.admin_status || listAdminStatus || listRowForInvoice?.admin_status || '',
+          ),
         });
       })
       .catch((err: any) => {
@@ -327,7 +347,7 @@ export const InvoiceDetailView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [invoiceId, invoiceNo]);
+  }, [invoiceId, invoiceNo, listInvoiceStatus, listApprovalStatus, listAdminStatus, listRowForInvoice]);
 
   const handleAttachmentUpload = (_file?: DocumentPickerResponse) => {
     setShowUploadModal(false);

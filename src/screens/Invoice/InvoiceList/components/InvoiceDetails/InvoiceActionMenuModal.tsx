@@ -16,6 +16,7 @@ import {PERMISSIONS} from '@constants/permissions';
 import {useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
 import {userSelector} from '@store/user';
+import {canShowWorkflowApproveReject} from '@utils/invoiceListActionable';
 
 /**
  * Visibility and Actionability Logic for "Manage Attachment"
@@ -85,6 +86,8 @@ type Props = {
   rawAdminStatus?: string;
   rawApprovalStatus?: string;
   rawInvoiceStatus?: string;
+  /** List-retained actionable flag — preferred over approval_status parsing */
+  listActionable?: boolean;
   userDepartment?: string;
   approvalLogsCount?: number;
 };
@@ -106,7 +109,8 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   rawAdminStatus,
   rawApprovalStatus,
   rawInvoiceStatus,
-  userDepartment,
+  listActionable,
+  userDepartment: _userDepartment,
   approvalLogsCount = 0,
 }) => {
   const permissionsLoading = useSelector(selectPermissionsLoading);
@@ -116,7 +120,6 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   const canReject = useHasPermission(PERMISSIONS.INVOICE_LIST_REJECT);
   const canViewHistory = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVAL_HISTORY);
   const canAttachment = useHasPermission(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
-  const canRecreate = useHasPermission(PERMISSIONS.INVOICE_LIST_RECREATE);
 
   const userInfo = useSelector(userSelector.getUserInfo);
 
@@ -157,18 +160,6 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
     return isEarlyStatus && hasNoWorkflowAction && !isForbiddenByApproval && !isForbiddenByAdmin;
   };
 
-  const isInvoiceInActionableState = (invoiceStatus?: string, adminStatus?: string) => {
-    const iStatus = invoiceStatus?.toLowerCase() || '';
-    const aStatus = adminStatus?.toLowerCase() || '';
-
-    // Block if in Draft or missing attachments
-    const isDraftState = ['draft', 'pending attachment', 'attachment pending'].includes(iStatus);
-    // Block if in a terminal state
-    const isTerminalState = ['verified', 'rejected'].includes(aStatus);
-
-    return !isDraftState && !isTerminalState;
-  };
-
   const isEditable = canEdit 
     && (isAnchorMaker || isDealerMaker || isCashnTechUser) 
     && isInvoiceInEditableState(
@@ -182,19 +173,29 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   // Backend enforces actual authorization (returns 401 when not allowed).
   const isDeletable = canDelete;
 
-  const isActionable = isInvoiceInActionableState(rawInvoiceStatus, rawAdminStatus);
-  
-  // Status Awareness Logic: Check if it's actually the user's turn
-  const approvalS = (rawApprovalStatus || '').trim().toUpperCase().replace(/_/g, ' ');
-  const roleLabel = (userInfo?.permission_group?.[0]?.business_role || userInfo?.permission_group?.[0]?.functional_role || '').trim().toUpperCase();
-  const isMyTurn = isCashnTechUser 
-    ? (rawAdminStatus || '').trim().toUpperCase().includes('PENDING') 
-    : (isAnchorAllAccess || isDealerAllAccess)
-      ? approvalS.includes(`PENDING ${isAnchorAllAccess ? 'ANCHOR' : 'DEALER'} CHECKER`) || 
-        approvalS.includes(`PENDING ${isAnchorAllAccess ? 'ANCHOR' : 'DEALER'} MAKER`)
-      : !!roleLabel && approvalS.includes(`PENDING ${roleLabel}`);
+  const roleLabel = (
+    userInfo?.permission_group?.[0]?.business_role ||
+    userInfo?.permission_group?.[0]?.functional_role ||
+    ''
+  ).trim();
 
-  const canShowApproveReject = (canApprove || canReject) && isActionable && isMyTurn;
+  const canShowApproveReject =
+    !isCashnTechUser &&
+    canShowWorkflowApproveReject(
+      {
+        actionable: listActionable,
+        rawApprovalStatus,
+        rawAdminStatus,
+        rawInvoiceStatus,
+      },
+      canApprove || canReject,
+      {
+        isCashnTechUser,
+        isAnchorAllAccess,
+        isDealerAllAccess,
+        roleLabel,
+      },
+    );
 
   if (!openMenuId) return null;
 

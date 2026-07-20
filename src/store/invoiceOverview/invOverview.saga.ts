@@ -3,7 +3,6 @@ import {PayloadAction} from '@reduxjs/toolkit';
 import {
   fetchInvoiceSummaryRequest,
   fetchInvoiceSummarySuccess,
-  fetchInvoiceSummaryFailure,
   fetchLatestInvoicesRequest,
   fetchLatestInvoicesSuccess,
   fetchLatestInvoicesFailure,
@@ -12,6 +11,7 @@ import {invoiceApi} from '@services/api/invoice.api';
 import {
   InvoiceOverviewSummaryItem,
   InvoiceOverviewLatestItem,
+  InvoiceOverviewRequest,
 } from './invOverview.types';
 import {
   fetchInvoiceKpisRequest,
@@ -19,13 +19,19 @@ import {
   fetchInvoiceKpisFailure,
 } from './invOverview.slice';
 
+function overviewProductContext(productId?: string | null) {
+  return productId ? {productId} : undefined;
+}
+
 function* fetchInvoiceSummarySaga(
-  action: PayloadAction<{programIds: string[]}>,
+  action: PayloadAction<InvoiceOverviewRequest>,
 ) {
   try {
+    const {programIds, productId} = action.payload;
     const response: any = yield call(
       invoiceApi.getInvoiceSummary,
-      action.payload.programIds,
+      programIds,
+      overviewProductContext(productId),
     );
     const data = Array.isArray(response?.data) ? response.data : [];
     yield put(
@@ -40,12 +46,14 @@ function* fetchInvoiceSummarySaga(
 }
 
 function* fetchLatestInvoicesSaga(
-  action: PayloadAction<{programIds: string[]}>,
+  action: PayloadAction<InvoiceOverviewRequest>,
 ) {
   try {
+    const {programIds, productId} = action.payload;
     const response: any = yield call(
       invoiceApi.getLatestInvoices,
-      action.payload.programIds,
+      programIds,
+      overviewProductContext(productId),
     );
     const data = Array.isArray(response?.data) ? response.data : [];
     yield put(fetchLatestInvoicesSuccess(data as InvoiceOverviewLatestItem[]));
@@ -59,12 +67,14 @@ function* fetchLatestInvoicesSaga(
 }
 
 function* fetchInvoiceKpisSaga(
-  action: PayloadAction<{programIds: string[]}>,
+  action: PayloadAction<InvoiceOverviewRequest>,
 ) {
   try {
+    const {programIds, productId} = action.payload;
     const kpis = yield call(
       invoiceApi.getInvoiceKpis,
-      action.payload.programIds,
+      programIds,
+      overviewProductContext(productId),
     );
     // eslint-disable-next-line no-console
     console.log('[fetchInvoiceKpisSaga] Final KPI Data for Store:', kpis);
@@ -83,4 +93,3 @@ export default function* invoiceOverviewSaga() {
   yield takeLatest(fetchLatestInvoicesRequest.type, fetchLatestInvoicesSaga);
   yield takeLatest(fetchInvoiceKpisRequest.type, fetchInvoiceKpisSaga);
 }
-
