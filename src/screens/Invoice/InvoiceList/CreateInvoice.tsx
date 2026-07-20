@@ -19,14 +19,17 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
 import {ensureCameraPermission} from '@services/permissions';
 import {runGSTInvoiceExtractionWithAI} from '@services/ocr';
-import {InvoiceForm, type PartyTaxOption} from '@components/InvoiceForm';
+import {
+  InvoiceForm,
+  type PartyTaxOption,
+  type CreditToOption,
+} from '@components/InvoiceForm';
 import {InvoiceCamera} from '@components/InvoiceCamera';
 import {UploadModal} from '@components/index';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import type {GSTInvoiceJSON} from '@services/gstInvoiceExtractor';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
-import {Camera, Upload, AI, Plus, LeftChevron} from '@assets/Icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {Camera, Upload, AI, LeftChevron} from '@assets/Icons';
 import Toast from 'react-native-toast-message';
 import {
   fetchDealerInfoRequest,
@@ -41,9 +44,7 @@ import {
   selectCreateInvoiceSuccess,
   selectCreateInvoiceError,
 } from '@store/invoice/inv.selector';
-import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {
-  setProgramSelection,
   setProgramScope,
   toggleProgramSelection,
 } from '@store/programSelection/programSelection.slice';
@@ -60,6 +61,10 @@ import type {DealerInfoParticipant} from '@store/invoice/inv.types';
 import {getParticipantAvailableLimit} from '@utils/normalizeDealerInfo';
 import {decryptValue} from '@utils/decrypt';
 import {invoiceApi} from '@services/api/invoice.api';
+import {requiresCreditToAccountId} from '@utils/invoicePartyInfoRoute';
+import {resolveProductCodeFromName} from '@store/product/product.resolver';
+import {selectEffectiveProductCode, selectActiveProductId} from '@store/product/product.selectors';
+import {PRODUCT_CODES} from '@store/product/product.types';
 
 const getInitialFields = (): InvoiceFields => ({
   dealer: '',
@@ -210,11 +215,8 @@ export const CreateInvoice: React.FC = () => {
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const permissionsError = useSelector(selectPermissionsError);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
-  const isAnchorMaker = userRole === 'anchor_maker';
-  const isDealerMaker = userRole === 'dealer_maker';
   const isAnchorChecker = userRole === 'anchor_checker';
   const isDealerChecker = userRole === 'dealer_checker';
-  const isCashnTechUser = userRole === 'cashntech_user';
 
   const [fields, setFields] = useState<InvoiceFields>(() => getInitialFields());
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -226,9 +228,28 @@ export const CreateInvoice: React.FC = () => {
   // Fetched fresh when invoice details load, matching Web Portal behavior.
   const [apmAvailableLimit, setApmAvailableLimit] = useState<number | null>(null);
 
+  const effectiveProductCode = useSelector(selectEffectiveProductCode);
+  const activeProductId = useSelector(selectActiveProductId);
+  const invoiceNo: string | undefined = route?.params?.invoiceNo;
+  const mode: 'edit' | 'recreate' | undefined = route?.params?.mode;
+  // Product-aware labels (Dealer vs Vendor): prefer the selected program's
+  // own product name (most accurate for the invoice being created/edited),
+  // falling back to the active product context from PR1/PR2.
+  const productType = useMemo<'dealer_finance' | 'vendor_finance'>(() => {
+    const fromProgram = resolveProductCodeFromName(programSelection?.productName);
+    const code = fromProgram ?? effectiveProductCode;
+    return code === PRODUCT_CODES.VENDOR_FINANCE ? 'vendor_finance' : 'dealer_finance';
+  }, [programSelection?.productName, effectiveProductCode]);
+
   const isFormValid = useMemo(() => {
     const tenorDays = parseInt(String(fields.tenor ?? '').trim(), 10);
     const tenorOk = Number.isFinite(tenorDays) && tenorDays > 0;
+    // Unified backend requires credit_to_account_id (UUID) on create for
+    // DF + VF alike; edit mode pass-through only, no re-selection needed.
+    const creditAccountOk =
+      mode === 'edit' ||
+      !requiresCreditToAccountId(productType) ||
+      !!fields.creditToAccountId?.trim();
     return !!(
       fields.invoiceNumber?.trim() &&
       fields.dealer?.trim() &&
@@ -236,9 +257,10 @@ export const CreateInvoice: React.FC = () => {
       tenorOk &&
       fields.items &&
       fields.items.length > 0 &&
-      fields.creditTo?.trim()
+      fields.creditTo?.trim() &&
+      creditAccountOk
     );
-  }, [fields]);
+  }, [fields, mode, productType]);
 
   console.log('[CreateInvoice] Render, createInvoiceLoading:', createInvoiceLoading, 'isFormValid:', isFormValid);
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -248,9 +270,6 @@ export const CreateInvoice: React.FC = () => {
     () => createInvoiceLoading || ocrLoading || permissionsLoading,
     [createInvoiceLoading, ocrLoading, permissionsLoading],
   );
-  const [productType, setProductType] = useState<'dealer_finance' | 'vendor_finance'>('dealer_finance');
-  const invoiceNo: string | undefined = route?.params?.invoiceNo;
-  const mode: 'edit' | 'recreate' | undefined = route?.params?.mode;
   const previewFieldsFromRoute: InvoiceFields | undefined = route?.params?.previewFields;
   const previewAttachmentFromRoute: DocumentPickerResponse | undefined = route?.params?.previewAttachment;
   const previewReturnToken: number | undefined = route?.params?.previewReturnToken;
@@ -348,27 +367,7 @@ export const CreateInvoice: React.FC = () => {
   };
 
   const headerModeTitle = mode === 'edit' ? "Invoice Details [Edit Invoice]" : "Invoice Details";
-   
-  const headerRefTitle = invoiceNo
-    ? `Invoice / Unique Ref. No: ${invoiceNo}`
-    : undefined;
-  const programContext = useMemo(() => {
-    const bank = programSelection?.bankName;
-    const product = programSelection?.productName;
-    const program = programSelection?.programName;
 
-    if (!bank && !product && !program) {
-      return null;
-    }
-
-    const parts: string[] = [];
-    if (bank) parts.push(bank);
-    if (product) parts.push(product);
-    if (program) parts.push(program);
-
-    return parts.join(' - ');
-  }, [programSelection]);
-  
   // Role-based access control: Prevent checkers from accessing Create Invoice screen
   useEffect(() => {
     if (isAnchorChecker || isDealerChecker) {
@@ -506,17 +505,6 @@ export const CreateInvoice: React.FC = () => {
     }
   }, [dealerInfoError]);
 
-  // Load last selected product type (Dealer Finance / Vendor Finance) for dynamic labels
-  useEffect(() => {
-    AsyncStorage.getItem('selectedProductType')
-      .then(stored => {
-        if (stored === 'dealer_finance' || stored === 'vendor_finance') {
-          setProductType(stored);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
   // Restore form when returning from preview (Close X on preview page)
   useEffect(() => {
     if (!previewReturnToken) return;
@@ -607,6 +595,9 @@ export const CreateInvoice: React.FC = () => {
           remark: data.remark || '',
           currency: data.currency || 'INR',
           creditTo: creditToAccount,
+          // Pass-through UUID so update keeps the existing credit-to account
+          // (unified backend `updateInvoice.dto` accepts it optionally).
+          creditToAccountId: data.credit_to_account_id || undefined,
           items: mappedItems,
           discountValue: String(data.discount_total || '0'),
           grandTotal: String(data.final_total || '0'),
@@ -796,6 +787,14 @@ export const CreateInvoice: React.FC = () => {
       case 'creditTo':
         if (!value?.trim()) {
           return 'Credit To is required';
+        }
+        // Unified backend requires credit_to_account_id (UUID) on create.
+        if (
+          mode !== 'edit' &&
+          requiresCreditToAccountId(productType) &&
+          !fields.creditToAccountId?.trim()
+        ) {
+          return 'Please select a valid Credit To account from the list';
         }
         return undefined;
       case 'items':
@@ -1224,6 +1223,7 @@ export const CreateInvoice: React.FC = () => {
           createdBy,
           attachment: selectedAttachment ?? undefined,
           approval_level: 1,
+          creditToAccountId: fields.creditToAccountId?.trim() || undefined,
         }),
       );
       return;
@@ -1257,15 +1257,31 @@ export const CreateInvoice: React.FC = () => {
             createdBy,
             attachment: selectedAttachment ?? undefined,
             approval_level: 1, // Reset to first checker as per backend discovery
+            creditToAccountId: fields.creditToAccountId?.trim() || undefined,
           }),
         );
+        return;
+      }
+
+      // Golden rule: credit_to_account_id is required on create for DF + VF
+      // alike on the unified backend. validateForm(true) above already
+      // blocks this via the 'creditTo' field check — this is a final guard.
+      if (
+        requiresCreditToAccountId(productType) &&
+        !fields.creditToAccountId?.trim()
+      ) {
+        Toast.show({
+          type: 'error',
+          text1: 'Please select a valid Credit To account from the list',
+          visibilityTime: 3000,
+        });
         return;
       }
 
       console.log('[CreateInvoice] Attempting to dispatch createInvoiceRequest', {
         partnerBankId,
         programId: programSelection?.programId,
-        productId: programSelection?.productId,
+        productId: programSelection?.productId || activeProductId,
         participantId: selectedParticipant?.id,
         partyId: programSelection?.partyId || (dealerInfo as any)?.party?.id
       });
@@ -1276,7 +1292,9 @@ export const CreateInvoice: React.FC = () => {
             createdBy,
             partnerBank: String(partnerBankId || ''),
             program: String(programSelection?.programId || ''),
-            product: String(programSelection?.productId || ''),
+            // Active product context from PR1/PR2: prefer the program's own
+            // productId; fall back to the globally active product.
+            product: String(programSelection?.productId || activeProductId || ''),
             anchorParticipantMapping: String(selectedParticipant?.id || ''),
             // For Anchor-maker: backend expects invoice.party to be the Anchor party.
             // prioritize the partyId captured at program selection.
@@ -1285,6 +1303,7 @@ export const CreateInvoice: React.FC = () => {
             counterPartyCode: String(selectedParticipant?.company_code || ''),
             counterPartyOdAccount: String(selectedParticipant?.od_account_no || ''),
             attachment: selectedAttachment ?? undefined,
+            creditToAccountId: fields.creditToAccountId?.trim() || undefined,
           }),
         );
         console.log('[CreateInvoice] createInvoiceRequest dispatch was successful');
@@ -1466,6 +1485,12 @@ export const CreateInvoice: React.FC = () => {
       return 'Tenor is required — select from the list';
     }
     if (!fields.creditTo?.trim()) return 'Credit To is required';
+    if (
+      requiresCreditToAccountId(productType) &&
+      !fields.creditToAccountId?.trim()
+    ) {
+      return 'Please select a valid Credit To account from the list';
+    }
     if (!fields.items || fields.items.length === 0) return 'At least one item is required';
     
     // Items detail check
@@ -1481,7 +1506,7 @@ export const CreateInvoice: React.FC = () => {
       return 'Please upload the invoice file';
     }
     return undefined;
-  }, [fields, canUploadFinal, hasAnyAttachment, mode]);
+  }, [fields, canUploadFinal, hasAnyAttachment, mode, productType]);
 
   const dealerOptions = useMemo(
     () =>
@@ -1491,7 +1516,7 @@ export const CreateInvoice: React.FC = () => {
       })) ?? [],
     [dealerInfo],
   );
-  const creditToOptions = useMemo(
+  const creditToOptions = useMemo<CreditToOption[]>(
     () => {
       // Use bank_details from party root if available
       const details =
@@ -1499,6 +1524,9 @@ export const CreateInvoice: React.FC = () => {
       return details?.map((b: any) => ({
         label: decryptValue(b.account_number ?? '') || b.account_number,
         value: b.account_number,
+        // Bank account UUID from party-info bankAccounts.id — sent as
+        // credit_to_account_id on submit (required, DF + VF alike).
+        accountId: b.id && b.id !== b.account_number ? String(b.id) : undefined,
       })) ?? [];
     },
     [dealerInfo],

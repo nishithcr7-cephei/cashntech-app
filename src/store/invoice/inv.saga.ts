@@ -156,6 +156,12 @@ function getErrorMessage(response: any, defaultMsg: string): string {
   const statusCode = response.statusCode;
   const message = response.message;
   if (statusCode === 409) {
+    // Unified backend also raises 409 when the program has no workflow
+    // steps configured (createInvoice/updateInvoice) — surface that
+    // distinctly instead of the generic duplicate-invoice-number copy.
+    if (typeof message === 'string' && /no workflow configured/i.test(message)) {
+      return `${message}. Please contact your administrator to configure a workflow for this program.`;
+    }
     return message || 'Invoice number already exists';
   }
   if (statusCode === 400 && Array.isArray(message)) {

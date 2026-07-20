@@ -72,8 +72,10 @@ export type CreateInvoicePayloadInput = {
   counterPartyOdAccount: string;
   attachment?: DocumentPickerResponse | null;
   /**
-   * VF/CWF: UUID of the credit-to bank account row (party-info bankAccounts.id).
-   * Optional — omitted for main DF create (credit_to account number only).
+   * UUID of the credit-to bank account row (party-info `bankAccounts.id`).
+   * Required by the unified backend `POST /invoice` for DF + VF alike (PR6).
+   * Typed optional here so callers get a clear runtime/UI validation error
+   * instead of a type error; `createInvoice` still sends it whenever set.
    */
   creditToAccountId?: string;
 };
@@ -170,8 +172,9 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     items,
   };
 
-  // VF/CWF: pass-through UUID when provided (PR6 will wire UI selection).
-  // Never required for DF — omit when unset.
+  // Required by the unified backend for DF + VF alike (createInvoice.dto
+  // @IsUUID, not @IsOptional). UI validation (CreateInvoice.tsx) blocks
+  // submit before this is ever unset — see requiresCreditToAccountId.
   const accountId =
     creditToAccountId?.trim() || fields.creditToAccountId?.trim() || '';
   if (accountId) {

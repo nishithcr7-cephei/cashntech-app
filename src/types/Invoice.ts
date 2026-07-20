@@ -46,8 +46,9 @@ export type InvoiceFields = {
   /** Credit To (bank account number / display value) */
   creditTo: string;
   /**
-   * VF/CWF: UUID of selected credit-to bank account (party-info bankAccounts.id).
-   * Optional — DF create does not send credit_to_account_id. Wired in PR6 UI.
+   * UUID of the selected credit-to bank account (party-info `bankAccounts.id`).
+   * Required by the unified backend on create for DF + VF alike (PR6);
+   * optional pass-through on edit when already set on the invoice.
    */
   creditToAccountId?: string;
   remark: string;

@@ -6,14 +6,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   Modal,
   TouchableWithoutFeedback,
-  ActivityIndicator,
-  FlatList,
   Linking,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
@@ -25,6 +21,14 @@ import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 
 export type DropdownOption = {label: string; value: string};
+
+/**
+ * Credit-to bank account option. `accountId` carries the party-info
+ * `bankAccounts.id` UUID (DF + VF, unified backend) — sent as
+ * `credit_to_account_id` on submit; `value`/`label` stay the display
+ * account number for backward-compatible matching (e.g. edit mode).
+ */
+export type CreditToOption = DropdownOption & {accountId?: string};
 
 /** Party tax from GET /configuration/party/tax/ */
 export type PartyTaxOption = {
@@ -77,7 +81,7 @@ type Props = {
   productType?: 'dealer_finance' | 'vendor_finance';
   entityType?: 'dealer' | 'anchor'; // Role-based: 'dealer' for Anchor Maker/Checker, 'anchor' for Dealer Maker
   dealerOptions?: DropdownOption[];
-  creditToOptions?: DropdownOption[];
+  creditToOptions?: CreditToOption[];
   tenorOptions?: DropdownOption[];
   /** Active party taxes — dropdown options; percentage auto-filled & locked (web parity). */
   partyTaxOptions?: PartyTaxOption[];
@@ -113,7 +117,6 @@ export const InvoiceForm: React.FC<Props> = ({
   onCancel,
   loading = false,
   errors = {},
-  isFormValid = false,
   productType = 'dealer_finance',
   entityType,
   dealerOptions,
@@ -121,9 +124,6 @@ export const InvoiceForm: React.FC<Props> = ({
   tenorOptions,
   partyTaxOptions,
   onLoadPartyTaxes,
-  bankOptions,
-  selectedBankId = '',
-  onBankSelect,
   staleInvoicePeriodDays = 30,
   defaultPaymentTermsDays = 60,
   submitButtonAppearsDisabled = false,
@@ -138,7 +138,6 @@ export const InvoiceForm: React.FC<Props> = ({
   isOcrMode = false,
   ocrLoading = false,
 }) => {
-  const insets = useSafeAreaInsets(); // Not available here but can use view padding
   const storageBaseUrl = 'https://d2wayd1he5a7q1.cloudfront.net'; // Same as DetailView
   const dealerData = dealerOptions ?? [];
   const creditToData = creditToOptions ?? [];
@@ -594,10 +593,10 @@ export const InvoiceForm: React.FC<Props> = ({
           </View>
         </View>
         <View style={styles.field}>
-          <Text style={styles.label}>OD Account No</Text>
+          <Text style={styles.label}>{entityODLabel}</Text>
           {mode === 'edit' ? (
             <View style={styles.readOnlyFieldContainer}>
-              <Text style={styles.label}>OD Account No</Text>
+              <Text style={styles.label}>{entityODLabel}</Text>
               <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
                 <Text style={styles.readOnlyText} numberOfLines={1}>
                   {value.odAccountNumber || '-'}
@@ -814,7 +813,15 @@ export const InvoiceForm: React.FC<Props> = ({
                   label="Credit To *"
                   data={creditToData}
                   value={value.creditTo}
-                  onChange={set('creditTo')}
+                  onChange={(accountNumber) => {
+                    const selected = creditToData.find(
+                      opt => opt.value === accountNumber,
+                    );
+                    onChange({
+                      creditTo: accountNumber,
+                      creditToAccountId: selected?.accountId || undefined,
+                    });
+                  }}
                   placeholder="Select credit to"
                   containerStyle={styles.dropdownContainer}
                 />
@@ -1411,6 +1418,8 @@ export const InvoiceForm: React.FC<Props> = ({
                   ? 'Invoice Date is required'
                   : !value.creditTo?.trim()
                   ? 'Credit To is required'
+                  : mode !== 'edit' && !value.creditToAccountId?.trim()
+                  ? 'Please select a valid Credit To account from the list'
                   : !value.items || value.items.length === 0
                   ? 'Please add at least one item'
                   : 'Please fill all required fields before submitting');

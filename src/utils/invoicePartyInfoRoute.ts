@@ -4,7 +4,6 @@ import {
   type ProductCode,
 } from '@store/product/product.types';
 import type {PartySide} from '@utils/roleNormalizer';
-import {isVendorFinance} from '@store/product/product.resolver';
 
 /**
  * Resolves create-invoice party bootstrap path for the unified cashntech-backend.
@@ -36,14 +35,16 @@ export function resolveInvoicePartyInfoPath(
   return ApiEndPoints.apiPartyInfo(programId);
 }
 
-/** True when create payload should include credit_to_account_id (VF/CWF). PR6 wires UI. */
+/**
+ * True when create payload must include credit_to_account_id.
+ * Unified backend (`createInvoice.dto.ts`) requires this UUID for ALL
+ * products — DF and VF alike. Parameter kept for call-site compatibility
+ * but no longer changes the result (PR6).
+ */
 export function requiresCreditToAccountId(
-  productCode?: ProductCode | string | null,
+  _productCode?: ProductCode | string | null,
 ): boolean {
-  if (productCode == null || productCode === '') {
-    return false;
-  }
-  return isVendorFinance(productCode as ProductCode);
+  return true;
 }
 
 export {PRODUCT_CODES};

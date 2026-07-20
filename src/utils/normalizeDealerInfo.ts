@@ -42,9 +42,11 @@ function toNumber(val: unknown): number {
 }
 
 /**
- * Parse VF/CWF `bankAccounts` JSON aggregate (array or JSON string) into
- * PartyBankDetail[]. Prefers real UUID `id` when present (needed for
- * credit_to_account_id on create). Falls back to account number as id for DF.
+ * Parse the unified party-info `bankAccounts` JSON aggregate (array or JSON
+ * string, returned for DF + VF alike) into PartyBankDetail[]. Prefers the
+ * real UUID `id` when present (required for credit_to_account_id on
+ * create/edit — PR6). Falls back to account number as id only for legacy
+ * flat rows that predate the bankAccounts aggregate.
  */
 function parseBankAccounts(val: unknown): PartyBankDetail[] {
   if (val == null || val === '') {
@@ -128,8 +130,9 @@ export function getParticipantAvailableLimit(
 }
 
 /**
- * Maps flat SQL rows from dealer-info / anchor-info / party-info to nested
- * DealerInfoResponse. Accepts VF/CWF `bankAccounts` aggregates with UUID ids.
+ * Maps flat SQL rows from the unified party-info endpoint to nested
+ * DealerInfoResponse. Accepts `bankAccounts` aggregates with UUID ids
+ * (DF + VF alike).
  */
 export function normalizeDealerInfoResponse(
   programId: string,
