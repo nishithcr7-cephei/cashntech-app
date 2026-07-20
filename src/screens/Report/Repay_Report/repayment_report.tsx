@@ -14,12 +14,13 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportColumns} from '@hooks/useReportColumns';
 import {useReportExport} from '@hooks/useReportExport';
-import {REPAYMENT_EXPORT_COLUMNS} from '@utils/reportExportColumns';
+import {buildReportFields} from '@products/shared/schemas/reports/reportFieldBuilder';
+import {repaymentFieldAccessor} from '@products/shared/schemas/reports/accessors/repaymentFieldAccessor';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -43,23 +44,6 @@ const INITIAL_PAGE_SIZE = 20;
 const LOAD_MORE_SIZE = 20;
 const INITIAL_VISIBLE_FIELD_COUNT = 6;
 
-const formatAmount = (val: number | undefined | null): string => {
-  if (val == null || Number.isNaN(Number(val))) {
-    return '-';
-  }
-  return `₹ ${Number(val).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-const formatText = (val: string | number | undefined | null): string => {
-  if (val == null || val === '') {
-    return '-';
-  }
-  return String(val);
-};
-
 const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   <View style={styles.infoGrid}>
     {fields.map(field => (
@@ -72,61 +56,6 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
     ))}
   </View>
 );
-
-const buildAllListFields = (item: RepaymentReportItem): FieldDef[] => [
-  {label: 'Lms Id', value: formatText(item.lms_id)},
-  {label: 'Loan Ref No', value: formatText(item.loan_ref_no)},
-  {label: 'Invoice No', value: formatText(item.invoice_no)},
-  {label: 'Bank Name', value: formatText(item.bank_name)},
-  {label: 'Product Name', value: formatText(item.product_name)},
-  {label: 'Program Name', value: formatText(item.program_name)},
-  {label: 'Anchor Name', value: formatText(item.anchor_name)},
-  {label: 'Dealer Name', value: formatText(item.dealer_name)},
-  {label: 'Payment Date', value: formatText(item.payment_date)},
-  {label: 'Invoice Amount', value: formatAmount(item.invoice_amount)},
-  {label: 'Disbursed Amount', value: formatAmount(item.disbursed_amount)},
-  {label: 'Due Amount', value: formatAmount(item.due_amount)},
-  {label: 'Paid Amount', value: formatAmount(item.paid_amount)},
-  {label: 'Principal Settled', value: formatAmount(item.principal_settled)},
-  {label: 'Interest Settled', value: formatAmount(item.interest_settled)},
-  {
-    label: 'Penal Interest Settled',
-    value: formatAmount(item.penal_interest_settled),
-  },
-  {
-    label: 'Settlement Priority',
-    value: formatText(item.settlement_priority),
-  },
-  {
-    label: 'Total Outstanding Amount',
-    value: formatAmount(item.total_outstanding_amount),
-  },
-  {label: 'Outstanding Interest', value: formatAmount(item.outstanding_interest)},
-  {label: 'Principal Amount', value: formatAmount(item.principal_amount)},
-  {label: 'Interest Amount', value: formatAmount(item.interest_amount)},
-  {label: 'Penal Amount', value: formatAmount(item.penal_amount)},
-  {label: 'Principal O S', value: formatAmount(item.principal_os)},
-  {label: 'Processed By User', value: formatText(item.processed_by_user)},
-  {label: 'Processed On Date', value: formatText(item.processed_on_date)},
-  {label: 'Created On', value: formatText(item.created_on)},
-  {label: 'Transaction Date', value: formatText(item.transaction_date)},
-  {
-    label: 'Status',
-    value: formatText(item.status),
-    valueStyle:
-      item.status === 'Closed'
-        ? {color: Colors.green, fontFamily: Fonts.GilroySemiBold}
-        : undefined,
-  },
-  {label: 'Utr No', value: formatText(item.utr_no)},
-  {label: 'Excess Amount', value: formatAmount(item.excess_amount)},
-];
-
-const buildInitialFields = (item: RepaymentReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT);
-
-const buildExpandedFields = (item: RepaymentReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT);
 
 function repaymentRowKey(item: RepaymentReportItem, index: number): string {
   return `${item.id}-${item.invoice_no}-${String(index)}`;
@@ -155,6 +84,25 @@ export const RepaymentReportScreen: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  const {screenColumns, exportColumns} = useReportColumns('repayment');
+
+  const buildAllListFields = useCallback(
+    (item: RepaymentReportItem) =>
+      buildReportFields(item, screenColumns, repaymentFieldAccessor),
+    [screenColumns],
+  );
+
+  const buildInitialFields = useCallback(
+    (item: RepaymentReportItem) =>
+      buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
+
+  const buildExpandedFields = useCallback(
+    (item: RepaymentReportItem) =>
+      buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
 
   const filteredData = useMemo(() => {
     let data = rows;
@@ -201,7 +149,7 @@ export const RepaymentReportScreen: React.FC = () => {
   const {handleExport, exporting} = useReportExport({
     reportTitle: 'Repayment Report',
     filename: 'repayment-report',
-    columns: REPAYMENT_EXPORT_COLUMNS,
+    columns: exportColumns,
     getExportRows: () => filteredData,
     appliedFilters,
   });
@@ -237,7 +185,7 @@ export const RepaymentReportScreen: React.FC = () => {
         </View>
       );
     },
-    [expandedIds],
+    [buildExpandedFields, buildInitialFields, expandedIds],
   );
 
   const listHeader = (

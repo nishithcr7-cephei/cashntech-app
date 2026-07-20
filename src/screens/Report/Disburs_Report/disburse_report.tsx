@@ -14,12 +14,13 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportColumns} from '@hooks/useReportColumns';
 import {useReportExport} from '@hooks/useReportExport';
-import {DISBURSEMENT_EXPORT_COLUMNS} from '@utils/reportExportColumns';
+import {buildReportFields} from '@products/shared/schemas/reports/reportFieldBuilder';
+import {disbursementFieldAccessor} from '@products/shared/schemas/reports/accessors/disbursementFieldAccessor';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -41,23 +42,7 @@ type FieldDef = {
 
 const INITIAL_PAGE_SIZE = 20;
 const LOAD_MORE_SIZE = 20;
-
-const formatAmount = (val: number | undefined | null): string => {
-  if (val == null || Number.isNaN(Number(val))) {
-    return '-';
-  }
-  return `₹ ${Number(val).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-const formatText = (val: string | number | undefined | null): string => {
-  if (val == null || val === '') {
-    return '-';
-  }
-  return String(val);
-};
+const INITIAL_VISIBLE_FIELD_COUNT = 6;
 
 const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   <View style={styles.infoGrid}>
@@ -71,53 +56,6 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
     ))}
   </View>
 );
-
-/** List view field order (Sr No. shown in top-left badge, not in grid) */
-const INITIAL_VISIBLE_FIELD_COUNT = 6;
-
-const buildAllListFields = (item: DisbursementReportItem): FieldDef[] => [
-  {label: 'Invoice Number', value: formatText(item.invoiceNumber)},
-  {label: 'Anchor Name', value: formatText(item.anchorName)},
-  {label: 'Anchor Pan', value: formatText(item.anchorPan)},
-  {label: 'Borrower Name', value: formatText(item.borrowerName)},
-  {label: 'Borrower Pan', value: formatText(item.borrowerPan)},
-  {label: 'Master Program Name', value: formatText(item.masterProgramName)},
-  {label: 'Program Name', value: formatText(item.programName)},
-  {label: 'Program Type Name', value: formatText(item.programTypeName)},
-  {label: 'Loan Account Number', value: formatText(item.loanAccountNumber)},
-  {label: 'Los Id', value: formatText(item.losId)},
-  {label: 'Tranch Number', value: formatText(item.tranchNumber)},
-  {label: 'Invoice Date', value: formatText(item.invoiceDate)},
-  {label: 'Disbursement Date', value: formatText(item.disbursementDate)},
-  {label: 'Maturity Date', value: formatText(item.maturityDate)},
-  {label: 'Invoice Value', value: formatAmount(item.invoiceValue)},
-  {
-    label: 'Disbursement Amount',
-    value: formatAmount(item.disbursementAmount),
-  },
-  {label: 'Roi', value: formatText(item.roi)},
-  {label: 'Margin', value: formatAmount(item.margin)},
-  {label: 'Bank Name', value: formatText(item.bankName)},
-  {label: 'Bank Account Number', value: formatText(item.bankAccountNumber)},
-  {label: 'Ifsc Code', value: formatText(item.ifscCode)},
-  {
-    label: 'Status',
-    value: formatText(item.status),
-    valueStyle:
-      item.status === 'Disbursed'
-        ? {color: Colors.green, fontFamily: Fonts.GilroySemiBold}
-        : undefined,
-  },
-  {label: 'Utr No', value: formatText(item.utrNo)},
-  {label: 'Message', value: formatText(item.message)},
-  {label: 'Generated Date', value: formatText(item.generatedDate)},
-];
-
-const buildInitialFields = (item: DisbursementReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT);
-
-const buildExpandedFields = (item: DisbursementReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT);
 
 function disbursementRowKey(item: DisbursementReportItem, index: number): string {
   return `${item.invoiceNumber}-${item.loanAccountNumber}-${String(index)}`;
@@ -146,6 +84,25 @@ export const DisbursementReportScreen: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  const {screenColumns, exportColumns} = useReportColumns('disbursement');
+
+  const buildAllListFields = useCallback(
+    (item: DisbursementReportItem) =>
+      buildReportFields(item, screenColumns, disbursementFieldAccessor),
+    [screenColumns],
+  );
+
+  const buildInitialFields = useCallback(
+    (item: DisbursementReportItem) =>
+      buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
+
+  const buildExpandedFields = useCallback(
+    (item: DisbursementReportItem) =>
+      buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
 
   const filteredData = useMemo(() => {
     let data = rows;
@@ -192,7 +149,7 @@ export const DisbursementReportScreen: React.FC = () => {
   const {handleExport, exporting} = useReportExport({
     reportTitle: 'Disbursement Report',
     filename: 'disbursement-report',
-    columns: DISBURSEMENT_EXPORT_COLUMNS,
+    columns: exportColumns,
     getExportRows: () => filteredData,
     appliedFilters,
   });
@@ -227,7 +184,7 @@ export const DisbursementReportScreen: React.FC = () => {
         </View>
       );
     },
-    [expandedIds],
+    [buildExpandedFields, buildInitialFields, expandedIds],
   );
 
   const listHeader = (

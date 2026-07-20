@@ -14,12 +14,13 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportColumns} from '@hooks/useReportColumns';
 import {useReportExport} from '@hooks/useReportExport';
-import {DAILY_ACCRUAL_EXPORT_COLUMNS} from '@utils/reportExportColumns';
+import {buildReportFields} from '@products/shared/schemas/reports/reportFieldBuilder';
+import {dailyAccrualFieldAccessor} from '@products/shared/schemas/reports/accessors/dailyAccrualFieldAccessor';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -42,23 +43,6 @@ type FieldDef = {
 const INITIAL_PAGE_SIZE = 20;
 const LOAD_MORE_SIZE = 20;
 
-const formatAmount = (val: number | undefined | null): string => {
-  if (val == null || Number.isNaN(Number(val))) {
-    return '-';
-  }
-  return `₹ ${Number(val).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-const formatText = (val: string | number | undefined | null): string => {
-  if (val == null || val === '') {
-    return '-';
-  }
-  return String(val);
-};
-
 const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   <View style={styles.infoGrid}>
     {fields.map(field => (
@@ -71,15 +55,6 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
     ))}
   </View>
 );
-
-const buildListFields = (row: DailyAccrualReportItem): FieldDef[] => [
-  {label: 'Loan Account Number', value: formatText(row.loanAccountNumber)},
-  {label: 'Invoice Number', value: formatText(row.invoiceNumber)},
-  {label: 'Customer', value: formatText(row.customer)},
-  {label: 'Daily Interest', value: formatAmount(row.dailyInterest)},
-  {label: 'Date', value: formatText(row.date)},
-  {label: 'Cumulative', value: formatAmount(row.cumulative)},
-];
 
 export const DailyAccrualReportScreen: React.FC = () => {
   const navigation = useNavigation<
@@ -103,6 +78,13 @@ export const DailyAccrualReportScreen: React.FC = () => {
 
   const [searchText, setSearchText] = useState('');
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  const {screenColumns, exportColumns} = useReportColumns('dailyAccrual');
+
+  const buildListFields = useCallback(
+    (item: DailyAccrualReportItem) =>
+      buildReportFields(item, screenColumns, dailyAccrualFieldAccessor),
+    [screenColumns],
+  );
 
   const filteredData = useMemo(() => {
     let data = rows;
@@ -142,7 +124,7 @@ export const DailyAccrualReportScreen: React.FC = () => {
   const {handleExport, exporting} = useReportExport({
     reportTitle: 'Daily Accrual Report',
     filename: 'daily-accrual-report',
-    columns: DAILY_ACCRUAL_EXPORT_COLUMNS,
+    columns: exportColumns,
     getExportRows: () => filteredData,
     appliedFilters,
   });
@@ -163,7 +145,7 @@ export const DailyAccrualReportScreen: React.FC = () => {
         </View>
       );
     },
-    [],
+    [buildListFields],
   );
 
   const listHeader = (

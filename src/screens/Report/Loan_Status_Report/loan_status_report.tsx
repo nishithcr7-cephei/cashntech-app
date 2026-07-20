@@ -14,12 +14,13 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportColumns} from '@hooks/useReportColumns';
 import {useReportExport} from '@hooks/useReportExport';
-import {LOAN_STATUS_EXPORT_COLUMNS} from '@utils/reportExportColumns';
+import {buildReportFields} from '@products/shared/schemas/reports/reportFieldBuilder';
+import {loanStatusFieldAccessor} from '@products/shared/schemas/reports/accessors/loanStatusFieldAccessor';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -43,30 +44,6 @@ const INITIAL_PAGE_SIZE = 20;
 const LOAD_MORE_SIZE = 20;
 const INITIAL_VISIBLE_FIELD_COUNT = 6;
 
-const formatAmount = (val: number | undefined | null): string => {
-  if (val == null || Number.isNaN(Number(val))) {
-    return '-';
-  }
-  return `₹ ${Number(val).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-const formatText = (val: string | number | undefined | null): string => {
-  if (val == null || val === '') {
-    return '-';
-  }
-  return String(val);
-};
-
-const formatLoanTenure = (tenure: number): string => {
-  if (!tenure || Number.isNaN(tenure)) {
-    return '-';
-  }
-  return `${tenure} Months`;
-};
-
 const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   <View style={styles.infoGrid}>
     {fields.map(field => (
@@ -79,51 +56,6 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
     ))}
   </View>
 );
-
-const buildAllListFields = (item: LoanStatusReportItem): FieldDef[] => [
-  {label: 'Program Name', value: formatText(item.programName)},
-  {label: 'Program Type', value: formatText(item.programTypeName)},
-  {label: 'Anchor Name', value: formatText(item.anchorName)},
-  {label: 'Anchor PAN', value: formatText(item.anchorPan)},
-  {label: 'Loan Acc No', value: formatText(item.loanAccNo)},
-  {label: 'Borrower Name', value: formatText(item.borrowerName)},
-  {label: 'Borrower PAN', value: formatText(item.borrowerPan)},
-  {
-    label: 'Borrower Constitution',
-    value: formatText(item.borrowerConstitution),
-  },
-  {label: 'GSTIN', value: formatText(item.gstin)},
-  {label: 'City', value: formatText(item.anchorCity)},
-  {label: 'State', value: formatText(item.anchorState)},
-  {label: 'Pincode', value: formatText(item.anchorPincode)},
-  {label: 'Scheme Type', value: formatText(item.schemetype)},
-  {label: 'Loan Sanction Date', value: formatText(item.loanSanctionDate)},
-  {label: 'Loan End Date', value: formatText(item.loanEndDate)},
-  {label: 'Loan Live Date', value: formatText(item.loanlivedate)},
-  {label: 'Sanction Limit', value: formatAmount(item.sanctionedLimit)},
-  {label: 'Available Limit', value: formatAmount(item.availableLimit)},
-  {label: 'ROI', value: formatText(item.roi)},
-  {label: 'Excess Amount', value: formatAmount(item.excessAmount)},
-  {label: 'RM Name', value: formatText(item.rmName)},
-  {label: 'Borrower CIF No.', value: formatText(item.borrowerCifNo)},
-  {
-    label: 'Status',
-    value: formatText(item.status),
-    valueStyle:
-      item.status === 'Active'
-        ? {color: Colors.green, fontFamily: Fonts.GilroySemiBold}
-        : undefined,
-  },
-  {label: 'Loan Tenure', value: formatLoanTenure(item.loanTenure)},
-  {label: 'Generated Date', value: formatText(item.generatedDate)},
-  {label: 'EOD Date', value: formatText(item.eodDate)},
-];
-
-const buildInitialFields = (item: LoanStatusReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT);
-
-const buildExpandedFields = (item: LoanStatusReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT);
 
 function loanStatusRowKey(item: LoanStatusReportItem, index: number): string {
   return `${item.loanAccNo}-${item.borrowerCifNo}-${index}`;
@@ -152,6 +84,25 @@ export const LoanStatusReportScreen: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  const {screenColumns, exportColumns} = useReportColumns('loanStatus');
+
+  const buildAllListFields = useCallback(
+    (item: LoanStatusReportItem) =>
+      buildReportFields(item, screenColumns, loanStatusFieldAccessor),
+    [screenColumns],
+  );
+
+  const buildInitialFields = useCallback(
+    (item: LoanStatusReportItem) =>
+      buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
+
+  const buildExpandedFields = useCallback(
+    (item: LoanStatusReportItem) =>
+      buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
 
   const filteredData = useMemo(() => {
     let data = rows;
@@ -196,7 +147,7 @@ export const LoanStatusReportScreen: React.FC = () => {
   const {handleExport, exporting} = useReportExport({
     reportTitle: 'Loan Status Report',
     filename: 'loan-status-report',
-    columns: LOAN_STATUS_EXPORT_COLUMNS,
+    columns: exportColumns,
     getExportRows: () => filteredData,
     appliedFilters,
   });
@@ -230,7 +181,7 @@ export const LoanStatusReportScreen: React.FC = () => {
         </View>
       );
     },
-    [expandedIds],
+    [buildExpandedFields, buildInitialFields, expandedIds],
   );
 
   const listHeader = (

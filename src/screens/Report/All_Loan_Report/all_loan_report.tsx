@@ -14,12 +14,13 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportColumns} from '@hooks/useReportColumns';
 import {useReportExport} from '@hooks/useReportExport';
-import {ALL_LOAN_EXPORT_COLUMNS} from '@utils/reportExportColumns';
+import {buildReportFields} from '@products/shared/schemas/reports/reportFieldBuilder';
+import {allLoansFieldAccessor} from '@products/shared/schemas/reports/accessors/allLoansFieldAccessor';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -41,23 +42,7 @@ type FieldDef = {
 
 const INITIAL_PAGE_SIZE = 20;
 const LOAD_MORE_SIZE = 20;
-
-const formatAmount = (val: number | undefined | null): string => {
-  if (val == null || Number.isNaN(Number(val))) {
-    return '-';
-  }
-  return `₹ ${Number(val).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-const formatText = (val: string | number | undefined | null): string => {
-  if (val == null || val === '') {
-    return '-';
-  }
-  return String(val);
-};
+const INITIAL_VISIBLE_FIELD_COUNT = 6;
 
 const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   <View style={styles.infoGrid}>
@@ -71,65 +56,6 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
     ))}
   </View>
 );
-
-const INITIAL_VISIBLE_FIELD_COUNT = 6;
-
-const buildAllListFields = (item: AllLoanReportItem): FieldDef[] => [
-  {label: 'Lms Id', value: formatText(item.lmsId)},
-  {label: 'Loan Account No', value: formatText(item.loanAccountNo)},
-  {label: 'Od Account No', value: formatText(item.odAccountNo)},
-  {label: 'Product Type', value: formatText(item.productType)},
-  {label: 'Product Code', value: formatText(item.productCode)},
-  {label: 'Anchor Name', value: formatText(item.anchorName)},
-  {label: 'Vendor Dealer Name', value: formatText(item.vendorDealerName)},
-  {label: 'Bank Name', value: formatText(item.bankName)},
-  {label: 'Sanction Amount', value: formatAmount(item.sanctionAmount)},
-  {label: 'Disbursed Amount', value: formatAmount(item.disbursedAmount)},
-  {label: 'Outstanding Amount', value: formatAmount(item.outstandingAmount)},
-  {
-    label: 'Loan Status',
-    value: formatText(item.loanStatus),
-    valueStyle:
-      item.loanStatus === 'Closed'
-        ? {color: Colors.green, fontFamily: Fonts.GilroySemiBold}
-        : undefined,
-  },
-  {label: 'Disbursement Date', value: formatText(item.disbursementDate)},
-  {label: 'Due Date', value: formatText(item.dueDate)},
-  {label: 'Tenor', value: formatText(item.tenor)},
-  {label: 'Roi', value: formatText(item.roi)},
-  {label: 'Repaid Amount', value: formatAmount(item.repaidAmount)},
-  {
-    label: 'Principal Outstanding',
-    value: formatAmount(item.principalOutstanding),
-  },
-  {
-    label: 'Interest Outstanding',
-    value: formatAmount(item.interestOutstanding),
-  },
-  {
-    label: 'Charges Outstanding',
-    value: formatAmount(item.chargesOutstanding),
-  },
-  {label: 'Dpd', value: formatText(item.dpd)},
-  {label: 'Npa Status', value: formatText(item.npaStatus)},
-  {label: 'Last Repayment Date', value: formatText(item.lastRepaymentDate)},
-  {
-    label: 'Last Repayment Amount',
-    value: formatAmount(item.lastRepaymentAmount),
-  },
-  {label: 'Overdue Amount', value: formatAmount(item.overdueAmount)},
-  {label: 'Settlement Status', value: formatText(item.settlementStatus)},
-  {label: 'Branch Name', value: formatText(item.branchName)},
-  {label: 'Created By', value: formatText(item.createdBy)},
-  {label: 'Created Date', value: formatText(item.createdDate)},
-];
-
-const buildInitialFields = (item: AllLoanReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT);
-
-const buildExpandedFields = (item: AllLoanReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT);
 
 export const AllLoanReportScreen: React.FC = () => {
   const navigation = useNavigation<
@@ -154,6 +80,25 @@ export const AllLoanReportScreen: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  const {screenColumns, exportColumns} = useReportColumns('allLoans');
+
+  const buildAllListFields = useCallback(
+    (item: AllLoanReportItem) =>
+      buildReportFields(item, screenColumns, allLoansFieldAccessor),
+    [screenColumns],
+  );
+
+  const buildInitialFields = useCallback(
+    (item: AllLoanReportItem) =>
+      buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
+
+  const buildExpandedFields = useCallback(
+    (item: AllLoanReportItem) =>
+      buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
 
   const filteredData = useMemo(() => {
     let data = rows;
@@ -200,7 +145,7 @@ export const AllLoanReportScreen: React.FC = () => {
   const {handleExport, exporting} = useReportExport({
     reportTitle: 'All Loans Report',
     filename: 'all-loans-report',
-    columns: ALL_LOAN_EXPORT_COLUMNS,
+    columns: exportColumns,
     getExportRows: () => filteredData,
     appliedFilters,
   });
@@ -236,7 +181,7 @@ export const AllLoanReportScreen: React.FC = () => {
         </View>
       );
     },
-    [expandedIds],
+    [buildExpandedFields, buildInitialFields, expandedIds],
   );
 
   const listHeader = (

@@ -14,12 +14,13 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportColumns} from '@hooks/useReportColumns';
 import {useReportExport} from '@hooks/useReportExport';
-import {ALL_PRODUCT_OUTSTANDING_EXPORT_COLUMNS} from '@utils/reportExportColumns';
+import {buildReportFields} from '@products/shared/schemas/reports/reportFieldBuilder';
+import {allProductOutstandingFieldAccessor} from '@products/shared/schemas/reports/accessors/allProductOutstandingFieldAccessor';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -43,23 +44,6 @@ const INITIAL_PAGE_SIZE = 20;
 const LOAD_MORE_SIZE = 20;
 const INITIAL_VISIBLE_FIELD_COUNT = 6;
 
-const formatAmount = (val: number | undefined | null): string => {
-  if (val == null || Number.isNaN(Number(val))) {
-    return '-';
-  }
-  return `₹ ${Number(val).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-const formatText = (val: string | number | undefined | null): string => {
-  if (val == null || val === '') {
-    return '-';
-  }
-  return String(val);
-};
-
 const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   <View style={styles.infoGrid}>
     {fields.map(field => (
@@ -72,76 +56,6 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
     ))}
   </View>
 );
-
-const buildAllListFields = (
-  item: AllProductOutstandingReportItem,
-): FieldDef[] => [
-  {label: 'LMS ID', value: formatText(item.lmsId)},
-  {label: 'Loan Account No', value: formatText(item.loanAccountNo)},
-  {label: 'Product Type', value: formatText(item.productType)},
-  {label: 'Product Code', value: formatText(item.productCode)},
-  {label: 'Program Name', value: formatText(item.programName)},
-  {label: 'Facility Type', value: formatText(item.facilityType)},
-  {label: 'Anchor Name', value: formatText(item.anchorName)},
-  {label: 'Counterparty Type', value: formatText(item.counterpartyType)},
-  {label: 'Counterparty Name', value: formatText(item.counterpartyName)},
-  {label: 'Buyer Name', value: formatText(item.buyerName)},
-  {label: 'Seller Name', value: formatText(item.sellerName)},
-  {label: 'Invoice No', value: formatText(item.invoiceNo)},
-  {label: 'Invoice Date', value: formatText(item.invoiceDate)},
-  {label: 'Disbursement Date', value: formatText(item.disbursementDate)},
-  {label: 'Due Date', value: formatText(item.dueDate)},
-  {label: 'Bank Name', value: formatText(item.bankName)},
-  {label: 'Sanction Amount', value: formatAmount(item.sanctionAmount)},
-  {label: 'Invoice Amount', value: formatAmount(item.invoiceAmount)},
-  {label: 'Disbursed Amount', value: formatAmount(item.disbursedAmount)},
-  {
-    label: 'Principal Outstanding',
-    value: formatAmount(item.principalOutstanding),
-  },
-  {
-    label: 'Interest Outstanding',
-    value: formatAmount(item.interestOutstanding),
-  },
-  {
-    label: 'Charges Outstanding',
-    value: formatAmount(item.chargesOutstanding),
-  },
-  {
-    label: 'Total Outstanding Amount',
-    value: formatAmount(item.totalOutstandingAmount),
-  },
-  {label: 'Overdue Amount', value: formatAmount(item.overdueAmount)},
-  {label: 'DPD', value: formatText(item.dpd)},
-  {label: 'NPA Status', value: formatText(item.npaStatus)},
-  {
-    label: 'Loan Status',
-    value: formatText(item.loanStatus),
-    valueStyle:
-      item.loanStatus === 'Closed'
-        ? {color: Colors.green, fontFamily: Fonts.GilroySemiBold}
-        : undefined,
-  },
-  {label: 'Settlement Status', value: formatText(item.settlementStatus)},
-  {label: 'Settlement Priority', value: formatText(item.settlementPriority)},
-  {label: 'Last Repayment Date', value: formatText(item.lastRepaymentDate)},
-  {
-    label: 'Last Repayment Amount',
-    value: formatAmount(item.lastRepaymentAmount),
-  },
-  {label: 'OD Account No', value: formatText(item.odAccountNo)},
-  {label: 'Branch Name', value: formatText(item.branchName)},
-  {label: 'Created By', value: formatText(item.createdBy)},
-  {label: 'Created Date', value: formatText(item.createdDate)},
-];
-
-const buildInitialFields = (item: AllProductOutstandingReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT);
-
-const buildExpandedFields = (
-  item: AllProductOutstandingReportItem,
-): FieldDef[] =>
-  buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT);
 
 function allProductOutstandingRowKey(
   item: AllProductOutstandingReportItem,
@@ -173,6 +87,25 @@ export const AllProductOutstandingReportScreen: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  const {screenColumns, exportColumns} = useReportColumns('allProductOutstanding');
+
+  const buildAllListFields = useCallback(
+    (item: AllProductOutstandingReportItem) =>
+      buildReportFields(item, screenColumns, allProductOutstandingFieldAccessor),
+    [screenColumns],
+  );
+
+  const buildInitialFields = useCallback(
+    (item: AllProductOutstandingReportItem) =>
+      buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
+
+  const buildExpandedFields = useCallback(
+    (item: AllProductOutstandingReportItem) =>
+      buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
 
   const filteredData = useMemo(() => {
     let data = rows;
@@ -185,7 +118,8 @@ export const AllProductOutstandingReportScreen: React.FC = () => {
           item.invoiceNo,
           item.lmsId,
           item.counterpartyName,
-          item.borrowerName,
+          item.buyerName,
+          item.sellerName,
           item.programName,
           item.odAccountNo,
         ),
@@ -219,7 +153,7 @@ export const AllProductOutstandingReportScreen: React.FC = () => {
   const {handleExport, exporting} = useReportExport({
     reportTitle: 'All Product Outstanding Report',
     filename: 'all-product-outstanding-report',
-    columns: ALL_PRODUCT_OUTSTANDING_EXPORT_COLUMNS,
+    columns: exportColumns,
     getExportRows: () => filteredData,
     appliedFilters,
   });
@@ -255,7 +189,7 @@ export const AllProductOutstandingReportScreen: React.FC = () => {
           </View>
         );
       },
-      [expandedIds],
+      [buildExpandedFields, buildInitialFields, expandedIds],
     );
 
   const listHeader = (

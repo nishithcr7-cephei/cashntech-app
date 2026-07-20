@@ -16,6 +16,7 @@ import type {ReportApiFilterState} from '@utils/reportFilterPayload';
 export type UseReportExportParams<T extends object> = {
   reportTitle: string;
   filename: string;
+  /** Product-resolved columns from `useReportColumns` (PR8). */
   columns: GenericExcelExportColumn[];
   /** Full dataset after client search/filter (not paginated slice). */
   getExportRows: () => T[];

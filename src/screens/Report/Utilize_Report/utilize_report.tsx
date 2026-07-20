@@ -14,12 +14,13 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportColumns} from '@hooks/useReportColumns';
 import {useReportExport} from '@hooks/useReportExport';
-import {UTILIZATION_EXPORT_COLUMNS} from '@utils/reportExportColumns';
+import {buildReportFields} from '@products/shared/schemas/reports/reportFieldBuilder';
+import {utilizationFieldAccessor} from '@products/shared/schemas/reports/accessors/utilizationFieldAccessor';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -43,30 +44,6 @@ const INITIAL_PAGE_SIZE = 20;
 const LOAD_MORE_SIZE = 20;
 const INITIAL_VISIBLE_FIELD_COUNT = 6;
 
-const formatAmount = (val: number | undefined | null): string => {
-  if (val == null || Number.isNaN(Number(val))) {
-    return '-';
-  }
-  return `₹ ${Number(val).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-const formatText = (val: string | number | undefined | null): string => {
-  if (val == null || val === '') {
-    return '-';
-  }
-  return String(val);
-};
-
-const formatLoanTenure = (tenure: number): string => {
-  if (!tenure || Number.isNaN(tenure)) {
-    return '-';
-  }
-  return `${tenure} Months`;
-};
-
 const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   <View style={styles.infoGrid}>
     {fields.map(field => (
@@ -79,51 +56,6 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
     ))}
   </View>
 );
-
-const buildAllListFields = (item: UtilizationReportItem): FieldDef[] => [
-  {label: 'Anchor Name', value: formatText(item.anchorName)},
-  {label: 'Anchor Pan', value: formatText(item.anchorPan)},
-  {label: 'Borrower Name', value: formatText(item.borrowerName)},
-  {label: 'Borrower Pan', value: formatText(item.borrowerPan)},
-  {label: 'Loan Account Number', value: formatText(item.lan)},
-  {label: 'Program Name', value: formatText(item.programName)},
-  {label: 'Program Type Name', value: formatText(item.programTypeName)},
-  {label: 'Master Program Name', value: formatText(item.masterProgramName)},
-  {label: 'Los Id', value: formatText(item.losid)},
-  {label: 'Scheme Type', value: formatText(item.schemetype)},
-  {label: 'Loan Account Roi', value: formatText(item.loanaccountroi)},
-  {label: 'Loan Tenure', value: formatLoanTenure(item.loanTenure)},
-  {label: 'Limit Creation Date', value: formatText(item.limitCreationDate)},
-  {label: 'Limit Expiry Date', value: formatText(item.limitExpiryDate)},
-  {label: 'Sanctioned Limit', value: formatAmount(item.sanctionedLimit)},
-  {label: 'Total Utilized Limit', value: formatAmount(item.totalUtilizedLimit)},
-  {label: 'Net Available Limit', value: formatAmount(item.netAvailableLimit)},
-  {
-    label: 'Total Principal O S',
-    value: formatAmount(item.totalPrincipalOS),
-  },
-  {label: 'Principal Due', value: formatAmount(item.principalDue)},
-  {label: 'Interest O S', value: formatAmount(item.interestOS)},
-  {label: 'Late Payment Due', value: formatAmount(item.latePaymentDue)},
-  {label: 'Total Charges Due', value: formatAmount(item.totalChargesDue)},
-  {label: 'Total Amount Due', value: formatAmount(item.totalAmountDue)},
-  {
-    label: 'Dpd',
-    value: formatText(item.dpd),
-    valueStyle:
-      item.dpd > 90
-        ? {color: Colors.primaryColor, fontFamily: Fonts.GilroySemiBold}
-        : undefined,
-  },
-  {label: 'Generation Date', value: formatText(item.generationDate)},
-  {label: 'Eod Date', value: formatText(item.eodDate)},
-];
-
-const buildInitialFields = (item: UtilizationReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT);
-
-const buildExpandedFields = (item: UtilizationReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT);
 
 function utilizationRowKey(item: UtilizationReportItem, index: number): string {
   return `${item.lan}-${item.losid}-${index}`;
@@ -152,6 +84,25 @@ export const UtilizationReportScreen: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  const {screenColumns, exportColumns} = useReportColumns('utilization');
+
+  const buildAllListFields = useCallback(
+    (item: UtilizationReportItem) =>
+      buildReportFields(item, screenColumns, utilizationFieldAccessor),
+    [screenColumns],
+  );
+
+  const buildInitialFields = useCallback(
+    (item: UtilizationReportItem) =>
+      buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
+
+  const buildExpandedFields = useCallback(
+    (item: UtilizationReportItem) =>
+      buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
 
   const filteredData = useMemo(() => {
     let data = rows;
@@ -197,7 +148,7 @@ export const UtilizationReportScreen: React.FC = () => {
   const {handleExport, exporting} = useReportExport({
     reportTitle: 'Utilization Report',
     filename: 'utilization-report',
-    columns: UTILIZATION_EXPORT_COLUMNS,
+    columns: exportColumns,
     getExportRows: () => filteredData,
     appliedFilters,
   });
@@ -231,7 +182,7 @@ export const UtilizationReportScreen: React.FC = () => {
         </View>
       );
     },
-    [expandedIds],
+    [buildExpandedFields, buildInitialFields, expandedIds],
   );
 
   const listHeader = (

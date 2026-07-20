@@ -14,12 +14,13 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportColumns} from '@hooks/useReportColumns';
 import {useReportExport} from '@hooks/useReportExport';
-import {INVOICE_OUTSTANDING_EXPORT_COLUMNS} from '@utils/reportExportColumns';
+import {buildReportFields} from '@products/shared/schemas/reports/reportFieldBuilder';
+import {invoiceOutstandingFieldAccessor} from '@products/shared/schemas/reports/accessors/invoiceOutstandingFieldAccessor';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -43,23 +44,6 @@ const INITIAL_PAGE_SIZE = 20;
 const LOAD_MORE_SIZE = 20;
 const INITIAL_VISIBLE_FIELD_COUNT = 6;
 
-const formatAmount = (val: number | undefined | null): string => {
-  if (val == null || Number.isNaN(Number(val))) {
-    return '-';
-  }
-  return `₹ ${Number(val).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-const formatText = (val: string | number | undefined | null): string => {
-  if (val == null || val === '') {
-    return '-';
-  }
-  return String(val);
-};
-
 const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   <View style={styles.infoGrid}>
     {fields.map(field => (
@@ -72,36 +56,6 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
     ))}
   </View>
 );
-
-const buildAllListFields = (item: InvoiceOutstandingReportItem): FieldDef[] => [
-  {label: 'Anchor Name', value: formatText(item.anchorName)},
-  {label: 'Anchor Pan', value: formatText(item.anchorPan)},
-  {label: 'Borrower Name', value: formatText(item.borrowerName)},
-  {label: 'Borrower Pan', value: formatText(item.borrowerPan)},
-  {label: 'Loan Account Number', value: formatText(item.loanAccountNumber)},
-  {label: 'Los Id', value: formatText(item.losId)},
-  {label: 'Scheme Type', value: formatText(item.schemeType)},
-  {label: 'Invoice Number', value: formatText(item.invoiceNumber)},
-  {label: 'Tranch Number', value: formatText(item.tranchNumber)},
-  {label: 'Invoice Date', value: formatText(item.invoiceDate)},
-  {label: 'Disbursement Date', value: formatText(item.disbursementDate)},
-  {label: 'Maturity Date', value: formatText(item.maturityDate)},
-  {label: 'Roi', value: formatText(item.roi)},
-  {label: 'Invoice Amount', value: formatAmount(item.invoiceValue)},
-  {label: 'Loan Amount', value: formatAmount(item.loanValue)},
-  {label: 'Disbursement Amount', value: formatAmount(item.disbursementAmount)},
-  {label: 'Principal O S', value: formatAmount(item.principalOS)},
-  {label: 'Interest O S', value: formatAmount(item.interestOS)},
-  {label: 'Penal O S', value: formatAmount(item.penalOS)},
-  {label: 'Invoice Status', value: formatText(item.invoiceStatus)},
-  {label: 'Closed Date', value: formatText(item.closedDate)},
-];
-
-const buildInitialFields = (item: InvoiceOutstandingReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT);
-
-const buildExpandedFields = (item: InvoiceOutstandingReportItem): FieldDef[] =>
-  buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT);
 
 function invoiceOutstandingRowKey(
   item: InvoiceOutstandingReportItem,
@@ -133,6 +87,25 @@ export const InvoiceOutstandingReportScreen: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  const {screenColumns, exportColumns} = useReportColumns('invoiceOutstanding');
+
+  const buildAllListFields = useCallback(
+    (item: InvoiceOutstandingReportItem) =>
+      buildReportFields(item, screenColumns, invoiceOutstandingFieldAccessor),
+    [screenColumns],
+  );
+
+  const buildInitialFields = useCallback(
+    (item: InvoiceOutstandingReportItem) =>
+      buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
+
+  const buildExpandedFields = useCallback(
+    (item: InvoiceOutstandingReportItem) =>
+      buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
 
   const filteredData = useMemo(() => {
     let data = rows;
@@ -178,7 +151,7 @@ export const InvoiceOutstandingReportScreen: React.FC = () => {
   const {handleExport, exporting} = useReportExport({
     reportTitle: 'Invoice Outstanding Report',
     filename: 'invoice-outstanding-report',
-    columns: INVOICE_OUTSTANDING_EXPORT_COLUMNS,
+    columns: exportColumns,
     getExportRows: () => filteredData,
     appliedFilters,
   });
@@ -213,7 +186,7 @@ export const InvoiceOutstandingReportScreen: React.FC = () => {
         </View>
       );
     },
-    [expandedIds],
+    [buildExpandedFields, buildInitialFields, expandedIds],
   );
 
   const listHeader = (

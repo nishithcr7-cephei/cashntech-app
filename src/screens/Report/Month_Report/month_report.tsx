@@ -14,12 +14,13 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportColumns} from '@hooks/useReportColumns';
 import {useReportExport} from '@hooks/useReportExport';
-import {MONTHLY_ACCRUAL_EXPORT_COLUMNS} from '@utils/reportExportColumns';
+import {buildReportFields} from '@products/shared/schemas/reports/reportFieldBuilder';
+import {monthlyAccrualFieldAccessor} from '@products/shared/schemas/reports/accessors/monthlyAccrualFieldAccessor';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -42,30 +43,6 @@ type FieldDef = {
 const INITIAL_PAGE_SIZE = 20;
 const LOAD_MORE_SIZE = 20;
 
-const formatAmount = (val: number | undefined | null): string => {
-  if (val == null || Number.isNaN(Number(val))) {
-    return '-';
-  }
-  return `₹ ${Number(val).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-const formatText = (val: string | number | undefined | null): string => {
-  if (val == null || val === '') {
-    return '-';
-  }
-  return String(val);
-};
-
-const formatRate = (val: number | undefined | null): string => {
-  if (val == null || Number.isNaN(Number(val))) {
-    return '-';
-  }
-  return `${Number(val)}%`;
-};
-
 const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   <View style={styles.infoGrid}>
     {fields.map(field => (
@@ -78,25 +55,6 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
     ))}
   </View>
 );
-
-const buildListFields = (row: MonthlyAccrualReportItem): FieldDef[] => [
-  {label: 'Loan Account Number', value: formatText(row.loanAccountNumber)},
-  {label: 'Invoice Number', value: formatText(row.invoiceNumber)},
-  {label: 'Anchor Name', value: formatText(row.anchorName)},
-  {label: 'Bank Name', value: formatText(row.bankName)},
-  {label: 'Customer', value: formatText(row.customer)},
-  {
-    label: 'Accrued Interest Amount',
-    value: formatAmount(row.accruedInterestAmount),
-  },
-  {
-    label: 'Posted Interest Amount',
-    value: formatAmount(row.postedInterestAmount),
-  },
-  {label: 'Rate', value: formatRate(row.rate)},
-  {label: 'Month', value: formatText(row.month)},
-  {label: 'Posted Date', value: formatText(row.postedDate)},
-];
 
 export const MonthlyInterestReportScreen: React.FC = () => {
   const navigation = useNavigation<
@@ -120,6 +78,13 @@ export const MonthlyInterestReportScreen: React.FC = () => {
 
   const [searchText, setSearchText] = useState('');
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  const {screenColumns, exportColumns} = useReportColumns('monthlyAccrual');
+
+  const buildListFields = useCallback(
+    (item: MonthlyAccrualReportItem) =>
+      buildReportFields(item, screenColumns, monthlyAccrualFieldAccessor),
+    [screenColumns],
+  );
 
   const filteredData = useMemo(() => {
     let data = rows;
@@ -161,7 +126,7 @@ export const MonthlyInterestReportScreen: React.FC = () => {
   const {handleExport, exporting} = useReportExport({
     reportTitle: 'Monthly Interest Report',
     filename: 'monthly-interest-report',
-    columns: MONTHLY_ACCRUAL_EXPORT_COLUMNS,
+    columns: exportColumns,
     getExportRows: () => filteredData,
     appliedFilters,
   });
@@ -184,7 +149,7 @@ export const MonthlyInterestReportScreen: React.FC = () => {
         </View>
       );
     },
-    [],
+    [buildListFields],
   );
 
   const listHeader = (

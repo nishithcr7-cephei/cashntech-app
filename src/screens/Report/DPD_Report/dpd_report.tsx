@@ -14,12 +14,13 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {AppBar, Container, ReportFilterModal} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
+import {useReportColumns} from '@hooks/useReportColumns';
 import {useReportExport} from '@hooks/useReportExport';
-import {DPD_EXPORT_COLUMNS} from '@utils/reportExportColumns';
+import {buildReportFields} from '@products/shared/schemas/reports/reportFieldBuilder';
+import {dpdFieldAccessor} from '@products/shared/schemas/reports/accessors/dpdFieldAccessor';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -41,23 +42,7 @@ type FieldDef = {
 
 const INITIAL_PAGE_SIZE = 20;
 const LOAD_MORE_SIZE = 20;
-
-const formatAmount = (val: number | undefined | null): string => {
-  if (val == null || Number.isNaN(Number(val))) {
-    return '-';
-  }
-  return `₹ ${Number(val).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-const formatText = (val: string | number | undefined | null): string => {
-  if (val == null || val === '') {
-    return '-';
-  }
-  return String(val);
-};
+const INITIAL_VISIBLE_FIELD_COUNT = 6;
 
 const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
   <View style={styles.infoGrid}>
@@ -71,46 +56,6 @@ const InfoFieldGrid: React.FC<{fields: FieldDef[]}> = ({fields}) => (
     ))}
   </View>
 );
-
-const INITIAL_VISIBLE_FIELD_COUNT = 6;
-
-const buildAllListFields = (row: DpdReportItem): FieldDef[] => [
-  {label: 'Lms Id', value: formatText(row.lmsId)},
-  {label: 'Invoice Number', value: formatText(row.invoiceNumber)},
-  {label: 'Invoice Date', value: formatText(row.invoiceDate)},
-  {label: 'Loan Account Number', value: formatText(row.loanAccountNumber)},
-  {label: 'Program Name', value: formatText(row.programName)},
-  {label: 'Product Type', value: formatText(row.productType)},
-  {label: 'Bank Name', value: formatText(row.bankName)},
-  {label: 'Anchor Name', value: formatText(row.anchorName)},
-  {label: 'Borrower Name', value: formatText(row.borrowerName)},
-  {label: 'Disbursement Date', value: formatText(row.disbursementDate)},
-  {label: 'Due Date', value: formatText(row.dueDate)},
-  {label: 'Tenure', value: formatText(row.tenure)},
-  {label: 'Principal O S', value: formatAmount(row.principalOS)},
-  {label: 'Principal Due', value: formatAmount(row.principalDue)},
-  {label: 'Interest O S', value: formatAmount(row.interestOS)},
-  {label: 'Interest Due', value: formatAmount(row.interestDue)},
-  {label: 'Penal Due', value: formatAmount(row.penalDue)},
-  {label: 'Total Outstanding', value: formatAmount(row.totalOutstanding)},
-  {
-    label: 'Dpd',
-    value: formatText(row.dpd),
-    valueStyle:
-      row.dpd > 90
-        ? {color: Colors.primaryColor, fontFamily: Fonts.GilroySemiBold}
-        : undefined,
-  },
-  {label: 'Principal Dpd', value: formatText(row.principalDpd)},
-  {label: 'Interest Dpd', value: formatText(row.interestDpd)},
-  {label: 'Bucket', value: formatText(row.bucket)},
-];
-
-const buildInitialFields = (row: DpdReportItem): FieldDef[] =>
-  buildAllListFields(row).slice(0, INITIAL_VISIBLE_FIELD_COUNT);
-
-const buildExpandedFields = (row: DpdReportItem): FieldDef[] =>
-  buildAllListFields(row).slice(INITIAL_VISIBLE_FIELD_COUNT);
 
 function dpdRowKey(item: DpdReportItem, index: number): string {
   return `${item.lmsId}-${item.invoiceNumber}-${item.loanAccountNumber}-${index}`;
@@ -139,6 +84,25 @@ export const DpdReportScreen: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  const {screenColumns, exportColumns} = useReportColumns('dpd');
+
+  const buildAllListFields = useCallback(
+    (item: DpdReportItem) =>
+      buildReportFields(item, screenColumns, dpdFieldAccessor),
+    [screenColumns],
+  );
+
+  const buildInitialFields = useCallback(
+    (item: DpdReportItem) =>
+      buildAllListFields(item).slice(0, INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
+
+  const buildExpandedFields = useCallback(
+    (item: DpdReportItem) =>
+      buildAllListFields(item).slice(INITIAL_VISIBLE_FIELD_COUNT),
+    [buildAllListFields],
+  );
 
   const filteredData = useMemo(() => {
     let data = rows;
@@ -185,7 +149,7 @@ export const DpdReportScreen: React.FC = () => {
   const {handleExport, exporting} = useReportExport({
     reportTitle: 'DPD / Overdue Report',
     filename: 'dpd-overdue-report',
-    columns: DPD_EXPORT_COLUMNS,
+    columns: exportColumns,
     getExportRows: () => filteredData,
     appliedFilters,
   });
@@ -221,7 +185,7 @@ export const DpdReportScreen: React.FC = () => {
         </View>
       );
     },
-    [expandedIds],
+    [buildExpandedFields, buildInitialFields, expandedIds],
   );
 
   const listHeader = (

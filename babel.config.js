@@ -17,6 +17,7 @@ module.exports = {
           '@store': './src/store',
           '@type': './src/types',
           '@utils': './src/utils',
+          '@products': './src/products',
         },
       },
     ],

@@ -16,7 +16,8 @@
       "@services/*": ["src/services/*"],
       "@store/*": ["src/store/*"],
       "@type/*": ["src/types/*"],
-      "@utils/*": ["src/utils/*"]
+      "@utils/*": ["src/utils/*"],
+      "@products/*": ["src/products/*"]
     }
   },
   "exclude": ["node_modules"]
