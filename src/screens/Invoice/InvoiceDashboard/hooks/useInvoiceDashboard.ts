@@ -73,7 +73,7 @@ export const useInvoiceDashboard = () => {
     isDealerChecker,
   };
   const isCashnTechUser = !!(
-    userRole === 'cashntech_user' || 
+    userRole === 'cashntech_user' ||
     (userRole && ROLE_LABELS[userRole] === 'CashnTech User')
   );
 
@@ -82,6 +82,20 @@ export const useInvoiceDashboard = () => {
   const [productTab, setProductTab] = useState<ProductTabType>(
     effectiveCode === PRODUCT_CODES.VENDOR_FINANCE ? 'vendor_finance' : 'dealer_finance',
   );
+
+  // Keep productTab in sync when the active product changes via the in-app
+  // switcher (drawer toggle / header chip / product branch tap). Without this,
+  // productTab only reflects the product at mount time and the dashboard would
+  // keep filtering/fetching data for the previous product after a switch.
+  useEffect(() => {
+    setProductTab(prev =>
+      prev === 'all_product' || prev === 'pid'
+        ? prev
+        : effectiveCode === PRODUCT_CODES.VENDOR_FINANCE
+        ? 'vendor_finance'
+        : 'dealer_finance',
+    );
+  }, [effectiveCode]);
   const [showCheckerApprovalModal, setShowCheckerApprovalModal] = useState(false);
   const [showApproveRejectModal, setShowApproveRejectModal] = useState(false);
   const [selectedDealerId, setSelectedDealerId] = useState<string | null>(null);
@@ -125,7 +139,7 @@ export const useInvoiceDashboard = () => {
   ]);
 
   const productBreadcrumbLabel = useMemo(() => {
-    if (activeProductName) return activeProductName;
+    if (activeProductName) {return activeProductName;}
     return PRODUCT_DISPLAY_NAMES[effectiveCode];
   }, [activeProductName, effectiveCode]);
 
@@ -162,7 +176,7 @@ export const useInvoiceDashboard = () => {
   }, [dispatch, scopeData]);
 
   useEffect(() => {
-    if (!scopeData || scopeData.length === 0) return;
+    if (!scopeData || scopeData.length === 0) {return;}
     if (
       programSelection?.programScope === 'selected' &&
       programIds.length === 0
@@ -189,8 +203,8 @@ export const useInvoiceDashboard = () => {
       approvalRemark?: string;
     }[];
   }) => {
-    if (payload.invoices.length === 0) return;
-    
+    if (payload.invoices.length === 0) {return;}
+
     setBulkLoading(true);
     try {
       const isChecker = isAnchorChecker || isDealerChecker;
@@ -207,7 +221,7 @@ export const useInvoiceDashboard = () => {
           const fromLatest = (latestData as {id?: string; approval_status?: string}[]).find(
             r => r.id === invoiceId,
           )?.approval_status;
-          if (fromLatest) return fromLatest;
+          if (fromLatest) {return fromLatest;}
           const fromSelection = selectedInvoices.find(inv => inv.id === invoiceId) as
             | {rawApprovalStatus?: string}
             | undefined;
@@ -233,7 +247,7 @@ export const useInvoiceDashboard = () => {
         // Admin Bulk Verification API (Verify/Reject/Hold)
         response = await invoiceApi.bulkUpdateInvoiceVerification(payload as any);
       }
-      
+
       if (response) {
         Toast.show({
           type: 'success',

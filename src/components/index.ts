@@ -6,6 +6,7 @@ export * from './Header/AppBar';
 export * from './Container/Container';
 export * from './KeyboardAwareScrollView/KeyboardAwareScrollView';
 export * from './Drawer/DrawerContent';
+export * from './Drawer/DrawerTreeMenu';
 export * from './Input/Input';
 export * from './Footer/TnCFooter';
 export * from './Footer/FooterButton';
@@ -34,6 +35,12 @@ export * from './MonthYearFilter/MonthYearFilter';
 // Program selector
 export * from './ProgramSelector/ProgramSelectorPill';
 export * from './ProgramSelector/ProgramBreadcrumb';
+export * from './ProgramSelector/ScopeSelectorCard';
+
+// Product switcher (in-app DF / VF switching)
+export * from './ProductSwitcher/ProductHeaderChip';
+export * from './ProductSwitcher/ProductBottomSheet';
+export * from './ProductSwitcher/ProductIcon';
 
 // Tab components
 export * from './TabBar';

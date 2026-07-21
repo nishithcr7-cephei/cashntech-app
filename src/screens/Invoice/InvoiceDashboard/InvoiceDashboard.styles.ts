@@ -96,7 +96,6 @@ export const styles = StyleSheet.create({
   },
   subValuesContainer: {
     flexDirection: 'column',
-    gap: scaleHeight(12),
     marginTop: scaleHeight(12),
     paddingTop: scaleHeight(12),
     borderTopWidth: 1,

@@ -17,7 +17,6 @@ import {
   AuthNavigatorType,
   HomeNavigatorType,
 } from '@type/NavigatorTypes';
-import {CompositeNavigationProp} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ProgramSelectorPill} from '@components/ProgramSelector/ProgramSelectorPill';
@@ -31,6 +30,8 @@ export type AppBarProps = {
   titleTextStyle?: StyleProp<TextStyle>;
   hideHamburger?: boolean;
   showProgramSelector?: boolean;
+  /** Optional content rendered at the far right of the title row (e.g. a product switcher chip). */
+  rightContent?: React.ReactNode;
 
   renderLeftIcon?: React.ReactNode;
   onPressLeftIcon?: () => void;
@@ -53,22 +54,23 @@ export const AppBar = ({
   titleTextStyle,
   hideHamburger = false,
   showProgramSelector = false,
+  rightContent,
   navigation,
 }: AppBarProps) => {
   const insets = useSafeAreaInsets();
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
-  
+
   // Get role-based header color (default to anchor_maker if no role)
-  const headerColors = userRole 
-    ? ROLE_HEADER_COLORS[userRole] 
+  const headerColors = userRole
+    ? ROLE_HEADER_COLORS[userRole]
     : ROLE_HEADER_COLORS.anchor_maker;
-  
+
   return (
     <View style={[
-      styles.container, 
+      styles.container,
       {backgroundColor: headerColors.bg},
-      {paddingTop: insets.top}, 
-      containerStyle
+      {paddingTop: insets.top},
+      containerStyle,
     ]}>
       {(renderLeftIcon || !hideHamburger) && (
         <TouchableOpacity
@@ -93,14 +95,15 @@ export const AppBar = ({
       )}
 
       <View style={[
-        styles.titleSection, 
+        styles.titleSection,
         !showProgramSelector && styles.titleSectionFull,
-        hideHamburger && styles.titleSectionNoHamburger
+        hideHamburger && styles.titleSectionNoHamburger,
       ]}>
         <Text style={[styles.titleText, titleTextStyle]} numberOfLines={1}>
           {title}
         </Text>
         {showProgramSelector && <ProgramSelectorPill />}
+        {rightContent}
       </View>
     </View>
   );

@@ -17,7 +17,6 @@ import {
   Logout,
   File,
   Folder,
-  BankBuilding,
 } from '@assets/Icons';
 import {DrawerContentComponentProps} from '@react-navigation/drawer';
 import {useNavigationState} from '@react-navigation/native';
@@ -32,6 +31,16 @@ import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
 import {selectPermissionsLoading} from '@store/permissions';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
+import {
+  selectActiveProductCode,
+  selectAvailableProducts,
+} from '@store/product/product.selectors';
+import {setActiveProduct} from '@store/product/product.slice';
+import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES, ResolvedProduct} from '@store/product/product.types';
+import {setProgramScope} from '@store/programSelection/programSelection.slice';
+import {ProductIcon} from '@components/ProductSwitcher/ProductIcon';
+import {DrawerTreeMenu, DrawerMenuNode} from './DrawerTreeMenu';
 
 const REPORT_MENU_ITEMS = [
   {key: 'all-loans', title: 'All Loans Report'},
@@ -47,24 +56,56 @@ const REPORT_MENU_ITEMS = [
 ] as const;
 
 export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
-  const [isProductsOpen, setIsProductsOpen] = React.useState(false);
+  const dispatch = useDispatch();
+  // Single expand/collapse map keyed by menu node key — replaces the previous
+  // fixed isProductsOpen/isDealerFinanceOpen/... booleans so the PRODUCTS tree
+  // can render an arbitrary number of product branches (DF, VF, ...).
+  const [expandedKeys, setExpandedKeys] = React.useState<Record<string, boolean>>({});
   const [isReportingOpen, setIsReportingOpen] = React.useState(false);
   const [activeReportKey, setActiveReportKey] = React.useState<string | null>(null);
-  const [isDealerFinanceOpen, setIsDealerFinanceOpen] = React.useState(false);
-  const [isTransactionsOpen, setIsTransactionsOpen] = React.useState(false);
-  const [isFundPlannerOpen, setIsFundPlannerOpen] = React.useState(false);
-  const [isLoanAccountsOpen, setIsLoanAccountsOpen] = React.useState(false);
   const {top, bottom} = useSafeAreaInsets();
   const userInfo = useSelector(userSelector.getUserInfo);
   const fullName = useSelector(userSelector.getFullName);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const canViewReports = useSelector(getIsCashntechUserType);
-  
+  const activeProductCode = useSelector(selectActiveProductCode);
+  const availableProducts = useSelector(selectAvailableProducts);
+  const effectiveProductCode = getEffectiveProductCode(activeProductCode);
+  const hasMultipleProducts = availableProducts.length > 1;
+  // PR1 store already defaults DF-only users to a single resolved product;
+  // this fallback only guards the brief window before scope/product hydration.
+  const productBranches: ResolvedProduct[] =
+    availableProducts.length > 0
+      ? availableProducts
+      : [
+          {
+            id: '',
+            name: PRODUCT_DISPLAY_NAMES[PRODUCT_CODES.DEALER_FINANCE],
+            code: PRODUCT_CODES.DEALER_FINANCE,
+          },
+        ];
+
+  const toggleExpandedKey = (key: string) => {
+    setExpandedKeys(prev => ({...prev, [key]: !prev[key]}));
+  };
+
+  const switchActiveProduct = (product: ResolvedProduct) => {
+    dispatch(setActiveProduct(product));
+    dispatch(setProgramScope('all'));
+  };
+
+  const handleActiveProductToggle = (product: ResolvedProduct) => {
+    if (product.code === activeProductCode) {
+      return;
+    }
+    switchActiveProduct(product);
+  };
+
   // Get role-based header colors (default to anchor_maker if no role)
   const headerColors = userRole
     ? ROLE_HEADER_COLORS[userRole]
     : ROLE_HEADER_COLORS.anchor_maker;
-  
+
   // Role-based menu visibility (All Access = same transaction menu as maker/checker on web)
   const isAnchorAllAccess = userRole === 'anchor_all_access';
   const isDealerAllAccess = userRole === 'dealer_all_access';
@@ -73,19 +114,16 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const isDealerMaker = userRole === 'dealer_maker' || isDealerAllAccess;
   const isDealerChecker = userRole === 'dealer_checker' || isDealerAllAccess;
   const isCashnTechUser = userRole === 'cashntech_user';
+  // Transactions items are visible for these 5 roles only (matches web parity gating).
+  const canViewTransactionsSection =
+    isAnchorMaker || isAnchorChecker || isDealerChecker || isDealerMaker || isCashnTechUser;
 
-  // Show TRANSACTIONS menu for all roles (including CashnTech User - same menu)
-  const showTransactions = true;
-
-  // Show Payments section for all roles (visible but disabled/gray for everyone)
-  const showPayments = false;
-  
   // Show Fund Planner for Dealer Maker only (removed dealer_checker)
   const showFundPlanner = isDealerMaker;
-  
+
   // Show Loan Accounts for Dealer Maker only (removed dealer_checker)
   const showLoanAccounts = isDealerMaker;
-  
+
   // Use shared role labels so all roles (including dealer_checker) are supported
   const roleLabel = userRole ? ROLE_LABELS[userRole] : '';
 
@@ -98,12 +136,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const canViewSOA = useHasPermission(PERMISSIONS.SOA);
   const canViewDPD = useHasPermission(PERMISSIONS.DPD_PENAL_NPA);
   const canViewOverview = useHasPermission(PERMISSIONS.TRANSACTIONS_OVERVIEW);
-  
-  // Show specific Invoice menu items based on role (including CashnTech User - same menu)
-  const showPendingApprovals = false;
-  const showRejectedFinances = false;
-  const showDiscountingPayments = false;
-  
+
   // Get current route (name + params) for highlighting active menu item
   const currentRouteInfo = useNavigationState(state => {
     if (state) {
@@ -122,10 +155,6 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const currentRoute = currentRouteInfo?.name as string | null;
   const currentRouteParams: any = currentRouteInfo?.params || {};
   const dealerMode = currentRouteParams?.mode;
-  const isDealerLandingRoute =
-    isDealerMaker &&
-    currentRoute === 'DealerMakerDashboardScreen' &&
-    dealerMode !== 'dashboard'; // default to landing if no mode
   const isDealerInvoiceDashboardRoute =
     isDealerMaker &&
     currentRoute === 'DealerMakerDashboardScreen' &&
@@ -134,7 +163,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   // Auto-expand menus based on current route
   React.useEffect(() => {
     // 1. Define all routes first
-    const isTransactionRoute = 
+    const isTransactionRoute =
       currentRoute === 'InvoiceDashboard' ||
       currentRoute === 'InvoiceDetails' ||
       currentRoute === 'CreateInvoice' ||
@@ -157,33 +186,179 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       currentRoute === 'ODRepaymentsScreen' ||
       currentRoute === 'AnchorsListScreen';
 
-    const isFundPlannerRoute = 
+    const isFundPlannerRoute =
       isDealerMaker &&
       (currentRoute === 'FinancingRequestScreen' ||
        currentRoute === 'LimitDetailsScreen');
 
-    const isLoanAccountsRoute = 
+    const isLoanAccountsRoute =
       isDealerMaker &&
       (currentRoute === 'ODDetailsScreen' ||
        currentRoute === 'ODRepaymentsScreen' ||
        currentRoute === 'AnchorsListScreen');
 
-    // 2. Set states based on routes
+    // 2. Auto-expand the branch for the *active* product — when a menu item
+    // under a product branch is tapped, that product becomes active first,
+    // then navigation happens, so this always expands the matching branch.
     if (isTransactionRoute || isFundPlannerRoute || isLoanAccountsRoute) {
-      setIsProductsOpen(true);
-      setIsDealerFinanceOpen(true);
-      setIsTransactionsOpen(true);
+      setExpandedKeys(prev => ({
+        ...prev,
+        products: true,
+        [`product-${effectiveProductCode}`]: true,
+        [`transactions-${effectiveProductCode}`]: true,
+      }));
     }
 
     if (isFundPlannerRoute) {
-      setIsFundPlannerOpen(true);
+      setExpandedKeys(prev => ({...prev, [`fundplanner-${effectiveProductCode}`]: true}));
     }
 
     if (isLoanAccountsRoute) {
-      setIsLoanAccountsOpen(true);
+      setExpandedKeys(prev => ({...prev, [`loanaccounts-${effectiveProductCode}`]: true}));
     }
 
-  }, [currentRoute, isDealerMaker]);
+  }, [currentRoute, isDealerMaker, effectiveProductCode]);
+
+  const getProductBranchIcon = (code: string) => (
+    <ProductIcon code={code} size={scaleHeight(20)} color="#7A7C82" />
+  );
+
+  const buildProductBranchNode = (product: ResolvedProduct): DrawerMenuNode => {
+    const isActiveProductBranch = product.code === effectiveProductCode;
+
+    const transactionsChildren: DrawerMenuNode[] = [
+      {
+        key: `invoice-overview-${product.code}`,
+        label: 'Invoice Overview',
+        route: 'InvoiceDashboard',
+        visible: canViewTransactionsSection && canViewOverview,
+        productContext: product,
+        isActive:
+          isActiveProductBranch &&
+          (currentRoute === 'InvoiceDashboard' || isDealerInvoiceDashboardRoute),
+      },
+      {
+        key: `invoice-list-${product.code}`,
+        label: 'Invoice List & Approvals',
+        route: 'InvoiceDetails',
+        visible: canViewTransactionsSection && canViewInvoices,
+        disabled: permissionsLoading,
+        productContext: product,
+        isActive:
+          isActiveProductBranch &&
+          (currentRoute === 'InvoiceDetails' ||
+            currentRoute === 'CreateInvoice' ||
+            currentRoute === 'UploadInvoiceList'),
+      },
+      {
+        key: `disbursement-${product.code}`,
+        label: 'Disbursement',
+        route: 'DisbursementScreen',
+        visible: canViewTransactionsSection && canViewDisbursement,
+        disabled: permissionsLoading,
+        productContext: product,
+        isActive: isActiveProductBranch && currentRoute === 'DisbursementScreen',
+      },
+      {
+        key: `interest-accruals-${product.code}`,
+        label: 'Interest Accruals',
+        visible: canViewTransactionsSection,
+        route: 'InterestAccrualsScreen',
+        disabled: permissionsLoading || !canViewInterestAccruals,
+        productContext: product,
+        isActive: isActiveProductBranch && currentRoute === 'InterestAccrualsScreen',
+      },
+      {
+        key: `repayment-${product.code}`,
+        label: 'Repayment & Settlement',
+        visible: canViewTransactionsSection,
+        route: 'RepaymentSettlementScreen',
+        disabled: permissionsLoading || !canViewRepayment,
+        productContext: product,
+        isActive: isActiveProductBranch && currentRoute === 'RepaymentSettlementScreen',
+      },
+      {
+        key: `dpd-${product.code}`,
+        label: 'DPD / Penal Interest / NPA',
+        visible: canViewTransactionsSection,
+        route: 'DPDPenalInterestNPAScreen',
+        disabled: !canViewDPD,
+        productContext: product,
+        isActive: isActiveProductBranch && currentRoute === 'DPDPenalInterestNPAScreen',
+      },
+      {
+        key: `soa-${product.code}`,
+        label: 'Statement of Account (SOA)',
+        visible: canViewTransactionsSection,
+        route: 'StatementOfAccount',
+        disabled: !canViewSOA,
+        productContext: product,
+        isActive: isActiveProductBranch && currentRoute === 'StatementOfAccount',
+      },
+    ];
+
+    const children: DrawerMenuNode[] = [
+      {
+        key: `transactions-${product.code}`,
+        label: 'Transactions',
+        icon: <File height={scaleHeight(22)} width={scaleWidth(22)} />,
+        children: transactionsChildren,
+      },
+    ];
+
+    // Fund Planner / Loan Accounts stay Dealer Finance only (dealer maker role), as today.
+    if (product.code === PRODUCT_CODES.DEALER_FINANCE && showFundPlanner) {
+      children.push({
+        key: `fundplanner-${product.code}`,
+        label: 'Fund Planner',
+        children: [
+          {key: `financing-request-${product.code}`, label: 'Financing Request', disabled: true},
+          {key: `limit-details-${product.code}`, label: 'Limit Details', disabled: true},
+        ],
+      });
+    }
+
+    if (product.code === PRODUCT_CODES.DEALER_FINANCE && showLoanAccounts) {
+      children.push({
+        key: `loanaccounts-${product.code}`,
+        label: 'Loan Accounts',
+        children: [
+          {key: `od-details-${product.code}`, label: 'OD Details', disabled: true},
+          {key: `od-repayments-${product.code}`, label: 'OD Repayments', disabled: true},
+          {key: `anchors-list-${product.code}`, label: 'Anchors List', disabled: true},
+        ],
+      });
+    }
+
+    return {
+      key: `product-${product.code}`,
+      label: product.name,
+      icon: getProductBranchIcon(product.code),
+      highlighted: isActiveProductBranch,
+      children,
+    };
+  };
+
+  const productsRootNode: DrawerMenuNode = {
+    key: 'products',
+    label: 'PRODUCTS',
+    icon: <Folder height={scaleHeight(22)} width={scaleWidth(22)} />,
+    children: productBranches.map(buildProductBranchNode),
+  };
+
+  const handleMenuNavigate = (node: DrawerMenuNode) => {
+    if (node.disabled || !node.route) {
+      return;
+    }
+    // Tapping a menu item under a non-active product branch switches the
+    // active product first, so the destination screen's data matches the
+    // branch the user tapped from.
+    if (node.productContext && node.productContext.code !== activeProductCode) {
+      switchActiveProduct(node.productContext);
+    }
+    navigation.closeDrawer();
+    navigation.navigate(node.route as never);
+  };
 
   const handleReportPress = (reportKey: string) => {
     setActiveReportKey(reportKey);
@@ -319,420 +494,55 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
           </TouchableOpacity>
         </View>
 
+        {/* Active product switcher — horizontal chip row for multi-product users */}
+        {hasMultipleProducts && (
+          <View style={styles.activeProductSection}>
+            <Text style={styles.sectionLabel}>ACTIVE PRODUCT</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              bounces={false}
+              style={styles.productChipScroll}
+              contentContainerStyle={styles.productChipRow}>
+              {availableProducts.map(product => {
+                const isActive = product.code === activeProductCode;
+                return (
+                  <TouchableOpacity
+                    key={product.code}
+                    style={[styles.productChip, isActive && styles.productChipActive]}
+                    activeOpacity={0.8}
+                    onPress={() => handleActiveProductToggle(product)}>
+                    <ProductIcon
+                      code={product.code}
+                      size={scaleHeight(11)}
+                      color={isActive ? Colors.white : '#6B7280'}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.productChipText,
+                        isActive && styles.productChipTextActive,
+                      ]}>
+                      {product.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Buttons */}
         <ScrollView
           showsVerticalScrollIndicator={false}
           style={styles.menuScroll}
           contentContainerStyle={styles.menuScrollContent}>
-            <View>
-              {/* PRODUCTS Root Menu */}
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  isProductsOpen && styles.parentMenuButton,
-                ]}
-                onPress={() => {
-                  setIsProductsOpen(!isProductsOpen);
-                }}>
-                <View style={styles.rowCenter}>
-                  <Folder
-                    height={scaleHeight(24)}
-                    width={scaleWidth(24)}
-                  />
-                  <Text
-                    style={[
-                      isProductsOpen ? styles.parentMenuText : styles.buttonText,
-                    ]}>
-                    PRODUCTS
-                  </Text>
-                </View>
-                <View style={styles.arrowContainer}>
-                  <UpChevron rotation={isProductsOpen ? 0 : 180} />
-                </View>
-              </TouchableOpacity>
-
-              {isProductsOpen && (
-                <View style={{marginLeft: scaleWidth(16)}}>
-                  {/* Dealer Finance - child of Products */}
-                  <TouchableOpacity
-                    style={[
-                      styles.button,
-                      isDealerFinanceOpen && styles.parentMenuButton,
-                    ]}
-                    onPress={() => {
-                      setIsDealerFinanceOpen(!isDealerFinanceOpen);
-                    }}>
-                    <View style={styles.rowCenter}>
-                      <BankBuilding
-                        height={scaleHeight(24)}
-                        width={scaleWidth(24)}
-                      />
-                      <Text
-                        style={[
-                          isDealerFinanceOpen ? styles.parentMenuText : styles.buttonText,
-                        ]}>
-                        Dealer Finance
-                      </Text>
-                    </View>
-                    <View style={styles.arrowContainer}>
-                      <UpChevron rotation={isDealerFinanceOpen ? 0 : 180} />
-                    </View>
-                  </TouchableOpacity>
-
-                  {isDealerFinanceOpen && (
-                    <View style={{marginLeft: scaleWidth(16)}}>
-                      {/* TRANSACTIONS - child of Dealer Finance */}
-                      <TouchableOpacity
-                        style={[
-                          styles.button,
-                          isTransactionsOpen && styles.parentMenuButton,
-                        ]}
-                        onPress={() => {
-                          setIsTransactionsOpen(!isTransactionsOpen);
-                        }}>
-                        <View style={styles.rowCenter}>
-                          <File
-                            height={scaleHeight(24)}
-                            width={scaleWidth(24)}
-                          />
-                          <Text
-                            style={[
-                              isTransactionsOpen ? styles.parentMenuText : styles.buttonText,
-                            ]}>
-                            Transactions
-                          </Text>
-                        </View>
-                        <View style={styles.arrowContainer}>
-                          <UpChevron rotation={isTransactionsOpen ? 0 : 180} />
-                        </View>
-                      </TouchableOpacity>
-
-                      {isTransactionsOpen && (
-                        <View style={{marginLeft: scaleWidth(16)}}>
-                          {/* Same structure for Anchor Maker, Anchor Checker, Dealer Maker, Dealer Checker, and CashnTech User */}
-                          {(isAnchorMaker || isAnchorChecker || isDealerChecker || isDealerMaker || isCashnTechUser) && (
-                            <>
-                              {/* 1. Invoice Overview - Direct item */}
-                              {canViewOverview && (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.button,
-                                    (currentRoute === 'InvoiceDashboard' || isDealerInvoiceDashboardRoute) &&
-                                      styles.activeButton,
-                                  ]}
-                                  onPress={() => {
-                                    navigation.closeDrawer();
-                                    navigation.navigate('InvoiceDashboard');
-                                  }}>
-                                  <Text
-                                    style={[
-                                      styles.buttonText,
-                                      (currentRoute === 'InvoiceDashboard' || isDealerInvoiceDashboardRoute) &&
-                                        styles.activeButtonText,
-                                    ]}>
-                                    Invoice Overview
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-
-                              {/* 2. Invoice List & Approvals - Direct item */}
-                              {canViewInvoices && (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.button,
-                                    (currentRoute === 'InvoiceDetails' ||
-                                      currentRoute === 'CreateInvoice' ||
-                                      currentRoute === 'UploadInvoiceList') &&
-                                      styles.activeButton,
-                                    permissionsLoading && styles.disabledMenuItem,
-                                  ]}
-                                  disabled={permissionsLoading}
-                                  onPress={() => {
-                                    navigation.navigate('InvoiceDetails');
-                                    navigation.closeDrawer();
-                                  }}>
-                                  <Text
-                                    style={[
-                                      styles.buttonText,
-                                      (currentRoute === 'InvoiceDetails' ||
-                                        currentRoute === 'CreateInvoice' ||
-                                        currentRoute === 'UploadInvoiceList') &&
-                                        styles.activeButtonText,
-                                      permissionsLoading && styles.disabledMenuItemText,
-                                    ]}>
-                                    Invoice List & Approvals
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-
-                              {/* 3. Disbursement */}
-                              {canViewDisbursement && (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.button,
-                                    currentRoute === 'DisbursementScreen' && styles.activeButton,
-                                    permissionsLoading && styles.disabledMenuItem,
-                                  ]}
-                                  disabled={permissionsLoading}
-                                  onPress={() => {
-                                    navigation.navigate('DisbursementScreen');
-                                    navigation.closeDrawer();
-                                  }}>
-                                  <Text
-                                    style={[
-                                      styles.buttonText,
-                                      currentRoute === 'DisbursementScreen' && styles.activeButtonText,
-                                      permissionsLoading && styles.disabledMenuItemText,
-                                    ]}>
-                                    Disbursement
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-
-                              {/* 4. Interest Accruals */}
-                              <TouchableOpacity
-                                style={[
-                                  styles.button,
-                                  currentRoute === 'InterestAccrualsScreen' && styles.activeButton,
-                                  permissionsLoading && styles.disabledMenuItem,
-                                ]}
-                                disabled={permissionsLoading || !canViewInterestAccruals}
-                                onPress={() => {
-                                  navigation.navigate('InterestAccrualsScreen');
-                                  navigation.closeDrawer();
-                                }}>
-                                <Text
-                                  style={[
-                                    styles.buttonText,
-                                    currentRoute === 'InterestAccrualsScreen' && styles.activeButtonText,
-                                    (permissionsLoading || !canViewInterestAccruals) && styles.disabledMenuItemText,
-                                  ]}>
-                                  Interest Accruals
-                                </Text>
-                              </TouchableOpacity>
-
-                              {/* 5. Repayment & Settlement */}
-                              {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) ? (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.button,
-                                    currentRoute === 'RepaymentSettlementScreen' && styles.activeButton,
-                                    permissionsLoading && styles.disabledMenuItem,
-                                  ]}
-                                  disabled={permissionsLoading || !canViewRepayment}
-                                  onPress={() => {
-                                    navigation.navigate('RepaymentSettlementScreen');
-                                    navigation.closeDrawer();
-                                  }}>
-                                  <Text
-                                    style={[
-                                      styles.buttonText,
-                                      currentRoute === 'RepaymentSettlementScreen' && styles.activeButtonText,
-                                      (permissionsLoading || !canViewRepayment) && styles.disabledMenuItemText,
-                                    ]}>
-                                    Repayment & Settlement
-                                  </Text>
-                                </TouchableOpacity>
-                              ) : (
-                                <TouchableOpacity
-                                  style={[styles.button, styles.disabledMenuItem]}
-                                  onPress={() => {}}
-                                  activeOpacity={1}>
-                                  <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                                    Repayment & Settlement
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-
-                              {/* 6. DPD / Penal Interest / NPA */}
-                              {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) ? (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.button,
-                                    currentRoute === 'DPDPenalInterestNPAScreen' && styles.activeButton,
-                                  ]}
-                                  disabled={!canViewDPD}
-                                  onPress={() => {
-                                    navigation.navigate('DPDPenalInterestNPAScreen');
-                                    navigation.closeDrawer();
-                                  }}>
-                                  <Text
-                                    style={[
-                                      styles.buttonText,
-                                      currentRoute === 'DPDPenalInterestNPAScreen' &&
-                                        styles.activeButtonText,
-                                      !canViewDPD && styles.disabledMenuItemText,
-                                    ]}>
-                                    DPD / Penal Interest / NPA
-                                  </Text>
-                                </TouchableOpacity>
-                              ) : (
-                                <TouchableOpacity
-                                  style={[styles.button, styles.disabledMenuItem]}
-                                  onPress={() => {}}
-                                  activeOpacity={1}>
-                                  <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                                    DPD / Penal Interest / NPA
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-
-                              {/* 7. Statement of Account (SOA) */}
-                              {(isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker || isCashnTechUser) ? (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.button,
-                                    currentRoute === 'StatementOfAccount' && styles.activeButton,
-                                  ]}
-                                  disabled={!canViewSOA}
-                                  onPress={() => {
-                                    navigation.navigate('StatementOfAccount');
-                                    navigation.closeDrawer();
-                                  }}>
-                                  <Text
-                                    style={[
-                                      styles.buttonText,
-                                      currentRoute === 'StatementOfAccount' &&
-                                        styles.activeButtonText,
-                                      !canViewSOA && styles.disabledMenuItemText,
-                                    ]}>
-                                    Statement of Account (SOA)
-                                  </Text>
-                                </TouchableOpacity>
-                              ) : (
-                                <TouchableOpacity
-                                  style={[styles.button, styles.disabledMenuItem]}
-                                  onPress={() => {}}
-                                  activeOpacity={1}>
-                                  <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                                    Statement of Account (SOA)
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-
-
-                            </>
-                          )}
-
-                          {/* Payments - visible but disabled for all users (gray, no expand) */}
-
-
-                          {/* Fund Planner Submenu - Dealer Maker only */}
-                          {showFundPlanner && (
-                            <>
-                              <TouchableOpacity
-                                style={[
-                                  styles.button,
-                                  isFundPlannerOpen && styles.parentMenuButton,
-                                ]}
-                                onPress={() => {
-                                  setIsFundPlannerOpen(!isFundPlannerOpen);
-                                }}>
-                                <View style={styles.rowCenter}>
-                                  <Text
-                                    style={[
-                                      isFundPlannerOpen ? styles.parentMenuText : styles.buttonText,
-                                    ]}>
-                                    Fund Planner
-                                  </Text>
-                                </View>
-                                <View style={styles.arrowContainer}>
-                                  <UpChevron rotation={isFundPlannerOpen ? 0 : 180} />
-                                </View>
-                              </TouchableOpacity>
-
-                              {isFundPlannerOpen && (
-                                <View style={{marginLeft: scaleWidth(24)}}>
-                                  {/* Financing Request - visible but disabled for now */}
-                                  <TouchableOpacity
-                                    style={[styles.button, styles.disabledMenuItem]}
-                                    onPress={() => {}}
-                                    activeOpacity={1}>
-                                    <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                                      Financing Request
-                                    </Text>
-                                  </TouchableOpacity>
-
-                                  {/* Limit Details - visible but disabled for now */}
-                                  <TouchableOpacity
-                                    style={[styles.button, styles.disabledMenuItem]}
-                                    onPress={() => {}}
-                                    activeOpacity={1}>
-                                    <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                                      Limit Details
-                                    </Text>
-                                  </TouchableOpacity>
-                                </View>
-                              )}
-                            </>
-                          )}
-
-                          {/* Loan Accounts Submenu - Dealer Maker only */}
-                          {showLoanAccounts && (
-                            <>
-                              <TouchableOpacity
-                                style={[
-                                  styles.button,
-                                  isLoanAccountsOpen && styles.parentMenuButton,
-                                ]}
-                                onPress={() => {
-                                  setIsLoanAccountsOpen(!isLoanAccountsOpen);
-                                }}>
-                                <View style={styles.rowCenter}>
-                                  <Text
-                                    style={[
-                                      isLoanAccountsOpen ? styles.parentMenuText : styles.buttonText,
-                                    ]}>
-                                    Loan Accounts
-                                  </Text>
-                                </View>
-                                <View style={styles.arrowContainer}>
-                                  <UpChevron rotation={isLoanAccountsOpen ? 0 : 180} />
-                                </View>
-                              </TouchableOpacity>
-
-                              {isLoanAccountsOpen && (
-                                <View style={{marginLeft: scaleWidth(24)}}>
-                                  {/* OD Details - visible but disabled for now */}
-                                  <TouchableOpacity
-                                    style={[styles.button, styles.disabledMenuItem]}
-                                    onPress={() => {}}
-                                    activeOpacity={1}>
-                                    <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                                      OD Details
-                                    </Text>
-                                  </TouchableOpacity>
-
-                                  {/* OD Repayments - visible but disabled for now */}
-                                  <TouchableOpacity
-                                    style={[styles.button, styles.disabledMenuItem]}
-                                    onPress={() => {}}
-                                    activeOpacity={1}>
-                                    <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                                      OD Repayments
-                                    </Text>
-                                  </TouchableOpacity>
-
-                                  {/* Anchors List - visible but disabled for now */}
-                                  <TouchableOpacity
-                                    style={[styles.button, styles.disabledMenuItem]}
-                                    onPress={() => {}}
-                                    activeOpacity={1}>
-                                    <Text style={[styles.buttonText, styles.disabledMenuItemText]}>
-                                      Anchors List
-                                    </Text>
-                                  </TouchableOpacity>
-                                </View>
-                              )}
-                            </>
-                          )}
-                        </View>
-                      )}
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
+            <DrawerTreeMenu
+              nodes={[productsRootNode]}
+              expandedKeys={expandedKeys}
+              onToggle={toggleExpandedKey}
+              onNavigate={handleMenuNavigate}
+            />
 
             {/* Reporting & Analysis — Cashntech user_type only */}
             {canViewReports ? (
@@ -744,12 +554,14 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                   ]}
                   onPress={() => setIsReportingOpen(prev => !prev)}>
                   <View style={styles.rowCenter}>
-                    <FontAwesome6
-                      name="chart-column"
-                      iconStyle="solid"
-                      size={scaleHeight(22)}
-                      color={isReportingOpen ? Colors.primaryColor : '#84919A'}
-                    />
+                    <View style={styles.iconBox}>
+                      <FontAwesome6
+                        name="chart-column"
+                        iconStyle="solid"
+                        size={scaleHeight(20)}
+                        color={isReportingOpen ? Colors.primaryColor : '#84919A'}
+                      />
+                    </View>
                     <Text
                       style={[
                         isReportingOpen
@@ -791,32 +603,41 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
 
             {/* Bottom actions: Profile & Logout */}
             <TouchableOpacity
+              style={[
+                styles.button,
+                styles.bottomButton,
+                currentRoute === 'Profile' && styles.activeButton,
+              ]}
               onPress={() => {
                 navigation.closeDrawer();
                 navigation.navigate('Profile' as never);
               }}>
-              <View
-                style={[
-                  styles.bottomButton,
-                  currentRoute === 'Profile' && styles.activeButton,
-                ]}>
-                <View style={styles.row}>
-                  <Text
-                    style={[
-                      styles.buttonText,
-                      currentRoute === 'Profile' && styles.activeButtonText,
-                    ]}>
-                    Profile
-                  </Text>
+              <View style={styles.rowCenter}>
+                <View style={styles.iconBox}>
+                  <FontAwesome6
+                    name="user"
+                    iconStyle="solid"
+                    size={scaleHeight(20)}
+                    color={currentRoute === 'Profile' ? Colors.primaryColor : '#84919A'}
+                  />
                 </View>
+                <Text
+                  style={[
+                    styles.buttonText,
+                    currentRoute === 'Profile' && styles.activeButtonText,
+                  ]}>
+                  Profile
+                </Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleLogout}>
-              <View style={styles.logOut}>
-                <View style={styles.row}>
-                  <Logout height={scaleHeight(24)} width={scaleWidth(24)} />
-                  <Text style={styles.buttonText}>Log Out</Text>
+            <TouchableOpacity
+              style={[styles.button, styles.logOut]}
+              onPress={handleLogout}>
+              <View style={styles.rowCenter}>
+                <View style={styles.iconBox}>
+                  <Logout height={scaleHeight(22)} width={scaleWidth(22)} />
                 </View>
+                <Text style={styles.buttonText}>Log Out</Text>
               </View>
             </TouchableOpacity>
         </ScrollView>
@@ -837,7 +658,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  row: {flexDirection: 'row', alignItems: 'center'},
   rowCenter: {flexDirection: 'row', flex: 1, alignItems: 'center'},
   headerContainer: {
     padding: scaleWidth(16),
@@ -909,6 +729,55 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.primaryColor,
   },
+  activeProductSection: {
+    paddingTop: scaleHeight(14),
+    paddingBottom: scaleHeight(10),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E6E6E6',
+  },
+  sectionLabel: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroySemiBold,
+    color: '#84919A',
+    letterSpacing: 0.5,
+    marginBottom: scaleHeight(8),
+    paddingHorizontal: scaleWidth(16),
+  },
+  productChipScroll: {
+    // Full drawer width so chips can scroll past the edge instead of clipping
+    flexGrow: 0,
+  },
+  productChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(8),
+    paddingHorizontal: scaleWidth(16),
+  },
+  productChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 0,
+    gap: scaleWidth(5),
+    paddingVertical: scaleHeight(6),
+    paddingHorizontal: scaleWidth(10),
+    borderRadius: scaleWidth(20),
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  productChipActive: {
+    backgroundColor: Colors.primaryColor,
+    borderColor: Colors.primaryColor,
+  },
+  productChipText: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyMedium,
+    color: '#6B7280',
+  },
+  productChipTextActive: {
+    color: Colors.white,
+    fontFamily: Fonts.GilroySemiBold,
+  },
   menuScroll: {
     flex: 1,
     marginTop: scaleHeight(12),
@@ -921,10 +790,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: scaleHeight(4),
+    paddingVertical: scaleHeight(10),
     paddingHorizontal: scaleWidth(8),
-    marginBottom: scaleHeight(2),
-    borderRadius: scaleWidth(4),
+    marginBottom: scaleHeight(4),
+    borderRadius: scaleWidth(6),
   },
   activeButton: {
     backgroundColor: '#FFE9E9',
@@ -940,11 +809,18 @@ const styles = StyleSheet.create({
     paddingLeft: scaleWidth(16),
     paddingRight: scaleWidth(8),
   },
+  // Fixed-width icon slot shared by all drawer rows so labels start at the same x.
+  iconBox: {
+    width: scaleWidth(24),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   buttonText: {
     color: '#252C32',
     fontFamily: Fonts.GilroyMedium,
-    fontSize: scaleFont(16),
-    marginStart: scaleWidth(16),
+    fontSize: scaleFont(15),
+    marginStart: scaleWidth(12),
+    flexShrink: 1,
   },
   activeButtonText: {
     color: Colors.primaryColor,
@@ -962,7 +838,10 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
   },
   reportingSection: {
-    marginTop: scaleHeight(4),
+    marginTop: scaleHeight(10),
+    paddingTop: scaleHeight(10),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E6E6E6',
   },
   reportingSubMenu: {
     marginLeft: scaleWidth(16),
@@ -976,9 +855,5 @@ const styles = StyleSheet.create({
   },
   bottomButton: {
     marginTop: scaleHeight(8),
-    marginBottom: scaleHeight(2),
-    paddingVertical: scaleHeight(4),
-    paddingHorizontal: scaleWidth(8),
-    borderRadius: scaleWidth(4),
   },
 });

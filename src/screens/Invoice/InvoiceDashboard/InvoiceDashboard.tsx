@@ -8,7 +8,7 @@ import {
 import {
   AppBar,
   Container,
-  ProgramBreadcrumb,
+  ScopeSelectorCard,
   BulkReviewModal,
 } from '@components/index';
 import {Colors, Fonts} from '@constants/index';
@@ -90,7 +90,7 @@ export const InvoiceDashboard: React.FC = () => {
   return (
     <Container>
       <AppBar title="Transactions > Invoice Overview" navigation={navigation as any} />
-      <ProgramBreadcrumb />
+      <ScopeSelectorCard />
       <View style={styles.breadcrumb}>
         <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">
           Products {'>'} {productBreadcrumbLabel} {'>'} Transactions
@@ -103,7 +103,7 @@ export const InvoiceDashboard: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        
+
         <Text style={styles.keyFigureHeading}>Invoice Dashboard : Key Figures</Text>
         <MetricsCard metrics={metrics} loading={kpisLoading} />
 
@@ -113,11 +113,11 @@ export const InvoiceDashboard: React.FC = () => {
             onPress={() => setActiveTab('dealers')}>
             <Text style={[styles.tabText, activeTab === 'dealers' && styles.activeTabText]}>
               {(isAnchorMaker || isAnchorChecker)
-                ? 'Summary of Dealers' 
+                ? 'Summary of Dealers'
                 : (isDealerMaker || isDealerChecker)
                   ? 'Summary of Anchors'
-                  : isCashnTechUser 
-                    ? 'Summary of All Program' 
+                  : isCashnTechUser
+                    ? 'Summary of All Program'
                     : 'Dealers Summary'}
             </Text>
           </TouchableOpacity>
@@ -203,28 +203,28 @@ export const InvoiceDashboard: React.FC = () => {
           </View>
           <View style={styles.bulkButtons}>
             {canApprove && (isAnchorChecker || isDealerChecker) && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.bulkBtn, styles.bulkBtnVerify]}
                 onPress={() => handleBulkAction('Approve')}>
                 <Text style={styles.bulkBtnText}>Approve</Text>
               </TouchableOpacity>
             )}
             {isCashnTechUser && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.bulkBtn, styles.bulkBtnVerify]}
                 onPress={() => handleBulkAction('Verify')}>
                 <Text style={styles.bulkBtnText}>Verify</Text>
               </TouchableOpacity>
             )}
             {(canReject || canApprove) && (isAnchorChecker || isDealerChecker) && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.bulkBtn, styles.bulkBtnReject]}
                 onPress={() => handleBulkAction('Reject')}>
                 <Text style={styles.bulkBtnText}>Reject</Text>
               </TouchableOpacity>
             )}
             {isCashnTechUser && (
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.bulkBtn, styles.bulkBtnHold]}
                 onPress={() => handleBulkAction('On Hold')}>
                 <Text style={styles.bulkBtnText}>Hold</Text>

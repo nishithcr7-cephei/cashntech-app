@@ -14,7 +14,17 @@ import {
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 
-export const ProgramBreadcrumb: React.FC = () => {
+type ProgramBreadcrumbProps = {
+  /**
+   * When true, renders only the inner row content (no outer padding/card).
+   * Used inside ScopeSelectorCard so program + product share one white card.
+   */
+  embedded?: boolean;
+};
+
+export const ProgramBreadcrumb: React.FC<ProgramBreadcrumbProps> = ({
+  embedded = false,
+}) => {
   const navigation = useNavigation<any>();
   const route = useRoute();
   const selection = useSelector(selectProgramSelection);
@@ -124,7 +134,7 @@ export const ProgramBreadcrumb: React.FC = () => {
   const renderFullBreadcrumb = (program: any) => {
     if (!program) return null;
     return (
-      <View style={styles.fullBreadcrumb}>
+      <View style={!embedded && styles.fullBreadcrumb}>
         {/* Row 1: Bank › Product */}
         <View style={styles.breadcrumbRow}>
           <View style={styles.itemFixed}>
@@ -192,7 +202,7 @@ export const ProgramBreadcrumb: React.FC = () => {
 
   const renderAllProgramBreadcrumb = () => {
     return (
-      <View style={styles.fullBreadcrumb}>
+      <View style={!embedded && styles.fullBreadcrumb}>
         <View style={styles.breadcrumbRow}>
           <View style={styles.itemGrow}>
             <File
@@ -217,13 +227,19 @@ export const ProgramBreadcrumb: React.FC = () => {
     );
   };
 
+  const content =
+    canUseAllProgramScope && selection.programScope === 'all'
+      ? renderAllProgramBreadcrumb()
+      : renderFullBreadcrumb(programToDisplay);
+
+  if (embedded) {
+    return <View style={styles.embeddedContent}>{content}</View>;
+  }
+
   return (
     <View style={styles.breadcrumbContainer}>
       <View style={styles.cardWrapper}>
-        {/* Single program display */}
-        {canUseAllProgramScope && selection.programScope === 'all'
-          ? renderAllProgramBreadcrumb()
-          : renderFullBreadcrumb(programToDisplay)}
+        {content}
 
         {/* EXPAND/COLLAPSE BUTTON - Commented for single selection, uncomment for multiple selection */}
         {/* 
@@ -256,6 +272,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E6E6E6',
+  },
+  embeddedContent: {
+    paddingHorizontal: scaleWidth(14),
+    paddingVertical: scaleHeight(11),
   },
   cardWrapper: {
     backgroundColor: '#FFF9F9',
