@@ -27,6 +27,7 @@ import {InvoiceDetailsControls} from './InvoiceDetailsControls';
 import {InvoiceDetailsCard} from './InvoiceDetailsCard';
 import {SendForApprovalModal} from './SendForApprovalModal';
 import {InvoiceActionMenuModal} from './InvoiceActionMenuModal';
+import {FinanceRequestDetailsModal} from './FinanceRequestDetailsModal';
 import {styles} from './InvoiceDetails.styles';
 
 export const InvoiceDetails: React.FC = () => {
@@ -47,6 +48,7 @@ export const InvoiceDetails: React.FC = () => {
     isDealerChecker,
     isCashnTechUser,
     dealerListTitle,
+    productBreadcrumbLabel,
     selectedDealerName,
     searchText,
     setSearchText,
@@ -63,7 +65,14 @@ export const InvoiceDetails: React.FC = () => {
     setShowCheckerApprovalModal,
     approvalHistoryEntries,
     approvalHistoryLoading,
+    approvalHistorySummary,
     setApprovalHistoryLoading,
+    showFinanceRequestModal,
+    financeRequestPreview,
+    financeRequestLoading,
+    financeRequestSubmitting,
+    closeFinanceRequestModal,
+    submitFinanceRequest,
     showApproveRejectModal,
     setShowApproveRejectModal,
     selectedInvoiceId,
@@ -158,7 +167,7 @@ export const InvoiceDetails: React.FC = () => {
       <ProgramBreadcrumb />
       <View style={styles.navPathContainer}>
         <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
-          Products {'>'} Dealer Finance {'>'} Transactions
+          Products {'>'} {productBreadcrumbLabel} {'>'} Transactions
         </Text>
       </View>
       {/* Removed Selected Program Row as requested */}
@@ -326,9 +335,24 @@ export const InvoiceDetails: React.FC = () => {
           setSelectedInvoiceId(null);
           setApprovalHistoryLoading(false);
         }}
-        approvalEntries={approvalHistoryEntries}
+        steps={approvalHistoryEntries}
         loading={approvalHistoryLoading}
         invoiceNo={selectedInvoiceNo || undefined}
+        invoiceAmount={approvalHistorySummary.invoiceAmount}
+        counterParty={approvalHistorySummary.counterParty}
+        primaryParty={approvalHistorySummary.primaryParty}
+        raisedOn={approvalHistorySummary.raisedOn}
+        dueOn={approvalHistorySummary.dueOn}
+        programName={approvalHistorySummary.programName}
+      />
+
+      <FinanceRequestDetailsModal
+        visible={showFinanceRequestModal}
+        onClose={closeFinanceRequestModal}
+        loading={financeRequestLoading}
+        submitting={financeRequestSubmitting}
+        preview={financeRequestPreview}
+        onSubmit={submitFinanceRequest}
       />
 
       <ApproveRejectModal

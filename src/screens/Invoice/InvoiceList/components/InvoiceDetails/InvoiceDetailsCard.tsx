@@ -9,6 +9,7 @@ import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
 import {useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
+import {isCashnTechPendingRow} from '@utils/invoiceListActionable';
 
 const STATUS_COLORS = {
   ATTACHMENT_PENDING: { bg: '#FFF4E5', text: '#FF8C00' },
@@ -91,6 +92,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   const canAttachment = useHasPermission(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
   const canRecreate = useHasPermission(PERMISSIONS.INVOICE_LIST_RECREATE);
   const canPrint = useHasPermission(PERMISSIONS.INVOICE_LIST_PRINT);
+  const canVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_ADMIN_VERIFICATION);
 
   const hasAnyActionPermission = 
     canEdit || canDelete || canApprove || canReject || 
@@ -110,14 +112,13 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   const rawApprovalStatusLower = (row.rawApprovalStatus || '').toLowerCase();
   const isNotCompletedOrRejected = rawApprovalStatusLower !== 'approval_complete' && rawApprovalStatusLower !== 'completed' && !approvalStatusLower.includes('completed') && !approvalStatusLower.includes('rejected');
 
-  const rawAdminStatusUpper = (row.rawAdminStatus || '').trim().toUpperCase();
   const statusLower = (row.rawInvoiceStatus || '').toLowerCase();
   const approvalSUpper = (row.rawApprovalStatus || '').trim().toUpperCase().replace(/_/g, ' ');
 
-  // Robust Blue Dot Logic (Sync with isInvoiceSelectable)
+  // CashnTech: same rule as pending badge / bulk select (actionable + verify perm)
   let showPendingBlueDot = false;
   if (isCashnTechUser) {
-    showPendingBlueDot = rawAdminStatusUpper === 'PENDING_VERIFICATION' || rawAdminStatusUpper === 'PENDING VERIFICATION';
+    showPendingBlueDot = isCashnTechPendingRow(row, canVerify);
   } else if (isAnchorAllAccess) {
     showPendingBlueDot = approvalSUpper.includes('PENDING ANCHOR MAKER') || approvalSUpper.includes('PENDING ANCHOR CHECKER');
   } else if (isDealerAllAccess) {

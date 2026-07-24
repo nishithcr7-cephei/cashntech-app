@@ -150,23 +150,36 @@ export const useInvoiceDashboard = () => {
     ) {
       return [programSelection.programId];
     }
+
+    // "All Program" / default: always active-product-scoped — never DF+VF combined.
+    const activeProductTab: ProductTabType =
+      effectiveCode === PRODUCT_CODES.VENDOR_FINANCE
+        ? 'vendor_finance'
+        : 'dealer_finance';
+    const tabForFetch =
+      productTab === 'all_product' || productTab === 'pid'
+        ? activeProductTab
+        : productTab;
+
     if (
       programSelection?.programScope === 'all' &&
       allProgramIds &&
       allProgramIds.length > 0
     ) {
-      if (productTab === 'all_product') {
+      // allProgramIds selector is already filtered to active product.
+      if (tabForFetch === activeProductTab) {
         return allProgramIds;
       }
-      return getProgramIdsForTab(productTab, scopeData);
+      return getProgramIdsForTab(tabForFetch, scopeData);
     }
-    return getProgramIdsForTab(productTab, scopeData);
+    return getProgramIdsForTab(tabForFetch, scopeData);
   }, [
     productTab,
     scopeData,
     programSelection?.programScope,
     programSelection?.programId,
     allProgramIds,
+    effectiveCode,
   ]);
 
   useEffect(() => {

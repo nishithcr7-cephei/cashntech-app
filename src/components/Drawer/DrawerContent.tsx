@@ -18,7 +18,7 @@ import {
   File,
   Folder,
 } from '@assets/Icons';
-import {DrawerContentComponentProps} from '@react-navigation/drawer';
+import {DrawerContentComponentProps, useDrawerStatus} from '@react-navigation/drawer';
 import {useNavigationState} from '@react-navigation/native';
 import {Colors, Fonts, ROLE_HEADER_COLORS} from '@constants/index';
 import {useDispatch, useSelector} from 'react-redux';
@@ -40,6 +40,8 @@ import {getEffectiveProductCode} from '@store/product/product.resolver';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES, ResolvedProduct} from '@store/product/product.types';
 import {setProgramScope} from '@store/programSelection/programSelection.slice';
 import {ProductIcon} from '@components/ProductSwitcher/ProductIcon';
+import {ProductBottomSheet} from '@components/ProductSwitcher/ProductBottomSheet';
+import {useProductSwitcherSheet} from '@hooks/useProductSwitcherSheet';
 import {DrawerTreeMenu, DrawerMenuNode} from './DrawerTreeMenu';
 
 const REPORT_MENU_ITEMS = [
@@ -54,6 +56,27 @@ const REPORT_MENU_ITEMS = [
   {key: 'all-product-outstanding', title: 'All Product Outstanding Report'},
   {key: 'utilization', title: 'Utilization Report'},
 ] as const;
+
+/** Expand only the active product path: PRODUCTS → product → Transactions (+ route-specific submenus). */
+const buildActiveProductExpandedKeys = (
+  productCode: string,
+  options: {expandFundPlanner?: boolean; expandLoanAccounts?: boolean} = {},
+): Record<string, boolean> => {
+  const keys: Record<string, boolean> = {
+    products: true,
+    [`product-${productCode}`]: true,
+    [`transactions-${productCode}`]: true,
+  };
+
+  if (options.expandFundPlanner) {
+    keys[`fundplanner-${productCode}`] = true;
+  }
+  if (options.expandLoanAccounts) {
+    keys[`loanaccounts-${productCode}`] = true;
+  }
+
+  return keys;
+};
 
 export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const dispatch = useDispatch();
@@ -71,7 +94,13 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const activeProductCode = useSelector(selectActiveProductCode);
   const availableProducts = useSelector(selectAvailableProducts);
   const effectiveProductCode = getEffectiveProductCode(activeProductCode);
-  const hasMultipleProducts = availableProducts.length > 1;
+  const {
+    sheetVisible,
+    openSheet,
+    closeSheet,
+    hasMultipleProducts,
+    activeProduct,
+  } = useProductSwitcherSheet();
   // PR1 store already defaults DF-only users to a single resolved product;
   // this fallback only guards the brief window before scope/product hydration.
   const productBranches: ResolvedProduct[] =
@@ -92,13 +121,6 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const switchActiveProduct = (product: ResolvedProduct) => {
     dispatch(setActiveProduct(product));
     dispatch(setProgramScope('all'));
-  };
-
-  const handleActiveProductToggle = (product: ResolvedProduct) => {
-    if (product.code === activeProductCode) {
-      return;
-    }
-    switchActiveProduct(product);
   };
 
   // Get role-based header colors (default to anchor_maker if no role)
@@ -160,70 +182,64 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
     currentRoute === 'DealerMakerDashboardScreen' &&
     dealerMode === 'dashboard';
 
-  // Auto-expand menus based on current route
-  React.useEffect(() => {
-    // 1. Define all routes first
-    const isTransactionRoute =
-      currentRoute === 'InvoiceDashboard' ||
-      currentRoute === 'InvoiceDetails' ||
-      currentRoute === 'CreateInvoice' ||
-      currentRoute === 'UploadInvoiceList' ||
-      currentRoute === 'DealerInvoiceList' ||
-      currentRoute === 'FundingLimitsForDealers' ||
-      currentRoute === 'ANCreditAccount' ||
-      currentRoute === 'CreditAccountDetails' ||
-      currentRoute === 'CreditAccountInvoiceNumber' ||
-      currentRoute === 'CreditAccountDailyInterest' ||
-      currentRoute === 'FinancingRequestScreen' ||
-      currentRoute === 'LimitDetailsScreen' ||
-      currentRoute === 'DealerMakerDashboardScreen' ||
-      currentRoute === 'DisbursementScreen' ||
-      currentRoute === 'InterestAccrualsScreen' ||
-      currentRoute === 'RepaymentSettlementScreen' ||
-      currentRoute === 'DPDPenalInterestNPAScreen' ||
-      currentRoute === 'StatementOfAccount' ||
-      currentRoute === 'ODDetailsScreen' ||
+  const isFundPlannerRoute =
+    isDealerMaker &&
+    (currentRoute === 'FinancingRequestScreen' ||
+      currentRoute === 'LimitDetailsScreen');
+
+  const isLoanAccountsRoute =
+    isDealerMaker &&
+    (currentRoute === 'ODDetailsScreen' ||
       currentRoute === 'ODRepaymentsScreen' ||
-      currentRoute === 'AnchorsListScreen';
+      currentRoute === 'AnchorsListScreen');
 
-    const isFundPlannerRoute =
-      isDealerMaker &&
-      (currentRoute === 'FinancingRequestScreen' ||
-       currentRoute === 'LimitDetailsScreen');
+  const drawerStatus = useDrawerStatus();
 
-    const isLoanAccountsRoute =
-      isDealerMaker &&
-      (currentRoute === 'ODDetailsScreen' ||
-       currentRoute === 'ODRepaymentsScreen' ||
-       currentRoute === 'AnchorsListScreen');
+  const getSyncedExpandedKeys = React.useCallback(() => {
+    return buildActiveProductExpandedKeys(effectiveProductCode, {
+      expandFundPlanner:
+        isFundPlannerRoute && effectiveProductCode === PRODUCT_CODES.DEALER_FINANCE,
+      expandLoanAccounts:
+        isLoanAccountsRoute && effectiveProductCode === PRODUCT_CODES.DEALER_FINANCE,
+    });
+  }, [effectiveProductCode, isFundPlannerRoute, isLoanAccountsRoute]);
 
-    // 2. Auto-expand the branch for the *active* product — when a menu item
-    // under a product branch is tapped, that product becomes active first,
-    // then navigation happens, so this always expands the matching branch.
-    if (isTransactionRoute || isFundPlannerRoute || isLoanAccountsRoute) {
-      setExpandedKeys(prev => ({
-        ...prev,
-        products: true,
-        [`product-${effectiveProductCode}`]: true,
-        [`transactions-${effectiveProductCode}`]: true,
-      }));
+  // Re-sync tree when active product changes — collapse all inactive branches.
+  React.useEffect(() => {
+    setExpandedKeys(getSyncedExpandedKeys());
+  }, [getSyncedExpandedKeys]);
+
+  // Re-sync when drawer opens so stale manual expansions do not persist.
+  React.useEffect(() => {
+    if (drawerStatus === 'open') {
+      setExpandedKeys(getSyncedExpandedKeys());
     }
+  }, [drawerStatus, getSyncedExpandedKeys]);
 
-    if (isFundPlannerRoute) {
-      setExpandedKeys(prev => ({...prev, [`fundplanner-${effectiveProductCode}`]: true}));
-    }
-
-    if (isLoanAccountsRoute) {
-      setExpandedKeys(prev => ({...prev, [`loanaccounts-${effectiveProductCode}`]: true}));
-    }
-
-  }, [currentRoute, isDealerMaker, effectiveProductCode]);
-
-  const getProductBranchIcon = (code: string) => (
-    <ProductIcon code={code} size={scaleHeight(20)} color="#7A7C82" />
+  const getProductBranchIcon = (code: string, isActive: boolean) => (
+    <ProductIcon
+      code={code}
+      size={scaleHeight(20)}
+      color={isActive ? Colors.primaryColor : '#9E9E9E'}
+    />
   );
 
-  const buildProductBranchNode = (product: ResolvedProduct): DrawerMenuNode => {
+  const annotateUnderActiveProduct = (
+    nodes: DrawerMenuNode[],
+    isUnderActiveProduct: boolean,
+  ): DrawerMenuNode[] =>
+    nodes.map(node => ({
+      ...node,
+      isUnderActiveProduct,
+      children: node.children
+        ? annotateUnderActiveProduct(node.children, isUnderActiveProduct)
+        : undefined,
+    }));
+
+  const buildProductBranchNode = (
+    product: ResolvedProduct,
+    branchIndex: number,
+  ): DrawerMenuNode => {
     const isActiveProductBranch = product.code === effectiveProductCode;
 
     const transactionsChildren: DrawerMenuNode[] = [
@@ -301,7 +317,13 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       {
         key: `transactions-${product.code}`,
         label: 'Transactions',
-        icon: <File height={scaleHeight(22)} width={scaleWidth(22)} />,
+        icon: (
+          <File
+            height={scaleHeight(22)}
+            width={scaleWidth(22)}
+            color={isActiveProductBranch ? Colors.primaryColor : '#9E9E9E'}
+          />
+        ),
         children: transactionsChildren,
       },
     ];
@@ -333,9 +355,12 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
     return {
       key: `product-${product.code}`,
       label: product.name,
-      icon: getProductBranchIcon(product.code),
+      icon: getProductBranchIcon(product.code, isActiveProductBranch),
+      isActiveProductBranch,
+      isInactiveProductBranch: hasMultipleProducts && !isActiveProductBranch,
+      showSeparatorBefore: branchIndex > 0,
       highlighted: isActiveProductBranch,
-      children,
+      children: annotateUnderActiveProduct(children, isActiveProductBranch),
     };
   };
 
@@ -343,7 +368,9 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
     key: 'products',
     label: 'PRODUCTS',
     icon: <Folder height={scaleHeight(22)} width={scaleWidth(22)} />,
-    children: productBranches.map(buildProductBranchNode),
+    children: productBranches.map((product, index) =>
+      buildProductBranchNode(product, index),
+    ),
   };
 
   const handleMenuNavigate = (node: DrawerMenuNode) => {
@@ -351,8 +378,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       return;
     }
     // Tapping a menu item under a non-active product branch switches the
-    // active product first, so the destination screen's data matches the
-    // branch the user tapped from.
+    // active product first, then navigation + tree re-sync via useEffect.
     if (node.productContext && node.productContext.code !== activeProductCode) {
       switchActiveProduct(node.productContext);
     }
@@ -494,43 +520,34 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
           </TouchableOpacity>
         </View>
 
-        {/* Active product switcher — horizontal chip row for multi-product users */}
-        {hasMultipleProducts && (
+        {/* Active product — single chip; full list lives in ProductBottomSheet */}
+        {hasMultipleProducts && activeProduct ? (
           <View style={styles.activeProductSection}>
             <Text style={styles.sectionLabel}>ACTIVE PRODUCT</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              bounces={false}
-              style={styles.productChipScroll}
-              contentContainerStyle={styles.productChipRow}>
-              {availableProducts.map(product => {
-                const isActive = product.code === activeProductCode;
-                return (
-                  <TouchableOpacity
-                    key={product.code}
-                    style={[styles.productChip, isActive && styles.productChipActive]}
-                    activeOpacity={0.8}
-                    onPress={() => handleActiveProductToggle(product)}>
-                    <ProductIcon
-                      code={product.code}
-                      size={scaleHeight(11)}
-                      color={isActive ? Colors.white : '#6B7280'}
-                    />
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.productChipText,
-                        isActive && styles.productChipTextActive,
-                      ]}>
-                      {product.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            <TouchableOpacity
+              style={styles.activeProductChip}
+              activeOpacity={0.8}
+              onPress={openSheet}>
+              <ProductIcon
+                code={activeProduct.code}
+                size={scaleHeight(12)}
+                color={Colors.primaryColor}
+              />
+              <Text
+                style={styles.activeProductChipText}
+                numberOfLines={1}
+                ellipsizeMode="tail">
+                {activeProduct.name}
+              </Text>
+              <UpChevron
+                rotation={180}
+                height={scaleHeight(8)}
+                width={scaleWidth(8)}
+              />
+            </TouchableOpacity>
+            <ProductBottomSheet visible={sheetVisible} onClose={closeSheet} />
           </View>
-        )}
+        ) : null}
 
         {/* Buttons */}
         <ScrollView
@@ -732,6 +749,7 @@ const styles = StyleSheet.create({
   activeProductSection: {
     paddingTop: scaleHeight(14),
     paddingBottom: scaleHeight(10),
+    paddingHorizontal: scaleWidth(16),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E6E6E6',
   },
@@ -741,42 +759,28 @@ const styles = StyleSheet.create({
     color: '#84919A',
     letterSpacing: 0.5,
     marginBottom: scaleHeight(8),
-    paddingHorizontal: scaleWidth(16),
   },
-  productChipScroll: {
-    // Full drawer width so chips can scroll past the edge instead of clipping
-    flexGrow: 0,
-  },
-  productChipRow: {
+  activeProductChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scaleWidth(8),
-    paddingHorizontal: scaleWidth(16),
-  },
-  productChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
-    gap: scaleWidth(5),
-    paddingVertical: scaleHeight(6),
+    alignSelf: 'flex-start',
+    gap: scaleWidth(6),
+    maxWidth: '100%',
+    minHeight: scaleHeight(36),
     paddingHorizontal: scaleWidth(10),
-    borderRadius: scaleWidth(20),
-    backgroundColor: '#F3F4F6',
+    paddingVertical: scaleHeight(8),
+    borderRadius: scaleWidth(16),
+    backgroundColor: '#FFF5F5',
     borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  productChipActive: {
-    backgroundColor: Colors.primaryColor,
     borderColor: Colors.primaryColor,
   },
-  productChipText: {
-    fontSize: scaleFont(11),
-    fontFamily: Fonts.GilroyMedium,
-    color: '#6B7280',
-  },
-  productChipTextActive: {
-    color: Colors.white,
+  activeProductChipText: {
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: scaleWidth(180),
+    fontSize: scaleFont(12),
     fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
   },
   menuScroll: {
     flex: 1,
@@ -840,8 +844,8 @@ const styles = StyleSheet.create({
   reportingSection: {
     marginTop: scaleHeight(10),
     paddingTop: scaleHeight(10),
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E6E6E6',
+    borderTopWidth: 1,
+    borderTopColor: '#E8E8E8',
   },
   reportingSubMenu: {
     marginLeft: scaleWidth(16),

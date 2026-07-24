@@ -7,8 +7,7 @@ import type {ResolvedProduct} from '@store/product/product.types';
 
 /**
  * Data-driven menu node for the drawer PRODUCTS tree (and other sections).
- * `isActive` / `highlighted` are precomputed by the caller (DrawerContent),
- * which already has access to the current route, role flags and permissions.
+ * `isActive` / styling flags are precomputed by the caller (DrawerContent).
  */
 export type DrawerMenuNode = {
   key: string;
@@ -24,6 +23,14 @@ export type DrawerMenuNode = {
   isActive?: boolean;
   /** Expandable node whose product/context is the active one — highlighted when collapsed. */
   highlighted?: boolean;
+  /** Top-level product branch is the currently active product. */
+  isActiveProductBranch?: boolean;
+  /** Top-level product branch is not the active product (multi-product only). */
+  isInactiveProductBranch?: boolean;
+  /** Render a separator line before this node (between product groups). */
+  showSeparatorBefore?: boolean;
+  /** Descendant of the active product branch — drives submenu styling. */
+  isUnderActiveProduct?: boolean;
   /** Product this leaf/branch belongs to, used by DrawerContent to switch product on tap. */
   productContext?: ResolvedProduct | null;
   children?: DrawerMenuNode[];
@@ -34,7 +41,43 @@ type DrawerTreeMenuProps = {
   expandedKeys: Record<string, boolean>;
   onToggle: (key: string) => void;
   onNavigate: (node: DrawerMenuNode) => void;
+  /** Active product code from Redux — used for tree styling context. */
+  activeProductCode?: string | null;
   depth?: number;
+};
+
+const getParentRowStyle = (node: DrawerMenuNode, isOpen: boolean) => {
+  if (node.isActiveProductBranch) {
+    return [styles.button, styles.productBranchActive, isOpen && styles.productBranchActiveOpen];
+  }
+  if (node.isInactiveProductBranch) {
+    return [styles.button, styles.productBranchInactive];
+  }
+  if (node.isUnderActiveProduct === false) {
+    return [styles.button, isOpen ? styles.inactiveSubParentOpen : styles.inactiveSubParent];
+  }
+  return [
+    styles.button,
+    isOpen && styles.parentMenuButton,
+    !isOpen && node.highlighted && styles.activeButton,
+  ];
+};
+
+const getParentTextStyle = (node: DrawerMenuNode, isOpen: boolean) => {
+  if (node.isActiveProductBranch) {
+    return [styles.productBranchActiveText, isOpen && styles.productBranchActiveTextOpen];
+  }
+  if (node.isInactiveProductBranch) {
+    return styles.productBranchInactiveText;
+  }
+  if (node.isUnderActiveProduct === false) {
+    return styles.inactiveSubParentText;
+  }
+  return [
+    styles.buttonText,
+    isOpen && styles.parentMenuText,
+    !isOpen && node.highlighted && styles.activeButtonText,
+  ];
 };
 
 export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
@@ -54,24 +97,19 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
           if (hasChildren) {
             const isOpen = !!expandedKeys[node.key];
             return (
-              <View key={node.key}>
+              <View
+                key={node.key}
+                style={node.showSeparatorBefore ? styles.productBranchWrapper : undefined}>
+                {node.showSeparatorBefore ? <View style={styles.productSeparator} /> : null}
                 <TouchableOpacity
-                  style={[
-                    styles.button,
-                    isOpen && styles.parentMenuButton,
-                    !isOpen && node.highlighted && styles.activeButton,
-                  ]}
+                  style={getParentRowStyle(node, isOpen)}
                   onPress={() => onToggle(node.key)}>
                   <View style={styles.rowCenter}>
                     {node.icon ? <View style={styles.iconBox}>{node.icon}</View> : null}
                     <Text
                       numberOfLines={1}
                       ellipsizeMode="tail"
-                      style={[
-                        styles.buttonText,
-                        isOpen && styles.parentMenuText,
-                        !isOpen && node.highlighted && styles.activeButtonText,
-                      ]}>
+                      style={getParentTextStyle(node, isOpen)}>
                       {node.label}
                     </Text>
                   </View>
@@ -95,6 +133,8 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
             );
           }
 
+          const showLeafActive = node.isActive && node.isUnderActiveProduct !== false;
+
           return (
             <TouchableOpacity
               key={node.key}
@@ -102,7 +142,9 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
               activeOpacity={node.disabled ? 1 : 0.7}
               style={[
                 styles.button,
-                node.isActive && styles.activeButton,
+                styles.leafButton,
+                showLeafActive && styles.activeButton,
+                node.isUnderActiveProduct === false && styles.inactiveLeaf,
                 node.disabled && styles.disabledMenuItem,
               ]}
               onPress={() => onNavigate(node)}>
@@ -112,7 +154,8 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
                 style={[
                   styles.buttonText,
                   styles.leafText,
-                  node.isActive && styles.activeButtonText,
+                  showLeafActive && styles.activeButtonText,
+                  node.isUnderActiveProduct === false && styles.inactiveLeafText,
                   node.disabled && styles.disabledMenuItemText,
                 ]}>
                 {node.label}
@@ -126,7 +169,6 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
 
 const styles = StyleSheet.create({
   rowCenter: {flexDirection: 'row', flex: 1, alignItems: 'center'},
-  // Fixed-width icon slot so labels start at the same x regardless of glyph width.
   iconBox: {
     width: scaleWidth(24),
     alignItems: 'center',
@@ -140,6 +182,68 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaleWidth(8),
     marginBottom: scaleHeight(4),
     borderRadius: scaleWidth(6),
+  },
+  leafButton: {
+    paddingVertical: scaleHeight(8),
+    marginBottom: scaleHeight(2),
+  },
+  productBranchWrapper: {
+    marginTop: scaleHeight(6),
+  },
+  productSeparator: {
+    height: 1,
+    backgroundColor: '#E8E8E8',
+    marginVertical: scaleHeight(8),
+    marginHorizontal: scaleWidth(8),
+  },
+  productBranchActive: {
+    backgroundColor: '#FFF5F5',
+    borderLeftWidth: scaleWidth(3),
+    borderLeftColor: Colors.primaryColor,
+  },
+  productBranchActiveOpen: {
+    backgroundColor: '#FFF5F5',
+  },
+  productBranchActiveText: {
+    color: Colors.primaryColor,
+    fontFamily: Fonts.GilroySemiBold,
+    fontSize: scaleFont(15),
+    marginStart: scaleWidth(12),
+    flexShrink: 1,
+  },
+  productBranchActiveTextOpen: {
+    color: Colors.primaryColor,
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  productBranchInactive: {
+    backgroundColor: '#FAFAFA',
+  },
+  productBranchInactiveText: {
+    color: '#757575',
+    fontFamily: Fonts.GilroyMedium,
+    fontSize: scaleFont(15),
+    marginStart: scaleWidth(12),
+    flexShrink: 1,
+  },
+  inactiveSubParent: {
+    backgroundColor: Colors.white,
+  },
+  inactiveSubParentOpen: {
+    backgroundColor: '#FAFAFA',
+  },
+  inactiveSubParentText: {
+    color: '#757575',
+    fontFamily: Fonts.GilroyMedium,
+    fontSize: scaleFont(15),
+    marginStart: scaleWidth(12),
+    flexShrink: 1,
+  },
+  inactiveLeaf: {
+    backgroundColor: Colors.white,
+  },
+  inactiveLeafText: {
+    color: '#757575',
+    fontFamily: Fonts.GilroyMedium,
   },
   activeButton: {
     backgroundColor: '#FFE9E9',

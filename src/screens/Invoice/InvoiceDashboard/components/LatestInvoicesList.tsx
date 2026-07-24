@@ -8,6 +8,7 @@ import {Tick} from '@assets/Icons';
 import type {InvoiceOverviewLatestItem} from '@store/invoiceOverview';
 import type {BulkInvoiceItem} from '@components/index';
 import {formatDateDDMmmYYYY} from '../utils/dashboardUtils';
+import type {ProductTabType} from '../types';
 
 interface LatestInvoicesListProps {
   loading: boolean;
@@ -20,6 +21,8 @@ interface LatestInvoicesListProps {
   isAnchorChecker?: boolean;
   isDealerMaker?: boolean;
   isDealerChecker?: boolean;
+  /** Active product tab — drives Dealer Name vs Vendor Name label. */
+  productTab?: ProductTabType;
 }
 
 export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
@@ -33,8 +36,11 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
   isAnchorChecker = false,
   isDealerMaker = false,
   isDealerChecker = false,
+  productTab = 'dealer_finance',
 }) => {
   const showCashnTechLayout = isCashnTechUser || isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker;
+  const partyLabel =
+    productTab === 'vendor_finance' ? 'Vendor Name' : 'Dealer Name';
 
   if (loading) {
     return (
@@ -110,7 +116,7 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
                     </View>
                     <View style={styles.infoGrid}>
                       <View style={[styles.infoColumn, {width: '100%', marginBottom: scaleHeight(6)}]}>
-                        <Text style={styles.infoLabel}>Dealer</Text>
+                        <Text style={styles.infoLabel}>{partyLabel}</Text>
                         <Text style={styles.infoValue}>{row.counterPartyName || '-'}</Text>
                       </View>
                     <View style={styles.infoColumn}>

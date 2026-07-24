@@ -1,12 +1,10 @@
-import React, {useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {useSelector} from 'react-redux';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {AuthNavigatorType} from '@type/NavigatorTypes';
-import {BankBuilding, Folder, File, RightChevron, EditIcon, UpChevron} from '@assets/Icons';
+import {BankBuilding, Folder, File, RightChevron, EditIcon} from '@assets/Icons';
 import {
   selectProgramSelection,
   selectSelectedPrograms,
@@ -166,35 +164,30 @@ export const ProgramBreadcrumb: React.FC<ProgramBreadcrumbProps> = ({
           </View>
         </View>
 
-        {/* Row 2: Program name + Change button */}
-        <View style={styles.breadcrumbRow2}>
-          <View style={styles.itemGrow}>
-            <File
-              width={scaleWidth(13)}
-              height={scaleWidth(13)}
-              color={Colors.primaryColor}
-            />
-            <Text style={styles.breadcrumbTextGrow} numberOfLines={1} ellipsizeMode="tail">
-              {program.programName}
-            </Text>
-          </View>
-
-          {/* BADGE CODE - Commented for single selection, uncomment for multiple selection */}
-          {/* 
-          {hasMultiplePrograms && !isExpanded && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>+{remainingCount}</Text>
+        {/* Row 2: Program Name — value wraps below so long names are fully visible */}
+        <View style={styles.programNameBlock}>
+          <View style={styles.programNameHeader}>
+            <View style={styles.programNameHeaderLeft}>
+              <File
+                width={scaleWidth(13)}
+                height={scaleWidth(13)}
+                color={Colors.primaryColor}
+              />
+              <Text style={styles.programNameLabel} numberOfLines={1}>
+                Program Name
+              </Text>
             </View>
-          )}
-          */}
-
-          <TouchableOpacity
-            style={styles.changePill}
-            onPress={() => navigation.navigate('SelectProgramScreen', {fromScreen: route.name})}
-            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-            <EditIcon />
-            <Text style={styles.changeText}>Change</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.changePill}
+              onPress={() =>
+                navigation.navigate('SelectProgramScreen', {fromScreen: route.name})
+              }
+              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+              <EditIcon />
+              <Text style={styles.changeText}>Change</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.programNameValue}>{program.programName}</Text>
         </View>
       </View>
     );
@@ -203,25 +196,29 @@ export const ProgramBreadcrumb: React.FC<ProgramBreadcrumbProps> = ({
   const renderAllProgramBreadcrumb = () => {
     return (
       <View style={!embedded && styles.fullBreadcrumb}>
-        <View style={styles.breadcrumbRow}>
-          <View style={styles.itemGrow}>
-            <File
-              width={scaleWidth(13)}
-              height={scaleWidth(13)}
-              color={Colors.primaryColor}
-            />
-            <Text style={styles.breadcrumbTextGrow} numberOfLines={1} ellipsizeMode="tail">
-              All Program
-            </Text>
-          </View>
-
+        <View style={styles.programNameBlock}>
+          <View style={styles.programNameHeader}>
+            <View style={styles.programNameHeaderLeft}>
+              <File
+                width={scaleWidth(13)}
+                height={scaleWidth(13)}
+                color={Colors.primaryColor}
+              />
+              <Text style={styles.programNameLabel} numberOfLines={1}>
+                Program Name
+              </Text>
+            </View>
             <TouchableOpacity
-            style={styles.changePill}
-            onPress={() => navigation.navigate('SelectProgramScreen', {fromScreen: route.name})}
-            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-            <EditIcon />
-            <Text style={styles.changeText}>Change</Text>
-          </TouchableOpacity>
+              style={styles.changePill}
+              onPress={() =>
+                navigation.navigate('SelectProgramScreen', {fromScreen: route.name})
+              }
+              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+              <EditIcon />
+              <Text style={styles.changeText}>Change</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.programNameValue}>All Program</Text>
         </View>
       </View>
     );
@@ -303,6 +300,32 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: scaleHeight(4),
   },
+  programNameBlock: {
+    width: '100%',
+    marginTop: scaleHeight(6),
+  },
+  programNameHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: scaleWidth(8),
+    width: '100%',
+  },
+  programNameHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(4),
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  programNameValue: {
+    marginTop: scaleHeight(4),
+    paddingRight: scaleWidth(4),
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+    lineHeight: scaleHeight(18),
+  },
   itemFixed: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -325,27 +348,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.primaryColor,
   },
-  breadcrumbTextGrow: {
+  programNameLabel: {
     fontSize: scaleFont(12),
     fontFamily: Fonts.GilroySemiBold,
-    color: Colors.primaryColor,
-    minWidth: 0,
-    flexShrink: 1,
-  },
-  badge: {
-    backgroundColor: Colors.primaryColor,
-    borderRadius: scaleWidth(10),
-    paddingHorizontal: scaleWidth(6),
-    paddingVertical: scaleHeight(2),
-    marginLeft: scaleWidth(4),
-    minWidth: scaleWidth(24),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: {
-    fontSize: scaleFont(10),
-    fontFamily: Fonts.GilroyBold,
-    color: Colors.white,
+    color: '#7A7C82',
+    flexShrink: 0,
   },
   changePill: {
     flexDirection: 'row',
@@ -357,7 +364,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#FFD9D9',
-    marginLeft: scaleWidth(4),
     flexShrink: 0,
   },
   changeText: {

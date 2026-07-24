@@ -1,7 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Container, Header} from '@components/index';
 import {BackHandler, StyleSheet, Text, View} from 'react-native';
-import {AuthScreens, Colors, Fonts, StorageKeys} from '@constants/index';
+import {AuthScreens, Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import LottieView from 'lottie-react-native';
 import {successLottie} from '@assets/Lottie';
@@ -9,9 +9,7 @@ import {AuthNavigatorType} from '@type/NavigatorTypes';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {useDispatch} from 'react-redux';
 import moment from 'moment';
-import {authActions} from '@store/auth';
 import {bootstrapProductContextRequest} from '@store/auth/auth.slice';
-import {setStorage} from '@services/localStorage';
 import {setProgramScope} from '@store/programSelection/programSelection.slice';
 import type {ProductBootstrapResult} from '@store/auth/auth.types';
 
@@ -120,13 +118,8 @@ export const SuccessScreen = ({
       return;
     }
 
-    // DF-only / single product / restored match — same home entry as before
-    dispatch(authActions.setIsLoggedIn(true));
-    setStorage(StorageKeys.IS_LOGGED_IN, true);
-    navigation.reset({
-      index: 0,
-      routes: [{name: AuthScreens.HomeNavigator}],
-    });
+    // DF-only / single product — still pick program before entering home
+    navigation.replace('SelectProgramScreen');
   }, [
     bootstrapResult,
     dispatch,

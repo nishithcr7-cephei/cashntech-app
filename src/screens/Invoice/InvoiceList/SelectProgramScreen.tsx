@@ -11,7 +11,7 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useDispatch, useSelector} from 'react-redux';
 import {AppBar, Container} from '@components/index';
-import {Colors, Fonts} from '@constants/index';
+import {Colors, Fonts, StorageKeys} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {RightChevron, UpChevron, File, BankBuilding} from '@assets/Icons';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
@@ -29,8 +29,15 @@ import {
 } from '@store/programSelection/programSelection.selector';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
-import {selectActiveProductCode} from '@store/product/product.selectors';
-import {isProgramSelectableForProduct} from '@utils/programProductFilter';
+import {selectActiveProductCode, selectActiveProductName} from '@store/product/product.selectors';
+import {
+  filterScopeBanksByActiveProduct,
+  isProgramSelectableForProduct,
+} from '@utils/programProductFilter';
+import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {authActions, authSelector} from '@store/auth';
+import {setStorage} from '@services/localStorage';
 
 const FolderIcon = ({size = 20, color = '#7A7C82'}: {size?: number; color?: string}) => (
   <View style={{width: size, height: size, justifyContent: 'center', alignItems: 'center'}}>
@@ -62,20 +69,17 @@ export const SelectProgramScreen: React.FC = () => {
   const scopeLoading = useSelector(selectScopeLoading);
   const scopeError = useSelector(selectScopeError);
   const selectedPrograms = useSelector(selectSelectedPrograms);
+  const isLoggedIn = useSelector(authSelector.getLoggedInState);
   const activeProductCode = useSelector(selectActiveProductCode);
+  const activeProductName = useSelector(selectActiveProductName);
+  const effectiveProductCode = getEffectiveProductCode(activeProductCode);
+  const activeProductLabel =
+    activeProductName || PRODUCT_DISPLAY_NAMES[effectiveProductCode];
 
-  const banksData = useMemo(() => {
-    if (!scopeData) return [];
-    return scopeData
-      .map(bank => ({
-        ...bank,
-        products: bank.products
-          .map(product => ({
-            ...product,
-            programs: product.programs,
-          })),
-      }));
-  }, [scopeData]);
+  const banksData = useMemo(
+    () => filterScopeBanksByActiveProduct(scopeData, activeProductCode),
+    [scopeData, activeProductCode],
+  );
 
   const isProgramSelectable = (bank: Bank, product: BankProgram, program: Program): boolean =>
     isProgramSelectableForProduct(bank.name, product, program, {
@@ -83,6 +87,24 @@ export const SelectProgramScreen: React.FC = () => {
       allowAllPrograms: canUseAllProgramScope,
       bankName: bank.name,
     });
+
+  /** After program choice during login: enter home. In-app: return to caller. */
+  const finishProgramSelection = () => {
+    if (!isLoggedIn) {
+      setStorage(StorageKeys.IS_LOGGED_IN, true);
+      dispatch(authActions.setIsLoggedIn(true));
+      return;
+    }
+    if (fromScreen) {
+      navigation.navigate(fromScreen as never);
+      return;
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.replace('HomeNavigator');
+  };
 
   useEffect(() => {
     if (!scopeData || scopeData.length === 0) {
@@ -150,24 +172,12 @@ export const SelectProgramScreen: React.FC = () => {
         approvalLevel: product.approval_level ?? null,
       }),
     );
-    if (fromScreen) {
-      navigation.navigate(fromScreen);
-    } else if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      navigation.replace('HomeNavigator');
-    }
+    finishProgramSelection();
   };
 
   const handleAllProgram = () => {
     dispatch(setProgramScope('all'));
-    if (fromScreen) {
-      navigation.navigate(fromScreen);
-    } else if (navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      navigation.replace('HomeNavigator');
-    }
+    finishProgramSelection();
   };
 
   const isBankExpanded = (bankId: string) => expandedBanks.has(bankId);
@@ -299,7 +309,7 @@ export const SelectProgramScreen: React.FC = () => {
   if (scopeLoading || !delayPassed) {
     return (
       <Container>
-        <AppBar title="Select DF Programs" navigation={navigation as any} hideHamburger={true} />
+        <AppBar title="Select Program" navigation={navigation as any} hideHamburger={true} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primaryColor} />
           <Text style={styles.loadingText}>Loading programs...</Text>
@@ -324,7 +334,9 @@ export const SelectProgramScreen: React.FC = () => {
       <Container>
         <AppBar title="Select Program" navigation={navigation as any} hideHamburger={true} />
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>No programs available</Text>
+          <Text style={styles.errorText}>
+            No programs available for {activeProductLabel}
+          </Text>
         </View>
       </Container>
     );
@@ -332,9 +344,12 @@ export const SelectProgramScreen: React.FC = () => {
 
   return (
     <Container>
-      <AppBar title="Select DF Programs" navigation={navigation as any} hideHamburger={true} />
+      <AppBar title="Select Program" navigation={navigation as any} hideHamburger={true} />
       <View style={styles.contentContainer}>
         <View style={styles.contentWrapper}>
+          <Text style={styles.productContextText}>
+            Showing programs for {activeProductLabel}
+          </Text>
           {canUseAllProgramScope && (
             <TouchableOpacity
               style={styles.allProgramBtn}
@@ -390,6 +405,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaleWidth(16),
     paddingTop: scaleHeight(16),
     paddingBottom: scaleHeight(16),
+  },
+  productContextText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: '#7A7C82',
+    marginBottom: scaleHeight(10),
   },
   allProgramBtn: {
     backgroundColor: Colors.white,

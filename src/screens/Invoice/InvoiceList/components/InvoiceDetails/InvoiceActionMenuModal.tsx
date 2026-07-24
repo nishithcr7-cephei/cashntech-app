@@ -16,7 +16,7 @@ import {PERMISSIONS} from '@constants/permissions';
 import {useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
 import {userSelector} from '@store/user';
-import {canShowWorkflowApproveReject} from '@utils/invoiceListActionable';
+import {canShowWorkflowApproveReject, canShowCashnTechInvoiceVerification, canShowFinanceRequest} from '@utils/invoiceListActionable';
 
 /**
  * Visibility and Actionability Logic for "Manage Attachment"
@@ -120,6 +120,8 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   const canReject = useHasPermission(PERMISSIONS.INVOICE_LIST_REJECT);
   const canViewHistory = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVAL_HISTORY);
   const canAttachment = useHasPermission(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
+  const canVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_ADMIN_VERIFICATION);
+  const canFinanceRequest = useHasPermission(PERMISSIONS.INVOICE_LIST_FINANCE_REQUEST);
 
   const userInfo = useSelector(userSelector.getUserInfo);
 
@@ -197,6 +199,26 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
       },
     );
 
+  const showCashnTechVerification = canShowCashnTechInvoiceVerification(
+    {
+      actionable: listActionable,
+      rawAdminStatus,
+      rawApprovalStatus,
+      rawInvoiceStatus,
+    },
+    canVerify,
+  );
+
+  const showFinanceRequest = canShowFinanceRequest(
+    {
+      actionable: listActionable,
+      rawAdminStatus,
+      rawApprovalStatus,
+      rawInvoiceStatus,
+    },
+    canFinanceRequest,
+  );
+
   if (!openMenuId) return null;
 
   return (
@@ -231,8 +253,8 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('approvalHistory', openMenuId)}
                   style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#0085FF" size={18} />
-                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
+                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#7C3AED" size={18} />
+                  <Text style={[styles.menuText, styles.menuTextHistory, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
                 </TouchableOpacity>
               )}
 
@@ -305,9 +327,9 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('approvalHistory', openMenuId)}
                   style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#0085FF" size={18} />
+                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#7C3AED" size={18} />
                   <View style={styles.menuItemTextBlock}>
-                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
+                    <Text style={[styles.menuText, styles.menuTextHistory, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
                     <Text style={styles.menuSubText}>Track Verification</Text>
                   </View>
                 </TouchableOpacity>
@@ -348,8 +370,8 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('approvalHistory', openMenuId)}
                   style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#0085FF" size={18} />
-                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
+                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#7C3AED" size={18} />
+                  <Text style={[styles.menuText, styles.menuTextHistory, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
                 </TouchableOpacity>
               )}
 
@@ -382,44 +404,48 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
           )}
           {isCashnTechUser && (
             <>
-              {/*
-               * CashnTech User — Admin Status Action Matrix:
-               *  ┌─────────────────────┬──────────────┬──────────────────┬─────────────┬────────┐
-               *  │ Admin Status        │ Verification │ Approval History │ Attachments │ Delete │
-               *  ├─────────────────────┼──────────────┼──────────────────┼─────────────┼────────┤
-               *  │ Pending Verification│     ✅       │       ✅         │     ✅      │   ✅   │
-               *  │ Verified            │     ❌       │       ✅         │     ✅      │   ✅   │
-               *  │ onHold              │     ❌       │       ✅         │     ✅      │   ✅   │
-               *  │ Rejected            │     ❌       │       ✅         │     ✅      │   ✅   │
-               *  │ (no status)         │     ❌       │       ✅         │     ✅      │   ✅   │
-               *  └─────────────────────┴──────────────┴──────────────────┴─────────────┴────────┘
-               */}
-
-              {/* Invoice Verification — Only for Pending Verification */}
-              {(
-                (rawAdminStatus || '').trim().toUpperCase() === 'PENDING_VERIFICATION' ||
-                (rawAdminStatus || '').trim().toUpperCase() === 'PENDING VERIFICATION'
-              ) && (
-                <TouchableOpacity
-                  disabled={permissionsLoading}
-                  onPress={() => onMenuAction('invoiceVerification', openMenuId)}
-                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="circle-check" iconStyle="solid" color={Colors.darkblack} size={16} />
-                  <View style={styles.menuItemTextBlock}>
-                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Invoice Verification</Text>
-                    <Text style={styles.menuSubText}>Approval / Reject</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-
-              {/* Approval History — Shown for all admin statuses */}
+              {/* Order: Approval History → Finance Request → Invoice Verification → Attachment → Delete */}
               {canViewHistory && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('approvalHistory', openMenuId)}
                   style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#0085FF" size={18} />
-                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Approval History</Text>
+                  <FontAwesome6 name="calendar-check" iconStyle="regular" color="#7C3AED" size={18} />
+                  <Text style={[styles.menuText, styles.menuTextHistory, permissionsLoading && styles.menuTextDisabled]}>
+                    Approval History
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Finance Request — actionable && finance_request (web parity) */}
+              {showFinanceRequest && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('financeRequest', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="file-invoice-dollar" iconStyle="solid" color="#0085FF" size={16} />
+                  <View style={styles.menuItemTextBlock}>
+                    <Text style={[styles.menuText, styles.menuTextAction, permissionsLoading && styles.menuTextDisabled]}>
+                      Finance Request
+                    </Text>
+                    <Text style={styles.menuSubText}>Raise disbursement request</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+
+              {/* Invoice Verification — actionable && invoice_verification (not admin_status string) */}
+              {showCashnTechVerification && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('invoiceVerification', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="circle-check" iconStyle="solid" color="#0085FF" size={16} />
+                  <View style={styles.menuItemTextBlock}>
+                    <Text style={[styles.menuText, styles.menuTextAction, permissionsLoading && styles.menuTextDisabled]}>
+                      Invoice Verification
+                    </Text>
+                    <Text style={styles.menuSubText}>Approval / Reject</Text>
+                  </View>
                 </TouchableOpacity>
               )}
 
@@ -490,6 +516,12 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     color: '#666666',
     fontFamily: Fonts.GilroyMedium,
+  },
+  menuTextAction: {
+    color: '#0085FF',
+  },
+  menuTextHistory: {
+    color: '#7C3AED',
   },
   deleteMenuText: {
     color: Colors.red,

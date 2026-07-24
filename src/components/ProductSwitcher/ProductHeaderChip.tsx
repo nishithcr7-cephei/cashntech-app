@@ -1,13 +1,9 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {Text, TouchableOpacity, StyleSheet} from 'react-native';
-import {useSelector} from 'react-redux';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {UpChevron} from '@assets/Icons';
-import {
-  selectActiveProduct,
-  selectHasMultipleProducts,
-} from '@store/product/product.selectors';
+import {useProductSwitcherSheet} from '@hooks/useProductSwitcherSheet';
 import {ProductBottomSheet} from './ProductBottomSheet';
 import {ProductIcon} from './ProductIcon';
 
@@ -24,9 +20,8 @@ type ProductHeaderChipProps = {
 export const ProductHeaderChip: React.FC<ProductHeaderChipProps> = ({
   filled = false,
 }) => {
-  const [sheetVisible, setSheetVisible] = useState(false);
-  const hasMultipleProducts = useSelector(selectHasMultipleProducts);
-  const activeProduct = useSelector(selectActiveProduct);
+  const {sheetVisible, openSheet, closeSheet, hasMultipleProducts, activeProduct} =
+    useProductSwitcherSheet();
 
   if (!hasMultipleProducts || !activeProduct) {
     return null;
@@ -37,7 +32,7 @@ export const ProductHeaderChip: React.FC<ProductHeaderChipProps> = ({
       <TouchableOpacity
         style={[styles.pill, filled && styles.pillFilled]}
         activeOpacity={0.8}
-        onPress={() => setSheetVisible(true)}>
+        onPress={openSheet}>
         <ProductIcon
           code={activeProduct.code}
           size={scaleHeight(12)}
@@ -49,7 +44,7 @@ export const ProductHeaderChip: React.FC<ProductHeaderChipProps> = ({
         <UpChevron rotation={180} height={scaleHeight(8)} width={scaleWidth(8)} />
       </TouchableOpacity>
 
-      <ProductBottomSheet visible={sheetVisible} onClose={() => setSheetVisible(false)} />
+      <ProductBottomSheet visible={sheetVisible} onClose={closeSheet} />
     </>
   );
 };

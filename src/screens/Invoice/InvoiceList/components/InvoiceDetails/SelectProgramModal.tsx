@@ -23,8 +23,13 @@ import {
 } from '@store/programSelection/programSelection.selector';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
-import {selectActiveProductCode} from '@store/product/product.selectors';
-import {isProgramSelectableForProduct} from '@utils/programProductFilter';
+import {selectActiveProductCode, selectActiveProductName} from '@store/product/product.selectors';
+import {
+  filterScopeBanksByActiveProduct,
+  isProgramSelectableForProduct,
+} from '@utils/programProductFilter';
+import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {getEffectiveProductCode} from '@store/product/product.resolver';
 
 const FolderIcon = ({size = 20, color = '#7A7C82'}: {size?: number; color?: string}) => (
   <View style={{width: size, height: size, justifyContent: 'center', alignItems: 'center'}}>
@@ -58,14 +63,15 @@ export const SelectProgramModal: React.FC<SelectProgramModalProps> = ({
   const scopeError = useSelector(selectScopeError);
   const selectedPrograms = useSelector(selectSelectedPrograms);
   const activeProductCode = useSelector(selectActiveProductCode);
+  const activeProductName = useSelector(selectActiveProductName);
+  const effectiveProductCode = getEffectiveProductCode(activeProductCode);
+  const activeProductLabel =
+    activeProductName || PRODUCT_DISPLAY_NAMES[effectiveProductCode];
 
-  const banksData = useMemo(() => {
-    if (!scopeData) return [];
-    return scopeData.map(bank => ({
-      ...bank,
-      products: bank.products.map(product => ({...product, programs: product.programs})),
-    }));
-  }, [scopeData]);
+  const banksData = useMemo(
+    () => filterScopeBanksByActiveProduct(scopeData, activeProductCode),
+    [scopeData, activeProductCode],
+  );
 
   const isProgramSelectable = (bank: Bank, product: BankProgram, program: Program): boolean =>
     isProgramSelectableForProduct(bank.name, product, program, {
@@ -249,7 +255,9 @@ export const SelectProgramModal: React.FC<SelectProgramModalProps> = ({
     if (banksData.length === 0) {
       return (
         <View style={modalStyles.errorContainer}>
-          <Text style={modalStyles.errorText}>No programs available</Text>
+          <Text style={modalStyles.errorText}>
+            No programs available for {activeProductLabel}
+          </Text>
         </View>
       );
     }
@@ -275,7 +283,7 @@ export const SelectProgramModal: React.FC<SelectProgramModalProps> = ({
           <View style={modalStyles.modalHeader}>
             <Text style={modalStyles.modalTitle}>Select Program</Text>
             <Text style={modalStyles.modalSubtitle}>
-              Choose a program to create invoice
+              Showing programs for {activeProductLabel}
             </Text>
           </View>
           <View style={modalStyles.modalBody}>{modalContent()}</View>

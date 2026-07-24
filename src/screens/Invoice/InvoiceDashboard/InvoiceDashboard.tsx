@@ -187,6 +187,7 @@ export const InvoiceDashboard: React.FC = () => {
                 isAnchorChecker={isAnchorChecker}
                 isDealerMaker={isDealerMaker}
                 isDealerChecker={isDealerChecker}
+                productTab={productTab}
               />
             </>
           )}

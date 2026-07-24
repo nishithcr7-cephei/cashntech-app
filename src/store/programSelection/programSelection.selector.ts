@@ -1,5 +1,7 @@
 import {createSelector} from '@reduxjs/toolkit';
 import {RootState} from '@store/app/store';
+import {selectActiveProductCode} from '@store/product/product.selectors';
+import {collectProgramIdsForActiveProduct} from '@utils/programProductFilter';
 
 const selectProgramSelectionState = (state: RootState) =>
   state.programSelection;
@@ -47,5 +49,18 @@ export const selectScopeError = (state: RootState) =>
   state.programSelection.scopeError;
 export const selectSelectedPrograms = (state: RootState) =>
   state.programSelection.selectedPrograms;
-export const selectAllProgramIds = (state: RootState) =>
-  state.programSelection.allProgramIds;
+
+/**
+ * Program IDs for "All Program" — always scoped to the active product.
+ * Never returns a DF+VF combined dump.
+ */
+export const selectAllProgramIds = createSelector(
+  [selectScopeData, selectActiveProductCode, selectProgramSelectionState],
+  (scopeData, activeProductCode, selection) => {
+    if (scopeData?.length) {
+      const ids = collectProgramIdsForActiveProduct(scopeData, activeProductCode);
+      return ids.length ? ids : null;
+    }
+    return selection.allProgramIds;
+  },
+);

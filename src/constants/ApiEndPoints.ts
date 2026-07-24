@@ -155,6 +155,8 @@ const Endpoints = {
   apiInvoiceSummary: '/invoice/summary',
   apiInvoiceLatest: '/invoice/latest',
   apiUpdateInvoiceStatus: (invoiceId: string) => `/invoice/status/${invoiceId}`,
+  apiFinanceRequestPreview: (invoiceId: string) =>
+    `/invoice/finance-request/preview/${invoiceId}`,
   apiUpdateInvoiceVerification: (invoiceId: string) => `/invoice/admin/${invoiceId}`,
   apiBulkUpdateInvoiceVerification: '/invoice/admin/bulk-status',
   apiBulkUpdateInvoiceStatus: '/invoice/bulk/status',

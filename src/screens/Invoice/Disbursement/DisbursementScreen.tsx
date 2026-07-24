@@ -34,7 +34,7 @@ import {Search, Dots, Filter} from '@assets/Icons';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {userSelector} from '@store/user';
 import {AppRole, ROLE_LABELS} from '@constants/roles';
-import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import {selectProgramSelection, selectAllProgramIds} from '@store/programSelection/programSelection.selector';
 import {invoiceApi} from '@services/api/invoice.api';
 import {formatStatus} from '@screens/Invoice/InvoiceList/components/InvoiceDetails/types';
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
@@ -245,6 +245,7 @@ export const DisbursementScreen: React.FC = () => {
     }, [dispatch]),
   );
   const programSelection = useSelector(selectProgramSelection);
+  const allProgramIds = useSelector(selectAllProgramIds);
   const programName =
     programSelection?.programScope === 'all'
       ? 'All Program'
@@ -307,16 +308,15 @@ export const DisbursementScreen: React.FC = () => {
 
   const programIds = useMemo(
     () =>
-      programSelection?.programScope === 'all' &&
-      programSelection?.allProgramIds?.length
-        ? programSelection.allProgramIds
+      programSelection?.programScope === 'all' && allProgramIds?.length
+        ? allProgramIds
         : programSelection?.programId
         ? [programSelection.programId]
         : undefined,
     [
       programSelection?.programScope,
       programSelection?.programId,
-      programSelection?.allProgramIds,
+      allProgramIds,
     ],
   );
 

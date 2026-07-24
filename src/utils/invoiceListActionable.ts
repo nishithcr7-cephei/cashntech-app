@@ -14,8 +14,13 @@ type LegacyTurnContext = {
   roleLabel?: string;
 };
 
+function isPendingVerificationStatus(adminStatus?: string | null): boolean {
+  const aStatus = (adminStatus || '').trim().toLowerCase().replace(/_/g, ' ');
+  return aStatus === 'pending verification';
+}
+
 /**
- * Whether Approve/Reject (workflow) should be offered.
+ * Whether Approve/Reject (workflow) should be offered for party users.
  * Prefers list `actionable` from unified backend; falls back to legacy parsing only when absent.
  */
 export function canShowWorkflowApproveReject(
@@ -47,7 +52,7 @@ export function canShowWorkflowApproveReject(
     .replace(/_/g, ' ');
 
   if (legacy.isCashnTechUser) {
-    return (row.rawAdminStatus || '').trim().toUpperCase().includes('PENDING');
+    return isPendingVerificationStatus(row.rawAdminStatus);
   }
 
   if (legacy.isAnchorAllAccess || legacy.isDealerAllAccess) {
@@ -62,6 +67,39 @@ export function canShowWorkflowApproveReject(
   return !!roleLabel && approvalS.includes(`PENDING ${roleLabel}`);
 }
 
+/**
+ * CashnTech / bank: Invoice Verification menu — actionable && invoice_verification.
+ * Fallback to Pending Verification only when actionable is absent from the API.
+ */
+export function canShowCashnTechInvoiceVerification(
+  row: ActionableRow,
+  canVerify: boolean,
+): boolean {
+  if (!canVerify) {
+    return false;
+  }
+  if (typeof row.actionable === 'boolean') {
+    return row.actionable;
+  }
+  return isPendingVerificationStatus(row.rawAdminStatus);
+}
+
+/**
+ * Finance Request menu — actionable && finance_request permission.
+ * No legacy admin_status fallback (matches web).
+ */
+export function canShowFinanceRequest(
+  row: ActionableRow,
+  canFinanceRequest: boolean,
+): boolean {
+  return canFinanceRequest && row.actionable === true;
+}
+
+/**
+ * Bulk-select / pending eligibility.
+ * CashnTech: actionable && invoice_verification (web Ze pending count).
+ * Fallback to Pending Verification only when actionable is undefined.
+ */
 export function isInvoiceBulkSelectable(
   row: ActionableRow,
   context: {
@@ -72,17 +110,32 @@ export function isInvoiceBulkSelectable(
 ): boolean {
   if (typeof row.actionable === 'boolean') {
     if (context.isCashnTechUser) {
-      const aStatus = (row.rawAdminStatus || '').toLowerCase();
-      return (
-        row.actionable &&
-        context.canVerify &&
-        (aStatus === 'pending verification' || aStatus === 'pending_verification')
-      );
+      return row.actionable && context.canVerify;
     }
     return row.actionable && context.hasFunctionalPermission;
   }
 
+  if (context.isCashnTechUser) {
+    return context.canVerify && isPendingVerificationStatus(row.rawAdminStatus);
+  }
+
   return false;
+}
+
+/**
+ * Pending badge count for a single row (CashnTech / bank path).
+ */
+export function isCashnTechPendingRow(
+  row: ActionableRow,
+  canVerify: boolean,
+): boolean {
+  if (!canVerify) {
+    return false;
+  }
+  if (typeof row.actionable === 'boolean') {
+    return row.actionable;
+  }
+  return isPendingVerificationStatus(row.rawAdminStatus);
 }
 
 export function readActionableFromApi(

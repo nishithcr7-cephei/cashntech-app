@@ -23,7 +23,9 @@ export const formatDateDDMmmYYYY = (dateStr: string | null | undefined): string 
 };
 
 /**
- * Get program IDs for a specific product tab
+ * Get program IDs for a specific product tab.
+ * Prefer dealer_finance / vendor_finance tabs — all_product is legacy and
+ * can mix DF+VF; callers should prefer active-product-scoped selectors.
  */
 export const getProgramIdsForTab = (
   tab: ProductTabType,
@@ -44,7 +46,10 @@ export const getProgramIdsForTab = (
         const isDFProgram =
           program.name.toLowerCase().includes('df') ||
           program.name.toLowerCase().includes('dealer finance');
-        const includeInAll = tab === 'all_product';
+        // all_product intentionally does not dump every program — treat as DF
+        // default so DF+VF never mix via this helper alone.
+        const includeInAll =
+          tab === 'all_product' && (isDFProduct || isDFProgram);
         const includeInDF =
           tab === 'dealer_finance' && (isDFProduct || isDFProgram);
         const includeInVF =
@@ -109,16 +114,21 @@ export const getCardMetrics = (
   const activeDealerRatioVal = kpis?.active_dealer_ratio ? `${parseFloat(kpis.active_dealer_ratio).toFixed(2)}%` : (totalDealers > 0 ? `${activeDealers}/${totalDealers}` : '-');
 
   const utilizedRateVal = kpis?.utilized_rate ? `${parseFloat(kpis.utilized_rate).toFixed(2)}%` : (finalTotalLimit > 0 ? formatPercentage((finalUtilizedAmount / finalTotalLimit) * 100) : '-');
-  
+
   const principalOverdueVal = formatCurrency(finalPrincipalOverdue);
   const interestOverdueVal = formatCurrency(finalInterestOverdue);
   const penalOverdueVal = formatCurrency(finalPenalOverdue);
 
+  const activeRatioLabel =
+    productTab === 'vendor_finance'
+      ? 'Active Vendor Ratio(%)'
+      : 'Active Dealer Ratio(%)';
+
   const metrics: MetricItem[] = [
     {label: 'Total Program Limit', value: totalLimitVal},
-    {label: 'Utilized Amount', value: utilizedAmountVal},
+    {label: 'Utilized Amount (Financed)', value: utilizedAmountVal},
     {label: 'Utilized Rate', value: utilizedRateVal},
-    {label: 'Active Dealer Ratio', value: activeDealerRatioVal},
+    {label: activeRatioLabel, value: activeDealerRatioVal},
     {label: 'Available Limit', value: availableLimitVal},
     {
       label: 'Overdue Amount',
@@ -127,8 +137,8 @@ export const getCardMetrics = (
         { label: 'Principal Amount', value: principalOverdueVal },
         { label: 'Interest Amount', value: interestOverdueVal },
         { label: 'Penal Interest Amount', value: penalOverdueVal },
-      ]
-    }
+      ],
+    },
   ];
 
   return metrics;

@@ -29,22 +29,28 @@ import {
 import { ProgramSelectionState } from '@store/programSelection/programSelection.types';
 import { userSelector } from '@store/user';
 import { AppRole, ROLE_LABELS } from '@constants/roles';
-import { mapApiToRow, formatDateDash, mapApprovalLogToEntry } from './types';
+import { mapApiToRow, formatDateDash, mapApprovalLogToTimelineStep } from './types';
 import { InvoiceListItemApi } from '@store/invoice/inv.types';
 import { invoiceApi } from '@services/api/invoice.api';
 import { useHasPermission } from '@hooks/useHasPermission';
 import { PERMISSIONS } from '@constants/permissions';
 import { decryptValue } from '@utils/decrypt';
 import { mapInvoiceAttachmentsWithUrls, type InvoiceAttachmentItem } from '@utils/invoiceAttachments';
-import type { CheckerApprovalEntry } from '@components/CheckerApprovalModal/CheckerApprovalModal';
+import type { WorkflowStep } from '@components/InvoiceTrackingModal/InvoiceTrackingModal';
 import type { ApproveRejectInvoiceDetails } from '@components/ApproveRejectModal/ApproveRejectModal';
 import {
   getBestWorkflowApprovalLevelFromScope,
   getInvoiceApprovalLevel,
   getInvoiceApprovalLevelForId,
 } from '@utils/getInvoiceApprovalLevel';
-import {isInvoiceBulkSelectable} from '@utils/invoiceListActionable';
+import {isInvoiceBulkSelectable, isCashnTechPendingRow} from '@utils/invoiceListActionable';
 import type {InvoiceListFilters} from '@store/invoice/inv.types';
+import {
+  selectActiveProductName,
+  selectActiveProductCode,
+} from '@store/product/product.selectors';
+import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {getEffectiveProductCode} from '@store/product/product.resolver';
 
 export function useInvoiceDetails() {
   const navigation = useNavigation();
@@ -58,6 +64,11 @@ export function useInvoiceDetails() {
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const userInfoFull = useSelector(userSelector.getUserInfo);
   const userDepartment = (userInfoFull as any)?.department || '';
+  const activeProductName = useSelector(selectActiveProductName);
+  const activeProductCode = useSelector(selectActiveProductCode);
+  const productBreadcrumbLabel =
+    activeProductName ||
+    PRODUCT_DISPLAY_NAMES[getEffectiveProductCode(activeProductCode)];
 
   // Enable LayoutAnimation for Android
   useEffect(() => {
@@ -177,8 +188,21 @@ export function useInvoiceDetails() {
   const [visibleCount, setVisibleCount] = useState(30);
   const [anchorCheckerInvoiceDetails, setAnchorCheckerInvoiceDetails] = useState<ApproveRejectInvoiceDetails | null>(null);
   const [anchorCheckerDetailsLoading, setAnchorCheckerDetailsLoading] = useState(false);
-  const [approvalHistoryEntries, setApprovalHistoryEntries] = useState<CheckerApprovalEntry[]>([]);
+  const [approvalHistoryEntries, setApprovalHistoryEntries] = useState<WorkflowStep[]>([]);
   const [approvalHistoryLoading, setApprovalHistoryLoading] = useState(false);
+  const [approvalHistorySummary, setApprovalHistorySummary] = useState<{
+    invoiceAmount?: string;
+    counterParty?: string;
+    primaryParty?: string;
+    raisedOn?: string;
+    dueOn?: string;
+    programName?: string;
+  }>({});
+  const [showFinanceRequestModal, setShowFinanceRequestModal] = useState(false);
+  const [financeRequestPreview, setFinanceRequestPreview] = useState<any>(null);
+  const [financeRequestLoading, setFinanceRequestLoading] = useState(false);
+  const [financeRequestSubmitting, setFinanceRequestSubmitting] = useState(false);
+  const [financeRequestInvoiceId, setFinanceRequestInvoiceId] = useState<string | null>(null);
 
   const programIdFromParams = routeParams?.programId;
   const concreteProgramId = programSelection?.programId ?? programIdFromParams;
@@ -393,12 +417,12 @@ export function useInvoiceDetails() {
         const entries = (Array.isArray(logs) ? logs : [])
           .map(log => {
             try {
-              return mapApprovalLogToEntry(log);
+              return mapApprovalLogToTimelineStep(log);
             } catch {
               return null;
             }
           })
-          .filter((entry): entry is CheckerApprovalEntry => entry !== null);
+          .filter((entry): entry is WorkflowStep => entry !== null);
         setApprovalHistoryEntries(entries);
       })
       .catch(() => {
@@ -512,6 +536,14 @@ export function useInvoiceDetails() {
       case 'checkerApproval':
         setSelectedInvoiceId(invoiceId);
         setSelectedInvoiceNo(invoiceNo);
+        setApprovalHistorySummary({
+          invoiceAmount: rowForAction?.invoiceAmount,
+          counterParty: rowForAction?.counterParty,
+          primaryParty: rowForAction?.primaryParty,
+          raisedOn: rowForAction?.requestDate,
+          dueOn: rowForAction?.dueDate,
+          programName: rowForAction?.programName,
+        });
         setShowCheckerApprovalModal(true);
         break;
       case 'recreateInvoice':
@@ -524,6 +556,14 @@ export function useInvoiceDetails() {
       case 'approvalHistory':
         setSelectedInvoiceId(invoiceId);
         setSelectedInvoiceNo(invoiceNo);
+        setApprovalHistorySummary({
+          invoiceAmount: rowForAction?.invoiceAmount,
+          counterParty: rowForAction?.counterParty,
+          primaryParty: rowForAction?.primaryParty,
+          raisedOn: rowForAction?.requestDate,
+          dueOn: rowForAction?.dueDate,
+          programName: rowForAction?.programName,
+        });
         setShowCheckerApprovalModal(true);
         break;
       case 'delete':
@@ -590,8 +630,42 @@ export function useInvoiceDetails() {
         setSelectedInvoiceNo(invoiceNo);
         setShowApproveRejectModal(true);
         break;
-      case 'attachment': {
-        const listItem = invoiceListRaw.find(inv => inv.id === invoiceId);
+      case 'financeRequest': {
+        const runFinanceRequestPreview = async () => {
+          setFinanceRequestInvoiceId(invoiceId);
+          setSelectedInvoiceId(invoiceId);
+          setSelectedInvoiceNo(invoiceNo);
+          setFinanceRequestPreview(null);
+          setFinanceRequestLoading(true);
+          setShowFinanceRequestModal(true);
+          try {
+            const previewRes = await invoiceApi.getFinanceRequestPreview(invoiceId);
+            const preview =
+              previewRes?.data ?? previewRes?.result ?? previewRes ?? {};
+            if (!preview || typeof preview !== 'object') {
+              throw new Error('Empty Finance Request preview');
+            }
+            setFinanceRequestPreview(preview);
+          } catch (e: any) {
+            setShowFinanceRequestModal(false);
+            setFinanceRequestPreview(null);
+            setFinanceRequestInvoiceId(null);
+            Toast.show({
+              type: 'error',
+              text1: 'Preview Failed',
+              text2:
+                e?.response?.data?.message ||
+                e?.message ||
+                'Could not load Finance Request preview',
+            });
+          } finally {
+            setFinanceRequestLoading(false);
+          }
+        };
+        runFinanceRequestPreview();
+        break;
+      }
+      case 'attachment': {        const listItem = invoiceListRaw.find(inv => inv.id === invoiceId);
         setAttachmentFallback(mapInvoiceAttachmentsWithUrls(listItem ?? {}));
         setSelectedInvoiceId(invoiceId);
         setShowAttachmentModal(true);
@@ -604,6 +678,61 @@ export function useInvoiceDetails() {
     }
   };
 
+  const closeFinanceRequestModal = useCallback(() => {
+    if (financeRequestSubmitting) return;
+    setShowFinanceRequestModal(false);
+    setFinanceRequestPreview(null);
+    setFinanceRequestLoading(false);
+    setFinanceRequestInvoiceId(null);
+  }, [financeRequestSubmitting]);
+
+  const submitFinanceRequest = useCallback(async () => {
+    if (!financeRequestInvoiceId || financeRequestSubmitting || financeRequestLoading) {
+      return;
+    }
+    setFinanceRequestSubmitting(true);
+    try {
+      const res = await invoiceApi.submitWorkflowStatusAction({
+        invoiceId: financeRequestInvoiceId,
+        action: 'Finance Request',
+        remark: '-',
+      });
+      if (res?.statusCode === 200 || res?.status === 200) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Finance Request submitted successfully',
+        });
+        setShowFinanceRequestModal(false);
+        setFinanceRequestPreview(null);
+        setFinanceRequestInvoiceId(null);
+        refreshInvoiceList();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Finance Request Failed',
+          text2: res?.message || 'Failed to submit Finance Request',
+        });
+      }
+    } catch (e: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2:
+          e?.response?.data?.message ||
+          e?.message ||
+          'Failed to submit Finance Request',
+      });
+    } finally {
+      setFinanceRequestSubmitting(false);
+    }
+  }, [
+    financeRequestInvoiceId,
+    financeRequestSubmitting,
+    financeRequestLoading,
+    refreshInvoiceList,
+  ]);
+
   const isInvoiceSelectable = useCallback((item: any) => {
     if (typeof item.actionable === 'boolean') {
       if (isCashnTechUser) {
@@ -614,6 +743,15 @@ export function useInvoiceDetails() {
         });
       }
       return item.actionable && hasFunctionalPermission;
+    }
+
+    // Legacy fallback when actionable is absent from list API
+    if (isCashnTechUser) {
+      return isInvoiceBulkSelectable(item, {
+        isCashnTechUser,
+        hasFunctionalPermission,
+        canVerify,
+      });
     }
 
     const programMethod = programSelection?.method;
@@ -636,12 +774,7 @@ export function useInvoiceDetails() {
     if (approvalS.includes('PENDING ATTACHMENT') || iStatus === 'attachment pending') return false;
     if (aStatus === 'verified') return false;
 
-    // 2. Status Awareness (Matching 3-dots/Web logic)
-    if (isCashnTechUser) {
-      return aStatus === 'pending verification' || aStatus === 'pending_verification';
-    }
-
-    // 3. Functional Permission Check (Sync with 3-dots)
+    // 2. Functional Permission Check (Sync with 3-dots)
     if (!hasFunctionalPermission) return false;
 
     // For regular roles, check if approval_status contains "PENDING [ROLE]"
@@ -1084,7 +1217,8 @@ export function useInvoiceDetails() {
       (programMethod === "Pull" && userRoleInternal === "dealer_maker") ||
       (programMethod === "Push" && userRoleInternal === "anchor_maker");
     if (!isAllowedByMethod) {
-      createInvoiceDisabledReason = "Role restricted for this program's method";
+      createInvoiceDisabledReason =
+        'You are not allowed to create invoice for this method';
     }
   }
 
@@ -1123,7 +1257,6 @@ export function useInvoiceDetails() {
 
     invoiceData.forEach(row => {
       const iStatusRaw = (row.rawInvoiceStatus || '').trim();
-      const aStatusRaw = (row.rawAdminStatus || '').trim();
       const approvalStatus = (row.rawApprovalStatus || '').trim();
       const approvalS = approvalStatus.toLowerCase().replace(/_/g, ' ');
 
@@ -1146,9 +1279,19 @@ export function useInvoiceDetails() {
         actionRequired++;
       }
 
-      // Fix 2 — Pending Invoice Approval logic
+      // Fix 2 — Pending Invoice Approval logic (web Ze parity)
       if (userPartyType === 'cashntech') {
-        if (canVerify && aStatusRaw.toLowerCase() === 'pending verification') {
+        if (
+          isCashnTechPendingRow(
+            {
+              actionable: row.actionable,
+              rawAdminStatus: row.rawAdminStatus,
+              rawApprovalStatus: row.rawApprovalStatus,
+              rawInvoiceStatus: row.rawInvoiceStatus,
+            },
+            canVerify,
+          )
+        ) {
           pending++;
         }
       } else {
@@ -1211,6 +1354,7 @@ export function useInvoiceDetails() {
     isDealerChecker,
     isCashnTechUser,
     dealerListTitle,
+    productBreadcrumbLabel,
     selectedDealerName,
     fromInvoiceDashboard,
     searchText,
@@ -1228,7 +1372,14 @@ export function useInvoiceDetails() {
     setShowCheckerApprovalModal,
     approvalHistoryEntries,
     approvalHistoryLoading,
+    approvalHistorySummary,
     setApprovalHistoryLoading,
+    showFinanceRequestModal,
+    financeRequestPreview,
+    financeRequestLoading,
+    financeRequestSubmitting,
+    closeFinanceRequestModal,
+    submitFinanceRequest,
     showApproveRejectModal,
     setShowApproveRejectModal,
     selectedInvoiceId,

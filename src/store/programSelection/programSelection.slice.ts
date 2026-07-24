@@ -30,6 +30,33 @@ const programSelectionSlice = createSlice({
   reducers: {
     setProgramScope: (state, action: PayloadAction<'all' | 'selected'>) => {
       state.programScope = action.payload;
+      // "All Program" is product-scoped; clear any stale single-program selection
+      // so breadcrumb / KPIs cannot keep a previous product's program.
+      if (action.payload === 'all') {
+        state.selectedPrograms = [];
+        state.bankId = null;
+        state.bankName = null;
+        state.partyId = null;
+        state.productId = null;
+        state.productName = null;
+        state.programId = null;
+        state.programName = null;
+        state.userType = null;
+        state.method = null;
+        state.role = null;
+        state.status = null;
+        // Recompute allProgramIds from full scope when returning to "all"
+        // (toggleProgramSelection nulls this). Consumers still filter by active product.
+        if (state.scopeData?.length) {
+          const ids: string[] = [];
+          state.scopeData.forEach(bank =>
+            bank.products?.forEach(p =>
+              p.programs?.forEach(prog => ids.push(prog.id)),
+            ),
+          );
+          state.allProgramIds = ids.length ? ids : null;
+        }
+      }
     },
     setProgramSelection: (
       state,

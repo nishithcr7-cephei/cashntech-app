@@ -1,23 +1,90 @@
 import type {InvoiceListItemApi} from '@store/invoice/inv.types';
 import type {InvoiceApprovalLogApi} from '@services/api/invoice.api';
 import type {CheckerApprovalEntry} from '@components/CheckerApprovalModal/CheckerApprovalModal';
+import type {WorkflowStep} from '@components/InvoiceTrackingModal/InvoiceTrackingModal';
 import {decryptValue} from '@utils/decrypt';
 
 export const NA_AD = 'N/A/AD';
 
-export function mapApprovalLogToEntry(
-  log: InvoiceApprovalLogApi | Record<string, any>,
-): CheckerApprovalEntry {
+function readApprovalLogUserName(log: InvoiceApprovalLogApi | Record<string, any>): string {
   const user = log?.user ?? {};
   const firstName = user.first_name ?? user.firstName ?? '';
   const lastName = user.last_name ?? user.lastName ?? '';
-  const approvedBy =
-    firstName || lastName
-      ? `${firstName} ${lastName}`.trim()
-      : (log as any).action_by_role ?? (log as any).actionByRole ?? 'Unknown';
+  if (firstName || lastName) {
+    return `${firstName} ${lastName}`.trim();
+  }
+  return '';
+}
+
+function readApprovalLogRole(log: InvoiceApprovalLogApi | Record<string, any>): string {
+  return (log as any).action_by_role ?? (log as any).actionByRole ?? '';
+}
+
+/** Web-style timeline timestamp: "21 Jul, 04:48 PM" */
+export function formatTimelineTimestamp(isoDate: string): string {
+  if (!isoDate) return '-';
+  try {
+    const d = new Date(isoDate);
+    if (Number.isNaN(d.getTime())) return isoDate;
+    const day = d.getDate();
+    const month = d.toLocaleString('en-GB', {month: 'short'});
+    const time = d
+      .toLocaleString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      })
+      .replace(/\u202f/g, ' ');
+    return `${day} ${month}, ${time}`;
+  } catch {
+    return isoDate;
+  }
+}
+
+function resolveTimelineStatus(
+  action?: string | null,
+  rejectionReason?: string | null,
+): WorkflowStep['status'] {
+  const a = (action || '').toLowerCase();
+  if (a.includes('reject') || (rejectionReason || '').trim()) {
+    return 'rejected';
+  }
+  return 'completed';
+}
+
+export function mapApprovalLogToTimelineStep(
+  log: InvoiceApprovalLogApi | Record<string, any>,
+): WorkflowStep {
+  const roleLabel = readApprovalLogRole(log);
+  const userName = readApprovalLogUserName(log);
+  const action = log.action ?? '';
+  const rejectionReason =
+    (log as any).rejection_reason ?? (log as any).rejectionReason ?? '';
+  return {
+    id: log.id ?? String(Math.random()),
+    action,
+    roleLabel,
+    userName: userName || 'Unknown',
+    timestamp: formatTimelineTimestamp(
+      (log as any).action_at ?? (log as any).actionAt ?? '',
+    ),
+    status: resolveTimelineStatus(action, rejectionReason),
+  };
+}
+
+export function mapApprovalLogToEntry(
+  log: InvoiceApprovalLogApi | Record<string, any>,
+): CheckerApprovalEntry {
+  const userName = readApprovalLogUserName(log);
+  const role = readApprovalLogRole(log);
+  const approvedBy = userName || role || 'Unknown';
+  const action = log.action ?? '';
+  const rejectionReason =
+    (log as any).rejection_reason ?? (log as any).rejectionReason ?? '';
   const status: 'Approved' | 'Rejected' =
-    log.action === 'Approve' || log.action === 'Verify' ? 'Approved' : 'Rejected';
-  const role = (log as any).action_by_role ?? (log as any).actionByRole ?? '';
+    resolveTimelineStatus(action, rejectionReason) === 'rejected'
+      ? 'Rejected'
+      : 'Approved';
   const approvalLevelRaw = log.role_approval_level;
   const approvalLevel =
     typeof approvalLevelRaw === 'number'
@@ -25,10 +92,6 @@ export function mapApprovalLogToEntry(
       : approvalLevelRaw != null
         ? String(approvalLevelRaw)
         : undefined;
-  const action = log.action ?? '';
-  const remark = log.remark ?? '';
-  const rejectionReason =
-    (log as any).rejection_reason ?? (log as any).rejectionReason ?? '';
   return {
     id: log.id ?? String(Math.random()),
     approvedBy,
@@ -37,7 +100,7 @@ export function mapApprovalLogToEntry(
     role,
     approvalLevel,
     action,
-    remark,
+    remark: log.remark ?? '',
     rejectionReason,
   };
 }
@@ -144,8 +207,9 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
       item.program?.productConfig?.partnerBank?.bank_name ??
       '-',
     productName:
-      item.product_name ??
-      item.program?.productConfig?.product?.name ??
+      item.product?.name ||
+      item.product_name ||
+      item.program?.productConfig?.product?.name ||
       '-',
     programName: item.program_name ?? item.program?.program_name ?? '-',
     primaryParty:

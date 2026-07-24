@@ -76,6 +76,8 @@ export type InvoiceListItemApi = {
   /** Populated on invoice list / approval APIs */
   partnerBank?: { id?: string; bank_name?: string };
   product_name?: string;
+  /** Nested product from unified list (invoice.product.name) */
+  product?: {id?: string; name?: string} | null;
   program_name?: string;
   primary_party_name?: string;
   /** Nested from API when flat fields not present */

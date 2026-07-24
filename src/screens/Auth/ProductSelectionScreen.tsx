@@ -1,27 +1,22 @@
 import React, {useMemo, useState} from 'react';
 import {
   BackHandler,
+  FlatList,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {AppBar, Button, Container} from '@components/index';
-import {AuthScreens, Colors, Fonts, StorageKeys} from '@constants/index';
+import {AuthScreens, Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {AuthNavigatorType} from '@type/NavigatorTypes';
-import {RightChevron} from '@assets/Icons';
 import {useDispatch, useSelector} from 'react-redux';
-import {authActions} from '@store/auth';
-import {setStorage} from '@services/localStorage';
-import {setProgramScope} from '@store/programSelection/programSelection.slice';
-import {
-  selectAvailableProducts,
-} from '@store/product/product.selectors';
+import {selectAvailableProducts} from '@store/product/product.selectors';
 import {setActiveProduct} from '@store/product/product.slice';
 import type {ResolvedProduct} from '@store/product/product.types';
+import {ProductSelectionRow} from './components/ProductSelectionRow';
 
 type ProductSelectionScreenProps = NativeStackScreenProps<
   AuthNavigatorType,
@@ -49,9 +44,8 @@ export const ProductSelectionScreen = ({
 
   const completeSignIn = (product: ResolvedProduct) => {
     dispatch(setActiveProduct(product));
-    dispatch(setProgramScope('all'));
-    setStorage(StorageKeys.IS_LOGGED_IN, true);
-    dispatch(authActions.setIsLoggedIn(true));
+    // Stay in auth stack — Select Program comes next, then login completes there.
+    navigation.replace('SelectProgramScreen');
   };
 
   const onConfirm = () => {
@@ -61,6 +55,14 @@ export const ProductSelectionScreen = ({
     completeSignIn(selected);
   };
 
+  const renderProductRow = ({item}: {item: ResolvedProduct}) => (
+    <ProductSelectionRow
+      product={item}
+      selected={selected?.code === item.code}
+      onPress={() => setSelected(item)}
+    />
+  );
+
   return (
     <Container>
       <AppBar
@@ -68,45 +70,30 @@ export const ProductSelectionScreen = ({
         navigation={navigation}
         hideHamburger={true}
       />
-      <View style={styles.contentContainer}>
-        <View style={styles.contentWrapper}>
-          <Text style={styles.title}>Select Product</Text>
-          <Text style={styles.instructionText}>
-            Choose a product to continue. You can use one product at a time.
-          </Text>
 
-          <View style={styles.optionsContainer}>
-            {products.map(product => {
-              const isSelected = selected?.code === product.code;
-              return (
-                <TouchableOpacity
-                  key={product.id || product.code}
-                  style={[
-                    styles.optionButton,
-                    isSelected && styles.optionButtonSelected,
-                  ]}
-                  onPress={() => setSelected(product)}
-                  activeOpacity={0.7}>
-                  <Text
-                    style={[
-                      styles.optionText,
-                      isSelected && styles.optionTextSelected,
-                    ]}>
-                    {product.name}
-                  </Text>
-                  <RightChevron
-                    height={scaleHeight(16)}
-                    width={scaleWidth(16)}
-                    style={styles.arrowIcon}
-                  />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+      <View style={styles.body}>
+        <View style={styles.header}>
+          <Text style={styles.subtitle}>Choose a product to continue</Text>
+          {products.length > 0 ? (
+            <Text style={styles.countText}>
+              {products.length} product{products.length === 1 ? '' : 's'} available
+            </Text>
+          ) : null}
+        </View>
 
+        <FlatList
+          data={products}
+          keyExtractor={item => item.id || item.code}
+          renderItem={renderProductRow}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        />
+
+        <View style={styles.footer}>
           <Button
             buttonText="Continue"
-            style={styles.confirmButton}
             onPress={onConfirm}
             disabled={!selected}
           />
@@ -117,60 +104,46 @@ export const ProductSelectionScreen = ({
 };
 
 const styles = StyleSheet.create({
-  contentContainer: {
+  body: {
     flex: 1,
     backgroundColor: Colors.white,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderColor: '#0066FF',
   },
-  contentWrapper: {
+  header: {
     paddingHorizontal: scaleWidth(16),
-    paddingTop: scaleHeight(24),
+    paddingTop: scaleHeight(16),
+    paddingBottom: scaleHeight(8),
   },
-  title: {
-    fontSize: scaleFont(24),
-    fontFamily: Fonts.GilroyBold,
-    color: Colors.darkblack,
-    marginBottom: scaleHeight(12),
-  },
-  instructionText: {
+  subtitle: {
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyRegular,
-    color: Colors.darkblack,
-    marginBottom: scaleHeight(32),
+    color: '#757575',
     lineHeight: scaleHeight(20),
   },
-  optionsContainer: {
-    gap: scaleHeight(16),
+  countText: {
+    marginTop: scaleHeight(4),
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: '#9E9E9E',
   },
-  optionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFE9E9',
-    paddingVertical: scaleHeight(16),
+  list: {
+    flex: 1,
+  },
+  listContent: {
     paddingHorizontal: scaleWidth(16),
-    borderRadius: scaleWidth(8),
-    borderWidth: 1,
-    borderColor: '#FFD9D9',
+    paddingTop: scaleHeight(8),
+    paddingBottom: scaleHeight(8),
   },
-  optionButtonSelected: {
-    borderColor: Colors.primaryColor,
-    backgroundColor: '#FFF0F0',
-  },
-  optionText: {
-    fontSize: scaleFont(16),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.primaryColor,
-  },
-  optionTextSelected: {
-    color: Colors.primaryColor,
-  },
-  arrowIcon: {
-    marginLeft: scaleWidth(8),
-  },
-  confirmButton: {
-    marginTop: scaleHeight(32),
+  footer: {
+    backgroundColor: Colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E0E0E0',
+    paddingHorizontal: scaleWidth(16),
+    paddingTop: scaleHeight(16),
+    paddingBottom: scaleHeight(16),
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: -2},
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 8,
   },
 });

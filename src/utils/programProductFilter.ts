@@ -1,15 +1,17 @@
-import type {BankProgram, Program} from '@constants/programSelection';
+import type {Bank, BankProgram, Program} from '@constants/programSelection';
 import {
-  DEFAULT_PRODUCT_CODE,
   PRODUCT_CODES,
   type ProductCode,
 } from '@store/product/product.types';
-import {resolveProductCode} from '@store/product/product.resolver';
+import {getEffectiveProductCode, resolveProductCode} from '@store/product/product.resolver';
 
 export type ProgramSelectabilityOptions = {
   /** Active product from PR1; absent = DF default behavior */
   activeProductCode?: ProductCode | string | null;
-  /** Makers/checkers/admin can pick any program in scope */
+  /**
+   * Role gate: user may select any program *within* the active product
+   * (makers / checkers / CashnTech). Does NOT ignore the product filter.
+   */
   allowAllPrograms?: boolean;
   bankName?: string;
 };
@@ -30,8 +32,45 @@ function isLegacyDealerFinanceProgram(
 }
 
 /**
+ * Whether a scope product node belongs to the given active product.
+ */
+export function doesProductMatchActiveProduct(
+  product: BankProgram,
+  activeProductCode?: ProductCode | string | null,
+  program?: Program,
+): boolean {
+  const activeCode = getEffectiveProductCode(
+    activeProductCode as ProductCode | null | undefined,
+  );
+  const scopeCode = resolveScopeProductCode(product);
+
+  if (activeCode === PRODUCT_CODES.VENDOR_FINANCE) {
+    return scopeCode === PRODUCT_CODES.VENDOR_FINANCE;
+  }
+
+  // Dealer Finance (default): DF-resolved products, or legacy DF-named rows
+  if (scopeCode === PRODUCT_CODES.DEALER_FINANCE) {
+    return true;
+  }
+  if (scopeCode === PRODUCT_CODES.VENDOR_FINANCE) {
+    return false;
+  }
+  if (program) {
+    return isLegacyDealerFinanceProgram(product, program);
+  }
+  return (
+    product.name.toLowerCase().includes('dealer finance') ||
+    product.programs.some(
+      p =>
+        p.name.toLowerCase().includes('df') ||
+        p.name.toLowerCase().includes('dealer finance'),
+    )
+  );
+}
+
+/**
  * Whether a scope program row is selectable for the current product context.
- * VF programs become selectable when active product is VF; DF logic unchanged when absent.
+ * Always product-scoped: allowAllPrograms never bypasses activeProductCode.
  */
 export function isProgramSelectableForProduct(
   bankName: string,
@@ -39,25 +78,66 @@ export function isProgramSelectableForProduct(
   program: Program,
   options: ProgramSelectabilityOptions,
 ): boolean {
-  if (options.allowAllPrograms) {
-    return true;
+  if (!doesProductMatchActiveProduct(product, options.activeProductCode, program)) {
+    return false;
   }
 
+  // Within the active product: UGRO rows stay selectable (legacy exception).
   if (bankName.toLowerCase() === 'ugro') {
     return true;
   }
 
-  const scopeCode = resolveScopeProductCode(product);
-  const activeCode =
-    (options.activeProductCode as ProductCode | null) ?? DEFAULT_PRODUCT_CODE;
+  // Role gate / default: once product matches, program is selectable.
+  // allowAllPrograms documents "any program within active product" — same result
+  // after the product match above.
+  return true;
+}
 
-  if (activeCode === PRODUCT_CODES.VENDOR_FINANCE) {
-    return scopeCode === PRODUCT_CODES.VENDOR_FINANCE;
+/**
+ * Prune scope bank tree to the active product only.
+ * Drops products that belong to other products, then drops empty banks.
+ */
+export function filterScopeBanksByActiveProduct(
+  banks: Bank[] | null | undefined,
+  activeProductCode?: ProductCode | string | null,
+): Bank[] {
+  if (!banks?.length) {
+    return [];
   }
 
-  if (scopeCode === PRODUCT_CODES.DEALER_FINANCE) {
-    return true;
-  }
+  return banks
+    .map(bank => ({
+      ...bank,
+      products: bank.products
+        .filter(product =>
+          doesProductMatchActiveProduct(product, activeProductCode),
+        )
+        .map(product => ({
+          ...product,
+          programs: product.programs.filter(program =>
+            doesProductMatchActiveProduct(product, activeProductCode, program),
+          ),
+        }))
+        .filter(product => product.programs.length > 0),
+    }))
+    .filter(bank => bank.products.length > 0);
+}
 
-  return isLegacyDealerFinanceProgram(product, program);
+/**
+ * Collect program IDs belonging to the active product only (for "All Program").
+ */
+export function collectProgramIdsForActiveProduct(
+  banks: Bank[] | null | undefined,
+  activeProductCode?: ProductCode | string | null,
+): string[] {
+  const filtered = filterScopeBanksByActiveProduct(banks, activeProductCode);
+  const ids: string[] = [];
+  filtered.forEach(bank =>
+    bank.products.forEach(product =>
+      product.programs.forEach(program => {
+        ids.push(program.id);
+      }),
+    ),
+  );
+  return Array.from(new Set(ids));
 }

@@ -65,18 +65,14 @@ export const InterestAccrualsScreen: React.FC = () => {
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
   const programIds = useMemo(
     () =>
-      programSelection?.programScope === 'all' &&
-      (allProgramIds?.length || programSelection?.allProgramIds?.length)
-        ? allProgramIds?.length
-          ? allProgramIds
-          : programSelection?.allProgramIds ?? undefined
+      programSelection?.programScope === 'all' && allProgramIds?.length
+        ? allProgramIds
         : programSelection?.programId
           ? [programSelection.programId]
           : undefined,
     [
       programSelection?.programScope,
       programSelection?.programId,
-      programSelection?.allProgramIds,
       allProgramIds,
     ],
   );

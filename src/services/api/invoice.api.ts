@@ -711,6 +711,37 @@ export const invoiceApi = {
   },
 
   /**
+   * Finance Request preview (read-only): GET /invoice/finance-request/preview/:invoiceId
+   */
+  getFinanceRequestPreview: async (invoiceId: string): Promise<any> => {
+    const response = await axiosInstance.get(
+      ApiEndPoints.apiFinanceRequestPreview(invoiceId),
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
+  /**
+   * Submit Finance Request (or other workflow action): PATCH /invoice/status/:invoiceId
+   * Body: { action, remark } — server derives step from current_step (no approval_level).
+   */
+  submitWorkflowStatusAction: async (payload: {
+    invoiceId: string;
+    action: string;
+    remark?: string;
+  }): Promise<any> => {
+    const response = await axiosInstance.patch(
+      ApiEndPoints.apiUpdateInvoiceStatus(payload.invoiceId),
+      {
+        action: payload.action,
+        remark: payload.remark ?? '-',
+      },
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
+  /**
    * CashnTech admin verification: PATCH /invoice/admin/:invoiceId
    * Body: { action: 'Verify' | 'Reject', remark: string }
    */
