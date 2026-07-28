@@ -335,11 +335,14 @@ export type DpdKpisResponse = {
     dpd_61_90?: string;
     average_dpd?: string;
   }>;
-  overdueSum?: Array<{
-    total_principal_outstanding?: string;
-    total_base_interest_outstanding?: string;
-    total_penal_outstanding?: string;
-  }>;
+  overdueSum?: Array<
+    | number
+    | {
+        total_principal_outstanding?: string;
+        total_base_interest_outstanding?: string;
+        total_penal_outstanding?: string;
+      }
+  >;
   gross_npa_percent?: string;
   total_outstanding_amount?: string;
   totalOsResult?: Array<{

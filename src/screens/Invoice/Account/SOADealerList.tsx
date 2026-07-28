@@ -26,6 +26,8 @@ import {
 } from '@store/soa/dealer/dealer.selector';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
+import {selectEffectiveProductCode} from '@store/product/product.selectors';
+import {PRODUCT_CODES} from '@store/product/product.types';
 
 export const SOADealerList: React.FC = () => {
   const navigation = useNavigation();
@@ -37,6 +39,10 @@ export const SOADealerList: React.FC = () => {
   const programName = (route.params as any)?.programName || 'Program name';
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isDealerChecker = userRole === 'dealer_checker';
+  const effectiveCode = useSelector(selectEffectiveProductCode);
+  const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
+  const partyLabel = isVendorFinance ? 'Vendor' : 'Dealer';
+  const partyLabelPlural = isVendorFinance ? 'Vendors' : 'Dealers';
 
   const selectedProgramIds = useMemo(
     () =>
@@ -192,12 +198,14 @@ export const SOADealerList: React.FC = () => {
       />
       
       <View style={styles.pageTitleBar}>
-        <Text style={styles.pageTitleText}>Dealer list of {programName}</Text>
+        <Text style={styles.pageTitleText}>
+          {partyLabel} list of {programName}
+        </Text>
       </View>
 
       <View style={styles.content}>
         <View style={styles.dealersHeader}>
-          <Text style={styles.dealersLabel}>Dealers</Text>
+          <Text style={styles.dealersLabel}>{partyLabelPlural}</Text>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{totalDealers}</Text>
           </View>
@@ -206,13 +214,15 @@ export const SOADealerList: React.FC = () => {
         {loading && (
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color={Colors.primaryColor} />
-            <Text style={styles.loadingText}>Fetching dealers...</Text>
+            <Text style={styles.loadingText}>Fetching {partyLabelPlural.toLowerCase()}...</Text>
           </View>
         )}
 
         {!loading && dealerList.length === 0 && (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No dealers found for {programName}</Text>
+            <Text style={styles.emptyText}>
+              No {partyLabelPlural.toLowerCase()} found for {programName}
+            </Text>
           </View>
         )}
 

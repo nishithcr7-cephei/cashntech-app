@@ -8,6 +8,8 @@ export interface ProgramSummaryApi {
   utilized_amount: string | number;
   overdue_days: string | number;
   entity_name?: string;
+  total_outstanding?: string | number;
+  pipeline_requests?: string | number;
 }
 
 export interface InterestSlabApi {
@@ -38,6 +40,7 @@ export interface TransactionDetailsApi {
   os_principal: string;
   os_interest: string;
   os_penal: string;
+  os_total?: string;
   due_other_charges: string;
   paid_other_charges: string;
   utr_number: string;

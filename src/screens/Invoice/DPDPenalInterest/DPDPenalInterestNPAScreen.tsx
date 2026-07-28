@@ -1,4 +1,4 @@
-import React, {useMemo, useState, useEffect} from 'react';
+import React, {useMemo, useState, useEffect, useCallback} from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -167,36 +167,56 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
       ? `₹ ${Number(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}`
       : '-';
 
+  const getOverdueVal = (val: string | number | undefined | null) =>
+    `₹ ${Number(val != null && val !== '' ? val : 0).toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+    })}`;
+
   const dpdMetrics = useMemo(() => {
     const dpdRow = apiKpis?.disbursedInvoices?.[0];
-    const overdueRow = apiKpis?.overdueSum?.[0];
+    const overdueRaw = apiKpis?.overdueSum?.[0];
+    const overdueRow =
+      overdueRaw != null && typeof overdueRaw === 'object' ? overdueRaw : null;
     const osRow = apiKpis?.totalOsResult?.[0];
+    const averageDpd = Number(
+      dpdRow?.average_dpd != null && dpdRow.average_dpd !== ''
+        ? dpdRow.average_dpd
+        : 0,
+    );
 
     return [
       {
         label: 'DPD Bucket Movement',
         subValues: [
-          {label: '0-30 Days', value: dpdRow?.dpd_1_30 ?? '-'},
-          {label: '31-60 Days', value: dpdRow?.dpd_31_60 ?? '-'},
-          {label: '61-90 Days', value: dpdRow?.dpd_61_90 ?? '-'},
+          {label: '0-30 Days', value: dpdRow?.dpd_1_30 ?? '0'},
+          {label: '31-60 Days', value: dpdRow?.dpd_31_60 ?? '0'},
+          {label: '61-90 Days', value: dpdRow?.dpd_61_90 ?? '0'},
         ],
       },
       {
-        label: 'Top 10 Overdue Accounts',
-        subValues: [
-          {
-            label: 'By Amount',
-            value: getVal(overdueRow?.total_principal_outstanding),
-          },
-          {
-            label: 'By DPD',
-            value: dpdRow?.average_dpd ? `${dpdRow.average_dpd} Days` : '-',
-          },
-        ],
+        label: 'Average DPD',
+        value: averageDpd.toFixed(2),
       },
       {
         label: 'Gross NPA % (DPD > 90 D)',
-        value: apiKpis?.gross_npa_percent ?? '-',
+        value: apiKpis?.gross_npa_percent ?? '0.00%',
+      },
+      {
+        label: 'Total Overdue Amount',
+        subValues: [
+          {
+            label: 'Principal Amount',
+            value: getOverdueVal(overdueRow?.total_principal_outstanding),
+          },
+          {
+            label: 'Interest Amount',
+            value: getOverdueVal(overdueRow?.total_base_interest_outstanding),
+          },
+          {
+            label: 'Penal Interest Amount',
+            value: getOverdueVal(overdueRow?.total_penal_outstanding),
+          },
+        ],
       },
       {
         label: 'Total Outstanding Amount',
@@ -212,23 +232,6 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
           {
             label: 'Penal Interest Amount',
             value: getVal(osRow?.totalPenalOutstanding),
-          },
-        ],
-      },
-      {
-        label: 'Total Overdue Amount',
-        subValues: [
-          {
-            label: 'Principal Amount',
-            value: getVal(overdueRow?.total_principal_outstanding),
-          },
-          {
-            label: 'Interest Amount',
-            value: getVal(overdueRow?.total_base_interest_outstanding),
-          },
-          {
-            label: 'Penal Interest Amount',
-            value: getVal(overdueRow?.total_penal_outstanding),
           },
         ],
       },
@@ -251,6 +254,19 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
     return data;
   }, [searchText, dpdRows]);
 
+  const handleInvoiceNoPress = useCallback(
+    (row: (typeof dpdRows)[number]) => {
+      if (!row.id) return;
+      (navigation as any).navigate('InvoiceDetailView', {
+        invoiceId: row.id,
+        invoiceNo: row.invoice_ref_no,
+        returnRoute: 'DPDPenalInterestNPAScreen',
+        listInvoiceStatus: row.invoice_status,
+      });
+    },
+    [navigation],
+  );
+
   return (
     <Container>
       <AppBar
@@ -271,9 +287,21 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
         <View style={styles.cardGrid}>
           {dpdMetrics.map((metric, index) => {
             const hasSubValues = (metric as any).subValues;
+            const isLongLabel = metric.label.startsWith('Gross NPA');
             return (
               <View key={index} style={styles.card}>
-                <Text style={[styles.cardLabel, styles.centerText]}>{metric.label}</Text>
+                <Text
+                  style={[
+                    styles.cardLabel,
+                    styles.centerText,
+                    isLongLabel && styles.cardLabelSmall,
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {metric.label}
+                </Text>
                 {metric.value ? (
                   <Text style={styles.cardValue} numberOfLines={1} adjustsFontSizeToFit>
                     {metric.value}
@@ -341,51 +369,64 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
                 <View style={styles.infoGrid}>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Loan Ref No.</Text>
-                    <Text style={styles.infoValue}>{row.loan_ref_no}</Text>
+                    <Text style={styles.infoValue}>{row.loan_ref_no ?? '-'}</Text>
                   </View>
                   <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice No</Text>
-                    <Text style={styles.infoValue}>{row.invoice_ref_no}</Text>
+                    <Text style={styles.infoLabel}>Invoice No.</Text>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => handleInvoiceNoPress(row)}
+                      disabled={!row.id || !row.invoice_ref_no}>
+                      <Text style={[styles.infoValue, styles.linkText]}>
+                        {row.invoice_ref_no ?? '-'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Program Name</Text>
-                    <Text style={styles.infoValue}>{row.program_name}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.disbursed_amount}</Text>
+                    <Text style={styles.infoValue}>{row.program_name ?? '-'}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Invoice Date</Text>
-                    <Text style={styles.infoValue}>{formatDate(row.invoice_date)}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Disburse Amount</Text>
-                    <Text style={styles.infoValue}>{row.disbursed_amount}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>DPD Days</Text>
-                    <Text style={styles.infoValue}>{row.dpd_days}</Text>
+                    <Text style={styles.infoValue}>{formatDate(row.invoice_date) || '-'}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>Due Date</Text>
-                    <Text style={styles.infoValue}>{formatDate(row.invoice_due_date)}</Text>
+                    <Text style={styles.infoValue}>{formatDate(row.invoice_due_date) || '-'}</Text>
                   </View>
                   <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Outstanding Principal</Text>
-                    <Text style={styles.infoValue}>{row.outstanding_principal}</Text>
+                    <Text style={styles.infoLabel}>Disbursement Amount (₹)</Text>
+                    <Text style={styles.infoValue}>{row.disbursed_amount ?? '-'}</Text>
                   </View>
                   <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Cumulative Interest</Text>
-                    <Text style={styles.infoValue}>{row.interest_accrued}</Text>
+                    <Text style={styles.infoLabel}>Invoice Accrued Amount (₹)</Text>
+                    <Text style={styles.infoValue}>{row.interest_accrued ?? '-'}</Text>
                   </View>
                   <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Penal Interest</Text>
-                    <Text style={styles.infoValue}>{row.penal_interest}</Text>
+                    <Text style={styles.infoLabel}>Disbursed Amount</Text>
+                    <Text style={styles.infoValue}>{row.disbursed_amount ?? '-'}</Text>
                   </View>
                   <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Total Outstanding</Text>
-                    <Text style={styles.infoValue}>{row.total_outstanding}</Text>
+                    <Text style={styles.infoLabel}>DPD Days</Text>
+                    <Text style={styles.infoValue}>
+                      {row.dpd_days != null ? String(row.dpd_days) : '-'}
+                    </Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>O/S Principal Amount (₹)</Text>
+                    <Text style={styles.infoValue}>{row.outstanding_principal ?? '-'}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>O/S Interest Accrued Amount (₹)</Text>
+                    <Text style={styles.infoValue}>{row.interest_accrued ?? '-'}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>O/S Penal Amount (₹)</Text>
+                    <Text style={styles.infoValue}>{row.penal_interest ?? '-'}</Text>
+                  </View>
+                  <View style={styles.infoColumn}>
+                    <Text style={styles.infoLabel}>O/S Total Amount (₹)</Text>
+                    <Text style={styles.infoValue}>{row.total_outstanding ?? '-'}</Text>
                   </View>
                   <View style={styles.infoColumn}>
                     <Text style={styles.infoLabel}>NPA Status</Text>
@@ -436,6 +477,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardLabel: { fontSize: scaleFont(14), color: Colors.graybase, marginBottom: scaleHeight(8), textAlign: 'center', fontFamily: Fonts.GilroyMedium },
+  cardLabelSmall: { fontSize: scaleFont(11) },
   cardValue: { fontSize: scaleFont(18), fontFamily: Fonts.GilroyBold, color: Colors.primaryColor, textAlign: 'center' },
   cardValueBlack: { color: Colors.darkblack },
   centerText: { textAlign: 'center' },
@@ -477,6 +519,10 @@ const styles = StyleSheet.create({
   infoColumn: { width: '47%', backgroundColor: '#F7F8FB', borderRadius: scaleWidth(10), padding: scaleWidth(12) },
   infoLabel: { fontSize: scaleFont(12), color: Colors.graybase, marginBottom: scaleHeight(4) },
   infoValue: { fontSize: scaleFont(14), color: Colors.darkblack, fontFamily: Fonts.GilroyMedium },
+  linkText: {
+    color: Colors.primaryColor,
+    textDecorationLine: 'underline',
+  },
   indexBadge: {
     backgroundColor: '#F7F8FB',
     width: scaleWidth(28),

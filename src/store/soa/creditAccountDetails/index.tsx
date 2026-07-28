@@ -31,6 +31,8 @@ import {
   selectClosedInvoiceMessage,
   selectRepaymentMessage,
 } from './selector';
+import {selectEffectiveProductCode} from '@store/product/product.selectors';
+import {PRODUCT_CODES} from '@store/product/product.types';
 
 const TABS = [
   'OD Account Summary',
@@ -53,6 +55,11 @@ export const CreditAccountDetails: React.FC = () => {
   const programId = (route.params as any)?.programId;
   const dealerName = (route.params as any)?.dealerName || 'Dealer';
   const programName = (route.params as any)?.anchor || 'Program';
+  const effectiveProductCode = useSelector(selectEffectiveProductCode);
+  const partyLabel =
+    effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE
+      ? 'Vendor Name'
+      : 'Dealer Name';
 
   // Redux state
   const summary = useSelector(selectProgramSummary);
@@ -174,23 +181,50 @@ export const CreditAccountDetails: React.FC = () => {
       <View style={styles.listCard}>
         <View style={styles.indexBadge}><Text style={styles.indexText}>{index + 1}</Text></View>
         <View style={styles.infoGrid}>
-          <View style={{width: '100%', marginBottom: scaleHeight(8)}}>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Txn Date</Text>
+            <Text style={styles.infoValue}>{item.txn_date || '-'}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice Ref No</Text>
+            <Text style={styles.infoValue}>{item.invoice_no || '-'}</Text>
+          </View>
+          <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Particulars</Text>
             <Text style={styles.infoValue}>{item.particulars || '-'}</Text>
           </View>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice Number</Text>
-            <Text style={styles.infoValue}>{item.invoice_no || 'N/A'}</Text>
+            <Text style={styles.infoLabel}>Debit</Text>
+            <Text style={styles.infoValue}>{item.debit || '-'}</Text>
           </View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Txn Date</Text><Text style={styles.infoValue}>{item.txn_date || '-'}</Text></View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Payment Date</Text><Text style={styles.infoValue}>{item.payment_date || '-'}</Text></View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Debit</Text><Text style={styles.infoValue}>{item.debit || '-'}</Text></View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Credit</Text><Text style={styles.infoValue}>{item.credit || '-'}</Text></View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>O/S Principal Amount</Text><Text style={styles.infoValue}>{item.os_principal || '-'}</Text></View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>O/S Interest Amount</Text><Text style={styles.infoValue}>{item.os_interest || '-'}</Text></View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>O/S Penal Amount</Text><Text style={styles.infoValue}>{item.os_penal || '-'}</Text></View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Due Other Charges</Text><Text style={styles.infoValue}>{item.due_other_charges || '-'}</Text></View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Paid Other Charges</Text><Text style={styles.infoValue}>{item.paid_other_charges || '-'}</Text></View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Credit</Text>
+            <Text style={styles.infoValue}>{item.credit || '-'}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>O/S Principal Amount</Text>
+            <Text style={styles.infoValue}>{item.os_principal || '-'}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>O/S Interest Accrued Amount</Text>
+            <Text style={styles.infoValue}>{item.os_interest || '-'}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>O/S Penal Amount (₹)</Text>
+            <Text style={styles.infoValue}>{item.os_penal || '-'}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>O/S Total Amount</Text>
+            <Text style={styles.infoValue}>{item.os_total || '-'}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Due Other Charges</Text>
+            <Text style={styles.infoValue}>{item.due_other_charges || '-'}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Paid Other Charges</Text>
+            <Text style={styles.infoValue}>{item.paid_other_charges || '-'}</Text>
+          </View>
         </View>
       </View>
     </View>
@@ -210,7 +244,7 @@ export const CreditAccountDetails: React.FC = () => {
             <Text style={styles.infoValue}>{item.invoice_no || 'N/A'}</Text>
           </View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Loan Amount</Text><Text style={styles.infoValue}>{item.loan_amount || '-'}</Text></View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Loan Date</Text><Text style={styles.infoValue}>{item.loan_date || '-'}</Text></View>
+          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Disbursement Date</Text><Text style={styles.infoValue}>{item.loan_date || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Principal O/S Amo.</Text><Text style={styles.infoValue}>{item.principal_os || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Interest O/S Amo.</Text><Text style={styles.infoValue}>{item.interest_os || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Penal Interest O/S</Text><Text style={styles.infoValue}>{item.penal_interest_os || '-'}</Text></View>
@@ -356,7 +390,11 @@ export const CreditAccountDetails: React.FC = () => {
         
         {/* Page Title */}
         <View style={styles.pageTitleBar}>
-          <Text style={styles.pageTitleText}>
+          <Text
+            style={styles.pageTitleText}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}>
             Credit Account Details of {dealerName}
           </Text>
         </View>
@@ -365,28 +403,38 @@ export const CreditAccountDetails: React.FC = () => {
         {summary && (
           <View style={styles.headerSummaryGrid}>
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Account Number</Text>
-              <Text style={styles.summaryValue}>{summary.account_number}</Text>
+              <Text style={styles.summaryLabel}>Credit Account No</Text>
+              <Text style={styles.summaryValue}>{summary.account_number || '-'}</Text>
             </View>
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>Anchor</Text>
-              <Text style={styles.summaryValue}>{summary.entity_name || programName}</Text>
+              <Text style={styles.summaryValue}>{summary.entity_name || programName || '-'}</Text>
             </View>
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>Sanctioned Limit</Text>
               <Text style={styles.summaryValue}>₹ {formatIndianNumber(String(summary.total_limit || 0))}</Text>
             </View>
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Utilized Limit</Text>
+              <Text style={styles.summaryLabel}>Utilized Amount</Text>
               <Text style={styles.summaryValue}>₹ {formatIndianNumber(String(summary.utilized_amount || 0))}</Text>
             </View>
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Available Amount</Text>
-              <Text style={styles.summaryValue}>₹ {formatIndianNumber(String(Number(summary.total_limit || 0) - Number(summary.utilized_amount || 0)))}</Text>
+              <Text style={styles.summaryLabel}>Available Limit</Text>
+              <Text style={styles.summaryValue}>
+                ₹ {formatIndianNumber(String(
+                  Number(summary.total_limit || 0) -
+                    Number(summary.utilized_amount || 0) -
+                    Number(summary.pipeline_requests || 0),
+                ))}
+              </Text>
+            </View>
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>Total Outstanding</Text>
+              <Text style={styles.summaryValue}>₹ {formatIndianNumber(String(summary.total_outstanding || 0))}</Text>
             </View>
             <View style={styles.summaryCard}>
               <Text style={styles.summaryLabel}>Overdue Days</Text>
-              <Text style={styles.summaryValue}>{summary.overdue_days || 0}</Text>
+              <Text style={styles.summaryValue}>{summary.overdue_days ?? 0}</Text>
             </View>
           </View>
         )}
@@ -407,7 +455,7 @@ export const CreditAccountDetails: React.FC = () => {
           {/* Dealer Count Header */}
           <View style={styles.invoiceHeader}>
             <View style={styles.invoiceBadgeContainer}>
-              <Text style={styles.invoiceLabel}>Dealer Name - {dealerName}</Text>
+              <Text style={styles.invoiceLabel}>{partyLabel} - {dealerName}</Text>
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
                   {activeTab === 'OD Account Summary' ? dealers.length : 
@@ -506,7 +554,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollContent: { paddingBottom: scaleHeight(40) },
   pageTitleBar: { paddingHorizontal: scaleWidth(16), paddingVertical: scaleHeight(12), backgroundColor: Colors.white },
-  pageTitleText: { fontSize: scaleFont(16), fontFamily: Fonts.GilroySemiBold, color: Colors.darkblack },
+  pageTitleText: { fontSize: scaleFont(13), fontFamily: Fonts.GilroySemiBold, color: Colors.darkblack },
   headerSummaryGrid: { 
     paddingHorizontal: scaleWidth(16), 
     flexDirection: 'row', 
