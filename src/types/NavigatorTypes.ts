@@ -105,6 +105,10 @@ export type HomeNavigatorType = {
   InvoiceDetailView: {
     invoiceId?: string;
     invoiceNo?: string;
+    returnRoute?: keyof HomeNavigatorType;
+    listInvoiceStatus?: string;
+    listApprovalStatus?: string;
+    listAdminStatus?: string;
   };
   InvoiceUploadPreview: {
     previewFields?: import('./Invoice').InvoiceFields;

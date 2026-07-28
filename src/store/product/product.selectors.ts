@@ -41,11 +41,11 @@ export const selectActiveProductCode = createSelector(
 /**
  * Non-null product code for optional product-aware params.
  * Defaults to DF when no active product — preserves current production behavior.
+ * Plain selector (not createSelector): getEffectiveProductCode often returns its
+ * input unchanged when a product is already selected, which Reselect warns about.
  */
-export const selectEffectiveProductCode = createSelector(
-  selectActiveProductCode,
-  code => getEffectiveProductCode(code),
-);
+export const selectEffectiveProductCode = (state: RootState) =>
+  getEffectiveProductCode(selectActiveProductCode(state));
 
 export const selectIsDealerFinanceActive = createSelector(
   selectActiveProductCode,

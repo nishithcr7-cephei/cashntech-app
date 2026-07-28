@@ -178,6 +178,7 @@ export const InvoiceDetailView: React.FC = () => {
 
   const rawInvoiceId = route?.params?.invoiceId || '';
   const invoiceNo = route?.params?.invoiceNo || '';
+  const returnRoute = route?.params?.returnRoute as keyof HomeNavigatorType | undefined;
   const listInvoiceStatus = route?.params?.listInvoiceStatus as string | undefined;
   const listApprovalStatus = route?.params?.listApprovalStatus as string | undefined;
   const listAdminStatus = route?.params?.listAdminStatus as string | undefined;
@@ -213,6 +214,14 @@ export const InvoiceDetailView: React.FC = () => {
   }, [rawInvoiceId, invoiceNo, invoiceListRaw]);
 
   const goBackToList = () => {
+    if (returnRoute) {
+      (navigation as any).navigate(returnRoute);
+      return;
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
     (navigation as any).navigate('InvoiceDetails', {
       programId: programSelection?.programId,
     });
@@ -232,8 +241,10 @@ export const InvoiceDetailView: React.FC = () => {
         if (cancelled) return;
         const apm = data?.anchorParticipantMapping;
         const party = data?.party;
-        const bankDetails = data.program?.bank_details;
+        const program = data?.program;
+        const bankDetails = program?.bank_details;
         const rawCreditAccount =
+          data?.creditToBankAccount?.accountNumber ||
           (Array.isArray(bankDetails)
             ? bankDetails[0]?.account_number
             : bankDetails?.account_number) ||
@@ -246,7 +257,10 @@ export const InvoiceDetailView: React.FC = () => {
         const dealerName = decryptValue(apm?.party?.entity_name ?? '') || '';
         const dealerCode = apm?.company_code_given_by_party ?? '';
         const odAccountNumber = decryptValue(apm?.od_account_no ?? '') || '';
-        const anchorName = decryptValue(party?.entity_name ?? '') || '';
+        const anchorName =
+          program?.program_name ||
+          decryptValue(party?.entity_name ?? '') ||
+          '';
         const poRefNo =
           data?.po_ref_no != null && String(data.po_ref_no).trim() !== ''
             ? String(data.po_ref_no)
@@ -265,16 +279,19 @@ export const InvoiceDetailView: React.FC = () => {
             (sum: number, t: any) => sum + (Number(t.tax_amount) || 0),
             0,
           );
+          const taxType = taxes[0]?.tax_type || 'Tax';
+          const taxPercent = taxes[0]?.tax_percentage ?? 0;
           const taxLabel =
-            taxes.length > 0
-              ? taxes
-                  .map((t: any) => `${t.tax_type || 'Tax'} ${t.tax_percentage ?? 0}%`)
-                  .join(', ')
-              : '-';
+            taxes.length > 0 ? `(${taxType}) (${taxPercent}%)` : '-';
           const qty = Number(it.quantity) || 0;
           const price = Number(it.price_per_quantity) || 0;
           const gross = qty * price;
-          const discountPercent = gross > 0 ? (lineDiscount / gross) * 100 : 0;
+          const discountPercent =
+            it.discount_type === 'Percentage' && it.discount_value != null
+              ? Number(it.discount_value) || 0
+              : gross > 0
+                ? (lineDiscount / gross) * 100
+                : 0;
 
           return {
             id: it.id || `item-${idx}`,
@@ -442,14 +459,6 @@ export const InvoiceDetailView: React.FC = () => {
             </View>
             <View style={styles.headerActions}>
               <TouchableOpacity style={styles.iconAction} disabled>
-                <FontAwesome6
-                  name="paperclip"
-                  iconStyle="solid"
-                  color={Colors.graybase}
-                  size={scaleWidth(16)}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconAction} disabled>
                 <Download width={scaleWidth(16)} height={scaleHeight(16)} />
               </TouchableOpacity>
             </View>
@@ -528,7 +537,7 @@ export const InvoiceDetailView: React.FC = () => {
           <DetailField label="Anchor Name" value={displayOrDash(invoiceData.anchorName)} />
           <DetailField label="Dealer Name" value={displayOrDash(invoiceData.dealerName)} />
           <DetailField label="Dealer Code" value={displayOrDash(invoiceData.dealerCode)} />
-          <DetailField label="OD Account Number" value={displayOrDash(invoiceData.odAccountNumber)} />
+          <DetailField label="Loan OD Account Number" value={displayOrDash(invoiceData.odAccountNumber)} />
           <DetailField label="Invoice Ref No" value={displayOrDash(invoiceData.invoiceRefNo)} />
           <DetailField label="PO Ref No" value={displayOrDash(invoiceData.poRefNo)} />
           <DetailField label="Invoice Date" value={displayOrDash(invoiceData.invoiceDate)} />
@@ -539,8 +548,12 @@ export const InvoiceDetailView: React.FC = () => {
           <DetailField label="WorkFlow Method" value={displayOrDash(invoiceData.workflowMethod)} />
           <DetailField label="Currency" value={displayOrDash(invoiceData.currency)} />
           <DetailField
-            label="Early Payment Discount (%)"
-            value={displayOrDash(fmtPercent(invoiceData.earlyPaymentDiscount))}
+            label="Early Payment Discount"
+            value={
+              invoiceData.earlyPaymentDiscount > 0
+                ? fmtPercent(invoiceData.earlyPaymentDiscount)
+                : displayOrDash(null)
+            }
           />
           <DetailField label="Remark" value={displayOrDash(invoiceData.remark)} />
         </View>

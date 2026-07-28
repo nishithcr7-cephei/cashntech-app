@@ -25,6 +25,12 @@ import {
   selectProgramSelection,
   selectAllProgramIds,
 } from '@store/programSelection/programSelection.selector';
+import {
+  selectActiveProductName,
+  selectActiveProductCode,
+} from '@store/product/product.selectors';
+import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 
 export const StatementOfAccount: React.FC = () => {
   const navigation = useNavigation();
@@ -32,7 +38,12 @@ export const StatementOfAccount: React.FC = () => {
 
   const programSelection = useSelector(selectProgramSelection);
   const allProgramIds = useSelector(selectAllProgramIds);
-  
+  const activeProductName = useSelector(selectActiveProductName);
+  const activeProductCode = useSelector(selectActiveProductCode);
+  const productBreadcrumbLabel =
+    activeProductName ||
+    PRODUCT_DISPLAY_NAMES[getEffectiveProductCode(activeProductCode)];
+
   const programList = useSelector(programListSelector);
   const loading = useSelector(soaLoadingSelector);
   const totalPrograms = useSelector(totalProgramsSelector);
@@ -155,7 +166,7 @@ export const StatementOfAccount: React.FC = () => {
       <AppBar title="Transactions > Statement of Account (SOA)" navigation={navigation as any} />
       <View style={styles.navPathContainer}>
         <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
-          Products {'>'} Dealer Finance {'>'} Transactions
+          Products {'>'} {productBreadcrumbLabel} {'>'} Transactions
         </Text>
       </View>
       

@@ -24,6 +24,12 @@ import {selectProgramSelection, selectAllProgramIds} from '@store/programSelecti
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 import {invoiceApi, InterestAccrualKpisResponse} from '@services/api/invoice.api';
+import {
+  selectActiveProductName,
+  selectActiveProductCode,
+} from '@store/product/product.selectors';
+import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 
 type InterestAccrualInvoiceRow = {
   id: string;
@@ -55,6 +61,11 @@ export const InterestAccrualsScreen: React.FC = () => {
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const programSelection = useSelector(selectProgramSelection);
   const allProgramIds = useSelector(selectAllProgramIds);
+  const activeProductName = useSelector(selectActiveProductName);
+  const activeProductCode = useSelector(selectActiveProductCode);
+  const productBreadcrumbLabel =
+    activeProductName ||
+    PRODUCT_DISPLAY_NAMES[getEffectiveProductCode(activeProductCode)];
   const programName = programSelection?.programName ?? '';
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
@@ -186,7 +197,7 @@ export const InterestAccrualsScreen: React.FC = () => {
         disburseDate,
         disburseAmount: fmtMoney(item.disbursed_amount),
         totalAccInterest: fmtMoney(item.cumulative_interest),
-        totalInterestPaid: '-', 
+        totalInterestPaid: fmtMoney(item.total_paid_interest),
         finalTotalRaw,
         disbursedAmountRaw,
         cumulativeInterestRaw,
@@ -273,7 +284,11 @@ export const InterestAccrualsScreen: React.FC = () => {
         </View>
         <View style={styles.infoGrid}>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Invoice No</Text>
+            <Text style={styles.infoLabel}>Loan Ref No.</Text>
+            <Text style={styles.infoValue}>{row.loanRefNo}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Invoice No.</Text>
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() =>
@@ -296,6 +311,10 @@ export const InterestAccrualsScreen: React.FC = () => {
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Program Name</Text>
             <Text style={styles.infoValue}>{row.programName}</Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Primary Party</Text>
+            <Text style={styles.infoValue}>{row.primaryParty}</Text>
           </View>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Counter Party</Text>
@@ -343,7 +362,7 @@ export const InterestAccrualsScreen: React.FC = () => {
       <ProgramBreadcrumb />
       <View style={styles.navPathContainer}>
         <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
-          Products {'>'} Dealer Finance {'>'} Transactions
+          Products {'>'} {productBreadcrumbLabel} {'>'} Transactions
         </Text>
       </View>
       <FlatList

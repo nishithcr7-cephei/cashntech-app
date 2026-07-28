@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {Container, AppBar, ProgramBreadcrumb} from '@components/index';
+import {Container, AppBar} from '@components/index';
 import {Search, LeftChevron} from '@assets/Icons';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -46,27 +46,29 @@ export const InvoiceDailyInterestScreen: React.FC = () => {
 
   const rows = useMemo(() => {
     return (dailyInterestData || []).map((item: any, index: number) => {
-      const fmt = (v: number | string) =>
-        Number(v || 0).toLocaleString('en-IN', {
+      const fmt = (v: number | string | null | undefined) =>
+        Number(v ?? 0).toLocaleString('en-IN', {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         });
       const penalAmount =
-        (item.penal_interest_on_interest || 0) +
-        (item.penal_interest_on_principal || 0);
+        Number(item.penal_interest_on_interest ?? 0) +
+        Number(item.penal_interest_on_principal ?? 0);
       return {
         id: String(item.id ?? index + 1),
         srNo: index + 1,
         invoiceNo,
-        balanceAmount: '-',
+        balanceAmount: `₹ ${fmt(item.balance_amount)}`,
         interestRate: fmt(item.interest_rate),
         interestAmount: `₹ ${fmt(item.daily_interest)}`,
         date: formatDateDash(item.accrual_date),
-        penalRate: penalAmount ? '-' : '-',
-        penalValues: penalAmount ? '-' : '-',
-        penalAmount: penalAmount ? `₹ ${fmt(penalAmount)}` : '-',
+        penalRate: fmt(item.penal_rate),
+        penalValues: `₹ ${fmt(item.penal_values)}`,
+        penalAmount: `₹ ${fmt(penalAmount)}`,
         cumulativeInterest: `₹ ${fmt(item.cumulative_interest)}`,
-        outstandingPrincipal: `₹ ${fmt(item.outstanding_principal ?? item.outstanding_principal_date)}`,
+        outstandingPrincipal: `₹ ${fmt(
+          item.outstanding_principal ?? item.outstanding_principal_date,
+        )}`,
       };
     });
   }, [dailyInterestData, invoiceNo]);
@@ -84,7 +86,6 @@ export const InvoiceDailyInterestScreen: React.FC = () => {
   return (
     <Container>
       <AppBar title="Daily Interest" navigation={navigation as any} />
-      <ProgramBreadcrumb />
       <View style={styles.pageTitleBar}>
         <TouchableOpacity
           style={styles.backButton}

@@ -1,4 +1,4 @@
-import React, {useMemo, useState, useEffect} from 'react';
+import React, {useMemo, useState, useEffect, useCallback} from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -242,15 +242,19 @@ export const RepaymentSettlementScreen: React.FC = () => {
       subValues: [
         {
           label: 'Principal Amount',
-          value: getVal(apiKpis?.overDueSum?.total_principal_outstanding),
+          value: getVal(
+            apiKpis?.overDueSum?.total_principal_outstanding ?? 0,
+          ),
         },
         {
           label: 'Interest Amount',
-          value: getVal(apiKpis?.overDueSum?.total_base_interest_outstanding),
+          value: getVal(
+            apiKpis?.overDueSum?.total_base_interest_outstanding ?? 0,
+          ),
         },
         {
           label: 'Penal Interest Amount',
-          value: getVal(apiKpis?.overDueSum?.total_penal_outstanding),
+          value: getVal(apiKpis?.overDueSum?.total_penal_outstanding ?? 0),
         },
       ],
     },
@@ -304,6 +308,18 @@ export const RepaymentSettlementScreen: React.FC = () => {
     }
     return data;
   }, [searchText, repaymentData]);
+
+  const handleInvoiceNoPress = useCallback(
+    (row: any) => {
+      (navigation as any).navigate('InvoiceDetailView', {
+        invoiceId: row.id,
+        invoiceNo: row.invoiceNo,
+        returnRoute: 'RepaymentSettlementScreen',
+        listInvoiceStatus: row.invoiceStatus,
+      });
+    },
+    [navigation],
+  );
 
   return (
     <Container>
@@ -411,7 +427,13 @@ export const RepaymentSettlementScreen: React.FC = () => {
                     </View>
                     <View style={styles.infoColumn}>
                       <Text style={styles.infoLabel}>Invoice No</Text>
-                      <Text style={styles.infoValue}>{row.invoiceNo}</Text>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => handleInvoiceNoPress(row)}>
+                        <Text style={[styles.infoValue, styles.linkText]}>
+                          {row.invoiceNo}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                     <View style={styles.infoColumn}>
                       <Text style={styles.infoLabel}>Bank Name</Text>
@@ -607,6 +629,10 @@ const styles = StyleSheet.create({
   infoColumn: { width: '47%', backgroundColor: '#F7F8FB', borderRadius: scaleWidth(10), padding: scaleWidth(12) },
   infoLabel: { fontSize: scaleFont(12), color: Colors.graybase, marginBottom: scaleHeight(4) },
   infoValue: { fontSize: scaleFont(14), color: Colors.darkblack, fontFamily: Fonts.GilroyMedium },
+  linkText: {
+    color: Colors.primaryColor,
+    textDecorationLine: 'underline',
+  },
   indexBadge: {
     backgroundColor: '#F7F8FB',
     width: scaleWidth(28),

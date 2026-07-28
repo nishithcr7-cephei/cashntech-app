@@ -53,6 +53,12 @@ import {
   bulkDisbursementRequest,
 } from '@store/invoice';
 import {useDispatch} from 'react-redux';
+import {
+  selectActiveProductName,
+  selectActiveProductCode,
+} from '@store/product/product.selectors';
+import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 
 const STATUS_COLORS = {
   PENDING: { bg: '#FFF4E5', text: '#FF8C00' },
@@ -113,6 +119,14 @@ function getInvoiceStatusStyles(invoiceStatus: string) {
   if (s === 'submitted' || s.includes('pending') || s.includes('processing')) return STATUS_COLORS.PENDING;
   if (s.includes('reject') || s.includes('fail') || s === 'cancelled') return STATUS_COLORS.REJECTED;
   return STATUS_COLORS.DEFAULT;
+}
+
+function formatAmountInr(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(Number(value))) return '-';
+  return `${Number(value).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}/-`;
 }
 
 export type DisbursementRow = {
@@ -246,6 +260,11 @@ export const DisbursementScreen: React.FC = () => {
   );
   const programSelection = useSelector(selectProgramSelection);
   const allProgramIds = useSelector(selectAllProgramIds);
+  const activeProductName = useSelector(selectActiveProductName);
+  const activeProductCode = useSelector(selectActiveProductCode);
+  const productBreadcrumbLabel =
+    activeProductName ||
+    PRODUCT_DISPLAY_NAMES[getEffectiveProductCode(activeProductCode)];
   const programName =
     programSelection?.programScope === 'all'
       ? 'All Program'
@@ -442,7 +461,7 @@ export const DisbursementScreen: React.FC = () => {
       value: `₹ ${pendingDisAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
     },
     {
-      label: 'Repeat usage',
+      label: 'Repeat Usage Rate',
       value: formatKpiPercent(apiKpis?.repeat_usage_rate),
     },
     {
@@ -822,6 +841,30 @@ export const DisbursementScreen: React.FC = () => {
     return {position: 'absolute' as const, top: anchor.y + anchor.height + topPadding, left};
   };
 
+  const handleInvoiceNoPress = useCallback(
+    (row: DisbursementRow) => {
+      (navigation as any).navigate('InvoiceDetailView', {
+        invoiceId: row.id,
+        invoiceNo: row.invoiceNo,
+        returnRoute: 'DisbursementScreen',
+        listInvoiceStatus: row.rawInvoiceStatus,
+        listAdminStatus: row.adminStatus,
+      });
+    },
+    [navigation],
+  );
+
+  const renderInvoiceNoField = (row: DisbursementRow) => (
+    <View style={styles.infoColumn}>
+      <Text style={styles.infoLabel}>Invoice No.</Text>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => handleInvoiceNoPress(row)}>
+        <Text style={[styles.infoValue, styles.linkText]}>{row.invoiceNo}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
 
   const renderDisbursementRow = ({item: row, index}: {item: DisbursementRow; index: number}) => {
     const isSelected = selectedBulkIds.has(row.id);
@@ -881,11 +924,8 @@ export const DisbursementScreen: React.FC = () => {
           <View style={styles.infoGrid}>
           {isAnchorMaker ? (
             <>
-              {/* Anchor Maker Order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Date → Due Date → Disbursement Date → Invoice Amount (₹) → UTR No. → Invoice Status */}
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice No.</Text>
-                <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-              </View>
+              {/* Anchor Maker Order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Date → Due Date → Disbursement Date → Invoice Amount (₹) → Disbursement Amount (₹) → UTR No. → Invoice Status */}
+              {renderInvoiceNoField(row)}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Bank Name</Text>
                 <Text style={styles.infoValue}>{row.bankName}</Text>
@@ -919,6 +959,12 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
               </View>
               <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Disbursement Amount (₹)</Text>
+                <Text style={styles.infoValue}>
+                  {formatAmountInr(row.disbursedAmount)}
+                </Text>
+              </View>
+              <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>UTR No.</Text>
                 <Text style={styles.infoValue}>{row.utrNo}</Text>
               </View>
@@ -931,10 +977,7 @@ export const DisbursementScreen: React.FC = () => {
             </>
           ) : isAnchorChecker ? (
             <>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice No.</Text>
-                <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-              </View>
+              {renderInvoiceNoField(row)}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Bank Name</Text>
                 <Text style={styles.infoValue}>{row.bankName}</Text>
@@ -960,12 +1003,18 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoValue}>{row.dueDate}</Text>
               </View>
               <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Disburse Date</Text>
+                <Text style={styles.infoLabel}>Disbursement Date</Text>
                 <Text style={styles.infoValue}>{row.disburseDate}</Text>
               </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
                 <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Disbursement Amount (₹)</Text>
+                <Text style={styles.infoValue}>
+                  {formatAmountInr(row.disbursedAmount)}
+                </Text>
               </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>UTR No.</Text>
@@ -986,10 +1035,7 @@ export const DisbursementScreen: React.FC = () => {
                   <Text style={styles.infoValue}>{row.loanRefNo}</Text>
                 </View>
               )}
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice No.</Text>
-                <Text style={styles.infoValue}>{row.invoiceNo}</Text>
-              </View>
+              {renderInvoiceNoField(row)}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Bank Name</Text>
                 <Text style={styles.infoValue}>{row.bankName}</Text>
@@ -1011,10 +1057,6 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoValue}>{row.counterParty}</Text>
               </View>
               <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice Amount</Text>
-                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-              </View>
-              <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Invoice Date</Text>
                 <Text style={styles.infoValue}>{row.invoiceDate}</Text>
               </View>
@@ -1023,8 +1065,18 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoValue}>{row.dueDate}</Text>
               </View>
               <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Disbur Date</Text>
+                <Text style={styles.infoLabel}>Disbursement Date</Text>
                 <Text style={styles.infoValue}>{row.disburseDate}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+              </View>
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Disbursement Amount (₹)</Text>
+                <Text style={styles.infoValue}>
+                  {formatAmountInr(row.disbursedAmount)}
+                </Text>
               </View>
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>UTR No.</Text>
@@ -1053,7 +1105,7 @@ export const DisbursementScreen: React.FC = () => {
       <ProgramBreadcrumb />
       <View style={styles.navPathContainer}>
         <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
-          Products {'>'} Dealer Finance {'>'} Transactions
+          Products {'>'} {productBreadcrumbLabel} {'>'} Transactions
         </Text>
       </View>
       <FlatList
@@ -1103,7 +1155,7 @@ export const DisbursementScreen: React.FC = () => {
               <>
                 {!(isDealerMaker || isDealerChecker) && (
                   <View style={styles.invoicesHeader}>
-                    <Text style={styles.invoicesLabel}>Verified Invoices</Text>
+                    <Text style={styles.invoicesLabel}>Invoice</Text>
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>{filteredData.length}</Text>
                     </View>
@@ -1171,7 +1223,7 @@ export const DisbursementScreen: React.FC = () => {
                 </View>
                 {(isDealerMaker || isDealerChecker) && (
                   <View style={[styles.invoicesHeader, {marginTop: scaleHeight(12)}]}>
-                    <Text style={styles.invoicesLabel}>Verified Invoices</Text>
+                    <Text style={styles.invoicesLabel}>Invoice</Text>
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>{filteredData.length}</Text>
                     </View>
@@ -1667,6 +1719,10 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     color: Colors.darkblack,
     fontFamily: Fonts.GilroyMedium,
+  },
+  linkText: {
+    color: Colors.primaryColor,
+    textDecorationLine: 'underline',
   },
   statusGreen: {
     color: Colors.green,
