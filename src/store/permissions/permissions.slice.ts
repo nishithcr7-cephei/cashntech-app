@@ -16,6 +16,22 @@ const initialState: PermissionsState = {
   error: null,
 };
 
+const normalizePermission = (permission: string): string => {
+  if (!permission) return permission;
+
+  return permission
+    .replace(/^lms\.products\.dealer_finance\./, 'lms.')
+    .replace(/^lms\.products\.vendor_finance\./, 'lms.')
+    .replace(/^lms\.vf_transactions\./, 'lms.transactions.')
+    .replace(/\.vf_overview(?=\.|$)/, '.overview')
+    .replace(/\.vf_invoice_list(?=\.|$)/, '.invoice_list')
+    .replace(/\.vf_disbursement(?=\.|$)/, '.disbursement')
+    .replace(/\.vf_interest_accruals(?=\.|$)/, '.interest_accruals')
+    .replace(/\.vf_repayment_settlement(?=\.|$)/, '.repayment_settlement')
+    .replace(/\.vf_dpd(?=\.|$)/, '.dpd')
+    .replace(/\.vf_soa(?=\.|$)/, '.soa');
+};
+
 const permissionsSlice = createSlice({
   name: 'permissions',
   initialState,
@@ -26,17 +42,14 @@ const permissionsSlice = createSlice({
     },
     fetchPermissionsSuccess: (state, action: PayloadAction<string[]>) => {
       const rawPermissions = action.payload || [];
-      
-      // Normalize permissions: Both standard and dealer-finance variants should work
-      // Standard: lms.transactions.xyz
-      // Dealer: lms.products.dealer_finance.transactions.xyz
-      const normalizedPermissions = rawPermissions.map(p => 
-        p.replace('lms.products.dealer_finance.', 'lms.')
-      );
-      
+
+      // Normalize product-specific permission namespaces so the app can keep
+      // checking shared `lms.transactions.*` keys across DF and VF.
+      const normalizedPermissions = rawPermissions.map(normalizePermission);
+
       // Combine unique permissions
       const allPermissions = Array.from(new Set([...rawPermissions, ...normalizedPermissions]));
-      
+
       state.permissions = allPermissions;
       state.canSendMailToBank = allPermissions.includes('lms.transactions.disbursement.action.send_mail_to_bank');
       state.canMarkAsDisbursed = allPermissions.includes('lms.transactions.disbursement.action.mark_as_disbursed');

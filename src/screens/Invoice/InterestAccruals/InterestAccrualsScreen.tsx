@@ -390,7 +390,7 @@ export const InterestAccrualsScreen: React.FC = () => {
                   value: kpisLoading
                     ? '...'
                     : apiKpis?.accrual_vs_expected != null
-                      ? `${Number(apiKpis.accrual_vs_expected).toFixed(2)}%`
+                      ? Number(apiKpis.accrual_vs_expected).toFixed(2)
                       : '-',
                 },
                 {

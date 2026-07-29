@@ -29,6 +29,8 @@ import {
 import { ProgramSelectionState } from '@store/programSelection/programSelection.types';
 import { userSelector } from '@store/user';
 import { AppRole, ROLE_LABELS } from '@constants/roles';
+import {selectEffectiveProductCode} from '@store/product/product.selectors';
+import {PRODUCT_CODES} from '@store/product/product.types';
 import { mapApiToRow, formatDateDash, mapApprovalLogToTimelineStep } from './types';
 import { InvoiceListItemApi } from '@store/invoice/inv.types';
 import { invoiceApi } from '@services/api/invoice.api';
@@ -109,12 +111,15 @@ export function useInvoiceDetails() {
   const isCashnTechUser =
     userRole === 'cashntech_user' ||
     !!(userRole && ROLE_LABELS[userRole] === 'CashnTech User');
+  const effectiveProductCode = useSelector(selectEffectiveProductCode);
   
   const storedUserRole = userRole ? ROLE_LABELS[userRole] : '';
 
   const dealerListTitle =
     isCashnTechUser
       ? 'Invoice'
+      : effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE
+        ? 'Vendor Wise Invoice Details'
       : isDealerMaker || isDealerChecker
         ? 'Anchor Wise Invoice Details'
         : 'Dealer Wise Invoice Details';
@@ -1205,6 +1210,9 @@ export function useInvoiceDetails() {
 
   const programMethod = programSelection?.method;
   const userRoleInternal = programSelection?.role?.toLowerCase().replace(' ', '_');
+  // vendor_maker maps to the same counterparty-maker category as dealer_maker
+  const normalizedRoleInternal =
+    userRoleInternal === 'vendor_maker' ? 'dealer_maker' : userRoleInternal;
 
   let createInvoiceDisabledReason: string | null = null;
 
@@ -1214,8 +1222,8 @@ export function useInvoiceDetails() {
     createInvoiceDisabledReason = "Program is inactive please contact admin";
   } else {
     const isAllowedByMethod =
-      (programMethod === "Pull" && userRoleInternal === "dealer_maker") ||
-      (programMethod === "Push" && userRoleInternal === "anchor_maker");
+      (programMethod === "Pull" && normalizedRoleInternal === "dealer_maker") ||
+      (programMethod === "Push" && normalizedRoleInternal === "anchor_maker");
     if (!isAllowedByMethod) {
       createInvoiceDisabledReason =
         'You are not allowed to create invoice for this method';
@@ -1295,6 +1303,16 @@ export function useInvoiceDetails() {
           pending++;
         }
       } else {
+        const isMakerPendingRow =
+          (isAnchorMaker || isDealerMaker) &&
+          iStatusRaw === 'Created' &&
+          approvalStatus !== 'Pending Attachment' &&
+          approvalStatus !== 'Rejected';
+        if (isMakerPendingRow) {
+          pending++;
+          return;
+        }
+
         const isActionable = canApprove || canReject;
 
         if (typeof row.actionable === 'boolean') {

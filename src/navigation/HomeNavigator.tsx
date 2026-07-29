@@ -4,10 +4,11 @@ import {HomeNavigatorType} from '@type/NavigatorTypes';
 import {scaleWidth} from '@utils/Scale';
 import React, {useEffect} from 'react';
 import {Dimensions} from 'react-native';
-import {useDispatch, useSelector} from 'react-redux';
-import {getIsCashntechUserType} from '@store/user';
+import {useDispatch} from 'react-redux';
 import {fetchUserScopeRequest} from '@store/programSelection/programSelection.slice';
 import {fetchPermissionsRequest} from '@store/permissions';
+import {useHasPermission} from '@hooks/index';
+import {PERMISSIONS} from '@constants/permissions';
 import {
   OcrInvoiceScreen,
   InvoiceDashboard,
@@ -55,7 +56,7 @@ const Drawer = createDrawerNavigator<HomeNavigatorType>();
 
 export const HomeNavigator = () => {
   const dispatch = useDispatch();
-  const canViewReports = useSelector(getIsCashntechUserType);
+  const canViewReports = useHasPermission(PERMISSIONS.REPORTING_ANALYSIS);
   const initialRoute = 'InvoiceDashboard';
 
   // Pre-load user scope and permissions when entering home.

@@ -42,4 +42,16 @@ export const PERMISSIONS = {
   REPAYMENT_SETTLEMENT: 'lms.transactions.repayment_settlement',
   DPD_PENAL_NPA: 'lms.transactions.dpd',
   SOA: 'lms.transactions.soa',
+  REPORTING_ANALYSIS: 'lms.reporting_analysis',
+  REPORT_ALL_LOANS: 'lms.reporting_analysis.all_loans_report',
+  REPORT_DISBURSEMENT: 'lms.reporting_analysis.disbursement_report',
+  REPORT_DPD: 'lms.reporting_analysis.dpd_report',
+  REPORT_DAILY_ACCRUAL: 'lms.reporting_analysis.daily_accrual_report',
+  REPORT_MONTHLY_INTEREST: 'lms.reporting_analysis.monthly_interest_report',
+  REPORT_REPAYMENT: 'lms.reporting_analysis.repayment_report',
+  REPORT_INVOICE_OUTSTANDING: 'lms.reporting_analysis.invoice_outstanding_report',
+  REPORT_LOAN_STATUS: 'lms.reporting_analysis.loan_status_report',
+  REPORT_ALL_PRODUCT_OUTSTANDING:
+    'lms.reporting_analysis.all_product_outstanding_report',
+  REPORT_UTILIZATION: 'lms.reporting_analysis.utilization_report',
 } as const;

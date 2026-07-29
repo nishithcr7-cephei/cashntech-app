@@ -310,11 +310,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
 
       <View style={styles.listHeader}>
         <Text style={styles.listHeaderLabel}>
-          {(isAnchorMaker || isAnchorChecker) 
-            ? 'Dealer Wise Invoice Details' 
-            : (isDealerMaker || isDealerChecker)
-              ? 'Anchor Wise Invoice Details'
-              : 'Invoices'}
+          {dealerListTitle}
         </Text>
         <View style={styles.countBadge}>
           <Text style={styles.countBadgeText}>{invoiceCount}</Text>

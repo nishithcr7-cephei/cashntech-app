@@ -23,7 +23,7 @@ import {useNavigationState} from '@react-navigation/native';
 import {Colors, Fonts, ROLE_HEADER_COLORS} from '@constants/index';
 import {useDispatch, useSelector} from 'react-redux';
 import {Alert} from 'react-native';
-import {getIsCashntechUserType, userSelector} from '@store/user';
+import {userSelector} from '@store/user';
 import {logoutUser} from '@services/api/api';
 import Toast from 'react-native-toast-message';
 import {AppRole, ROLE_LABELS} from '@constants/roles';
@@ -45,16 +45,66 @@ import {useProductSwitcherSheet} from '@hooks/useProductSwitcherSheet';
 import {DrawerTreeMenu, DrawerMenuNode} from './DrawerTreeMenu';
 
 const REPORT_MENU_ITEMS = [
-  {key: 'all-loans', title: 'All Loans Report'},
-  {key: 'disbursement', title: 'Disbursment Report'},
-  {key: 'dpd', title: 'DPD Report'},
-  {key: 'daily-accrual', title: 'Daily Accrual Report'},
-  {key: 'monthly-interest', title: 'Monthly Interest Report'},
-  {key: 'repayment', title: 'Repayment Report'},
-  {key: 'invoice-outstanding', title: 'Invoice Outstanding Report'},
-  {key: 'loan-status', title: 'Loan Status Report'},
-  {key: 'all-product-outstanding', title: 'All Product Outstanding Report'},
-  {key: 'utilization', title: 'Utilization Report'},
+  {
+    key: 'all-loans',
+    title: 'All Loans Report',
+    route: 'AllLoanReportScreen',
+    permission: PERMISSIONS.REPORT_ALL_LOANS,
+  },
+  {
+    key: 'disbursement',
+    title: 'Disbursment Report',
+    route: 'DisbursementReportScreen',
+    permission: PERMISSIONS.REPORT_DISBURSEMENT,
+  },
+  {
+    key: 'dpd',
+    title: 'DPD Report',
+    route: 'DpdReportScreen',
+    permission: PERMISSIONS.REPORT_DPD,
+  },
+  {
+    key: 'daily-accrual',
+    title: 'Daily Accrual Report',
+    route: 'DailyAccrualReportScreen',
+    permission: PERMISSIONS.REPORT_DAILY_ACCRUAL,
+  },
+  {
+    key: 'monthly-interest',
+    title: 'Monthly Interest Report',
+    route: 'MonthlyInterestReportScreen',
+    permission: PERMISSIONS.REPORT_MONTHLY_INTEREST,
+  },
+  {
+    key: 'repayment',
+    title: 'Repayment Report',
+    route: 'RepaymentReportScreen',
+    permission: PERMISSIONS.REPORT_REPAYMENT,
+  },
+  {
+    key: 'invoice-outstanding',
+    title: 'Invoice Outstanding Report',
+    route: 'InvoiceOutstandingReportScreen',
+    permission: PERMISSIONS.REPORT_INVOICE_OUTSTANDING,
+  },
+  {
+    key: 'loan-status',
+    title: 'Loan Status Report',
+    route: 'LoanStatusReportScreen',
+    permission: PERMISSIONS.REPORT_LOAN_STATUS,
+  },
+  {
+    key: 'all-product-outstanding',
+    title: 'All Product Outstanding Report',
+    route: 'AllProductOutstandingReportScreen',
+    permission: PERMISSIONS.REPORT_ALL_PRODUCT_OUTSTANDING,
+  },
+  {
+    key: 'utilization',
+    title: 'Utilization Report',
+    route: 'UtilizationReportScreen',
+    permission: PERMISSIONS.REPORT_UTILIZATION,
+  },
 ] as const;
 
 /** Expand only the active product path: PRODUCTS → product → Transactions (+ route-specific submenus). */
@@ -90,7 +140,6 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const userInfo = useSelector(userSelector.getUserInfo);
   const fullName = useSelector(userSelector.getFullName);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
-  const canViewReports = useSelector(getIsCashntechUserType);
   const activeProductCode = useSelector(selectActiveProductCode);
   const availableProducts = useSelector(selectAvailableProducts);
   const effectiveProductCode = getEffectiveProductCode(activeProductCode);
@@ -158,6 +207,31 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const canViewSOA = useHasPermission(PERMISSIONS.SOA);
   const canViewDPD = useHasPermission(PERMISSIONS.DPD_PENAL_NPA);
   const canViewOverview = useHasPermission(PERMISSIONS.TRANSACTIONS_OVERVIEW);
+  const canViewReports = useHasPermission(PERMISSIONS.REPORTING_ANALYSIS);
+  const canViewAllLoansReport = useHasPermission(PERMISSIONS.REPORT_ALL_LOANS);
+  const canViewDisbursementReport = useHasPermission(
+    PERMISSIONS.REPORT_DISBURSEMENT,
+  );
+  const canViewDpdReport = useHasPermission(PERMISSIONS.REPORT_DPD);
+  const canViewDailyAccrualReport = useHasPermission(
+    PERMISSIONS.REPORT_DAILY_ACCRUAL,
+  );
+  const canViewMonthlyInterestReport = useHasPermission(
+    PERMISSIONS.REPORT_MONTHLY_INTEREST,
+  );
+  const canViewRepaymentReport = useHasPermission(PERMISSIONS.REPORT_REPAYMENT);
+  const canViewInvoiceOutstandingReport = useHasPermission(
+    PERMISSIONS.REPORT_INVOICE_OUTSTANDING,
+  );
+  const canViewLoanStatusReport = useHasPermission(
+    PERMISSIONS.REPORT_LOAN_STATUS,
+  );
+  const canViewAllProductOutstandingReport = useHasPermission(
+    PERMISSIONS.REPORT_ALL_PRODUCT_OUTSTANDING,
+  );
+  const canViewUtilizationReport = useHasPermission(
+    PERMISSIONS.REPORT_UTILIZATION,
+  );
 
   // Get current route (name + params) for highlighting active menu item
   const currentRouteInfo = useNavigationState(state => {
@@ -386,57 +460,28 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
     navigation.navigate(node.route as never);
   };
 
+  const reportPermissionMap: Record<string, boolean> = {
+    'all-loans': canViewAllLoansReport,
+    disbursement: canViewDisbursementReport,
+    dpd: canViewDpdReport,
+    'daily-accrual': canViewDailyAccrualReport,
+    'monthly-interest': canViewMonthlyInterestReport,
+    repayment: canViewRepaymentReport,
+    'invoice-outstanding': canViewInvoiceOutstandingReport,
+    'loan-status': canViewLoanStatusReport,
+    'all-product-outstanding': canViewAllProductOutstandingReport,
+    utilization: canViewUtilizationReport,
+  };
+
   const handleReportPress = (reportKey: string) => {
+    if (!reportPermissionMap[reportKey]) {
+      return;
+    }
     setActiveReportKey(reportKey);
     navigation.closeDrawer();
-
-    if (reportKey === 'all-loans') {
-      navigation.navigate('AllLoanReportScreen');
-      return;
-    }
-
-    if (reportKey === 'disbursement') {
-      navigation.navigate('DisbursementReportScreen');
-      return;
-    }
-
-    if (reportKey === 'dpd') {
-      navigation.navigate('DpdReportScreen');
-      return;
-    }
-
-    if (reportKey === 'daily-accrual') {
-      navigation.navigate('DailyAccrualReportScreen');
-      return;
-    }
-
-    if (reportKey === 'monthly-interest') {
-      navigation.navigate('MonthlyInterestReportScreen');
-      return;
-    }
-
-    if (reportKey === 'repayment') {
-      navigation.navigate('RepaymentReportScreen');
-      return;
-    }
-
-    if (reportKey === 'invoice-outstanding') {
-      navigation.navigate('InvoiceOutstandingReportScreen');
-      return;
-    }
-
-    if (reportKey === 'loan-status') {
-      navigation.navigate('LoanStatusReportScreen');
-      return;
-    }
-
-    if (reportKey === 'all-product-outstanding') {
-      navigation.navigate('AllProductOutstandingReportScreen');
-      return;
-    }
-
-    if (reportKey === 'utilization') {
-      navigation.navigate('UtilizationReportScreen');
+    const report = REPORT_MENU_ITEMS.find(item => item.key === reportKey);
+    if (report?.route) {
+      navigation.navigate(report.route as never);
       return;
     }
 
@@ -561,7 +606,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
               onNavigate={handleMenuNavigate}
             />
 
-            {/* Reporting & Analysis — Cashntech user_type only */}
+            {/* Reporting & Analysis — permission-based, matches web */}
             {canViewReports ? (
               <View style={styles.reportingSection}>
                 <TouchableOpacity
@@ -597,16 +642,23 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                   <View style={styles.reportingSubMenu}>
                     {REPORT_MENU_ITEMS.map(item => {
                       const isActive = activeReportKey === item.key;
+                      const isEnabled = reportPermissionMap[item.key];
                       return (
                         <TouchableOpacity
                           key={item.key}
-                          style={[styles.button, isActive && styles.activeButton]}
+                          style={[
+                            styles.button,
+                            isActive && styles.activeButton,
+                            !isEnabled && styles.disabledMenuItem,
+                          ]}
+                          disabled={!isEnabled}
                           onPress={() => handleReportPress(item.key)}>
                           <Text
                             style={[
                               styles.buttonText,
                               styles.reportingSubMenuText,
                               isActive && styles.activeButtonText,
+                              !isEnabled && styles.disabledMenuItemText,
                             ]}>
                             {item.title}
                           </Text>

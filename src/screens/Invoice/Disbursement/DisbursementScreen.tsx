@@ -282,7 +282,7 @@ export const DisbursementScreen: React.FC = () => {
   const isAnchorMaker = userRole === 'anchor_maker';
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
-  
+
   // Permissions
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canViewDisbursement = useHasPermission(PERMISSIONS.DISBURSEMENT);
@@ -461,7 +461,7 @@ export const DisbursementScreen: React.FC = () => {
       value: `₹ ${pendingDisAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
     },
     {
-      label: 'Repeat Usage Rate',
+      label: 'Repeat Usage Rate %',
       value: formatKpiPercent(apiKpis?.repeat_usage_rate),
     },
     {
@@ -1029,12 +1029,10 @@ export const DisbursementScreen: React.FC = () => {
             </>
           ) : (
             <>
-              {!(isDealerMaker || isDealerChecker) && (
-                <View style={styles.infoColumn}>
-                  <Text style={styles.infoLabel}>Loan Ref No.</Text>
-                  <Text style={styles.infoValue}>{row.loanRefNo}</Text>
-                </View>
-              )}
+              <View style={styles.infoColumn}>
+                <Text style={styles.infoLabel}>Loan Ref No.</Text>
+                <Text style={styles.infoValue}>{row.loanRefNo}</Text>
+              </View>
               {renderInvoiceNoField(row)}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Bank Name</Text>
