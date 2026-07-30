@@ -5,6 +5,7 @@ import {
   Text,
   StyleSheet,
   StyleProp,
+  TextStyle,
   ViewStyle,
   View,
 } from 'react-native';
@@ -17,6 +18,8 @@ type Props = {
   placeholder?: string;
   onChange?: (value: string) => void;
   containerStyle?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>;
+  selectedTextStyle?: StyleProp<TextStyle>;
   dropdownStyle?: StyleProp<ViewStyle>;
   itemContainerStyle?: StyleProp<ViewStyle>;
   showSearch?: boolean;
@@ -33,6 +36,8 @@ export const CustomDropdown = ({
   onChange,
   showSearch = true,
   containerStyle,
+  labelStyle,
+  selectedTextStyle,
   dropdownStyle,
   itemContainerStyle,
   dropdownPosition,
@@ -53,7 +58,7 @@ export const CustomDropdown = ({
 
   return (
     <View style={[styles.container, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && <Text style={[styles.label, labelStyle]}>{label}</Text>}
       <Dropdown
         style={[
           styles.dropdown,
@@ -63,6 +68,7 @@ export const CustomDropdown = ({
         placeholderStyle={styles.placeholderStyle}
         selectedTextStyle={[
           styles.selectedTextStyle,
+          selectedTextStyle,
           !editable && styles.disabledText,
         ]}
         itemTextStyle={styles.itemTextStyle}
@@ -88,7 +94,7 @@ export const CustomDropdown = ({
         )}
         // ✅ Custom render selected item to show label instead of value
         renderSelectedItem={(item) => (
-          <Text style={styles.selectedTextStyle}>
+          <Text style={[styles.selectedTextStyle, selectedTextStyle]}>
             {data.find(d => d.value === item?.value)?.label || placeholder}
           </Text>
         )}

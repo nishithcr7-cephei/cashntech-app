@@ -149,6 +149,12 @@ export const InvoiceUploadPreview: React.FC = () => {
     | DocumentPickerResponse
     | undefined;
   const previewAnchorName = route?.params?.previewAnchorName as string | undefined;
+  const productType =
+    (route?.params?.productType as 'dealer_finance' | 'vendor_finance' | undefined) ||
+    'dealer_finance';
+  const isVendorFinance = productType === 'vendor_finance';
+  const counterpartyLabel = isVendorFinance ? 'Vendor Name' : 'Dealer Name';
+  const counterpartyCodeLabel = isVendorFinance ? 'Vendor Code' : 'Dealer Code';
 
   const invoiceData = useMemo(
     () =>
@@ -183,7 +189,10 @@ export const InvoiceUploadPreview: React.FC = () => {
         <View style={styles.headerTop}>
           <View style={styles.invoiceTitleContainer}>
             <Text style={styles.invoiceTitle}>
-              Invoice / Unique Ref. No - {previewFields?.invoiceNumber || 'N/A'}
+              Invoice / Unique Ref. No -{' '}
+              {previewFields?.invoiceNumber?.trim() ||
+                invoiceData.poRefNo ||
+                'N/A'}
             </Text>
             <View style={styles.titleUnderline} />
           </View>
@@ -204,11 +213,11 @@ export const InvoiceUploadPreview: React.FC = () => {
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Invoice Details</Text>
           <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>Dealer Name</Text>
+            <Text style={styles.keyLabel}>{counterpartyLabel}</Text>
             <Text style={styles.keyValue}>{invoiceData.dealerName || '-'}</Text>
           </View>
           <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>Dealer Code</Text>
+            <Text style={styles.keyLabel}>{counterpartyCodeLabel}</Text>
             <Text style={styles.keyValue}>{invoiceData.dealerCode || '-'}</Text>
           </View>
           <View style={styles.keyValueRow}>

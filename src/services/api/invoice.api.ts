@@ -394,9 +394,13 @@ export const invoiceApi = {
     if (!body || typeof body !== 'object') {
       return body;
     }
+    // Prefer unwrapped `data` rows; fall back to full body for nested parsers.
+    const rawPartyInfo = Array.isArray(body)
+      ? body
+      : (body as {data?: unknown}).data ?? body;
     return {
       ...body,
-      data: normalizeDealerInfoResponse(programId, body),
+      data: normalizeDealerInfoResponse(programId, rawPartyInfo),
     };
   },
 

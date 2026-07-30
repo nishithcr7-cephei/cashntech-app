@@ -20,6 +20,8 @@ import {PERMISSIONS} from '@constants/permissions';
 import {useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
 import {shouldShowCreateInvoice} from '@utils/permissionHelpers';
+import {selectEffectiveProductCode} from '@store/product/product.selectors';
+import {PRODUCT_CODES} from '@store/product/product.types';
 
 type Props = {
   dealerListTitle: string;
@@ -88,7 +90,14 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
 }) => {
   const [showSearchHelp, setShowSearchHelp] = React.useState(false);
   const permissionsLoading = useSelector(selectPermissionsLoading);
-  const canCreateInvoice = useHasPermission(PERMISSIONS.CREATE_INVOICE);
+  const effectiveProductCode = useSelector(selectEffectiveProductCode);
+  const createPermissionKey =
+    effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE
+      ? PERMISSIONS.VF_CREATE_INVOICE
+      : PERMISSIONS.DF_CREATE_INVOICE;
+  const canCreateInvoice =
+    useHasPermission(createPermissionKey) ||
+    useHasPermission(PERMISSIONS.INVOICE_LIST_CREATE);
   const canUploadInvoice = useHasPermission(PERMISSIONS.INVOICE_LIST_IMPORT);
   const canApprove = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVE);
   const canReject = useHasPermission(PERMISSIONS.INVOICE_LIST_REJECT);

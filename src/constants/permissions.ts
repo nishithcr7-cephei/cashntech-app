@@ -27,9 +27,18 @@ export const PERMISSIONS = {
   INVOICE_LIST_REJECT: 'lms.transactions.invoice_list.action.reject',
   INVOICE_LIST_FILTER: 'lms.transactions.invoice_list.action.filter',
   INVOICE_LIST_CREATE: 'lms.transactions.invoice_list.action.create_invoice',
+  DF_CREATE_INVOICE:
+    'lms.products.dealer_finance.transactions.invoice_list.action.create_invoice',
+  VF_CREATE_INVOICE:
+    'lms.products.vendor_finance.vf_transactions.vf_invoice_list.action.create_invoice',
   INVOICE_LIST_ADMIN_VERIFICATION: 'lms.transactions.invoice_list.action.invoice_verification',
   INVOICE_LIST_FINANCE_REQUEST: 'lms.transactions.invoice_list.action.finance_request',
-  INVOICE_LIST_UPLOAD_VERIFY: 'lms.products.dealer_finance.transactions.invoice_list.action.upload_verify',
+  /** DF product-scoped upload/verify (list actions). */
+  INVOICE_LIST_UPLOAD_VERIFY:
+    'lms.products.dealer_finance.transactions.invoice_list.action.upload_verify',
+  /** VF product-scoped upload/verify (list actions). */
+  VF_INVOICE_LIST_UPLOAD_VERIFY:
+    'lms.products.vendor_finance.vf_transactions.vf_invoice_list.action.upload_verify',
   CREATE_INVOICE: 'lms.products.dealer_finance.transactions.invoice_list.action.create_invoice',
   INTEREST_ACCRUALS: 'lms.transactions.interest_accruals',
   INTEREST_ACCRUALS_VIEW_DAILY: 'lms.transactions.interest_accruals.action.view_daily_interest',

@@ -3,6 +3,20 @@ import type {
   DealerInfoResponse,
   PartyBankDetail,
 } from '@store/invoice/inv.types';
+import {decryptValue} from '@utils/decrypt';
+
+function isBankAccountUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    id,
+  );
+}
+
+/** Stable map key: prefer decrypted account number so ENC + plain rows merge. */
+function bankAccountMapKey(accountNumber: string): string {
+  const raw = String(accountNumber ?? '').trim();
+  if (!raw) return '';
+  return (decryptValue(raw) || raw).trim() || raw;
+}
 
 function pick(row: Record<string, unknown>, ...keys: string[]): unknown {
   for (const k of keys) {
@@ -87,6 +101,19 @@ function parseBankAccounts(val: unknown): PartyBankDetail[] {
   return out;
 }
 
+function preferBankDetail(
+  existing: PartyBankDetail | undefined,
+  next: PartyBankDetail,
+): PartyBankDetail {
+  if (!existing) return next;
+  const existingIsUuid = isBankAccountUuid(existing.id);
+  const nextIsUuid = isBankAccountUuid(next.id);
+  // Prefer real bankAccounts.id UUID over account-number fallback ids.
+  if (nextIsUuid && !existingIsUuid) return next;
+  if (existingIsUuid && !nextIsUuid) return existing;
+  return next;
+}
+
 function collectBankDetails(
   row: Record<string, unknown>,
   bankMap: Map<string, PartyBankDetail>,
@@ -96,21 +123,25 @@ function collectBankDetails(
   );
   if (fromAgg.length > 0) {
     for (const b of fromAgg) {
-      // Prefer UUID id when the same account appears with only account-number id
-      const existing = bankMap.get(b.account_number);
-      if (!existing || (existing.id === existing.account_number && b.id !== b.account_number)) {
-        bankMap.set(b.account_number, b);
-      }
+      const key = bankAccountMapKey(b.account_number);
+      if (!key) continue;
+      bankMap.set(key, preferBankDetail(bankMap.get(key), b));
     }
     return;
   }
 
-  // Main DF flat rows: one account_number column per row
+  // Legacy flat rows: one account_number column per row (no bankAccounts agg).
   const account = String(pick(row, 'account_number', 'accountNumber') ?? '').trim();
   if (account) {
-    if (!bankMap.has(account)) {
-      bankMap.set(account, {id: account, account_number: account});
-    }
+    const key = bankAccountMapKey(account);
+    if (!key) return;
+    bankMap.set(
+      key,
+      preferBankDetail(bankMap.get(key), {
+        id: account,
+        account_number: account,
+      }),
+    );
   }
 }
 

@@ -1,4 +1,4 @@
-import React, {useMemo, useState, useEffect, useCallback} from 'react';
+import React, {useMemo, useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -124,6 +124,46 @@ interface ValidationErrors {
   [key: string]: string | undefined;
 }
 
+function isBankAccountUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    id,
+  );
+}
+
+function resolveCreditAccountIdFromOptions(
+  creditTo: string | undefined,
+  options: Array<{label: string; value: string; accountId?: string}>,
+  currentAccountId?: string,
+): string | undefined {
+  const existing = currentAccountId?.trim();
+  if (existing && isBankAccountUuid(existing)) return existing;
+  // Non-UUID leftovers (encrypted/plain account numbers mistakenly stored as
+  // accountId) must not short-circuit — keep resolving against options.
+  const raw = (creditTo || '').trim();
+  if (!raw) {
+    return existing && isBankAccountUuid(existing) ? existing : undefined;
+  }
+  const rawDecrypted = (decryptValue(raw) || raw).trim();
+  const selected = options.find(opt => {
+    const optValue = (opt.value || '').trim();
+    const optLabel = (opt.label || '').trim();
+    const optDecrypted = (decryptValue(optValue) || optValue).trim();
+    return (
+      optValue === raw ||
+      optLabel === raw ||
+      opt.accountId === raw ||
+      optDecrypted === raw ||
+      optValue === rawDecrypted ||
+      optLabel === rawDecrypted ||
+      optDecrypted === rawDecrypted
+    );
+  });
+  const fromOption = selected?.accountId?.trim();
+  if (fromOption && isBankAccountUuid(fromOption)) return fromOption;
+  if (existing && isBankAccountUuid(existing)) return existing;
+  return undefined;
+}
+
 
 
 export const CreateInvoice: React.FC = () => {
@@ -170,32 +210,30 @@ export const CreateInvoice: React.FC = () => {
     }, [dispatch, resetScreenData]),
   );
 
-  // Flush screen data on unmount or when navigating away (back button)
+  // Flush only when leaving Create Invoice for a non-preview route.
+  // Do NOT reset on every focus — returning from camera / document picker
+  // would wipe dealer, dates, invoice no. while items/OCR might remain
+  // (broken Invoice Preview for DF + VF alike).
   useEffect(() => {
-    const unsubscribeFocus = navigation.addListener('focus', () => {
-      // If we are not coming back from preview, ensure we have a fresh state.
-      if (!route.params?.previewReturnToken) {
-        resetScreenData();
-      }
-    });
+    const isPreviewNavigation = (action: any) => {
+      const type = action?.type;
+      const name = action?.payload?.name;
+      return (
+        (type === 'NAVIGATE' || type === 'JUMP_TO') &&
+        name === 'InvoiceUploadPreview'
+      );
+    };
 
     const removeListener = navigation.addListener('beforeRemove', (e) => {
-      // If we are navigating to Preview, do NOT flush data.
-      // We check the action to see where we are going.
-      const action = e.data.action;
-      const isGoingToPreview = action.type === 'NAVIGATE' && (action.payload as any)?.name === 'InvoiceUploadPreview';
-      
-      if (!isGoingToPreview) {
-        // Flush state if leaving the screen (Back button, menu switch, etc.)
+      if (!isPreviewNavigation(e.data.action)) {
         resetScreenData();
       }
     });
 
     return () => {
-      unsubscribeFocus();
       removeListener();
     };
-  }, [navigation, dispatch, route.params?.previewReturnToken, resetScreenData]);
+  }, [navigation, resetScreenData]);
 
   // Handle final flush only when the screen is actually unmounting
   useEffect(() => {
@@ -219,6 +257,9 @@ export const CreateInvoice: React.FC = () => {
   const isDealerChecker = userRole === 'dealer_checker';
 
   const [fields, setFields] = useState<InvoiceFields>(() => getInitialFields());
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const fieldsRef = useRef(fields);
+  fieldsRef.current = fields;
   const [ocrLoading, setOcrLoading] = useState(false);
   const [isOcrPopulated, setIsOcrPopulated] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -241,15 +282,92 @@ export const CreateInvoice: React.FC = () => {
     return code === PRODUCT_CODES.VENDOR_FINANCE ? 'vendor_finance' : 'dealer_finance';
   }, [programSelection?.productName, effectiveProductCode]);
 
+  const creditToOptions = useMemo<CreditToOption[]>(() => {
+    const details =
+      dealerInfo?.bank_details || dealerInfo?.party?.party_bank_details;
+    // Dedupe by decrypted account number; prefer rows with a real UUID
+    // (party-info bankAccounts.id) — required for DF + VF create alike.
+    const byAccount = new Map<string, CreditToOption>();
+    for (const b of details ?? []) {
+      const rawAccount = String((b as any)?.account_number ?? '');
+      const accountNumber = (decryptValue(rawAccount) || rawAccount).trim();
+      if (!accountNumber) continue;
+      const id = (b as any)?.id != null ? String((b as any).id).trim() : '';
+      const accountId = isBankAccountUuid(id)
+        ? id
+        : id && id !== rawAccount && id !== accountNumber
+          ? id
+          : undefined;
+      const next: CreditToOption = {
+        label: accountNumber,
+        value: accountNumber,
+        accountId,
+      };
+      const existing = byAccount.get(accountNumber);
+      if (
+        !existing ||
+        (accountId && isBankAccountUuid(accountId) && !existing.accountId)
+      ) {
+        byAccount.set(accountNumber, next);
+      }
+    }
+    return Array.from(byAccount.values());
+  }, [dealerInfo]);
+
+  // Keep creditToAccountId in sync once bank options load (encrypted/raw
+  // mismatch used to leave UUID empty even when account number was shown).
+  useEffect(() => {
+    if (mode === 'edit' || mode === 'recreate') return;
+    if (!creditToOptions.length) return;
+
+    if (!fields.creditTo?.trim() && creditToOptions.length === 1) {
+      const only = creditToOptions[0];
+      if (only?.value) {
+        setFields(prev => ({
+          ...prev,
+          creditTo: only.value,
+          creditToAccountId: only.accountId,
+        }));
+      }
+      return;
+    }
+
+    const resolved = resolveCreditAccountIdFromOptions(
+      fields.creditTo,
+      creditToOptions,
+      fields.creditToAccountId,
+    );
+    if (resolved && resolved !== fields.creditToAccountId) {
+      setFields(prev => ({...prev, creditToAccountId: resolved}));
+      // Clear stale field error once UUID is linked (same account already shown).
+      setErrors(prev => {
+        if (!prev.creditTo) return prev;
+        const next = {...prev};
+        delete next.creditTo;
+        return next;
+      });
+    }
+  }, [
+    creditToOptions,
+    fields.creditTo,
+    fields.creditToAccountId,
+    mode,
+  ]);
+
   const isFormValid = useMemo(() => {
     const tenorDays = parseInt(String(fields.tenor ?? '').trim(), 10);
     const tenorOk = Number.isFinite(tenorDays) && tenorDays > 0;
+    const resolvedCreditAccountId = resolveCreditAccountIdFromOptions(
+      fields.creditTo,
+      creditToOptions,
+      fields.creditToAccountId,
+    );
     // Unified backend requires credit_to_account_id (UUID) on create for
     // DF + VF alike; edit mode pass-through only, no re-selection needed.
     const creditAccountOk =
       mode === 'edit' ||
       !requiresCreditToAccountId(productType) ||
-      !!fields.creditToAccountId?.trim();
+      !!resolvedCreditAccountId;
     return !!(
       fields.invoiceNumber?.trim() &&
       fields.dealer?.trim() &&
@@ -260,11 +378,12 @@ export const CreateInvoice: React.FC = () => {
       fields.creditTo?.trim() &&
       creditAccountOk
     );
-  }, [fields, mode, productType]);
+  }, [fields, mode, productType, creditToOptions]);
 
   console.log('[CreateInvoice] Render, createInvoiceLoading:', createInvoiceLoading, 'isFormValid:', isFormValid);
-  const [errors, setErrors] = useState<ValidationErrors>({});
   const [selectedParticipant, setSelectedParticipant] = useState<DealerInfoParticipant | null>(null);
+  const selectedParticipantRef = useRef(selectedParticipant);
+  selectedParticipantRef.current = selectedParticipant;
   const [selectedAttachment, setSelectedAttachment] = useState<DocumentPickerResponse | null>(null);
   const disabled = useMemo(
     () => createInvoiceLoading || ocrLoading || permissionsLoading,
@@ -273,13 +392,30 @@ export const CreateInvoice: React.FC = () => {
   const previewFieldsFromRoute: InvoiceFields | undefined = route?.params?.previewFields;
   const previewAttachmentFromRoute: DocumentPickerResponse | undefined = route?.params?.previewAttachment;
   const previewReturnToken: number | undefined = route?.params?.previewReturnToken;
-  
-  const hasCreatePerm = permissions.includes(PERMISSIONS.CREATE_INVOICE);
+
+  const createPermissionKey = useMemo(
+    () =>
+      productType === 'vendor_finance'
+        ? PERMISSIONS.VF_CREATE_INVOICE
+        : PERMISSIONS.DF_CREATE_INVOICE,
+    [productType],
+  );
+  const hasCreatePerm =
+    permissions.includes(createPermissionKey) ||
+    permissions.includes(PERMISSIONS.INVOICE_LIST_CREATE);
   const hasEditPerm = permissions.includes(PERMISSIONS.INVOICE_LIST_EDIT);
   const hasRecreatePerm = permissions.includes(PERMISSIONS.INVOICE_LIST_RECREATE);
-  const hasUploadPerm = permissions.includes(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY);
+  const hasUploadPerm =
+    permissions.includes(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY) ||
+    permissions.includes(PERMISSIONS.VF_INVOICE_LIST_UPLOAD_VERIFY);
   const hasAttachmentPerm = permissions.includes(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
-  const canUploadFinal = hasUploadPerm && hasAttachmentPerm;
+  // Create Invoice must show "Add Attachments" for DF + VF makers so they can
+  // attach the invoice file (web parity). Do not require DF-only
+  // upload_verify ∩ attachment — that hid the button for VF and many DF users.
+  const canUploadFinal =
+    mode === 'edit'
+      ? hasAttachmentPerm || hasUploadPerm
+      : hasCreatePerm || hasAttachmentPerm || hasUploadPerm;
   const [partyTaxOptions, setPartyTaxOptions] = useState<PartyTaxOption[]>([]);
   const isOcrPrerequisitesMet = useMemo(() => {
     const tenorDays = parseInt(String(fields.tenor ?? '').trim(), 10);
@@ -390,7 +526,10 @@ export const CreateInvoice: React.FC = () => {
   const programRoleKey = useMemo(() => {
     const rawRole = programSelection?.role;
     if (!rawRole) return null;
-    return rawRole.toLowerCase().trim().replace(/\s+/g, '_') as AppRole;
+    const normalizedRole = rawRole.toLowerCase().trim().replace(/\s+/g, '_');
+    if (normalizedRole === 'vendor_maker') return 'dealer_maker';
+    if (normalizedRole === 'vendor_checker') return 'dealer_checker';
+    return normalizedRole as AppRole;
   }, [programSelection?.role]);
 
   // Method-based access control: Push-Pull logic
@@ -739,8 +878,13 @@ export const CreateInvoice: React.FC = () => {
     }
   }, [fields.currency]);
 
-  // Validation function
-  const validateField = (fieldName: keyof InvoiceFields, value: any): string | undefined => {
+  // Validation function. Optional fieldState lets applyPatch validate against
+  // the in-flight merged fields (creditTo + creditToAccountId same patch).
+  const validateField = (
+    fieldName: keyof InvoiceFields,
+    value: any,
+    fieldState: InvoiceFields = fields,
+  ): string | undefined => {
     switch (fieldName) {
       case 'odAccountNumber':
         if (programSelection?.method?.toLowerCase() === 'pull' && !value?.trim()) {
@@ -789,10 +933,15 @@ export const CreateInvoice: React.FC = () => {
           return 'Credit To is required';
         }
         // Unified backend requires credit_to_account_id (UUID) on create.
+        // Use fieldState so a same-patch creditToAccountId is not ignored.
         if (
           mode !== 'edit' &&
           requiresCreditToAccountId(productType) &&
-          !fields.creditToAccountId?.trim()
+          !resolveCreditAccountIdFromOptions(
+            String(value || ''),
+            creditToOptions,
+            fieldState.creditToAccountId,
+          )
         ) {
           return 'Please select a valid Credit To account from the list';
         }
@@ -938,10 +1087,21 @@ export const CreateInvoice: React.FC = () => {
       const newErrors = {...errors};
       Object.keys(patch).forEach(key => {
         const fieldName = key as keyof InvoiceFields;
-        const error = validateField(fieldName, updated[fieldName]);
+        const error = validateField(fieldName, updated[fieldName], updated);
         if (error) newErrors[fieldName] = error;
         else delete newErrors[fieldName];
       });
+      // Selecting Credit To also sets creditToAccountId — re-check creditTo
+      // so a prior "valid account" error clears once UUID is linked.
+      if (
+        patch.creditToAccountId !== undefined &&
+        patch.creditTo === undefined &&
+        updated.creditTo
+      ) {
+        const creditErr = validateField('creditTo', updated.creditTo, updated);
+        if (creditErr) newErrors.creditTo = creditErr;
+        else delete newErrors.creditTo;
+      }
       setErrors(newErrors);
       return updated;
     });
@@ -949,17 +1109,58 @@ export const CreateInvoice: React.FC = () => {
 
   const openUploadPreview = useCallback(
     (previewFields: InvoiceFields, previewAttachment: DocumentPickerResponse) => {
+      const participant = selectedParticipantRef.current;
+      // Snapshot + fill gaps from selected participant so preview never shows
+      // empty dealer/OD when the form had them (DF + VF alike).
+      const dealerFromParticipant =
+        decryptValue(participant?.party?.entity_name ?? '') ||
+        participant?.party?.entity_name ||
+        '';
+      const codeFromParticipant =
+        decryptValue(participant?.company_code ?? '') ||
+        participant?.company_code ||
+        decryptValue(participant?.company_code_given_by_party ?? '') ||
+        participant?.company_code_given_by_party ||
+        '';
+      const odFromParticipant =
+        decryptValue(participant?.od_account_no ?? '') ||
+        participant?.od_account_no ||
+        '';
+
+      const snapshot: InvoiceFields = {
+        ...previewFields,
+        items: (previewFields.items || []).map(item => ({
+          ...item,
+          taxes: item.taxes ? item.taxes.map(t => ({...t})) : undefined,
+        })),
+        dealer: previewFields.dealer?.trim() || dealerFromParticipant,
+        dealerCode: previewFields.dealerCode?.trim() || codeFromParticipant,
+        odAccountNumber:
+          previewFields.odAccountNumber?.trim() || odFromParticipant,
+      };
+
       (navigation as any).navigate('InvoiceUploadPreview', {
-        previewFields,
+        previewFields: snapshot,
         previewAttachment,
         previewAnchorName:
           decryptValue(dealerInfo?.party?.entity_name ?? '') ||
           dealerInfo?.party?.entity_name ||
           '',
+        productType,
       });
     },
-    [navigation, dealerInfo?.party?.entity_name],
+    [navigation, dealerInfo?.party?.entity_name, productType],
   );
+
+  const handleProofUploadFile = async (
+    file: DocumentPickerResponse | undefined,
+  ) => {
+    if (!file) return;
+    setSelectedAttachment(file);
+    // Always read latest form via ref — avoids stale empty header fields
+    // after camera/picker briefly blurred this screen.
+    openUploadPreview(fieldsRef.current, file);
+  };
 
   const openCamera = async () => {
     const ok = await ensureCameraPermission();
@@ -1088,14 +1289,6 @@ export const CreateInvoice: React.FC = () => {
       return;
     }
     await runOcrAndPatchForm(file.uri);
-  };
-  
-  const handleProofUploadFile = async (
-    file: DocumentPickerResponse | undefined,
-  ) => {
-    if (!file) return;
-    setSelectedAttachment(file);
-    openUploadPreview(fields, file);
   };
     
   const handleSubmit = async () => {
@@ -1264,12 +1457,14 @@ export const CreateInvoice: React.FC = () => {
       }
 
       // Golden rule: credit_to_account_id is required on create for DF + VF
-      // alike on the unified backend. validateForm(true) above already
-      // blocks this via the 'creditTo' field check — this is a final guard.
-      if (
-        requiresCreditToAccountId(productType) &&
-        !fields.creditToAccountId?.trim()
-      ) {
+      // alike on the unified backend. Resolve UUID from selected account
+      // number when dropdown showed a value but accountId wasn't synced.
+      const resolvedCreditToAccountId = resolveCreditAccountIdFromOptions(
+        fields.creditTo,
+        creditToOptions,
+        fields.creditToAccountId,
+      );
+      if (requiresCreditToAccountId(productType) && !resolvedCreditToAccountId) {
         Toast.show({
           type: 'error',
           text1: 'Please select a valid Credit To account from the list',
@@ -1288,7 +1483,10 @@ export const CreateInvoice: React.FC = () => {
       try {
         dispatch(
           createInvoiceRequest({
-            fields,
+            fields: {
+              ...fields,
+              creditToAccountId: resolvedCreditToAccountId,
+            },
             createdBy,
             partnerBank: String(partnerBankId || ''),
             program: String(programSelection?.programId || ''),
@@ -1303,7 +1501,7 @@ export const CreateInvoice: React.FC = () => {
             counterPartyCode: String(selectedParticipant?.company_code || ''),
             counterPartyOdAccount: String(selectedParticipant?.od_account_no || ''),
             attachment: selectedAttachment ?? undefined,
-            creditToAccountId: fields.creditToAccountId?.trim() || undefined,
+            creditToAccountId: resolvedCreditToAccountId,
           }),
         );
         console.log('[CreateInvoice] createInvoiceRequest dispatch was successful');
@@ -1434,7 +1632,8 @@ export const CreateInvoice: React.FC = () => {
       const actionType = e?.data?.action?.type;
       const targetRouteName = e?.data?.action?.payload?.name;
       const isGoingToPreview =
-        actionType === 'NAVIGATE' && targetRouteName === 'InvoiceUploadPreview';
+        (actionType === 'NAVIGATE' || actionType === 'JUMP_TO') &&
+        targetRouteName === 'InvoiceUploadPreview';
       if (!isGoingToPreview) {
         dispatch(setProgramScope('all'));
         InteractionManager.runAfterInteractions(() => {
@@ -1444,7 +1643,7 @@ export const CreateInvoice: React.FC = () => {
     });
 
     return unsubscribe;
-  }, [navigation, resetCreateInvoiceForm]);
+  }, [navigation, resetCreateInvoiceForm, dispatch]);
 
   // Handle Android hardware back button
   useFocusEffect(
@@ -1487,7 +1686,11 @@ export const CreateInvoice: React.FC = () => {
     if (!fields.creditTo?.trim()) return 'Credit To is required';
     if (
       requiresCreditToAccountId(productType) &&
-      !fields.creditToAccountId?.trim()
+      !resolveCreditAccountIdFromOptions(
+        fields.creditTo,
+        creditToOptions,
+        fields.creditToAccountId,
+      )
     ) {
       return 'Please select a valid Credit To account from the list';
     }
@@ -1499,6 +1702,9 @@ export const CreateInvoice: React.FC = () => {
        if (!item.itemName?.trim()) return `Item ${i + 1}: Item Name is required`;
        if (!item.quantity?.trim() || parseFloat(item.quantity) <= 0) return `Item ${i + 1}: Valid Quantity is required`;
        if (!item.unit?.trim()) return `Item ${i + 1}: Unit is required`;
+      if (!/^[A-Z]{1,3}$/.test(item.unit.trim().toUpperCase())) {
+        return `Item ${i + 1}: Unit must be 1 to 3 letters like PCS or BOX`;
+      }
        if (!item.pricePerQuantity?.trim() || parseFloat(item.pricePerQuantity) <= 0) return `Item ${i + 1}: Valid Price is required`;
     }
 
@@ -1506,7 +1712,7 @@ export const CreateInvoice: React.FC = () => {
       return 'Please upload the invoice file';
     }
     return undefined;
-  }, [fields, canUploadFinal, hasAnyAttachment, mode, productType]);
+  }, [fields, canUploadFinal, hasAnyAttachment, mode, productType, creditToOptions]);
 
   const dealerOptions = useMemo(
     () =>
@@ -1514,21 +1720,6 @@ export const CreateInvoice: React.FC = () => {
         label: decryptValue(p.party.entity_name ?? '') || p.party.entity_name,
         value: p.party.entity_name,
       })) ?? [],
-    [dealerInfo],
-  );
-  const creditToOptions = useMemo<CreditToOption[]>(
-    () => {
-      // Use bank_details from party root if available
-      const details =
-        dealerInfo?.bank_details || dealerInfo?.party?.party_bank_details;
-      return details?.map((b: any) => ({
-        label: decryptValue(b.account_number ?? '') || b.account_number,
-        value: b.account_number,
-        // Bank account UUID from party-info bankAccounts.id — sent as
-        // credit_to_account_id on submit (required, DF + VF alike).
-        accountId: b.id && b.id !== b.account_number ? String(b.id) : undefined,
-      })) ?? [];
-    },
     [dealerInfo],
   );
   const tenorOptions = useMemo(() => {

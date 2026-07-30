@@ -37,6 +37,10 @@ export type PartyTaxOption = {
   percentage: number;
 };
 
+function normalizeUnitInput(value: string): string {
+  return value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 3);
+}
+
 const emptyFields: InvoiceFields = {
   dealer: '',
   dealerCode: '',
@@ -360,7 +364,9 @@ export const InvoiceForm: React.FC<Props> = ({
         taxes: [{taxType: '', taxPercentage: '', taxAmount: ''}],
       };
     }
-    newItems[index] = {...newItems[index], [field]: text};
+    const normalizedText =
+      field === 'unit' ? normalizeUnitInput(text) : text;
+    newItems[index] = {...newItems[index], [field]: normalizedText};
     
     // Auto-calculate line total (qty * price)
     const qty = parseFloat(newItems[index].quantity) || 0;
@@ -391,14 +397,14 @@ export const InvoiceForm: React.FC<Props> = ({
     }
     newItems[index].discountAmount = discountAmount.toFixed(2);
     
-    // Auto-calculate item-level taxes on (Sub Total - Discount), matching Web Portal logic
-    const discountedPrice = Math.max(0, lineTotal - discountAmount);
+    // Web currently calculates tax on the item subtotal before discount.
+    const taxableBase = lineTotal;
     
     const rawTaxes = newItems[index].taxes?.length ? newItems[index].taxes! : (newItems[index].taxType ? [{taxType: newItems[index].taxType!, taxPercentage: newItems[index].taxPercentage || '', taxAmount: newItems[index].taxAmount || ''}] : []);
     const taxes = rawTaxes.map(t => ({...t}));
     taxes.forEach((t, i) => {
       const pct = parseFloat(t.taxPercentage || '0') || 0;
-      taxes[i] = {...t, taxAmount: roundToTwo((discountedPrice * pct) / 100).toFixed(2)};
+      taxes[i] = {...t, taxAmount: roundToTwo((taxableBase * pct) / 100).toFixed(2)};
     });
     newItems[index].taxes = taxes.length ? taxes : [{taxType: '', taxPercentage: '', taxAmount: ''}];
     newItems[index].taxAmount = roundToTwo(taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0)).toFixed(2);
@@ -413,14 +419,12 @@ export const InvoiceForm: React.FC<Props> = ({
     const taxes = [...(item.taxes?.length ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}])];
     if (!taxes[taxIndex]) taxes[taxIndex] = {taxType: '', taxPercentage: '', taxAmount: ''};
     taxes[taxIndex] = {...taxes[taxIndex], [field]: fieldValue};
-    // Tax is calculated on (Sub Total - Discount), matching Web Portal logic
+    // Web currently calculates tax on the item subtotal before discount.
     const itemSubTotal = parseFloat(item.total) || 0;
-    const itemDiscAmount = parseFloat(item.discountAmount || '0') || 0;
-    const discountedPrice = Math.max(0, itemSubTotal - itemDiscAmount);
 
     taxes.forEach((t, i) => {
       const pct = parseFloat(t.taxPercentage || '0') || 0;
-      taxes[i] = {...t, taxAmount: roundToTwo((discountedPrice * pct) / 100).toFixed(2)};
+      taxes[i] = {...t, taxAmount: roundToTwo((itemSubTotal * pct) / 100).toFixed(2)};
     });
     newItems[itemIndex] = {...item, taxes};
     newItems[itemIndex].taxAmount = roundToTwo(taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0)).toFixed(2);
@@ -454,14 +458,12 @@ export const InvoiceForm: React.FC<Props> = ({
     taxes[taxIndex] = {...taxes[taxIndex], taxType: taxName, taxPercentage: pct};
 
     const itemSubTotal = parseFloat(item.total) || 0;
-    const itemDiscAmount = parseFloat(item.discountAmount || '0') || 0;
-    const discountedPrice = Math.max(0, itemSubTotal - itemDiscAmount);
 
     taxes.forEach((t, i) => {
       const taxPct = parseFloat(t.taxPercentage || '0') || 0;
       taxes[i] = {
         ...t,
-        taxAmount: roundToTwo((discountedPrice * taxPct) / 100).toFixed(2),
+        taxAmount: roundToTwo((itemSubTotal * taxPct) / 100).toFixed(2),
       };
     });
     newItems[itemIndex] = {...item, taxes};
@@ -491,14 +493,12 @@ export const InvoiceForm: React.FC<Props> = ({
       onDeleteItemTax(itemIndex, taxIndex);
       return;
     }
-    // Tax is calculated on (Sub Total - Discount), matching Web Portal logic
+    // Web currently calculates tax on the item subtotal before discount.
     const itemSubTotalForRemove = parseFloat(item.total) || 0;
-    const itemDiscAmountForRemove = parseFloat(item.discountAmount || '0') || 0;
-    const discountedPrice = Math.max(0, itemSubTotalForRemove - itemDiscAmountForRemove);
 
     taxesFiltered.forEach((t, i) => {
       const pct = parseFloat(t.taxPercentage || '0') || 0;
-      taxesFiltered[i] = {...t, taxAmount: roundToTwo((discountedPrice * pct) / 100).toFixed(2)};
+      taxesFiltered[i] = {...t, taxAmount: roundToTwo((itemSubTotalForRemove * pct) / 100).toFixed(2)};
     });
     newItems[itemIndex] = {...item, taxes: taxesFiltered, taxAmount: roundToTwo(taxesFiltered.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0)).toFixed(2)};
     onChange({items: newItems});
@@ -573,7 +573,7 @@ export const InvoiceForm: React.FC<Props> = ({
               <View style={styles.readOnlyFieldContainer}>
                 <Text style={styles.label}>{`${entityCodeLabel} *`}</Text>
                 <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
-                  <Text style={styles.readOnlyText} numberOfLines={1}>
+                  <Text style={styles.emphasisValueText} numberOfLines={1}>
                     {value.dealerCode || '-'}
                   </Text>
                 </View>
@@ -585,6 +585,7 @@ export const InvoiceForm: React.FC<Props> = ({
                 value={value.dealerCode}
                 onChange={set('dealerCode')}
                 placeholder={entityCodeLabel}
+                selectedTextStyle={styles.emphasisValueText}
                 containerStyle={styles.dropdownContainer}
                 editable={!dealerOptions || !dealerOptions.length}
               />
@@ -598,7 +599,7 @@ export const InvoiceForm: React.FC<Props> = ({
             <View style={styles.readOnlyFieldContainer}>
               <Text style={styles.label}>{entityODLabel}</Text>
               <View style={[styles.dropdownContainer, styles.readOnlyBox]}>
-                <Text style={styles.readOnlyText} numberOfLines={1}>
+                <Text style={styles.emphasisValueText} numberOfLines={1}>
                   {value.odAccountNumber || '-'}
                 </Text>
               </View>
@@ -610,6 +611,7 @@ export const InvoiceForm: React.FC<Props> = ({
               value={value.odAccountNumber}
               onChange={set('odAccountNumber')}
               placeholder="Select Acc. No"
+              selectedTextStyle={styles.emphasisValueText}
               containerStyle={styles.dropdownContainer}
               editable={!dealerOptions || !dealerOptions.length}
             />
@@ -814,11 +816,19 @@ export const InvoiceForm: React.FC<Props> = ({
                   data={creditToData}
                   value={value.creditTo}
                   onChange={(accountNumber) => {
-                    const selected = creditToData.find(
-                      opt => opt.value === accountNumber,
-                    );
+                    const selected = creditToData.find(opt => {
+                      const optValue = (opt.value || '').trim();
+                      const optLabel = (opt.label || '').trim();
+                      const raw = String(accountNumber || '').trim();
+                      return (
+                        optValue === raw ||
+                        optLabel === raw ||
+                        opt.accountId === raw
+                      );
+                    });
                     onChange({
-                      creditTo: accountNumber,
+                      creditTo: selected?.value || accountNumber,
+                      // Prefer UUID from the matched option (DF + VF alike).
                       creditToAccountId: selected?.accountId || undefined,
                     });
                   }}
@@ -943,7 +953,7 @@ export const InvoiceForm: React.FC<Props> = ({
                     data={[
                       {label: 'None', value: ''},
                       {label: 'Percentage', value: 'percentage'},
-                      {label: 'Value', value: 'value'},
+                      {label: 'Absolute', value: 'value'},
                     ]}
                     value={item.discountType || ''}
                     onChange={(val) => updateItem(index, 'discountType', val)}
@@ -1416,9 +1426,12 @@ export const InvoiceForm: React.FC<Props> = ({
                   ? 'Dealer Code is required'
                   : !value.invoiceDate?.trim()
                   ? 'Invoice Date is required'
-                  : !value.creditTo?.trim()
+                  : mode !== 'edit' &&
+                    !value.creditTo?.trim()
                   ? 'Credit To is required'
-                  : mode !== 'edit' && !value.creditToAccountId?.trim()
+                  : mode !== 'edit' &&
+                    value.creditTo?.trim() &&
+                    !value.creditToAccountId?.trim()
                   ? 'Please select a valid Credit To account from the list'
                   : !value.items || value.items.length === 0
                   ? 'Please add at least one item'
@@ -1576,6 +1589,10 @@ const styles = StyleSheet.create({
     color: '#555',
     minHeight: 20,
     lineHeight: 20,
+  },
+  emphasisValueText: {
+    fontWeight: '700',
+    color: Colors.darkblack,
   },
   input: {
     borderWidth: 1,

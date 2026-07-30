@@ -114,6 +114,7 @@ export type HomeNavigatorType = {
     previewFields?: import('./Invoice').InvoiceFields;
     previewAttachment?: import('@react-native-documents/picker').DocumentPickerResponse;
     previewAnchorName?: string;
+    productType?: 'dealer_finance' | 'vendor_finance';
   };
   DealerInvoiceDetailsScreen: {
     dealerName?: string;
