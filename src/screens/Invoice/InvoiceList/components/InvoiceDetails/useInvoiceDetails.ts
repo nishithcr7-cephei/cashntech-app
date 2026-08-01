@@ -37,9 +37,13 @@ import { invoiceApi } from '@services/api/invoice.api';
 import { useHasPermission } from '@hooks/useHasPermission';
 import { PERMISSIONS } from '@constants/permissions';
 import { decryptValue } from '@utils/decrypt';
-import { mapInvoiceAttachmentsWithUrls, type InvoiceAttachmentItem } from '@utils/invoiceAttachments';
+import { formatApiInvoiceDate } from '@utils/invoiceDateFormat';
+import { mapInvoiceAttachmentsWithUrls, buildInvoiceAttachmentUrl, type InvoiceAttachmentItem } from '@utils/invoiceAttachments';
 import type { WorkflowStep } from '@components/InvoiceTrackingModal/InvoiceTrackingModal';
-import type { ApproveRejectInvoiceDetails } from '@components/ApproveRejectModal/ApproveRejectModal';
+import type {
+  ApproveRejectInvoiceDetails,
+  ApproveRejectInvoiceItem,
+} from '@components/ApproveRejectModal/ApproveRejectModal';
 import {
   getBestWorkflowApprovalLevelFromScope,
   getInvoiceApprovalLevel,
@@ -310,7 +314,7 @@ export function useInvoiceDetails() {
   );
 
   useEffect(() => {
-    if ((!isAnchorChecker && !isCashnTechUser) || !showApproveRejectModal || !selectedInvoiceId) {
+    if (!showApproveRejectModal || !selectedInvoiceId) {
       setAnchorCheckerInvoiceDetails(null);
       return;
     }
@@ -326,6 +330,7 @@ export function useInvoiceDetails() {
         })();
         const apm = data?.anchorParticipantMapping;
         const party = data?.party;
+        const program = data?.program;
         const rawDealerName =
           apm?.party?.entity_name ??
           apm?.party?.name ??
@@ -342,6 +347,7 @@ export function useInvoiceDetails() {
           party?.entity_name ??
           party?.name ??
           data?.primary_party_name ??
+          program?.program_name ??
           '';
         const anchorName =
           decryptValue(rawAnchorName) ||
@@ -349,50 +355,161 @@ export function useInvoiceDetails() {
           selectedListRow?.primaryParty ||
           '-';
 
-        const invoiceDate = data?.invoice_date
-          ? formatDateDash(data.invoice_date)
-          : selectedListRow?.invoiceDate || 'DD / MM / YYYY';
-        const invoiceDueDate = data?.invoice_due_date
-          ? formatDateDash(data.invoice_due_date)
-          : selectedListRow?.dueDate || 'DD / MM / YYYY';
-        const totalAmount = data?.final_total ?? data?.sub_total;
-        const invoiceAmount =
-          totalAmount != null
-            ? `Rs. ${Number(totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /-`
-            : selectedListRow?.invoiceAmount || 'Rs. 0 /-';
-        const programName = data?.program?.program_name || '';
+        const partyCode =
+          apm?.company_code_given_by_party ??
+          selectedListRow?.dealerCode ??
+          '';
+        const odAccountNumber =
+          decryptValue(apm?.od_account_no ?? '') || apm?.od_account_no || '';
 
-        // getInvoiceDetails API only returns {id, program_name} — no bank_details.
-        // Fall back to the raw invoice list (already in Redux) to get bank_details.
+        const invoiceDate =
+          formatApiInvoiceDate(data?.invoice_date) ||
+          (data?.invoice_date ? formatDateDash(data.invoice_date) : '') ||
+          selectedListRow?.invoiceDate ||
+          '';
+        const invoiceDueDate =
+          formatApiInvoiceDate(data?.invoice_due_date) ||
+          (data?.invoice_due_date ? formatDateDash(data.invoice_due_date) : '') ||
+          selectedListRow?.dueDate ||
+          '';
+        const grnDate = formatApiInvoiceDate(data?.grn_date) || '';
+        const paymentDate = formatApiInvoiceDate(data?.payment_date) || '';
+        const poRefNo =
+          data?.po_ref_no != null && String(data.po_ref_no).trim() !== ''
+            ? String(data.po_ref_no)
+            : '';
+        const tenorDays =
+          data?.tenor != null && data?.tenor !== ''
+            ? String(Math.round(Number(data.tenor)))
+            : '';
+
+        const subTotalAmount = Number(data?.sub_total) || 0;
+        const discountAmount = Number(data?.discount_total) || 0;
+        const taxAmount = Number(data?.tax_total) || 0;
+        const advanceInterest = Number(data?.upfront_interest) || 0;
+        const totalAmount = Number(data?.final_total ?? data?.sub_total) || 0;
+        const invoiceAmount =
+          totalAmount > 0
+            ? `Rs. ${totalAmount.toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })} /-`
+            : selectedListRow?.invoiceAmount || 'Rs. 0 /-';
+        const programNameFromApi = program?.program_name || '';
+
+        // Prefer creditToBankAccount; fall back to list/program bank_details.
         const rawInvoice = invoiceListRaw.find((inv: any) => inv.id === selectedInvoiceId);
         const bankDetails =
-          rawInvoice?.program?.bank_details?.[0] ??
-          data?.program?.bank_details?.[0];
-
-        const rawAccNumber =
-          bankDetails?.account_number ??
+          data?.creditToBankAccount?.accountNumber ??
+          (Array.isArray(program?.bank_details)
+            ? program?.bank_details?.[0]?.account_number
+            : program?.bank_details?.account_number) ??
+          rawInvoice?.program?.bank_details?.[0]?.account_number ??
           data?.credit_to ??
           '';
-        const decryptedAcc = rawAccNumber ? decryptValue(rawAccNumber) : '';
+        const rawAccNumber = bankDetails || '';
+        const decryptedAcc = rawAccNumber ? decryptValue(String(rawAccNumber)) : '';
+        const creditTo =
+          (decryptedAcc && decryptedAcc !== String(rawAccNumber)
+            ? decryptedAcc
+            : rawAccNumber
+              ? String(rawAccNumber)
+              : '') || '';
 
         let creditAccountNumber = '-';
-        if (decryptedAcc && decryptedAcc !== rawAccNumber && programName) {
-          creditAccountNumber = `(${decryptedAcc}) ${programName}`;
-        } else if (decryptedAcc && decryptedAcc !== rawAccNumber) {
-          creditAccountNumber = decryptedAcc;
-        } else if (rawAccNumber) {
-          creditAccountNumber = String(rawAccNumber);
-        } else if (programName) {
-          creditAccountNumber = programName;
+        if (creditTo && programNameFromApi) {
+          creditAccountNumber = `(${creditTo}) ${programNameFromApi}`;
+        } else if (creditTo) {
+          creditAccountNumber = creditTo;
+        } else if (programNameFromApi) {
+          creditAccountNumber = programNameFromApi;
         }
+
+        const items: ApproveRejectInvoiceItem[] = (data?.invoiceItems || []).map(
+          (it: any, idx: number) => {
+            const lineTotal = Number(it.total) || 0;
+            const lineDiscount = Number(it.discount_amount) || 0;
+            const taxes = Array.isArray(it.taxes) ? it.taxes : [];
+            const lineTaxAmount = taxes.reduce(
+              (sum: number, t: any) => sum + (Number(t.tax_amount) || 0),
+              0,
+            );
+            const taxType = taxes[0]?.tax_type || 'Tax';
+            const taxPercent = taxes[0]?.tax_percentage ?? 0;
+            const taxLabel =
+              taxes.length > 0 ? `(${taxType}) (${taxPercent}%)` : '-';
+            const qty = Number(it.quantity) || 0;
+            const price = Number(it.price_per_quantity) || 0;
+            const gross = qty * price;
+            const discountPercent =
+              it.discount_type === 'Percentage' && it.discount_value != null
+                ? Number(it.discount_value) || 0
+                : gross > 0
+                  ? (lineDiscount / gross) * 100
+                  : 0;
+
+            return {
+              id: it.id || `item-${idx}`,
+              itemName: it.name ?? '-',
+              description: it.description ?? '',
+              quantity: qty,
+              unit: String(it.unit ?? '-'),
+              price,
+              discountAmount: lineDiscount,
+              discountPercent,
+              taxAmount: lineTaxAmount,
+              taxLabel,
+              total: lineTotal,
+            };
+          },
+        );
+
+        const attachments = (() => {
+          const fromApi = data?.attachment ?? data?.attachments;
+          if (Array.isArray(fromApi) && fromApi.length > 0) {
+            return fromApi
+              .map((a: any, idx: number) => {
+                const attachment_url = String(
+                  a?.attachment_url ?? a?.attachmentUrl ?? '',
+                ).trim();
+                const existingFull = String(a?.fullUrl ?? '').trim();
+                const sourcePath = attachment_url || existingFull;
+                if (!sourcePath) return null;
+                return {
+                  id: Number(a?.id) || idx,
+                  attachment_url: attachment_url || existingFull,
+                  fullUrl: buildInvoiceAttachmentUrl(sourcePath) || existingFull,
+                };
+              })
+              .filter(Boolean) as InvoiceAttachmentItem[];
+          }
+          return mapInvoiceAttachmentsWithUrls(data);
+        })();
 
         setAnchorCheckerInvoiceDetails({
           dealerName,
           anchorName,
+          partyCode,
+          odAccountNumber,
+          creditTo,
           creditAccountNumber,
           invoiceDate,
           invoiceDueDate,
+          grnDate,
+          paymentDate,
+          poRefNo,
+          tenorDays,
           invoiceAmount,
+          subTotal: invoiceAmount,
+          subTotalAmount,
+          discountAmount,
+          taxAmount,
+          advanceInterest,
+          totalAmount,
+          finalPayableAmount: invoiceAmount,
+          finalDueDate: invoiceDueDate,
+          items,
+          attachments,
         });
       })
       .catch(() => {
@@ -404,7 +521,7 @@ export function useInvoiceDetails() {
     return () => {
       cancelled = true;
     };
-  }, [isAnchorChecker, isCashnTechUser, showApproveRejectModal, selectedInvoiceId, invoiceListRaw]);
+  }, [showApproveRejectModal, selectedInvoiceId, invoiceListRaw]);
 
   useEffect(() => {
     if (!showCheckerApprovalModal || !selectedInvoiceId) {
@@ -613,10 +730,17 @@ export function useInvoiceDetails() {
         setAnchorCheckerInvoiceDetails({
           dealerName: rowForAction?.dealerName || rowForAction?.counterParty || '-',
           anchorName: rowForAction?.primaryParty || '-',
+          partyCode: rowForAction?.dealerCode || '',
           creditAccountNumber: rowForAction?.creditAccountNumber || '-',
-          invoiceDate: rowForAction?.invoiceDate || 'DD / MM / YYYY',
-          invoiceDueDate: rowForAction?.dueDate || 'DD / MM / YYYY',
+          creditTo: rowForAction?.creditAccountNumber || '-',
+          invoiceDate: rowForAction?.invoiceDate || '',
+          invoiceDueDate: rowForAction?.dueDate || '',
+          finalDueDate: rowForAction?.dueDate || '',
           invoiceAmount: rowForAction?.invoiceAmount || 'Rs. 0 /-',
+          subTotal: rowForAction?.invoiceAmount || '-',
+          finalPayableAmount: rowForAction?.invoiceAmount || '-',
+          items: [],
+          attachments: [],
         });
         setSelectedInvoiceId(invoiceId);
         setSelectedInvoiceNo(invoiceNo);
@@ -626,9 +750,11 @@ export function useInvoiceDetails() {
         setAnchorCheckerInvoiceDetails({
           dealerName: rowForAction?.dealerName || rowForAction?.counterParty || '-',
           anchorName: rowForAction?.primaryParty || '-',
+          partyCode: rowForAction?.dealerCode || '',
           creditAccountNumber: rowForAction?.creditAccountNumber || '-',
-          invoiceDate: rowForAction?.invoiceDate || 'DD / MM / YYYY',
-          invoiceDueDate: rowForAction?.dueDate || 'DD / MM / YYYY',
+          creditTo: rowForAction?.creditAccountNumber || '-',
+          invoiceDate: rowForAction?.invoiceDate || '',
+          invoiceDueDate: rowForAction?.dueDate || '',
           invoiceAmount: rowForAction?.invoiceAmount || 'Rs. 0 /-',
         });
         setSelectedInvoiceId(invoiceId);
@@ -636,6 +762,9 @@ export function useInvoiceDetails() {
         setShowApproveRejectModal(true);
         break;
       case 'financeRequest': {
+        if (isCashnTechUser) {
+          break;
+        }
         const runFinanceRequestPreview = async () => {
           setFinanceRequestInvoiceId(invoiceId);
           setSelectedInvoiceId(invoiceId);
@@ -691,17 +820,19 @@ export function useInvoiceDetails() {
     setFinanceRequestInvoiceId(null);
   }, [financeRequestSubmitting]);
 
-  const submitFinanceRequest = useCallback(async () => {
-    if (!financeRequestInvoiceId || financeRequestSubmitting || financeRequestLoading) {
-      return;
-    }
-    setFinanceRequestSubmitting(true);
-    try {
-      const res = await invoiceApi.submitWorkflowStatusAction({
-        invoiceId: financeRequestInvoiceId,
-        action: 'Finance Request',
-        remark: '-',
-      });
+  const submitFinanceRequest = useCallback(
+    async (payload: {preferredDisbursementDate: string}) => {
+      if (!financeRequestInvoiceId || financeRequestSubmitting || financeRequestLoading) {
+        return;
+      }
+      setFinanceRequestSubmitting(true);
+      try {
+        const res = await invoiceApi.submitWorkflowStatusAction({
+          invoiceId: financeRequestInvoiceId,
+          action: 'Finance Request',
+          remark: '-',
+          preferredDisbursementDate: payload.preferredDisbursementDate,
+        });
       if (res?.statusCode === 200 || res?.status === 200) {
         Toast.show({
           type: 'success',
@@ -979,7 +1110,11 @@ export function useInvoiceDetails() {
     }
   };
 
-  const onApproveRejectApprove = (invoiceId: string, remarks?: string) => {
+  const onApproveRejectApprove = (
+    invoiceId: string,
+    remarks?: string,
+    grnDate?: string,
+  ) => {
     if (!canApprove) {
       Toast.show({
         type: 'error',
@@ -994,6 +1129,7 @@ export function useInvoiceDetails() {
         action: 'Approve',
         approvalLevel: resolveApprovalLevelForInvoice(invoiceId),
         remark: remarks,
+        grnDate,
         programId,
         filters: apiFilters,
       }),
@@ -1004,7 +1140,11 @@ export function useInvoiceDetails() {
     setAnchorCheckerInvoiceDetails(null);
   };
 
-  const onApproveRejectReject = (invoiceId: string, remarks?: string) => {
+  const onApproveRejectReject = (
+    invoiceId: string,
+    remarks?: string,
+    grnDate?: string,
+  ) => {
     // Maker/checker workflow reject uses PATCH /invoice/status (same as approve); web often grants only approve permission.
     if (!canReject && !canApprove) {
       Toast.show({
@@ -1020,6 +1160,7 @@ export function useInvoiceDetails() {
         action: 'Reject',
         approvalLevel: resolveApprovalLevelForInvoice(invoiceId),
         remark: remarks,
+        grnDate,
         programId,
         filters: apiFilters,
       }),
@@ -1075,6 +1216,30 @@ export function useInvoiceDetails() {
       updateInvoiceVerificationRequest({
         invoiceId,
         action: 'Reject',
+        remark: remarks,
+        programId,
+        filters: apiFilters,
+      }),
+    );
+    setShowApproveRejectModal(false);
+    setSelectedInvoiceId(null);
+    setSelectedInvoiceNo(null);
+    setAnchorCheckerInvoiceDetails(null);
+  };
+
+  const onVerifyHold = (invoiceId: string, remarks?: string) => {
+    if (!canVerify) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission to update invoice verification.',
+      });
+      return;
+    }
+    dispatch(
+      updateInvoiceVerificationRequest({
+        invoiceId,
+        action: 'On Hold',
         remark: remarks,
         programId,
         filters: apiFilters,
@@ -1407,6 +1572,7 @@ export function useInvoiceDetails() {
     selectedInvoiceDetails,
     anchorCheckerInvoiceDetails,
     anchorCheckerDetailsLoading,
+    effectiveProductCode,
     showAttachmentModal,
     setShowAttachmentModal,
     attachmentFallback,
@@ -1431,6 +1597,7 @@ export function useInvoiceDetails() {
     onApproveRejectReject,
     onVerifyApprove,
     onVerifyReject,
+    onVerifyHold,
     onBulkApply,
     handleBulkReviewSubmit,
     getMenuPosition,
@@ -1445,6 +1612,9 @@ export function useInvoiceDetails() {
     selectedInvoiceRawInvoiceStatus: selectedRowForMenu?.rawInvoiceStatus,
     selectedInvoiceActionable: selectedRowForMenu?.actionable,
     selectedInvoiceApprovalLogsCount: selectedRowForMenu?.approvalLogsCount || 0,
+    selectedInvoiceCurrentStepSequenceNo:
+      selectedRowForMenu?.currentStepSequenceNo ?? null,
+    selectedInvoiceProgramMethod: programSelection?.method ?? null,
     userDepartment,
     storedUserRole,
     userInfoFull,

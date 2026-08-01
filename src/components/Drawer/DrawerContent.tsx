@@ -26,7 +26,7 @@ import {Alert} from 'react-native';
 import {userSelector} from '@store/user';
 import {logoutUser} from '@services/api/api';
 import Toast from 'react-native-toast-message';
-import {AppRole, ROLE_LABELS} from '@constants/roles';
+import {AppRole} from '@constants/roles';
 import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
 import {selectPermissionsLoading} from '@store/permissions';
@@ -140,6 +140,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const userInfo = useSelector(userSelector.getUserInfo);
   const fullName = useSelector(userSelector.getFullName);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
+  const roleLabel = useSelector(userSelector.getUserRoleLabel);
   const activeProductCode = useSelector(selectActiveProductCode);
   const availableProducts = useSelector(selectAvailableProducts);
   const effectiveProductCode = getEffectiveProductCode(activeProductCode);
@@ -194,9 +195,6 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
 
   // Show Loan Accounts for Dealer Maker only (removed dealer_checker)
   const showLoanAccounts = isDealerMaker;
-
-  // Use shared role labels so all roles (including dealer_checker) are supported
-  const roleLabel = userRole ? ROLE_LABELS[userRole] : '';
 
   // Permissions
   const permissionsLoading = useSelector(selectPermissionsLoading);

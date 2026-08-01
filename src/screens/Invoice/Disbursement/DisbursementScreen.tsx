@@ -1350,9 +1350,7 @@ export const DisbursementScreen: React.FC = () => {
         invoiceNo={
           filteredData.find(item => item.id === selectedDisbursementId)?.invoiceNo
         }
-        programName={
-          filteredData.find(item => item.id === selectedDisbursementId)?.programName
-        }
+        productCode={getEffectiveProductCode(activeProductCode)}
         onSubmit={async data => {
           if (!selectedDisbursementId) return;
           try {

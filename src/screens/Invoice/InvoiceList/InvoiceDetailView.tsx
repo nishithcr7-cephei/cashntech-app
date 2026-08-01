@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Linking,
   Alert,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
@@ -24,7 +23,7 @@ import {invoiceApi} from '@services/api/invoice.api';
 import {formatStatus} from './components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
-import {mapInvoiceAttachmentsWithUrls} from '@utils/invoiceAttachments';
+import {mapInvoiceAttachmentsWithUrls, openInvoiceAttachment} from '@utils/invoiceAttachments';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 
 const fmtAmount = (n: number) =>
@@ -372,7 +371,7 @@ export const InvoiceDetailView: React.FC = () => {
 
   const openAttachment = async (fullUrl: string) => {
     try {
-      await Linking.openURL(fullUrl);
+      await openInvoiceAttachment(fullUrl);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to open attachment');
     }

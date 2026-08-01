@@ -1,5 +1,7 @@
 import {createSelector} from '@reduxjs/toolkit';
 import {RootState} from '@store/app/store';
+import {ROLE_LABELS, type AppRole} from '@constants/roles';
+import {getCapabilityLabel} from '@utils/roleNormalizer';
 
 const _selectState = (state: RootState) => state.user;
 
@@ -22,6 +24,21 @@ const getUserRole = createSelector(
 export const getUserCapability = createSelector(
   _selectState,
   (user) => user.capability ?? null,
+);
+
+/**
+ * Display label that preserves Vendor vs Dealer.
+ * Prefer capability (keeps "Vendor Maker"); fall back to legacy ROLE_LABELS.
+ */
+export const getUserRoleLabel = createSelector(
+  getUserCapability,
+  getUserRole,
+  (capability, appRole) => {
+    if (capability) {
+      return getCapabilityLabel(capability);
+    }
+    return appRole ? ROLE_LABELS[appRole as AppRole] : '';
+  },
 );
 
 const getIsClient = createSelector(
@@ -52,6 +69,7 @@ export default {
   getFullName,
   getUserRole,
   getUserCapability,
+  getUserRoleLabel,
   getIsClient,
   getIsCashntechUserType,
   getPrimaryPermissionGroupId,

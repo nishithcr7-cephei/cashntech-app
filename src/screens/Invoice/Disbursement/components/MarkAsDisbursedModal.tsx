@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   Modal,
   View,
@@ -9,22 +9,30 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
+import moment from 'moment';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
-import {DateNTimePicker, CustomDropdown} from '@components/index';
+import {DateNTimePicker} from '@components/index';
 import {invoiceApi} from '@services/api/invoice.api';
 import Toast from 'react-native-toast-message';
 import {decryptValue} from '@utils/decrypt';
+import {
+  PRODUCT_CODES,
+  PRODUCT_DISPLAY_NAMES,
+  type ProductCode,
+} from '@store/product/product.types';
+import {getEffectiveProductCode} from '@store/product/product.resolver';
 
 type MarkAsDisbursedModalProps = {
   visible: boolean;
   onClose: () => void;
   invoiceId?: string;
-  invoiceAmount?: string;
   invoiceNo?: string;
-  programName?: string;
+  invoiceAmount?: string;
+  productCode?: string | null;
   onSubmit?: (data: {
     debitFrom: string;
     creditTo: string;
@@ -40,142 +48,286 @@ type MarkAsDisbursedModalProps = {
   }) => void | Promise<void>;
 };
 
-const accountOptionsFallback = [
-  {label: 'Select Account No', value: ''},
-];
+const DATE_FORMATS = ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'] as const;
 
-const statusOptions = [
-  {label: 'Disbursed', value: 'Disbursed'},
-  {label: 'Hold', value: 'Hold'},
-  {label: 'Reject', value: 'Reject'},
-];
+const actionOptions = ['Disbursed', 'Hold', 'Reject'] as const;
+type DisbursementAction = (typeof actionOptions)[number];
 
-const holdCategoryOptions = [
-  {label: 'Verification Pending', value: 'Verification Pending'},
-  {label: 'Insufficient Funds', value: 'Insufficient Funds'},
-  {label: 'KYC Issue', value: 'KYC Issue'},
-  {label: 'Other', value: 'Other'},
-];
+function dash(value?: string | number | null): string {
+  if (value == null) return '-';
+  const s = String(value).trim();
+  return s ? s : '-';
+}
+
+function formatAmount(value?: string | number | null): string {
+  if (value == null || value === '') return '-';
+  const n = Number(value);
+  if (Number.isNaN(n)) return String(value);
+  return n.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatPercent(value?: string | number | null): string {
+  if (value == null || value === '') return '-';
+  const n = Number(value);
+  if (Number.isNaN(n)) return String(value);
+  return n % 1 === 0 ? String(n) : n.toFixed(2);
+}
+
+function formatDateDDMMYYYY(value?: string | null): string {
+  if (!value) return '-';
+  const m = moment(String(value).trim(), DATE_FORMATS, true);
+  if (m.isValid()) return m.format('DD-MM-YYYY');
+  try {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    return moment(d).format('DD-MM-YYYY');
+  } catch {
+    return String(value);
+  }
+}
+
+function resolveProductCode(
+  productCode?: string | null,
+  previewProductName?: string | null,
+): ProductCode {
+  const fromProp = getEffectiveProductCode(productCode ?? null);
+  if (productCode) return fromProp;
+  const name = (previewProductName || '').toLowerCase();
+  if (name.includes('vendor')) return PRODUCT_CODES.VENDOR_FINANCE;
+  if (name.includes('dealer')) return PRODUCT_CODES.DEALER_FINANCE;
+  return fromProp;
+}
+
+function DetailRow({
+  label,
+  value,
+  emphasize,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text
+        style={[styles.detailValue, emphasize && styles.detailValueEmphasize]}
+        numberOfLines={3}>
+        {value}
+      </Text>
+    </View>
+  );
+}
 
 export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   visible,
   onClose,
   invoiceId,
-  invoiceAmount = '15,556',
   invoiceNo,
-  programName,
+  invoiceAmount,
+  productCode,
   onSubmit,
 }) => {
-  const [accountOptions, setAccountOptions] = useState<{label: string; value: string}[]>(accountOptionsFallback);
-  const [accountsLoading, setAccountsLoading] = useState(false);
-  const [debitFrom, setDebitFrom] = useState('');
-  const [creditTo, setCreditTo] = useState('');
-  const [disbursedAmount, setDisbursedAmount] = useState(invoiceAmount || '10,000');
-  const [status, setStatus] = useState('');
+  const insets = useSafeAreaInsets();
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [preview, setPreview] = useState<any>(null);
+
+  const [disbursementAction, setDisbursementAction] =
+    useState<DisbursementAction | ''>('');
+  const [actionDropdownOpen, setActionDropdownOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const [disbursedAmount, setDisbursedAmount] = useState('');
   const [date, setDate] = useState('');
   const [utrNo, setUtrNo] = useState('');
-  const [remark, setRemark] = useState('');
   const [transactionNo, setTransactionNo] = useState('');
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [holdCategory, setHoldCategory] = useState('');
-  const [expectedReleaseDate, setExpectedReleaseDate] = useState('');
+  const [remark, setRemark] = useState('');
+
+  const [debitFrom, setDebitFrom] = useState('');
+  const [creditTo, setCreditTo] = useState('');
 
   useEffect(() => {
-    if (visible) {
-      setDebitFrom('');
-      setCreditTo('');
-      setDisbursedAmount(invoiceAmount || '0.00');
-      setStatus('');
-      setDate('');
-      setUtrNo('');
-      setRemark('');
-      setTransactionNo('');
-      setRejectionReason('');
-      setHoldCategory('');
-      setExpectedReleaseDate('');
-    }
-  }, [visible, invoiceAmount]);
-
-  useEffect(() => {
-    // Clear specific fields when swapping statuses to avoid dirty data
-    if (status !== 'Disbursed') {
-      setUtrNo('');
-      setTransactionNo('');
-      setDate('');
-    }
-    if (status !== 'Hold') {
-      setHoldCategory('');
-      setExpectedReleaseDate('');
-    }
-    if (status === 'Disbursed') {
-      setRejectionReason('');
-      setHoldCategory('');
-    }
-  }, [status]);
-
-  useEffect(() => {
-    if (visible && invoiceId) {
-      setAccountsLoading(true);
-      invoiceApi
-        .getBankAccountsForDisbursement(invoiceId)
-        .then((data: any) => {
-          const d = data?.data ?? data;
-          const opts: {label: string; value: string}[] = [];
-          const apm = d?.anchorParticipantMapping ?? d?.anchor_participant_mapping;
-          const apmObj = Array.isArray(apm) ? apm[0] : apm;
-          const odAccount = apmObj?.od_account_no ?? apmObj?.odAccountNo ?? '';
-          const entityName = apmObj?.party?.entity_name ?? apmObj?.Party?.entityName ?? '';
-
-          if (odAccount) {
-            // Debit From remains the OD account according to previous roll-back
-            const decryptedOd = decryptValue(odAccount);
-            const displayDebitLabel = entityName ? `${decryptedOd} (${entityName})` : decryptedOd;
-            setDebitFrom(displayDebitLabel);
-          }
-
-          const program = d?.program ?? d?.Program;
-          const apiProgramName = program?.program_name ?? program?.programName ?? '';
-          const finalProgName = programName || apiProgramName; // Prioritize prop from list
-          const programBankDetails = program?.bank_details ?? [];
-          const programAcc = Array.isArray(programBankDetails) && programBankDetails.length > 0 
-                             ? programBankDetails[0]?.account_number ?? programBankDetails[0]?.accountNumber ?? '' 
-                             : '';
-
-          if (programAcc) {
-            // Credit To is now based on Program details
-            const decryptedPg = decryptValue(programAcc);
-            const displayCreditLabel = finalProgName ? `${decryptedPg} (${finalProgName})` : decryptedPg;
-            setCreditTo(displayCreditLabel);
-          }
-        })
-        .catch((err: any) => {
-          setAccountOptions(accountOptionsFallback);
-          Alert.alert(
-            'Bank accounts not found',
-            err?.message || 'Bank accounts not found for this invoice. Please configure party bank details / OD account in backend.',
-          );
-        })
-        .finally(() => setAccountsLoading(false));
-    }
+    if (!visible) return;
+    setDisbursementAction('');
+    setActionDropdownOpen(false);
+    setActionError(null);
+    setDisbursedAmount('');
+    setDate('');
+    setUtrNo('');
+    setTransactionNo('');
+    setRemark('');
+    setPreview(null);
+    setDebitFrom('');
+    setCreditTo('');
   }, [visible, invoiceId]);
 
+  useEffect(() => {
+    if (!visible || !invoiceId) return;
+    let cancelled = false;
+    setPreviewLoading(true);
+    invoiceApi
+      .getFinanceRequestPreview(invoiceId)
+      .then((res: any) => {
+        if (cancelled) return;
+        const data = res?.data ?? res?.result ?? res ?? {};
+        setPreview(data);
+
+        const apm = data?.anchorParticipantMapping ?? {};
+        const odRaw = apm.od_account_no ?? '';
+        const odDisplay = decryptValue(String(odRaw)) || String(odRaw);
+        setDebitFrom(odDisplay);
+
+        const creditAcc =
+          data?.credit_to_bank_account?.accountNumber ??
+          data?.credit_to ??
+          '';
+        const creditName =
+          data?.credit_to_bank_account?.nameAsPerBank ??
+          data?.anchor_name ??
+          '';
+        const decryptedAcc = creditAcc ? decryptValue(String(creditAcc)) : '';
+        const accLabel = decryptedAcc || String(creditAcc);
+        const creditLabel = creditName
+          ? `${accLabel} (${decryptValue(String(creditName)) || creditName})`
+          : accLabel;
+        setCreditTo(creditLabel);
+
+        const defaultAmt =
+          data?.eligible_loan_amount ??
+          data?.requested_loan_amount ??
+          data?.final_total ??
+          data?.invoice_amount ??
+          invoiceAmount?.replace(/[,\s₹/-]/g, '') ??
+          '';
+        const amtNum = Number(defaultAmt);
+        setDisbursedAmount(
+          !Number.isNaN(amtNum) && amtNum > 0
+            ? String(amtNum)
+            : invoiceAmount?.replace(/[,\s₹/-]/g, '') || '0',
+        );
+      })
+      .catch((err: any) => {
+        if (cancelled) return;
+        Toast.show({
+          type: 'error',
+          text1: 'Failed to load disbursement details',
+          text2:
+            err?.response?.data?.message ||
+            err?.message ||
+            'Could not load invoice preview',
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, invoiceId, invoiceAmount]);
+
+  useEffect(() => {
+    if (disbursementAction === 'Disbursed') {
+      setDate(moment().format('DD-MM-YYYY'));
+    } else {
+      setUtrNo('');
+      setTransactionNo('');
+      setDate('');
+    }
+  }, [disbursementAction]);
+
+  const todayStart = moment().startOf('day').toDate();
+  const todayEnd = moment().endOf('day').toDate();
+  const todayDisplay = moment().format('DD-MM-YYYY');
+
+  const effectiveCode = resolveProductCode(
+    productCode,
+    preview?.program?.productConfig?.product?.name ??
+      preview?.product?.name ??
+      null,
+  );
+  const productDisplayName = PRODUCT_DISPLAY_NAMES[effectiveCode];
+  const invoiceLabel = invoiceNo || preview?.invoice_ref_no || invoiceId || 'N/A';
+  const modalSubtitle = `${invoiceLabel} · ${productDisplayName}`;
+
+  const display = useMemo(() => {
+    const p = preview ?? {};
+    const vendorRaw = p.vendor_name ?? p.anchorParticipantMapping?.party?.entity_name ?? '';
+    const anchorRaw = p.anchor_name ?? p.program?.party?.entity_name ?? '';
+    const creditAcc =
+      p.credit_to_bank_account?.accountNumber ?? p.credit_to ?? '';
+    const creditName =
+      p.credit_to_bank_account?.nameAsPerBank ?? anchorRaw ?? '';
+    const decryptedAcc = creditAcc ? decryptValue(String(creditAcc)) : '';
+    const accLabel = decryptedAcc || String(creditAcc);
+    const creditDisplay = accLabel
+      ? creditName
+        ? `${accLabel} (${decryptValue(String(creditName)) || creditName})`
+        : accLabel
+      : '-';
+
+    return {
+      primaryParty: dash(decryptValue(vendorRaw) || vendorRaw),
+      counterParty: dash(decryptValue(anchorRaw) || anchorRaw),
+      requestDate: formatDateDDMMYYYY(
+        p.preferred_disbursement_requested_at ??
+          p.request_date ??
+          p.invoice_date ??
+          null,
+      ),
+      grnDate: formatDateDDMMYYYY(p.grn_date ?? null),
+      dueDate: formatDateDDMMYYYY(p.due_date ?? p.invoice_due_date ?? null),
+      eligibleLoanAmount: formatAmount(p.eligible_loan_amount),
+      eligibility:
+        p.eligibility_percent != null
+          ? `${formatPercent(p.eligibility_percent)}%`
+          : '-',
+      creditToAccount: creditDisplay,
+      requestedDisbursementDate: formatDateDDMMYYYY(
+        p.preferred_disbursement_date ?? null,
+      ),
+      advanceInterest: formatAmount(
+        p.upfront_interest_amount ?? p.upfront_interest ?? 0,
+      ),
+      status: dash(p.status ?? p.invoice_status),
+    };
+  }, [preview]);
+
+  const handleClose = () => {
+    setDisbursementAction('');
+    setActionDropdownOpen(false);
+    setActionError(null);
+    onClose();
+  };
+
   const handleSubmit = async () => {
+    if (!disbursementAction) {
+      setActionError('Please select a disbursement action');
+      return;
+    }
+    setActionError(null);
+
     const amount = (disbursedAmount || '').replace(/[,\s₹]/g, '').trim();
-    if (!debitFrom) {
-      Toast.show({type: 'error', text1: 'Debit From is required'});
-      return;
-    }
-    if (!amount) {
-      Toast.show({type: 'error', text1: 'Disbursed Amount is required'});
-      return;
-    }
-    if (!status) {
-      Toast.show({type: 'error', text1: 'Status is required'});
-      return;
-    }
-    if (status === 'Disbursed') {
+    if (disbursementAction === 'Disbursed') {
+      if (!debitFrom) {
+        Toast.show({type: 'error', text1: 'Debit account is required'});
+        return;
+      }
+      if (!amount) {
+        Toast.show({type: 'error', text1: 'Disburse amount is required'});
+        return;
+      }
       if (!date) {
-        Toast.show({type: 'error', text1: 'Date is required'});
+        Toast.show({type: 'error', text1: 'Disbursement date is required'});
+        return;
+      }
+      if (date !== todayDisplay) {
+        Toast.show({
+          type: 'error',
+          text1: 'Disbursement date must be today',
+        });
         return;
       }
       if (!utrNo.trim()) {
@@ -188,76 +340,31 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       }
     }
 
-    if (status === 'Hold') {
-      if (!holdCategory) {
-        Toast.show({type: 'error', text1: 'Hold Category is required'});
-        return;
-      }
-      if (!expectedReleaseDate) {
-        Toast.show({type: 'error', text1: 'Expected Release Date is required'});
-        return;
-      }
+    if (disbursementAction === 'Reject' && !remark.trim()) {
+      Toast.show({type: 'error', text1: 'Remark is required for rejection'});
+      return;
     }
+
     if (onSubmit) {
       await onSubmit({
         debitFrom,
         creditTo,
         disbursedAmount: disbursedAmount.trim(),
-        status,
-        date: status === 'Disbursed' ? date : status === 'Hold' ? expectedReleaseDate : '',
-        utrNo: status === 'Disbursed' ? utrNo.trim() : '',
-        remark: (status === 'Hold' || status === 'Disbursed' || status === 'Reject') ? remark.trim() : '',
-        transactionNo: status === 'Disbursed' ? transactionNo.trim() : '',
-        rejectionReason: status === 'Reject' ? remark.trim() : '',
-        holdCategory,
-        expectedReleaseDate,
+        status: disbursementAction,
+        date: disbursementAction === 'Disbursed' ? todayDisplay : '',
+        utrNo: disbursementAction === 'Disbursed' ? utrNo.trim() : '',
+        remark: remark.trim(),
+        transactionNo: disbursementAction === 'Disbursed' ? transactionNo.trim() : '',
+        rejectionReason: disbursementAction === 'Reject' ? remark.trim() : '',
       });
     }
     handleClose();
   };
 
-  const getSubmitButtonStyle = () => {
-    if (!status) return {backgroundColor: Colors.graybase, opacity: 0.5};
-    
-    // Check missing mandatory fields per status
-    let isMissing = false;
-    if (status === 'Disbursed') {
-      if (!date || !utrNo.trim() || !transactionNo.trim() || !debitFrom) isMissing = true;
-    } else if (status === 'Reject') {
-      if (!remark.trim()) isMissing = true;
-    } else if (status === 'Hold') {
-      if (!holdCategory || !expectedReleaseDate) isMissing = true;
-    }
-
-    const baseColor = status === 'Disbursed' ? Colors.green : 
-                     status === 'Reject' ? Colors.red : 
-                     status === 'Hold' ? Colors.Yellow : Colors.graybase;
-
-    return {
-      backgroundColor: isMissing ? Colors.graybase : baseColor,
-      opacity: isMissing ? 0.6 : 1
-    };
-  };
-
   const isSubmitDisabled =
-    !status ||
-    (status === 'Disbursed' &&
+    !disbursementAction ||
+    (disbursementAction === 'Disbursed' &&
       (!date || !utrNo.trim() || !transactionNo.trim() || !disbursedAmount));
-
-  const handleClose = () => {
-    setDebitFrom('');
-    setCreditTo('');
-    setDisbursedAmount('0.00');
-    setStatus('');
-    setDate('');
-    setUtrNo('');
-    setRemark('');
-    setTransactionNo('');
-    setRejectionReason('');
-    setHoldCategory('');
-    setExpectedReleaseDate('');
-    onClose();
-  };
 
   return (
     <Modal
@@ -266,199 +373,262 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       animationType="fade"
       onRequestClose={handleClose}>
       <TouchableWithoutFeedback onPress={handleClose}>
-        <View style={styles.overlay}>
+        <View
+          style={[
+            styles.overlay,
+            {paddingTop: insets.top, paddingBottom: insets.bottom},
+          ]}>
           <TouchableWithoutFeedback onPress={() => {}}>
             <View style={styles.modalContainer}>
-              {/* Header - Invoice No */}
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitleBold}>Invoice No: {invoiceNo || '-'}</Text>
-              </View>
-
-              {/* Content */}
-              <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                nestedScrollEnabled>
-                {/* Details Section - First view */}
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionHeaderText}>Details</Text>
-                </View>
-                <View style={styles.tableContainer}>
-                  {/* Invoice Amount - read-only */}
-                  <View style={styles.tableRow}>
-                    <View style={styles.detailColumn}>
-                      <Text style={styles.detailLabel}>Invoice Amount</Text>
-                    </View>
-                    <View style={styles.amountColumn}>
-                      <TextInput
-                        style={[styles.input, styles.readOnlyInput]}
-                        value={invoiceAmount ? `₹ ${invoiceAmount}` : ''}
-                        editable={false}
-                        placeholderTextColor={Colors.graybase}
-                      />
-                    </View>
-                  </View>
-
-                  {/* Debit From - Decoded Label */}
-                  <View style={styles.tableRow}>
-                    <View style={styles.detailColumn}>
-                      <Text style={styles.detailLabel}>Debit From</Text>
-                    </View>
-                    <View style={styles.amountColumn}>
-                      <Text style={styles.infoValueText}>{decryptValue(debitFrom) || '-'}</Text>
-                    </View>
-                  </View>
-
-                  {/* Credit To - Combined String (Already Decrypted) */}
-                  <View style={styles.tableRow}>
-                    <View style={styles.detailColumn}>
-                      <Text style={styles.detailLabel}>Credit To</Text>
-                    </View>
-                    <View style={styles.amountColumn}>
-                      <Text style={styles.infoValueText}>{creditTo || '-'}</Text>
-                    </View>
-                  </View>
-
-                  {/* Status Selection */}
-                  <View style={styles.tableRow}>
-                    <View style={styles.detailColumn}>
-                      <Text style={styles.detailLabel}>Status</Text>
-                    </View>
-                    <View style={styles.amountColumn}>
-                      <CustomDropdown
-                        label=""
-                        data={statusOptions}
-                        value={status}
-                        onChange={setStatus}
-                        placeholder="Select status"
-                        containerStyle={styles.dropdownContainer}
-                        showSearch={false}
-                      />
-                    </View>
-                  </View>
-                </View>
-
-                {/* Disbursement Specific Details */}
-                {status === 'Disbursed' && (
-                  <>
-                    <View style={[styles.sectionHeader, {marginTop: scaleHeight(16)}]}>
-                      <Text style={styles.sectionHeaderText}>Disbursement Details</Text>
-                    </View>
-                    <View style={styles.tableContainer}>
-                      <View style={styles.tableRow}>
-                        <View style={styles.detailColumn}>
-                          <Text style={styles.detailLabel}>Disburse Amount <Text style={styles.required}>*</Text></Text>
-                        </View>
-                        <View style={styles.amountColumn}>
-                          <TextInput
-                            style={styles.input}
-                            value={disbursedAmount}
-                            onChangeText={setDisbursedAmount}
-                            keyboardType="numeric"
-                            placeholder="0.00"
-                            placeholderTextColor={Colors.graybase}
-                          />
-                        </View>
-                      </View>
-                      <View style={styles.tableRow}>
-                        <View style={styles.detailColumn}>
-                          <Text style={styles.detailLabel}>Disburse Date <Text style={styles.required}>*</Text></Text>
-                        </View>
-                        <View style={styles.amountColumn}>
-                          <DateNTimePicker
-                            label=""
-                            mode="date"
-                            value={date}
-                            datePickerProps={{maximumDate: new Date()}} // Restricted to Today or Past
-                            onConfirm={(selectedDate: Date) => {
-                              const day = String(selectedDate.getDate()).padStart(2, '0');
-                              const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
-                              const year = selectedDate.getFullYear();
-                              setDate(`${day}-${month}-${year}`);
-                            }}
-                            placeholder="DD-MM-YYYY"
-                            containerStyle={styles.datePickerContainer}
-                          />
-                        </View>
-                      </View>
-                      <View style={styles.tableRow}>
-                        <View style={styles.detailColumn}>
-                          <Text style={styles.detailLabel}>Enter UTR No <Text style={styles.required}>*</Text></Text>
-                        </View>
-                        <View style={styles.amountColumn}>
-                          <TextInput
-                            style={styles.input}
-                            value={utrNo}
-                            onChangeText={setUtrNo}
-                            placeholder="Bank Ref No"
-                            placeholderTextColor={Colors.graybase}
-                          />
-                        </View>
-                      </View>
-                      <View style={styles.tableRow}>
-                        <View style={styles.detailColumn}>
-                          <Text style={styles.detailLabel}>Enter Transaction No <Text style={styles.required}>*</Text></Text>
-                        </View>
-                        <View style={styles.amountColumn}>
-                          <TextInput
-                            style={styles.input}
-                            value={transactionNo}
-                            onChangeText={setTransactionNo}
-                            placeholder="Internal Ref No"
-                            placeholderTextColor={Colors.graybase}
-                          />
-                        </View>
-                      </View>
-                    </View>
-                  </>
-                )}
-
-                {/* Remarks Field - Very Bottom Placement */}
-                {(status === 'Disbursed' || status === 'Hold' || status === 'Reject') && (
-                  <>
-                    <View style={[styles.sectionHeader, {marginTop: scaleHeight(16)}]}>
-                      <Text style={styles.sectionHeaderText}>Final Remarks</Text>
-                    </View>
-                    <View style={styles.tableContainer}>
-                      <View style={[styles.tableRow, {borderBottomWidth: 0}]}>
-                        <View style={styles.detailColumn}>
-                          <Text style={styles.detailLabel}>Remarks</Text>
-                        </View>
-                        <View style={styles.amountColumn}>
-                          <TextInput
-                            style={[styles.input, {height: scaleHeight(80), textAlignVertical: 'top'}]}
-                            value={remark}
-                            onChangeText={setRemark}
-                            placeholder="Enter any final comments..."
-                            placeholderTextColor={Colors.graybase}
-                            multiline
-                          />
-                        </View>
-                      </View>
-                    </View>
-                  </>
-                )}
-              </ScrollView>
-
-              {/* Action Buttons */}
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.cancelButton]}
-                  onPress={handleClose}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.submitButton, getSubmitButtonStyle()]}
-                  disabled={isSubmitDisabled}
-                  onPress={handleSubmit}>
-                  <Text style={styles.submitButtonText}>
-                    {status === 'Reject' ? 'Reject' : status === 'Hold' ? 'Hold Transaction' : 'Submit'}
+                <View style={styles.modalHeaderText}>
+                  <Text style={styles.modalTitle}>Disbursement Details</Text>
+                  <Text style={styles.modalSubtitle} numberOfLines={2}>
+                    {modalSubtitle}
                   </Text>
+                  <View
+                    style={[
+                      styles.productBadge,
+                      effectiveCode === PRODUCT_CODES.VENDOR_FINANCE
+                        ? styles.productBadgeVf
+                        : styles.productBadgeDf,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.productBadgeText,
+                        effectiveCode === PRODUCT_CODES.VENDOR_FINANCE
+                          ? styles.productBadgeTextVf
+                          : styles.productBadgeTextDf,
+                      ]}>
+                      {productDisplayName}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={handleClose}
+                  style={styles.closeButton}
+                  hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <Text style={styles.closeButtonText}>×</Text>
                 </TouchableOpacity>
               </View>
+
+              {previewLoading ? (
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator size="small" color="#666" />
+                  <Text style={styles.loadingText}>
+                    Loading disbursement details...
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <ScrollView
+                    style={styles.scroll}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator
+                    bounces={false}
+                    keyboardShouldPersistTaps="handled"
+                    nestedScrollEnabled>
+                    <Text style={styles.sectionTitle}>Party Details</Text>
+                    <View style={styles.detailsBox}>
+                      <DetailRow
+                        label="Primary Party"
+                        value={display.primaryParty}
+                      />
+                      <DetailRow
+                        label="Counter Party"
+                        value={display.counterParty}
+                        emphasize
+                      />
+                    </View>
+
+                    <Text style={styles.sectionTitle}>
+                      Invoice & Eligibility
+                    </Text>
+                    <View style={styles.detailsBox}>
+                      <DetailRow
+                        label="Request Date"
+                        value={display.requestDate}
+                      />
+                      <DetailRow label="GRN Date" value={display.grnDate} />
+                      <DetailRow label="Due Date" value={display.dueDate} />
+                      <DetailRow
+                        label="Eligible Loan Amount"
+                        value={display.eligibleLoanAmount}
+                      />
+                      <DetailRow
+                        label="Eligibility"
+                        value={display.eligibility}
+                        emphasize
+                      />
+                    </View>
+
+                    <Text style={styles.sectionTitle}>
+                      Disbursement & Rates
+                    </Text>
+                    <View style={styles.detailsBox}>
+                      <DetailRow
+                        label="Credit to account no."
+                        value={display.creditToAccount}
+                      />
+                      <DetailRow
+                        label="Requested Disbursement Date"
+                        value={display.requestedDisbursementDate}
+                      />
+                      <DetailRow
+                        label="Advance Interest"
+                        value={display.advanceInterest}
+                      />
+                      <DetailRow
+                        label="Status"
+                        value={display.status}
+                        emphasize
+                      />
+                    </View>
+
+                    <View style={styles.actionFieldContainer}>
+                      <Text style={styles.inputLabel}>Disbursement Action</Text>
+                      <TouchableOpacity
+                        style={styles.actionDropdown}
+                        activeOpacity={0.8}
+                        onPress={() => setActionDropdownOpen(prev => !prev)}>
+                        <Text
+                          style={[
+                            styles.actionDropdownText,
+                            !disbursementAction && styles.actionPlaceholder,
+                          ]}>
+                          {disbursementAction || 'Select status'}
+                        </Text>
+                        <Text style={styles.actionDropdownIcon}>▼</Text>
+                      </TouchableOpacity>
+                      {!!actionError && (
+                        <Text style={styles.fieldError}>{actionError}</Text>
+                      )}
+                      {actionDropdownOpen && (
+                        <View style={styles.actionOptions}>
+                          {actionOptions.map(option => (
+                            <TouchableOpacity
+                              key={option}
+                              style={styles.actionOption}
+                              activeOpacity={0.8}
+                              onPress={() => {
+                                setDisbursementAction(option);
+                                setActionDropdownOpen(false);
+                                setActionError(null);
+                              }}>
+                              <Text style={styles.actionOptionText}>
+                                {option}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+
+                    {disbursementAction === 'Disbursed' && (
+                      <>
+                        <Text style={styles.sectionTitle}>
+                          Disbursement Entry
+                        </Text>
+                        <View style={styles.detailsBox}>
+                          <View style={styles.inputRow}>
+                            <Text style={styles.inputLabel}>
+                              Disburse Amount *
+                            </Text>
+                            <TextInput
+                              style={styles.input}
+                              value={disbursedAmount}
+                              onChangeText={setDisbursedAmount}
+                              keyboardType="numeric"
+                              placeholder="0.00"
+                              placeholderTextColor={Colors.graybase}
+                            />
+                          </View>
+                          <View style={styles.inputRow}>
+                            <Text style={styles.inputLabel}>
+                              Disbursement Date *
+                            </Text>
+                            <DateNTimePicker
+                              label=""
+                              mode="date"
+                              value={date || todayDisplay}
+                              datePickerProps={{
+                                minimumDate: todayStart,
+                                maximumDate: todayEnd,
+                                date: todayStart,
+                              }}
+                              onConfirm={() => {
+                                setDate(todayDisplay);
+                              }}
+                              placeholder="DD-MM-YYYY"
+                              containerStyle={styles.datePickerContainer}
+                            />
+                          </View>
+                          <View style={styles.inputRow}>
+                            <Text style={styles.inputLabel}>UTR No *</Text>
+                            <TextInput
+                              style={styles.input}
+                              value={utrNo}
+                              onChangeText={setUtrNo}
+                              placeholder="Bank Ref No"
+                              placeholderTextColor={Colors.graybase}
+                            />
+                          </View>
+                          <View style={styles.inputRow}>
+                            <Text style={styles.inputLabel}>
+                              Transaction No *
+                            </Text>
+                            <TextInput
+                              style={styles.input}
+                              value={transactionNo}
+                              onChangeText={setTransactionNo}
+                              placeholder="Internal Ref No"
+                              placeholderTextColor={Colors.graybase}
+                            />
+                          </View>
+                        </View>
+                      </>
+                    )}
+
+                    <View style={styles.remarkContainer}>
+                      <Text style={styles.inputLabel}>Remark</Text>
+                      <TextInput
+                        style={styles.remarkInput}
+                        value={remark}
+                        onChangeText={setRemark}
+                        placeholder="Remark"
+                        placeholderTextColor={Colors.graybase}
+                        multiline
+                        numberOfLines={3}
+                        textAlignVertical="top"
+                      />
+                    </View>
+                  </ScrollView>
+
+                  <View style={styles.buttonContainer}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.cancelButton]}
+                      onPress={handleClose}>
+                      <Text style={styles.cancelButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.actionButton,
+                        styles.submitButton,
+                        isSubmitDisabled && styles.submitButtonDisabled,
+                      ]}
+                      disabled={isSubmitDisabled}
+                      onPress={handleSubmit}>
+                      <Text style={styles.submitButtonText}>Submit</Text>
+                      <FontAwesome6
+                        name="check"
+                        iconStyle="solid"
+                        size={scaleWidth(14)}
+                        color={Colors.white}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
             </View>
           </TouchableWithoutFeedback>
         </View>
@@ -475,126 +645,226 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    width: '90%',
+    width: '94%',
     maxHeight: '90%',
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(12),
     overflow: 'hidden',
-    flexDirection: 'column',
   },
   modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingHorizontal: scaleWidth(16),
-    paddingTop: scaleHeight(16),
+    paddingTop: scaleHeight(20),
     paddingBottom: scaleHeight(12),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E6E6E6',
-    alignItems: 'center',
   },
-  modalTitleWrap: {
-    fontSize: scaleFont(15),
-    fontFamily: Fonts.GilroyMedium,
+  modalHeaderText: {
+    flex: 1,
+    paddingRight: scaleWidth(8),
+  },
+  modalTitle: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-    textAlign: 'center',
   },
-  modalTitleBold: {
+  modalSubtitle: {
+    marginTop: scaleHeight(4),
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
+  productBadge: {
+    alignSelf: 'flex-start',
+    marginTop: scaleHeight(8),
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(4),
+    borderRadius: scaleWidth(4),
+  },
+  productBadgeVf: {
+    backgroundColor: '#E8F4FD',
+  },
+  productBadgeDf: {
+    backgroundColor: '#FFF3E0',
+  },
+  productBadgeText: {
+    fontSize: scaleFont(11),
     fontFamily: Fonts.GilroySemiBold,
   },
-  scrollView: {
-    flexShrink: 1,
+  productBadgeTextVf: {
+    color: '#1565C0',
+  },
+  productBadgeTextDf: {
+    color: '#E65100',
+  },
+  closeButton: {
+    width: scaleWidth(24),
+    height: scaleWidth(24),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeButtonText: {
+    fontSize: scaleFont(24),
+    color: Colors.darkblack,
+    fontWeight: '300',
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scaleWidth(8),
+    paddingVertical: scaleHeight(40),
+  },
+  loadingText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
+  scroll: {
+    maxHeight: scaleHeight(480),
   },
   scrollContent: {
-    padding: scaleWidth(16),
+    paddingHorizontal: scaleWidth(16),
+    paddingTop: scaleHeight(12),
+    paddingBottom: scaleHeight(8),
   },
-  sectionHeader: {
-    backgroundColor: '#E6E6E6',
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(12),
-    marginBottom: scaleHeight(4),
-    borderRadius: scaleWidth(6),
-  },
-  sectionHeaderText: {
-    fontSize: scaleFont(14),
+  sectionTitle: {
+    fontSize: scaleFont(13),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
+    marginBottom: scaleHeight(8),
+    marginTop: scaleHeight(4),
   },
-  tableContainer: {
-    borderWidth: 1,
-    borderColor: '#E6E6E6',
-    borderRadius: scaleWidth(8),
+  detailsBox: {
     backgroundColor: '#F7F8FB',
-    overflow: 'hidden',
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#E6E6E6',
-    borderBottomWidth: 1,
-    borderBottomColor: '#D0D0D0',
-  },
-  tableHeaderText: {
-    flex: 1,
-    fontSize: scaleFont(14),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.darkblack,
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(12),
-    textAlign: 'center',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E6E6E6',
-    minHeight: scaleHeight(50),
-  },
-  detailColumn: {
-    flex: 1,
-    justifyContent: 'center',
+    borderRadius: scaleWidth(8),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E6E6E6',
     paddingHorizontal: scaleWidth(12),
     paddingVertical: scaleHeight(8),
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: '#E6E6E6',
-    backgroundColor: Colors.white,
+    marginBottom: scaleHeight(10),
   },
-  amountColumn: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: scaleWidth(12),
-    paddingVertical: scaleHeight(8),
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: scaleHeight(6),
+    gap: scaleWidth(12),
   },
   detailLabel: {
-    fontSize: scaleFont(13),
+    flex: 1,
+    fontSize: scaleFont(12),
     fontFamily: Fonts.GilroyMedium,
-    color: Colors.darkblack,
+    color: Colors.graybase,
   },
-  required: {
-    color: Colors.red,
+  detailValue: {
+    flex: 1,
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    textAlign: 'right',
+  },
+  detailValueEmphasize: {
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  inputRow: {
+    marginBottom: scaleHeight(10),
+  },
+  inputLabel: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(6),
   },
   input: {
     borderWidth: 1,
     borderColor: '#E6E6E6',
-    borderRadius: scaleWidth(6),
-    paddingHorizontal: scaleWidth(10),
+    borderRadius: scaleWidth(8),
+    paddingHorizontal: scaleWidth(12),
     paddingVertical: scaleHeight(8),
-    fontSize: scaleFont(13),
+    fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
     backgroundColor: Colors.white,
-    minHeight: scaleHeight(36),
-  },
-  readOnlyInput: {
-    backgroundColor: '#F5F5F5',
-    color: Colors.graybase,
-  },
-  dropdownContainer: {
-    marginBottom: 0,
+    minHeight: scaleHeight(40),
   },
   datePickerContainer: {
     marginBottom: 0,
     marginTop: 0,
   },
+  actionFieldContainer: {
+    marginTop: scaleHeight(4),
+    marginBottom: scaleHeight(8),
+  },
+  actionDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#D0D4DD',
+    borderRadius: scaleWidth(8),
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(10),
+    backgroundColor: Colors.white,
+  },
+  actionDropdownText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+  },
+  actionPlaceholder: {
+    color: Colors.graybase,
+  },
+  actionDropdownIcon: {
+    fontSize: scaleFont(10),
+    color: Colors.graybase,
+  },
+  actionOptions: {
+    marginTop: scaleHeight(4),
+    borderWidth: 1,
+    borderColor: '#D0D4DD',
+    borderRadius: scaleWidth(8),
+    backgroundColor: Colors.white,
+    overflow: 'hidden',
+  },
+  actionOption: {
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(10),
+  },
+  actionOptionText: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+  },
+  fieldError: {
+    marginTop: scaleHeight(4),
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.red,
+  },
+  remarkContainer: {
+    marginBottom: scaleHeight(8),
+  },
+  remarkInput: {
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    borderRadius: scaleWidth(8),
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(8),
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+    minHeight: scaleHeight(72),
+    backgroundColor: '#F7F8FB',
+  },
   buttonContainer: {
     flexDirection: 'row',
     gap: scaleWidth(12),
-    padding: scaleWidth(16),
+    paddingHorizontal: scaleWidth(16),
+    paddingBottom: scaleHeight(16),
+    paddingTop: scaleHeight(8),
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E6E6E6',
   },
@@ -604,28 +874,29 @@ const styles = StyleSheet.create({
     borderRadius: scaleWidth(8),
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: scaleWidth(6),
   },
   cancelButton: {
     backgroundColor: Colors.white,
     borderWidth: 1,
-    borderColor: '#D0D0D0',
+    borderColor: '#D0D4DD',
   },
   submitButton: {
     backgroundColor: Colors.green,
   },
+  submitButtonDisabled: {
+    backgroundColor: Colors.graybase,
+    opacity: 0.6,
+  },
   cancelButtonText: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(16),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
   },
   submitButtonText: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(16),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.white,
-  },
-  infoValueText: {
-    fontSize: scaleFont(13),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.darkblack,
   },
 });

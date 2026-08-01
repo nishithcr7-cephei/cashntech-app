@@ -2,7 +2,6 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Linking,
   Modal,
   StyleSheet,
   Text,
@@ -24,6 +23,7 @@ import {tryCatch} from '@utils/TryCatch';
 import {
   fileNameFromAttachmentUrl,
   mapInvoiceAttachmentsWithUrls,
+  openInvoiceAttachment,
   type InvoiceAttachmentItem,
 } from '@utils/invoiceAttachments';
 import Toast from 'react-native-toast-message';
@@ -141,12 +141,12 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
   };
 
   const handleView = async (row: InvoiceAttachmentItem) => {
-    if (!row.fullUrl) {
+    if (!row.fullUrl && !row.attachment_url) {
       Toast.show({type: 'error', text1: 'Invalid attachment URL'});
       return;
     }
     try {
-      await Linking.openURL(row.fullUrl);
+      await openInvoiceAttachment(row.fullUrl || row.attachment_url);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to open attachment');
     }

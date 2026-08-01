@@ -7,6 +7,10 @@ type ActionableRow = {
   rawInvoiceStatus?: string | null;
 };
 
+export type InvoiceEditRow = ActionableRow & {
+  currentStepSequenceNo?: number | null;
+};
+
 type LegacyTurnContext = {
   isCashnTechUser?: boolean;
   isAnchorAllAccess?: boolean;
@@ -86,13 +90,93 @@ export function canShowCashnTechInvoiceVerification(
 
 /**
  * Finance Request menu — actionable && finance_request permission.
- * No legacy admin_status fallback (matches web).
+ * Not shown to CashnTech admin (Vendor/Dealer makers raise finance request).
  */
 export function canShowFinanceRequest(
   row: ActionableRow,
   canFinanceRequest: boolean,
+  options?: {isCashnTechUser?: boolean},
 ): boolean {
+  if (options?.isCashnTechUser) {
+    return false;
+  }
   return canFinanceRequest && row.actionable === true;
+}
+
+/**
+ * Backend updateInvoice state gate (invoice.service.ts):
+ * Draft | Rejected | current_step.sequence_no <= 2
+ * UI also hides terminal invoice/admin statuses even when current_step is null
+ * (backend treats null step as seq 0 — misleading for Submitted/Disbursed rows).
+ */
+export function isInvoiceEditableByBackendState(row: InvoiceEditRow): boolean {
+  const status = (row.rawInvoiceStatus || '').trim();
+  const adminS = (row.rawAdminStatus || '').trim().toLowerCase();
+
+  if (['Draft', 'Rejected', 'REJECTED_BY_CHECKER'].includes(status)) {
+    return true;
+  }
+
+  if (adminS === 'verified') {
+    return false;
+  }
+
+  const terminalInvoice = [
+    'submitted',
+    'disbursed',
+    'closed',
+    'finance requested',
+    'in progress',
+  ];
+  if (terminalInvoice.includes(status.toLowerCase())) {
+    return false;
+  }
+
+  const seq = row.currentStepSequenceNo;
+  if (typeof seq === 'number') {
+    return seq <= 2;
+  }
+
+  return false;
+}
+
+/**
+ * Edit re-runs workflow step 1 (Upload). Pull/VF → counterparty maker;
+ * Push → anchor maker; CashnTech bypasses party role.
+ */
+export function canPerformInvoiceUploadEdit(context: {
+  programMethod?: string | null;
+  isAnchorMaker: boolean;
+  isDealerMaker: boolean;
+  isCashnTechUser: boolean;
+  isAnchorAllAccess?: boolean;
+  isDealerAllAccess?: boolean;
+}): boolean {
+  if (context.isCashnTechUser) {
+    return true;
+  }
+
+  const method = (context.programMethod || '').trim().toLowerCase();
+  if (method === 'push') {
+    return !!(context.isAnchorMaker || context.isAnchorAllAccess);
+  }
+
+  return !!(context.isDealerMaker || context.isDealerAllAccess);
+}
+
+/** 3-dots Edit — permission + upload role + backend editable state. */
+export function canShowInvoiceListEdit(
+  row: InvoiceEditRow,
+  canEdit: boolean,
+  uploadContext: Parameters<typeof canPerformInvoiceUploadEdit>[0],
+): boolean {
+  if (!canEdit) {
+    return false;
+  }
+  if (!canPerformInvoiceUploadEdit(uploadContext)) {
+    return false;
+  }
+  return isInvoiceEditableByBackendState(row);
 }
 
 /**

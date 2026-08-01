@@ -13,7 +13,6 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {LeftChevron} from '@assets/Icons';
 import {userSelector} from '@store/user';
-import {AppRole, ROLE_LABELS} from '@constants/roles';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import type {HomeNavigatorType} from '@type/NavigatorTypes';
 import {useNavigation, type CompositeNavigationProp} from '@react-navigation/native';
@@ -30,8 +29,7 @@ export const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<ProfileNavigation>();
   const userInfo = useSelector(userSelector.getUserInfo);
   const fullName = useSelector(userSelector.getFullName);
-  const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
-  const roleLabel = userRole ? ROLE_LABELS[userRole] : '';
+  const roleLabel = useSelector(userSelector.getUserRoleLabel);
 
   const nameToShow = fullName?.trim() || `${userInfo?.first_name ?? ''} ${userInfo?.last_name ?? ''}`.trim() || 'User Name';
   const firstLetter = nameToShow.charAt(0).toUpperCase();

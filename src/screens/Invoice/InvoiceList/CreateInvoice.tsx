@@ -249,6 +249,7 @@ export const CreateInvoice: React.FC = () => {
   const createInvoiceSuccess = useSelector(selectCreateInvoiceSuccess);
   const createInvoiceError = useSelector(selectCreateInvoiceError);
   const userId = useSelector((s: any) => s.user?.id);
+  const userPartyName = useSelector((s: any) => s.user?.party_name as string | null | undefined);
   const permissions = useSelector(selectPermissions) || [];
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const permissionsError = useSelector(selectPermissionsError);
@@ -1473,12 +1474,25 @@ export const CreateInvoice: React.FC = () => {
         return;
       }
 
+      // invoice.party must be the program's Anchor party (DF + VF alike).
+      // Prefer party-info `anchorPartyId` (dealerInfo.party.id) over
+      // programSelection.partyId: for VF Vendor Maker / DF Dealer Pull,
+      // scope bank.partyId is the logged-in counterparty (self), not the
+      // anchor — using it made Anchor+Vendor both show the vendor name.
+      const anchorPartyId = String(
+        (dealerInfo as any)?.party?.id ||
+          programSelection?.partyId ||
+          '',
+      ).trim();
+
       console.log('[CreateInvoice] Attempting to dispatch createInvoiceRequest', {
         partnerBankId,
         programId: programSelection?.programId,
         productId: programSelection?.productId || activeProductId,
         participantId: selectedParticipant?.id,
-        partyId: programSelection?.partyId || (dealerInfo as any)?.party?.id
+        partyId: anchorPartyId,
+        scopePartyId: programSelection?.partyId,
+        partyInfoAnchorId: (dealerInfo as any)?.party?.id,
       });
       try {
         dispatch(
@@ -1494,12 +1508,29 @@ export const CreateInvoice: React.FC = () => {
             // productId; fall back to the globally active product.
             product: String(programSelection?.productId || activeProductId || ''),
             anchorParticipantMapping: String(selectedParticipant?.id || ''),
-            // For Anchor-maker: backend expects invoice.party to be the Anchor party.
-            // prioritize the partyId captured at program selection.
-            party: String(programSelection?.partyId || (dealerInfo as any)?.party?.id || ''),
-            counterPartyName: String(selectedParticipant?.party?.entity_name || ''),
-            counterPartyCode: String(selectedParticipant?.company_code || ''),
-            counterPartyOdAccount: String(selectedParticipant?.od_account_no || ''),
+            party: anchorPartyId,
+            // Pull (VF vendor / DF dealer maker): party-info row entityName is
+            // the Anchor; counterparty is the logged-in party. Push: selected
+            // participant is the counterparty (dealer/vendor).
+            counterPartyName: String(
+              (String(programSelection?.method || '').toLowerCase() === 'pull'
+                ? decryptValue(userPartyName || '') ||
+                  userPartyName ||
+                  decryptValue(selectedParticipant?.party?.entity_name || '') ||
+                  selectedParticipant?.party?.entity_name
+                : decryptValue(selectedParticipant?.party?.entity_name || '') ||
+                  selectedParticipant?.party?.entity_name) || '',
+            ),
+            counterPartyCode: String(
+              decryptValue(selectedParticipant?.company_code || '') ||
+                selectedParticipant?.company_code ||
+                '',
+            ),
+            counterPartyOdAccount: String(
+              decryptValue(selectedParticipant?.od_account_no || '') ||
+                selectedParticipant?.od_account_no ||
+                '',
+            ),
             attachment: selectedAttachment ?? undefined,
             creditToAccountId: resolvedCreditToAccountId,
           }),

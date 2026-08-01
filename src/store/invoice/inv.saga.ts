@@ -261,6 +261,7 @@ function* updateInvoiceStatusSaga(
       action: act,
       approvalLevel,
       remark,
+      grnDate,
       programId,
       filters,
       onSuccess,
@@ -271,6 +272,7 @@ function* updateInvoiceStatusSaga(
       action: act,
       approvalLevel,
       remark,
+      grnDate,
     });
     showActionToast(
       'success',
@@ -311,7 +313,9 @@ function* updateInvoiceVerificationSaga(
       response?.message ||
         (act === 'Verify'
           ? 'Invoice verified successfully'
-          : 'Invoice rejected successfully'),
+          : act === 'On Hold'
+            ? 'Invoice put on hold successfully'
+            : 'Invoice rejected successfully'),
     );
     yield put(updateInvoiceVerificationSuccess());
     if (onSuccess) {

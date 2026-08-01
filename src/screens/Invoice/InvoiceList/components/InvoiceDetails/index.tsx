@@ -82,6 +82,7 @@ export const InvoiceDetails: React.FC = () => {
     selectedInvoiceDetails,
     anchorCheckerInvoiceDetails,
     anchorCheckerDetailsLoading,
+    effectiveProductCode,
     showAttachmentModal,
     setShowAttachmentModal,
     attachmentFallback,
@@ -102,6 +103,7 @@ export const InvoiceDetails: React.FC = () => {
     onApproveRejectReject,
     onVerifyApprove,
     onVerifyReject,
+    onVerifyHold,
     onBulkApply,
     handleBulkReviewSubmit,
     getMenuPosition,
@@ -118,6 +120,8 @@ export const InvoiceDetails: React.FC = () => {
     selectedInvoiceRawInvoiceStatus,
     selectedInvoiceActionable,
     selectedInvoiceApprovalLogsCount,
+    selectedInvoiceCurrentStepSequenceNo,
+    selectedInvoiceProgramMethod,
     userDepartment,
     storedUserRole,
     userInfoFull,
@@ -359,6 +363,7 @@ export const InvoiceDetails: React.FC = () => {
         visible={showApproveRejectModal}
         invoiceId={selectedInvoiceId}
         invoiceNo={selectedInvoiceNo || undefined}
+        productCode={effectiveProductCode}
         variant={
           isCashnTechUser
             ? 'cashntech_verification'
@@ -367,28 +372,31 @@ export const InvoiceDetails: React.FC = () => {
               : 'default'
         }
         invoiceDetails={
-          isCashnTechUser || isAnchorChecker
-            ? anchorCheckerInvoiceDetails ?? undefined
-            : selectedInvoiceDetails
+          anchorCheckerInvoiceDetails ?? selectedInvoiceDetails
         }
-        detailsLoading={(isAnchorChecker || isCashnTechUser) && anchorCheckerDetailsLoading}
+        detailsLoading={anchorCheckerDetailsLoading}
         onClose={() => {
           setShowApproveRejectModal(false);
           setSelectedInvoiceId(null);
           setSelectedInvoiceNo(null);
         }}
-        onApprove={(invoiceId, remarks) => {
+        onApprove={(invoiceId, remarks, grnDate) => {
           if (isCashnTechUser) {
             onVerifyApprove(invoiceId, remarks);
           } else {
-            onApproveRejectApprove(invoiceId, remarks);
+            onApproveRejectApprove(invoiceId, remarks, grnDate);
           }
         }}
-        onReject={(invoiceId, remarks) => {
+        onReject={(invoiceId, remarks, grnDate) => {
           if (isCashnTechUser) {
             onVerifyReject(invoiceId, remarks);
           } else {
-            onApproveRejectReject(invoiceId, remarks);
+            onApproveRejectReject(invoiceId, remarks, grnDate);
+          }
+        }}
+        onHold={(invoiceId, remarks) => {
+          if (isCashnTechUser) {
+            onVerifyHold(invoiceId, remarks);
           }
         }}
       />
@@ -436,6 +444,8 @@ export const InvoiceDetails: React.FC = () => {
         listActionable={selectedInvoiceActionable}
         userDepartment={userDepartment}
         approvalLogsCount={selectedInvoiceApprovalLogsCount}
+        currentStepSequenceNo={selectedInvoiceCurrentStepSequenceNo}
+        programMethod={selectedInvoiceProgramMethod}
       />
       {/* Floating trigger removed as requested */}
 

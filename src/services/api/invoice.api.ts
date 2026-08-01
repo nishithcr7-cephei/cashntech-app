@@ -169,6 +169,10 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     discount_total: Ue(discountTotal),
     tax_total: Ue(taxTotal),
     final_total: Ue(finalTotalValue),
+    // Required by unified createInvoice.dto (@IsNumber). Create UI has no
+    // input yet — default 0; VF Upfront amount is computed later in finance
+    // preview / approval flows.
+    upfront_interest: 0,
     items,
   };
 
@@ -230,11 +234,13 @@ export type UpdateInvoiceStatusPayload = {
   action: 'Approve' | 'Reject';
   approvalLevel: number;
   remark?: string;
+  /** VF AM approve — YYYY-MM-DD; optional on reject */
+  grnDate?: string;
 };
 
 export type UpdateInvoiceVerificationPayload = {
   invoiceId: string;
-  action: 'Verify' | 'Reject';
+  action: 'Verify' | 'Reject' | 'On Hold';
   remark?: string;
 };
 
@@ -703,12 +709,16 @@ export const invoiceApi = {
   updateInvoiceStatus: async (
     payload: UpdateInvoiceStatusPayload,
   ): Promise<any> => {
-    const {invoiceId, action, approvalLevel, remark} = payload;
-    const body = {
+    const {invoiceId, action, approvalLevel, remark, grnDate} = payload;
+    const body: Record<string, unknown> = {
       action,
       approval_level: approvalLevel,
       remark: remark ?? '',
     };
+    const normalizedGrn = grnDate?.trim() ? toYYYYMMDD(grnDate.trim()) : '';
+    if (normalizedGrn) {
+      body.grn_date = normalizedGrn;
+    }
     const response = await axiosInstance.patch(
       ApiEndPoints.apiUpdateInvoiceStatus(invoiceId),
       body,
@@ -736,13 +746,22 @@ export const invoiceApi = {
     invoiceId: string;
     action: string;
     remark?: string;
+    preferredDisbursementDate?: string;
+    grnDate?: string;
   }): Promise<any> => {
+    const body: Record<string, unknown> = {
+      action: payload.action,
+      remark: payload.remark ?? '-',
+    };
+    if (payload.preferredDisbursementDate?.trim()) {
+      body.preferred_disbursement_date = payload.preferredDisbursementDate.trim();
+    }
+    if (payload.grnDate?.trim()) {
+      body.grn_date = payload.grnDate.trim();
+    }
     const response = await axiosInstance.patch(
       ApiEndPoints.apiUpdateInvoiceStatus(payload.invoiceId),
-      {
-        action: payload.action,
-        remark: payload.remark ?? '-',
-      },
+      body,
       {authRequired: true} as any,
     );
     return response.data;
@@ -750,7 +769,7 @@ export const invoiceApi = {
 
   /**
    * CashnTech admin verification: PATCH /invoice/admin/:invoiceId
-   * Body: { action: 'Verify' | 'Reject', remark: string }
+   * Body: { action: 'Verify' | 'Reject' | 'On Hold', remark: string }
    */
   updateInvoiceVerification: async (
     payload: UpdateInvoiceVerificationPayload,

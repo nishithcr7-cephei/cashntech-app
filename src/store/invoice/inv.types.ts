@@ -144,6 +144,8 @@ export type UpdateInvoiceStatusRequest = {
   action: 'Approve' | 'Reject';
   approvalLevel: number;
   remark?: string;
+  /** VF approve — YYYY-MM-DD */
+  grnDate?: string;
   programId?: string;
   filters?: InvoiceListFilters;
   onSuccess?: () => void;
@@ -152,7 +154,7 @@ export type UpdateInvoiceStatusRequest = {
 /** CashnTech admin verification (PATCH /invoice/admin/:invoiceId) */
 export type UpdateInvoiceVerificationRequest = {
   invoiceId: string;
-  action: 'Verify' | 'Reject';
+  action: 'Verify' | 'Reject' | 'On Hold';
   remark?: string;
   programId?: string;
   filters?: InvoiceListFilters;

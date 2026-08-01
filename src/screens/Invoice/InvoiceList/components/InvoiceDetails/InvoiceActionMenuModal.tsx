@@ -16,7 +16,7 @@ import {PERMISSIONS} from '@constants/permissions';
 import {useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
 import {userSelector} from '@store/user';
-import {canShowWorkflowApproveReject, canShowCashnTechInvoiceVerification, canShowFinanceRequest} from '@utils/invoiceListActionable';
+import {canShowCashnTechInvoiceVerification, canShowFinanceRequest, canShowInvoiceListEdit, canShowWorkflowApproveReject} from '@utils/invoiceListActionable';
 
 /**
  * Visibility and Actionability Logic for "Manage Attachment"
@@ -41,10 +41,11 @@ export const shouldShowAttachmentOption = (
   const isSuperUser = bRole === null && fRole === null;
   if (isSuperUser && canAttachment && isAllowedStatus) return true;
 
-  // 2. Regular Anchor Maker
+  // 2. Regular Anchor / counterparty (Dealer + Vendor) roles
   const isAnchorMaker = bRole === 'Anchor' && fRole === 'Maker';
   const isAnchorChecker = bRole === 'Anchor' && fRole === 'Checker';
-  const isDealerChecker = bRole === 'Dealer' && fRole === 'Checker';
+  const isCounterpartyChecker =
+    (bRole === 'Dealer' || bRole === 'Vendor') && fRole === 'Checker';
 
   // Anchor Maker must be in a specific status to view/edit attachments
   if (isAnchorMaker && canAttachment && isAllowedStatus) {
@@ -56,11 +57,11 @@ export const shouldShowAttachmentOption = (
     return true;
   }
 
-  // Dealer Checker can view attachments for review purposes, except when invoice is rejected
-  // or admin verification has reached a terminal status.
+  // Dealer/Vendor Checker can view attachments for review, except when invoice is
+  // rejected or admin verification has reached a terminal status.
   const isRejectedStatus = s.includes('reject');
   const isAdminTerminalStatus = ['verified', 'rejected'].includes(adminS);
-  if (isDealerChecker && canAttachment && !isRejectedStatus && !isAdminTerminalStatus) {
+  if (isCounterpartyChecker && canAttachment && !isRejectedStatus && !isAdminTerminalStatus) {
     return true;
   }
 
@@ -90,6 +91,10 @@ type Props = {
   listActionable?: boolean;
   userDepartment?: string;
   approvalLogsCount?: number;
+  /** Backend updateInvoice editable when sequence_no <= 2 (or Draft/Rejected) */
+  currentStepSequenceNo?: number | null;
+  /** Program method — Pull/VF upload is counterparty maker; Push is anchor maker */
+  programMethod?: string | null;
 };
 
 export const InvoiceActionMenuModal: React.FC<Props> = ({
@@ -111,7 +116,9 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   rawInvoiceStatus,
   listActionable,
   userDepartment: _userDepartment,
-  approvalLogsCount = 0,
+  approvalLogsCount: _approvalLogsCount = 0,
+  currentStepSequenceNo = null,
+  programMethod = null,
 }) => {
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canEdit = useHasPermission(PERMISSIONS.INVOICE_LIST_EDIT);
@@ -132,44 +139,23 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
     canAttachment,
   );
 
-  const isInvoiceInEditableState = (
-    status?: string,
-    approvalStatus?: string,
-    adminStatus?: string,
-    logsCount: number = 0,
-  ) => {
-    const s = status || '';
-    const approvalS = (approvalStatus || '').toLowerCase();
-    const adminS = (adminStatus || '').toLowerCase();
-
-    // 1. 'Rejected' & 'Draft' — ALWAYS editable regardless of logs count
-    //    (mirrors backend: invoice_status === 'Rejected' || 'Draft' bypasses logs check)
-    const isRejectedOrDraft = ['Rejected', 'REJECTED_BY_CHECKER', 'Draft'].includes(s);
-    if (isRejectedOrDraft) return true;
-
-    // 2. 'Created', 'Pending', 'Attachment Pending' — editable ONLY if no workflow
-    //    action has been taken yet (logs <= 1), mirroring backend rule:
-    //    approvalLogs.length > 1 → throw UnauthorizedException
-    const isEarlyStatus = ['Pending', 'Created', 'Attachment Pending'].includes(s);
-    const hasNoWorkflowAction = logsCount <= 1;
-
-    // 3. HIDDEN: Terminal approval/admin statuses where editing is always forbidden
-    const isForbiddenByApproval = ['approved', 'disbursed', 'cancelled', 'completed', 'approval complete'].some(
-      term => approvalS.includes(term),
-    );
-    const isForbiddenByAdmin = adminS === 'verified';
-
-    return isEarlyStatus && hasNoWorkflowAction && !isForbiddenByApproval && !isForbiddenByAdmin;
-  };
-
-  const isEditable = canEdit 
-    && (isAnchorMaker || isDealerMaker || isCashnTechUser) 
-    && isInvoiceInEditableState(
+  const isEditable = canShowInvoiceListEdit(
+    {
       rawInvoiceStatus,
-      rawApprovalStatus,
       rawAdminStatus,
-      approvalLogsCount,
-    );
+      rawApprovalStatus,
+      currentStepSequenceNo,
+    },
+    canEdit,
+    {
+      programMethod,
+      isAnchorMaker,
+      isDealerMaker,
+      isCashnTechUser,
+      isAnchorAllAccess,
+      isDealerAllAccess,
+    },
+  );
 
   // Show Delete for all invoices when permission exists — matches web view.
   // Backend enforces actual authorization (returns 401 when not allowed).
@@ -217,6 +203,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
       rawInvoiceStatus,
     },
     canFinanceRequest,
+    {isCashnTechUser},
   );
 
   if (!openMenuId) return null;
@@ -258,14 +245,33 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
-              {/* Dealer Maker can approve/reject at the next workflow step */}
-              {isDealerMaker && canShowApproveReject && (
+              {/* Anchor/Dealer/Vendor Maker: approve when list actionable (VF AM step + DF/VF maker steps) */}
+              {(isAnchorMaker || isDealerMaker) && canShowApproveReject && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
                   onPress={() => onMenuAction('approveReject', openMenuId)}
                   style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
                   <FontAwesome6 name="check" iconStyle="solid" color={Colors.darkblack} size={16} />
-                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Invoice Verification</Text>
+                  <View style={styles.menuItemTextBlock}>
+                    <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Invoice Verification</Text>
+                    <Text style={styles.menuSubText}>Approval / Reject</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+
+              {/* VF: Vendor Maker raises Finance Request after AC; DF Dealer Maker same when workflow requires it */}
+              {(isAnchorMaker || isDealerMaker) && showFinanceRequest && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('financeRequest', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="file-invoice-dollar" iconStyle="solid" color="#0085FF" size={16} />
+                  <View style={styles.menuItemTextBlock}>
+                    <Text style={[styles.menuText, styles.menuTextAction, permissionsLoading && styles.menuTextDisabled]}>
+                      Finance Request
+                    </Text>
+                    <Text style={styles.menuSubText}>Raise disbursement request</Text>
+                  </View>
                 </TouchableOpacity>
               )}
 
@@ -404,7 +410,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
           )}
           {isCashnTechUser && (
             <>
-              {/* Order: Approval History → Finance Request → Invoice Verification → Attachment → Delete */}
+              {/* Order: Approval History → Invoice Verification → Attachment → Delete */}
               {canViewHistory && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
@@ -414,22 +420,6 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                   <Text style={[styles.menuText, styles.menuTextHistory, permissionsLoading && styles.menuTextDisabled]}>
                     Approval History
                   </Text>
-                </TouchableOpacity>
-              )}
-
-              {/* Finance Request — actionable && finance_request (web parity) */}
-              {showFinanceRequest && (
-                <TouchableOpacity
-                  disabled={permissionsLoading}
-                  onPress={() => onMenuAction('financeRequest', openMenuId)}
-                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="file-invoice-dollar" iconStyle="solid" color="#0085FF" size={16} />
-                  <View style={styles.menuItemTextBlock}>
-                    <Text style={[styles.menuText, styles.menuTextAction, permissionsLoading && styles.menuTextDisabled]}>
-                      Finance Request
-                    </Text>
-                    <Text style={styles.menuSubText}>Raise disbursement request</Text>
-                  </View>
                 </TouchableOpacity>
               )}
 

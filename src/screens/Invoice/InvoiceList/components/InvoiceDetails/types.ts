@@ -166,6 +166,8 @@ export type InvoiceRow = {
   /** From list API — drives Approve/Reject when present */
   actionable?: boolean;
   currentStepRole?: string;
+  /** Backend edit gate: sequence_no <= 2 (or Draft/Rejected) */
+  currentStepSequenceNo?: number | null;
 };
 
 export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
@@ -220,6 +222,10 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
     approvalLogsCount: Array.isArray(item.approvalLogs) ? item.approvalLogs.length : 0,
     actionable: typeof item.actionable === 'boolean' ? item.actionable : undefined,
     currentStepRole: item.current_step?.role,
+    currentStepSequenceNo:
+      typeof item.current_step?.sequence_no === 'number'
+        ? item.current_step.sequence_no
+        : null,
   };
 }
 
