@@ -12,6 +12,10 @@ import {
   resolveInvoicePartyInfoPath,
   type InvoicePartyInfoRouteOptions,
 } from '@utils/invoicePartyInfoRoute';
+import {
+  computeInvoiceLineAggregates,
+  computeInvoiceNetTotal,
+} from '@utils/invoiceTotals';
 
 // Unit mapping: PCS=1, KG=2, LTR=3, etc. (backend accepts any number)
 const UNIT_MAP: Record<string, number> = {
@@ -29,6 +33,43 @@ const UNIT_MAP: Record<string, number> = {
   PACK: 12,
   STRIP: 13,
 };
+
+export type PartyTaxRecord = {
+  id?: number;
+  name: string;
+  value: number;
+  is_active?: boolean;
+  account_no?: string;
+  section_nature?: {
+    id?: string;
+    section?: string;
+    nature_of_payment?: string;
+  } | null;
+  threshold?: number | null;
+};
+
+function mapPartyTaxList(body: unknown): PartyTaxRecord[] {
+  const payload = body as {data?: unknown} | unknown[] | null | undefined;
+  const list = Array.isArray((payload as {data?: unknown})?.data)
+    ? ((payload as {data: unknown[]}).data)
+    : Array.isArray(payload)
+      ? payload
+      : [];
+  return list
+    .filter((t: any) => t && t.is_active !== false && t.name)
+    .map((t: any) => ({
+      id: t.id != null && t.id !== '' ? Number(t.id) : undefined,
+      name: String(t.name),
+      value: Number(t.value) || 0,
+      is_active: t.is_active,
+      account_no: t.account_no,
+      section_nature: t.section_nature ?? null,
+      threshold:
+        t.threshold != null && t.threshold !== ''
+          ? Number(t.threshold)
+          : null,
+    }));
+}
 
 /**
  * Numeric precision utility (equivalent to Web's Ue() utility)
@@ -101,16 +142,18 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
   } = input;
 
   // Align with InvoiceForm: use item-level discount and tax (same as form summary)
-  const subtotal = fields.items.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0);
-  const discountTotal = fields.items.reduce(
-    (sum, item) => sum + (parseFloat(item.discountAmount || '0') || 0),
-    0,
+  const {subTotal: subtotal, discountTotal, taxTotal} =
+    computeInvoiceLineAggregates(fields.items, fields);
+  const tdsAmount = parseFloat(fields.tdsAmount || '0') || 0;
+  // Financing charge recorded alongside the invoice; deliberately not part of
+  // final_total, which the backend uses as the invoice value for eligibility.
+  const upfrontInterest = parseFloat(fields.upfrontInterest || '0') || 0;
+  const finalTotalValue = computeInvoiceNetTotal(
+    subtotal,
+    discountTotal,
+    taxTotal,
+    tdsAmount,
   );
-  const taxTotal = fields.items.reduce(
-    (sum, item) => sum + (parseFloat(item.taxAmount || '0') || 0),
-    0,
-  );
-  const finalTotalValue = Math.max(0, subtotal - discountTotal + taxTotal);
 
   const items = fields.items.map((item: InvoiceLineItem) => {
     // Map textual unit (PCS, KG...) to numeric code that DB expects,
@@ -169,10 +212,8 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     discount_total: Ue(discountTotal),
     tax_total: Ue(taxTotal),
     final_total: Ue(finalTotalValue),
-    // Required by unified createInvoice.dto (@IsNumber). Create UI has no
-    // input yet — default 0; VF Upfront amount is computed later in finance
-    // preview / approval flows.
-    upfront_interest: 0,
+    upfront_interest: Ue(upfrontInterest),
+    tds_amount: Ue(tdsAmount),
     items,
   };
 
@@ -417,28 +458,56 @@ export const invoiceApi = {
     return response.data;
   },
 
-  /** GET /configuration/party/tax/ — active taxes for logged-in user's party (web parity). */
-  getPartyTaxes: async (): Promise<
-    Array<{id: number; name: string; value: number; is_active?: boolean; account_no?: string}>
-  > => {
+  /** GET /configuration/party/tax/ — active taxes for logged-in user's party. */
+  getPartyTaxes: async (): Promise<PartyTaxRecord[]> => {
     const response = await axiosInstance.get(ApiEndPoints.apiPartyTaxList, {
       authRequired: true,
     } as any);
-    const body = response?.data;
-    const list = Array.isArray(body?.data)
-      ? body.data
-      : Array.isArray(body)
-        ? body
-        : [];
-    return list
-      .filter((t: any) => t && t.is_active !== false && t.name)
-      .map((t: any) => ({
-        id: Number(t.id),
-        name: String(t.name),
-        value: Number(t.value) || 0,
-        is_active: t.is_active,
-        account_no: t.account_no,
-      }));
+    return mapPartyTaxList(response?.data);
+  },
+
+  /**
+   * GET /configuration/program/invoice-tax/:programId
+   * Web parity: VF uses vendor GST + anchor TDS; other products use anchor taxes.
+   */
+  getProgramInvoiceTaxes: async (programId: string): Promise<PartyTaxRecord[]> => {
+    const id = String(programId || '').trim();
+    if (!id) return [];
+    const response = await axiosInstance.get(ApiEndPoints.apiProgramInvoiceTax(id), {
+      authRequired: true,
+    } as any);
+    return mapPartyTaxList(response?.data);
+  },
+
+  /** GET /configuration/party/tax/:id — includes threshold for TDS. */
+  getPartyTaxById: async (
+    taxId: number | string,
+  ): Promise<{
+    id?: number;
+    name?: string;
+    value?: number;
+    threshold?: number | null;
+    section_nature?: {id?: string} | null;
+  } | null> => {
+    const response = await axiosInstance.get(
+      ApiEndPoints.apiPartyTaxById(taxId),
+      {authRequired: true} as any,
+    );
+    const data = response?.data?.data ?? response?.data ?? null;
+    return data && typeof data === 'object' ? data : null;
+  },
+
+  /** GET /invoice/party-invoices-total/:partyId — FY YTD SUM(sub_total). */
+  getPartyInvoicesTotal: async (
+    partyId: string,
+  ): Promise<number> => {
+    if (!partyId?.trim()) return 0;
+    const response = await axiosInstance.get(
+      ApiEndPoints.apiPartyInvoicesTotal(partyId),
+      {authRequired: true} as any,
+    );
+    const data = response?.data?.data ?? response?.data ?? {};
+    return Number(data?.total_invoice_amount) || 0;
   },
 
   getInvoiceSummary: async (
@@ -1024,16 +1093,18 @@ export const invoiceApi = {
     const {invoiceId, fields, attachment, approval_level, createdBy} = input;
     
     // Manually calculate totals for the update payload
-    const subtotal = fields.items.reduce((sum: number, item: any) => sum + (parseFloat(item.total) || 0), 0);
-    const discountTotal = fields.items.reduce(
-      (sum: number, item: any) => sum + (parseFloat(item.discountAmount || '0') || 0),
-      0,
+    const {subTotal: subtotal, discountTotal, taxTotal} =
+      computeInvoiceLineAggregates(fields.items, fields);
+    const tdsAmount = parseFloat(fields.tdsAmount || '0') || 0;
+    // Recomputed on edit so a changed amount or tenor never leaves a stale
+    // figure behind; excluded from final_total for the same reason as create.
+    const upfrontInterest = parseFloat(fields.upfrontInterest || '0') || 0;
+    const finalTotalValue = computeInvoiceNetTotal(
+      subtotal,
+      discountTotal,
+      taxTotal,
+      tdsAmount,
     );
-    const taxTotal = fields.items.reduce(
-      (sum: number, item: any) => sum + (parseFloat(item.taxAmount || '0') || 0),
-      0,
-    );
-    const finalTotalValue = Math.max(0, subtotal - discountTotal + taxTotal);
 
     const items = fields.items.map((item: any) => {
       const unitNum = UNIT_MAP[item.unit?.toUpperCase()] ?? 1;
@@ -1081,6 +1152,10 @@ export const invoiceApi = {
       discount_total: Ue(discountTotal),
       tax_total: Ue(taxTotal),
       final_total: Ue(finalTotalValue),
+      tds_amount: Ue(tdsAmount),
+      // Backend UpdateInvoiceDto may strip this until DTO adds the field;
+      // still send for forward-compat / when whitelist allows.
+      upfront_interest: Ue(upfrontInterest),
       // Add counter-party information for update
       counter_party_name: fields.dealer || '',
       counter_party_code: fields.dealerCode || '',

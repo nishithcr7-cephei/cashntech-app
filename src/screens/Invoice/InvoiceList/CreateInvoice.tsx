@@ -32,6 +32,16 @@ import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {Camera, Upload, AI, LeftChevron} from '@assets/Icons';
 import Toast from 'react-native-toast-message';
 import {
+  computeInvoiceLineAggregates,
+  computeInvoiceNetTotal,
+  computeInvoiceTaxableBase,
+  computeTdsAmount,
+  computeVendorFinanceAdvanceInterest,
+  extractRoiPercent,
+  isTdsPartyTaxName,
+} from '@utils/invoiceTotals';
+import {invoiceApi} from '@services/api/invoice.api';
+import {
   fetchDealerInfoRequest,
   createInvoiceRequest,
   updateInvoiceRequest,
@@ -60,7 +70,6 @@ import {
 import type {DealerInfoParticipant} from '@store/invoice/inv.types';
 import {getParticipantAvailableLimit} from '@utils/normalizeDealerInfo';
 import {decryptValue} from '@utils/decrypt';
-import {invoiceApi} from '@services/api/invoice.api';
 import {requiresCreditToAccountId} from '@utils/invoicePartyInfoRoute';
 import {resolveProductCodeFromName} from '@store/product/product.resolver';
 import {selectEffectiveProductCode, selectActiveProductId} from '@store/product/product.selectors';
@@ -87,6 +96,8 @@ const getInitialFields = (): InvoiceFields => ({
   cgst: '',
   sgst: '',
   grandTotal: '',
+  tdsAmount: '0',
+  upfrontInterest: '0',
 });
 
 const convertOcrLineItems = (
@@ -283,6 +294,8 @@ export const CreateInvoice: React.FC = () => {
     return code === PRODUCT_CODES.VENDOR_FINANCE ? 'vendor_finance' : 'dealer_finance';
   }, [programSelection?.productName, effectiveProductCode]);
 
+  const isVendorFinance = productType === 'vendor_finance';
+
   const creditToOptions = useMemo<CreditToOption[]>(() => {
     const details =
       dealerInfo?.bank_details || dealerInfo?.party?.party_bank_details;
@@ -418,6 +431,13 @@ export const CreateInvoice: React.FC = () => {
       ? hasAttachmentPerm || hasUploadPerm
       : hasCreatePerm || hasAttachmentPerm || hasUploadPerm;
   const [partyTaxOptions, setPartyTaxOptions] = useState<PartyTaxOption[]>([]);
+  /** TDS party-tax config (excluded from GST dropdown). */
+  const [tdsTaxConfig, setTdsTaxConfig] = useState<{
+    id?: number;
+    ratePercent: number;
+    threshold: number | null;
+  } | null>(null);
+  const [ytdInvoiceTotal, setYtdInvoiceTotal] = useState(0);
   const isOcrPrerequisitesMet = useMemo(() => {
     const tenorDays = parseInt(String(fields.tenor ?? '').trim(), 10);
     return !!(
@@ -470,27 +490,191 @@ export const CreateInvoice: React.FC = () => {
   const isOcrTemporarilyDisabled = false;
 
   const loadPartyTaxes = useCallback(() => {
+    const programId = String(programSelection?.programId || '').trim();
+    if (!programId) {
+      setPartyTaxOptions([]);
+      setTdsTaxConfig(null);
+      return;
+    }
+
     invoiceApi
-      .getPartyTaxes()
-      .then(taxes => {
-        setPartyTaxOptions(
-          taxes.map(t => ({
+      .getProgramInvoiceTaxes(programId)
+      .then(async taxes => {
+        const gstOptions: PartyTaxOption[] = [];
+        let tdsCandidate: {
+          id?: number;
+          ratePercent: number;
+          threshold: number | null;
+        } | null = null;
+
+        for (const t of taxes) {
+          const isTds =
+            isTdsPartyTaxName(t.name) || !!t.section_nature?.id;
+          if (isTds) {
+            if (!tdsCandidate) {
+              tdsCandidate = {
+                id: t.id,
+                ratePercent: Number(t.value) || 0,
+                threshold:
+                  t.threshold != null && Number.isFinite(Number(t.threshold))
+                    ? Number(t.threshold)
+                    : null,
+              };
+            }
+            continue;
+          }
+          gstOptions.push({
             label: t.name,
             value: t.name,
             percentage: Number(t.value) || 0,
-          })),
-        );
+            id: t.id,
+            sectionNatureId: t.section_nature?.id ?? null,
+            threshold: t.threshold ?? null,
+            isTds: false,
+          });
+        }
+
+        // Fallback detail fetch when list omits TDS threshold (legacy party/tax API).
+        if (
+          tdsCandidate?.id != null &&
+          (tdsCandidate.threshold == null || !Number.isFinite(tdsCandidate.threshold))
+        ) {
+          try {
+            const detail = await invoiceApi.getPartyTaxById(tdsCandidate.id);
+            if (detail?.threshold != null) {
+              tdsCandidate.threshold = Number(detail.threshold);
+            }
+            if (detail?.value != null) {
+              tdsCandidate.ratePercent = Number(detail.value) || tdsCandidate.ratePercent;
+            }
+          } catch {
+            // keep list values
+          }
+        }
+
+        setPartyTaxOptions(gstOptions);
+        setTdsTaxConfig(tdsCandidate);
       })
       .catch(() => {
         setPartyTaxOptions([]);
+        setTdsTaxConfig(null);
       });
-  }, []);
+  }, [programSelection?.programId]);
 
   useFocusEffect(
     useCallback(() => {
       loadPartyTaxes();
     }, [loadPartyTaxes]),
   );
+
+  // FY YTD sub_total for TDS threshold (same party as create payload).
+  useEffect(() => {
+    const partyId = String(dealerInfo?.party?.id || '').trim();
+    if (!partyId) {
+      setYtdInvoiceTotal(0);
+      return;
+    }
+    let cancelled = false;
+    invoiceApi
+      .getPartyInvoicesTotal(partyId)
+      .then(total => {
+        if (!cancelled) setYtdInvoiceTotal(total);
+      })
+      .catch(() => {
+        if (!cancelled) setYtdInvoiceTotal(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dealerInfo?.party?.id]);
+
+  // Invoice value = Sub − Discount + Tax − TDS. Advance interest is excluded:
+  // it is a financing charge, and the backend applies eligibility to this
+  // amount when computing the disbursal.
+  const invoiceTotals = useMemo(() => {
+    const {subTotal, discountTotal, taxTotal} = computeInvoiceLineAggregates(
+      fields.items,
+      fields,
+    );
+    const base = computeInvoiceTaxableBase(subTotal, discountTotal, taxTotal);
+    const tds = computeTdsAmount({
+      ratePercent: tdsTaxConfig?.ratePercent,
+      threshold: tdsTaxConfig?.threshold,
+      ytdInvoiceTotal,
+      currentBase: base,
+    });
+    return {
+      tds,
+      net: computeInvoiceNetTotal(subTotal, discountTotal, taxTotal, tds),
+    };
+  }, [
+    fields.items,
+    fields.cgst,
+    fields.sgst,
+    fields.taxTotal,
+    tdsTaxConfig,
+    ytdInvoiceTotal,
+  ]);
+
+  // Same inputs and rounding as the backend finance-request preview, so this
+  // figure matches what is actually deducted at disbursement.
+  const advanceInterestInfo = useMemo(
+    () =>
+      computeVendorFinanceAdvanceInterest({
+        isVendorFinance,
+        interestChargeType: dealerInfo?.interest_charge_type,
+        invoiceAmount: invoiceTotals.net,
+        eligibilityPercent: selectedParticipant?.eligibility,
+        roiPercent: extractRoiPercent(selectedParticipant?.interest_parameters),
+        tenorDays: fields.tenor,
+      }),
+    [
+      isVendorFinance,
+      dealerInfo?.interest_charge_type,
+      invoiceTotals.net,
+      selectedParticipant,
+      fields.tenor,
+    ],
+  );
+
+  const showAdvanceInterest = advanceInterestInfo.applicable;
+
+  useEffect(() => {
+    const nextTds = invoiceTotals.tds.toFixed(2);
+    const nextNet = invoiceTotals.net.toFixed(2);
+
+    // Rewrite the stored charge only when a figure can be stated, or when the
+    // charge plainly does not apply. While the program parameters are still
+    // loading (edit mode fetches them after the invoice) the existing amount
+    // is left alone rather than being zeroed.
+    const currentAdvanceInterest = parseFloat(fields.upfrontInterest || '0') || 0;
+    const nextAdvanceInterest = advanceInterestInfo.applicable
+      ? advanceInterestInfo.advanceInterest
+      : advanceInterestInfo.chargeApplies
+        ? currentAdvanceInterest
+        : 0;
+
+    if (
+      fields.tdsAmount === nextTds &&
+      fields.grandTotal === nextNet &&
+      currentAdvanceInterest === nextAdvanceInterest
+    ) {
+      return;
+    }
+
+    setFields(prev => ({
+      ...prev,
+      tdsAmount: nextTds,
+      upfrontInterest: nextAdvanceInterest.toFixed(2),
+      grandTotal: nextNet,
+    }));
+  }, [
+    invoiceTotals,
+    advanceInterestInfo,
+    fields.tdsAmount,
+    fields.upfrontInterest,
+    fields.grandTotal,
+  ]);
 
   // Determine required permission based on mode
   const hasRequiredPerm = () => {
@@ -741,6 +925,8 @@ export const CreateInvoice: React.FC = () => {
           items: mappedItems,
           discountValue: String(data.discount_total || '0'),
           grandTotal: String(data.final_total || '0'),
+          tdsAmount: String(data.tds_amount ?? '0'),
+          upfrontInterest: String(data.upfront_interest ?? '0'),
           attachments: (data.attachment || []).map((a: any) => ({
             id: a.id,
             attachment_url: a.attachment_url,
@@ -1148,9 +1334,17 @@ export const CreateInvoice: React.FC = () => {
           dealerInfo?.party?.entity_name ||
           '',
         productType,
+        advanceInterestBreakdown: advanceInterestInfo.applicable
+          ? advanceInterestInfo
+          : null,
       });
     },
-    [navigation, dealerInfo?.party?.entity_name, productType],
+    [
+      navigation,
+      dealerInfo?.party?.entity_name,
+      productType,
+      advanceInterestInfo,
+    ],
   );
 
   const handleProofUploadFile = async (
@@ -1362,21 +1556,18 @@ export const CreateInvoice: React.FC = () => {
     }
 
     // Final Total Integrity Check (0.01 precision)
-    // sum(items.total) - sum(items.discount) + sum(items.tax) must match final_total
-    const subTotalCalc = fields.items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
-    const discCalc = fields.items.reduce((s, i) => s + (parseFloat(i.discountAmount || '0') || 0), 0);
-    const itemTaxCalc = fields.items.reduce((s, i) => {
-      if (i.taxes?.length) return s + i.taxes.reduce((ts, t) => ts + (parseFloat(t.taxAmount || '0') || 0), 0);
-      return s + (parseFloat(i.taxAmount || '0') || 0);
-    }, 0);
-    const ocrTaxTotal =
-      (parseFloat(fields.cgst || '0') || 0) +
-      (parseFloat(fields.sgst || '0') || 0) +
-      (parseFloat(fields.taxTotal || '0') || 0);
-    const taxCalc = itemTaxCalc > 0 ? itemTaxCalc : ocrTaxTotal;
-    
-    const calculatedGrandTotal = Math.max(0, subTotalCalc - discCalc + taxCalc);
-    const reportedGrandTotal = parseFloat(fields.grandTotal || '0') || calculatedGrandTotal;
+    // Invoice value = Sub − Disc + Tax − TDS (advance interest excluded)
+    const {subTotal: subTotalCalc, discountTotal: discCalc, taxTotal: taxCalc} =
+      computeInvoiceLineAggregates(fields.items, fields);
+    const tdsCalc = parseFloat(fields.tdsAmount || '0') || 0;
+    const calculatedGrandTotal = computeInvoiceNetTotal(
+      subTotalCalc,
+      discCalc,
+      taxCalc,
+      tdsCalc,
+    );
+    const reportedGrandTotal =
+      parseFloat(fields.grandTotal || '0') || calculatedGrandTotal;
     
     if (Math.abs(calculatedGrandTotal - reportedGrandTotal) > 0.01) {
       console.error('[CreateInvoice] Total Mismatch:', {calculatedGrandTotal, reportedGrandTotal});
@@ -1905,6 +2096,10 @@ export const CreateInvoice: React.FC = () => {
             tenorOptions={tenorOptions}
             partyTaxOptions={partyTaxOptions.length > 0 ? partyTaxOptions : undefined}
             onLoadPartyTaxes={loadPartyTaxes}
+            showAdvanceInterest={showAdvanceInterest}
+            advanceInterest={advanceInterestInfo.advanceInterest}
+            eligibleLoanAmount={advanceInterestInfo.eligibleLoanAmount}
+            netDisbursal={advanceInterestInfo.netDisbursal}
             staleInvoicePeriodDays={dealerInfo?.basic_parameters?.stale_invoice_period_days != null ? Number(dealerInfo.basic_parameters.stale_invoice_period_days) : undefined}
             defaultPaymentTermsDays={dealerInfo?.basic_parameters?.default_payment_terms_days != null ? Number(dealerInfo.basic_parameters.default_payment_terms_days) : undefined}
             mode={mode}

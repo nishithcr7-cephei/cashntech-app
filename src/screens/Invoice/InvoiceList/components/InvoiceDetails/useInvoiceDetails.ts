@@ -387,6 +387,7 @@ export function useInvoiceDetails() {
         const discountAmount = Number(data?.discount_total) || 0;
         const taxAmount = Number(data?.tax_total) || 0;
         const advanceInterest = Number(data?.upfront_interest) || 0;
+        const tdsAmount = Number(data?.tds_amount) || 0;
         const totalAmount = Number(data?.final_total ?? data?.sub_total) || 0;
         const invoiceAmount =
           totalAmount > 0
@@ -505,6 +506,7 @@ export function useInvoiceDetails() {
           discountAmount,
           taxAmount,
           advanceInterest,
+          tdsAmount,
           totalAmount,
           finalPayableAmount: invoiceAmount,
           finalDueDate: invoiceDueDate,
@@ -989,8 +991,8 @@ export function useInvoiceDetails() {
   const selectedInvoiceDetails = selectedRow
     ? {
       subTotal: selectedRow.invoiceAmount,
-      withholdingTaxesPercent: '0.00/-',
-      withholdingAmount: '0.00/-',
+      withholdingTaxesPercent: undefined,
+      withholdingAmount: undefined,
       finalPayableAmount: selectedRow.invoiceAmount,
       finalDueDate: selectedRow.dueDate,
     }

@@ -9,6 +9,10 @@ export type DealerInfoParticipant = {
   utilized_amount?: number | string;
   /** Pending invoice total (non-disbursed/closed/rejected) — used for available limit. */
   pipeline_requests?: number | string;
+  /** VF: participant eligibility % for finance preview / AI base. */
+  eligibility?: number | string;
+  /** VF: interest_parameters JSON (ROI / slabs). */
+  interest_parameters?: unknown;
 };
 
 export type PartyBankDetail = {
@@ -30,6 +34,8 @@ export type DealerInfoResponse = {
   id: string;
   program_name: string;
   basic_parameters?: DealerInfoBasicParameters;
+  /** Program product config — VF Upfront AI gate. */
+  interest_charge_type?: string | null;
   party: {
     id: string;
     entity_name?: string;

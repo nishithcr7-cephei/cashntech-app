@@ -72,6 +72,7 @@ export type ApproveRejectInvoiceDetails = {
   discountAmount?: number;
   taxAmount?: number;
   advanceInterest?: number;
+  tdsAmount?: number;
   totalAmount?: number;
   items?: ApproveRejectInvoiceItem[];
   attachments?: ApproveRejectAttachment[];
@@ -457,6 +458,10 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                         label={isCashnTechVerification ? 'Tax Total' : 'Tax'}
                         value={fmtAmount(details.taxAmount ?? 0)}
                       />
+                      <DetailRow
+                        label="TDS"
+                        value={fmtAmount(details.tdsAmount ?? 0)}
+                      />
                       {showAdvanceInterest && (
                         <DetailRow
                           label="Advance Interest"
@@ -464,7 +469,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                         />
                       )}
                       <DetailRow
-                        label="Total"
+                        label="Total (Net)"
                         value={
                           details.totalAmount != null
                             ? fmtAmount(details.totalAmount)

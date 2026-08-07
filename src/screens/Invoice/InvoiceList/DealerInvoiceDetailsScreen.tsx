@@ -525,8 +525,8 @@ export const DealerInvoiceDetailsScreen: React.FC = () => {
         invoiceNo={selectedInvoiceNo || undefined}
         invoiceDetails={{
           subTotal: '10,80,025/-',
-          withholdingTaxesPercent: '0.00/-',
-          withholdingAmount: '0.00/-',
+          withholdingTaxesPercent: undefined,
+          withholdingAmount: undefined,
           finalPayableAmount: '10,80,025/-',
           finalDueDate: 'dd-mm-yyyy',
         }}

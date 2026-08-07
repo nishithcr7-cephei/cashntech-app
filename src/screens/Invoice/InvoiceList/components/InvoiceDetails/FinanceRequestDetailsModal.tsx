@@ -21,6 +21,7 @@ import {
 } from '@utils/invoiceAttachments';
 import {decryptValue} from '@utils/decrypt';
 import {toYYYYMMDD} from '@services/api/invoice.api';
+import {resolveAdvanceInterestFromPreview} from '@utils/invoiceTotals';
 
 export type FinanceRequestPreview = {
   vendor_name?: string | null;
@@ -36,6 +37,7 @@ export type FinanceRequestPreview = {
   eligibility_percent?: number | string | null;
   eligible_loan_amount?: number | string | null;
   requested_loan_amount?: number | string | null;
+  net_disbursal_amount?: number | string | null;
   credit_to_bank_account?: {
     id?: string | number | null;
     accountNumber?: string | null;
@@ -247,9 +249,7 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
       subTotal: formatAmount(p.sub_total),
       discountTotal: formatAmount(p.discount_total),
       taxTotal: formatAmount(p.tax_total),
-      advanceInterest: formatAmount(
-        p.upfront_interest_amount ?? p.upfront_interest ?? 0,
-      ),
+      advanceInterest: formatAmount(resolveAdvanceInterestFromPreview(p)),
       total: formatAmount(p.final_total ?? p.invoice_amount),
       items,
       attachments,

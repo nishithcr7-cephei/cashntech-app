@@ -16,11 +16,11 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {decryptValue} from '@utils/decrypt';
+import type {AdvanceInterestBreakdown} from '@utils/invoiceTotals';
 import type {InvoiceFields} from '../../types/Invoice';
 
 const fmtAmount = (n: number) =>
   n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-const fmtPercent = (n: number) => Number(n).toFixed(2);
 
 type AttachmentItem = {id: number; attachment_url: string; fullUrl: string};
 
@@ -36,6 +36,8 @@ type InvoiceDetailData = {
   items: Array<{id: string; itemName: string; quantity: number; unit: number | string; price: number; total: number}>;
   discount: {percent: number; amount: number};
   tax: {percent: number; amount: number};
+  subTotal: number;
+  tdsAmount: number;
   total: number;
   attachments: AttachmentItem[];
 };
@@ -102,7 +104,11 @@ const mapPreviewFieldsToInvoiceData = (
     (sum, it) => sum + (Number(it.total) || 0),
     0,
   );
-  const total = Number(fields.grandTotal) || sumOfItemTotals;
+  const subTotal = subTotalBeforeDiscountTax;
+  const tdsAmount = Number(fields.tdsAmount) || 0;
+  // Advance interest is a financing charge, not part of the invoice value.
+  const total =
+    Number(fields.grandTotal) || Math.max(0, sumOfItemTotals - tdsAmount);
 
   const discountPercent =
     subTotalBeforeDiscountTax > 0
@@ -126,6 +132,8 @@ const mapPreviewFieldsToInvoiceData = (
     items: normalizedItems,
     discount: {percent: discountPercent, amount: discountAmount},
     tax: {percent: taxPercent, amount: taxAmount},
+    subTotal,
+    tdsAmount,
     total,
     attachments: attachment?.uri
       ? [
@@ -155,6 +163,10 @@ export const InvoiceUploadPreview: React.FC = () => {
   const isVendorFinance = productType === 'vendor_finance';
   const counterpartyLabel = isVendorFinance ? 'Vendor Name' : 'Dealer Name';
   const counterpartyCodeLabel = isVendorFinance ? 'Vendor Code' : 'Dealer Code';
+  const advanceInterestBreakdown = route?.params?.advanceInterestBreakdown as
+    | AdvanceInterestBreakdown
+    | null
+    | undefined;
 
   const invoiceData = useMemo(
     () =>
@@ -166,7 +178,7 @@ export const InvoiceUploadPreview: React.FC = () => {
             ? decryptValue(dealerInfo.party.entity_name) || dealerInfo.party.entity_name
             : ''),
       ),
-    [previewFields, previewAttachment, previewAnchorName, dealerInfo],
+    [previewFields, previewAttachment, previewAnchorName],
   );
 
   const closePreview = () => {
@@ -284,24 +296,68 @@ export const InvoiceUploadPreview: React.FC = () => {
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Summary</Text>
           <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>Discount</Text>
+            <Text style={styles.keyLabel}>Sub Total</Text>
+            <Text style={styles.keyValue}>{fmtAmount(invoiceData.subTotal)}/-</Text>
+          </View>
+          <View style={styles.keyValueRow}>
+            <Text style={styles.keyLabel}>Discount Total</Text>
             <Text style={styles.keyValue}>
-              {fmtPercent(invoiceData.discount.percent)}% ({fmtAmount(invoiceData.discount.amount)}/-)
+              {fmtAmount(invoiceData.discount.amount)}/-
             </Text>
           </View>
-          <View style={styles.keyValueRowLast}>
-            <Text style={styles.keyLabel}>Tax Value</Text>
+          <View style={styles.keyValueRow}>
+            <Text style={styles.keyLabel}>Tax Total</Text>
             <Text style={styles.keyValue}>
-              {fmtPercent(invoiceData.tax.percent)}% ({fmtAmount(invoiceData.tax.amount)}/-)
+              {fmtAmount(invoiceData.tax.amount)}/-
+            </Text>
+          </View>
+          <View style={styles.keyValueRow}>
+            <Text style={styles.keyLabel}>TDS</Text>
+            <Text style={styles.keyValue}>
+              {fmtAmount(invoiceData.tdsAmount)}/-
             </Text>
           </View>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalLabel}>Total (Net)</Text>
             <Text style={styles.totalValue}>
               {fmtAmount(invoiceData.total)}/-
             </Text>
           </View>
         </View>
+
+        {advanceInterestBreakdown?.applicable && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Financing</Text>
+            <View style={styles.keyValueRow}>
+              <Text style={styles.keyLabel}>Eligible Loan Amount</Text>
+              <Text style={styles.keyValue}>
+                {fmtAmount(advanceInterestBreakdown.eligibleLoanAmount)}/-
+              </Text>
+            </View>
+            <View style={styles.keyValueRow}>
+              <Text style={styles.keyLabel}>Advance Interest</Text>
+              <Text style={styles.keyValue}>
+                {fmtAmount(advanceInterestBreakdown.advanceInterest)}/-
+              </Text>
+            </View>
+            <View style={styles.keyValueRow}>
+              <Text style={styles.keyLabel}>Net Disbursal</Text>
+              <Text style={styles.keyValue}>
+                {fmtAmount(advanceInterestBreakdown.netDisbursal)}/-
+              </Text>
+            </View>
+            <Text style={styles.financingNote}>
+              Indicative. Final amounts are confirmed at disbursement.
+            </Text>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={styles.closeFooterButton}
+          onPress={closePreview}
+          activeOpacity={0.8}>
+          <Text style={styles.closeFooterButtonText}>Close</Text>
+        </TouchableOpacity>
 
         {invoiceData.attachments.length > 0 && (
           <View style={styles.sectionCard}>
@@ -374,6 +430,20 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   content: {padding: scaleWidth(16), paddingBottom: scaleHeight(28)},
+  closeFooterButton: {
+    marginTop: scaleHeight(4),
+    marginBottom: scaleHeight(14),
+    backgroundColor: Colors.primaryColor,
+    borderRadius: scaleWidth(8),
+    paddingVertical: scaleHeight(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeFooterButtonText: {
+    fontSize: scaleFont(15),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.white,
+  },
   sectionCard: {
     backgroundColor: Colors.white,
     borderWidth: 1,
@@ -417,6 +487,12 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
     marginBottom: scaleHeight(12),
+  },
+  financingNote: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+    marginTop: scaleHeight(8),
   },
   itemCard: {
     borderWidth: 1,

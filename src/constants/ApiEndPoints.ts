@@ -181,6 +181,13 @@ const Endpoints = {
 
   // Party tax configuration (Create Invoice line-item tax)
   apiPartyTaxList: '/configuration/party/tax/',
+  apiPartyTaxById: (taxId: string | number) => `/configuration/party/tax/${taxId}`,
+  /** Program-aware taxes for create invoice (VF: vendor GST + anchor TDS). */
+  apiProgramInvoiceTax: (programId: string) =>
+    `/configuration/program/invoice-tax/${programId}`,
+  /** FY YTD SUM(sub_total) for TDS threshold checks */
+  apiPartyInvoicesTotal: (partyId: string) =>
+    `/invoice/party-invoices-total/${partyId}`,
 
   // User Scope (Program Selection)
   apiUserScope: '/user/scope',

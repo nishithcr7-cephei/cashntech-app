@@ -230,15 +230,32 @@ export function normalizeDealerInfoResponse(
         'utilizedAmount',
       ) as number | string | undefined,
       pipeline_requests: pipelineRaw as number | string | undefined,
+      eligibility: pick(r, 'eligibility') as number | string | undefined,
+      interest_parameters: pick(
+        r,
+        'interestParameters',
+        'interest_parameters',
+        'interestparameters',
+      ),
     };
   });
 
   const party_bank_details = Array.from(bankMap.values());
+  const interestChargeTypeRaw = pick(
+    first,
+    'interest_charge_type',
+    'interestChargeType',
+    'product_config.interest_charge_type',
+  );
 
   return {
     id: programId,
     program_name: String(pick(first, 'program_name', 'programName') ?? ''),
     basic_parameters,
+    interest_charge_type:
+      interestChargeTypeRaw != null && String(interestChargeTypeRaw).trim() !== ''
+        ? String(interestChargeTypeRaw)
+        : null,
     party: {
       id: String(pick(first, 'anchorPartyId', 'anchorpartyid') ?? ''),
       party_bank_details,

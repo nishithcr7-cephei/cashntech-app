@@ -66,7 +66,11 @@ export type InvoiceFields = {
   discountTotal?: string;
   cgst: string; // Central GST
   sgst: string; // State GST
-  grandTotal: string; // Grand Total (Final Amount + CGST + SGST)
+  grandTotal: string; // Grand Total / Total (Net)
+  /** Invoice-level TDS amount (maps to backend `tds_amount`) */
+  tdsAmount?: string;
+  /** Invoice-level advance interest (maps to backend `upfront_interest`) */
+  upfrontInterest?: string;
 
   // Attachments
   attachments?: {id: number; attachment_url: string}[];

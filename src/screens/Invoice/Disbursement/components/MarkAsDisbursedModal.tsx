@@ -25,6 +25,10 @@ import {
   type ProductCode,
 } from '@store/product/product.types';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {
+  resolveAdvanceInterestFromPreview,
+  resolveDefaultDisbursalAmount,
+} from '@utils/invoiceTotals';
 
 type MarkAsDisbursedModalProps = {
   visible: boolean;
@@ -196,12 +200,9 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
         setCreditTo(creditLabel);
 
         const defaultAmt =
-          data?.eligible_loan_amount ??
-          data?.requested_loan_amount ??
-          data?.final_total ??
-          data?.invoice_amount ??
-          invoiceAmount?.replace(/[,\s₹/-]/g, '') ??
-          '';
+          resolveDefaultDisbursalAmount(data) ||
+          Number(invoiceAmount?.replace(/[,\s₹/-]/g, '') || '') ||
+          0;
         const amtNum = Number(defaultAmt);
         setDisbursedAmount(
           !Number.isNaN(amtNum) && amtNum > 0
@@ -288,9 +289,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       requestedDisbursementDate: formatDateDDMMYYYY(
         p.preferred_disbursement_date ?? null,
       ),
-      advanceInterest: formatAmount(
-        p.upfront_interest_amount ?? p.upfront_interest ?? 0,
-      ),
+      advanceInterest: formatAmount(resolveAdvanceInterestFromPreview(p)),
       status: dash(p.status ?? p.invoice_status),
     };
   }, [preview]);

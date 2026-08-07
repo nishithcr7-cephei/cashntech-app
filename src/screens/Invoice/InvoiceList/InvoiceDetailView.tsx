@@ -71,6 +71,9 @@ type InvoiceDetailData = {
   items: InvoiceItemRow[];
   discount: {percent: number; amount: number};
   tax: {percent: number; amount: number};
+  tdsAmount: number;
+  advanceInterest: number;
+  showAdvanceInterest: boolean;
   total: number;
   attachments: AttachmentItem[];
   invoiceStatus: string;
@@ -98,6 +101,9 @@ const defaultInvoiceData: InvoiceDetailData = {
   items: [],
   discount: {percent: 0, amount: 0},
   tax: {percent: 0, amount: 0},
+  tdsAmount: 0,
+  advanceInterest: 0,
+  showAdvanceInterest: false,
   total: 0,
   attachments: [],
   invoiceStatus: '',
@@ -269,6 +275,17 @@ export const InvoiceDetailView: React.FC = () => {
         const taxTotal = Number(data?.tax_total) || 0;
         const discountTotal = Number(data?.discount_total) || 0;
         const finalTotal = Number(data?.final_total) || 0;
+        const tdsAmount = Number(data?.tds_amount) || 0;
+        const advanceInterest = Number(data?.upfront_interest) || 0;
+        const productName = String(
+          data?.product?.name ||
+            data?.program?.productConfig?.product?.name ||
+            listRowForInvoice?.product?.name ||
+            listRowForInvoice?.product_name ||
+            '',
+        );
+        const showAdvanceInterest =
+          /vendor\s*finance/i.test(productName) || advanceInterest > 0;
 
         const items: InvoiceItemRow[] = (data?.invoiceItems || []).map((it: any, idx: number) => {
           const lineTotal = Number(it.total) || 0;
@@ -335,6 +352,9 @@ export const InvoiceDetailView: React.FC = () => {
           items,
           discount: {percent: discountPercent, amount: discountTotal},
           tax: {percent: taxPercent, amount: taxTotal},
+          tdsAmount,
+          advanceInterest,
+          showAdvanceInterest,
           total: finalTotal,
           attachments,
           invoiceStatus: formatStatus(
@@ -631,8 +651,20 @@ export const InvoiceDetailView: React.FC = () => {
                   <Text style={styles.totalsLabel}>Tax Total</Text>
                   <Text style={styles.totalsValue}>{fmtAmount(invoiceData.tax.amount)}</Text>
                 </View>
+                <View style={styles.totalsRow}>
+                  <Text style={styles.totalsLabel}>TDS</Text>
+                  <Text style={styles.totalsValue}>{fmtAmount(invoiceData.tdsAmount)}</Text>
+                </View>
+                {invoiceData.showAdvanceInterest && (
+                  <View style={styles.totalsRow}>
+                    <Text style={styles.totalsLabel}>Advance Interest</Text>
+                    <Text style={styles.totalsValue}>
+                      {fmtAmount(invoiceData.advanceInterest)}
+                    </Text>
+                  </View>
+                )}
                 <View style={[styles.totalsRow, styles.totalsRowFinal]}>
-                  <Text style={styles.totalsLabelFinal}>Total</Text>
+                  <Text style={styles.totalsLabelFinal}>Total (Net)</Text>
                   <Text style={styles.totalsValueFinal}>{fmtAmount(invoiceData.total)}</Text>
                 </View>
               </View>
