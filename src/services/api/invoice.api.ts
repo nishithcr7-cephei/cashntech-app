@@ -145,14 +145,14 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
   const {subTotal: subtotal, discountTotal, taxTotal} =
     computeInvoiceLineAggregates(fields.items, fields);
   const tdsAmount = parseFloat(fields.tdsAmount || '0') || 0;
-  // Financing charge recorded alongside the invoice; deliberately not part of
-  // final_total, which the backend uses as the invoice value for eligibility.
+  // Web Create: final_total = Sub − Disc + Tax − TDS − Advance Interest
   const upfrontInterest = parseFloat(fields.upfrontInterest || '0') || 0;
   const finalTotalValue = computeInvoiceNetTotal(
     subtotal,
     discountTotal,
     taxTotal,
     tdsAmount,
+    upfrontInterest,
   );
 
   const items = fields.items.map((item: InvoiceLineItem) => {
@@ -1096,14 +1096,14 @@ export const invoiceApi = {
     const {subTotal: subtotal, discountTotal, taxTotal} =
       computeInvoiceLineAggregates(fields.items, fields);
     const tdsAmount = parseFloat(fields.tdsAmount || '0') || 0;
-    // Recomputed on edit so a changed amount or tenor never leaves a stale
-    // figure behind; excluded from final_total for the same reason as create.
+    // Web Create parity: final_total includes Advance Interest deduct.
     const upfrontInterest = parseFloat(fields.upfrontInterest || '0') || 0;
     const finalTotalValue = computeInvoiceNetTotal(
       subtotal,
       discountTotal,
       taxTotal,
       tdsAmount,
+      upfrontInterest,
     );
 
     const items = fields.items.map((item: any) => {

@@ -93,6 +93,47 @@ function formatDateDDMMYYYY(value?: string | null): string {
   }
 }
 
+function parseFlexibleDate(value?: string | null): moment.Moment | null {
+  if (!value?.trim()) return null;
+  const strict = moment(value.trim(), DATE_FORMATS, true);
+  if (strict.isValid()) return strict.startOf('day');
+  const loose = moment(value.trim());
+  return loose.isValid() ? loose.startOf('day') : null;
+}
+
+/** Usance Days — prefer API value; else Due − Disbursement / tenor − (Disb − GRN). */
+function resolveUsanceDays(params: {
+  usanceDays?: number | string | null;
+  preferredDisbursementDate?: string | null;
+  dueDate?: string | null;
+  grnDate?: string | null;
+  invoiceDate?: string | null;
+  tenor?: number | string | null;
+}): string {
+  const fromApi = Number(params.usanceDays);
+  if (Number.isFinite(fromApi) && params.usanceDays != null && params.usanceDays !== '') {
+    return String(Math.round(fromApi));
+  }
+
+  const disb = parseFlexibleDate(params.preferredDisbursementDate ?? null);
+  if (!disb) return '-';
+
+  const due = parseFlexibleDate(params.dueDate ?? null);
+  if (due) {
+    return String(due.diff(disb, 'days'));
+  }
+
+  const tenor = Number(params.tenor);
+  if (!Number.isFinite(tenor)) return '-';
+
+  const base =
+    parseFlexibleDate(params.grnDate ?? null) ||
+    parseFlexibleDate(params.invoiceDate ?? null);
+  if (!base) return '-';
+
+  return String(tenor - disb.diff(base, 'days'));
+}
+
 function resolveProductCode(
   productCode?: string | null,
   previewProductName?: string | null,
@@ -255,12 +296,19 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
 
   const display = useMemo(() => {
     const p = preview ?? {};
-    const vendorRaw = p.vendor_name ?? p.anchorParticipantMapping?.party?.entity_name ?? '';
+    const apm = p.anchorParticipantMapping ?? {};
+    const isVf = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
+
+    const vendorRaw =
+      p.vendor_name ?? apm.party?.entity_name ?? '';
     const anchorRaw = p.anchor_name ?? p.program?.party?.entity_name ?? '';
+    const odRaw = apm.od_account_no ?? debitFrom ?? '';
+    const vendorCodeRaw = apm.company_code_given_by_party ?? '';
+
     const creditAcc =
       p.credit_to_bank_account?.accountNumber ?? p.credit_to ?? '';
     const creditName =
-      p.credit_to_bank_account?.nameAsPerBank ?? anchorRaw ?? '';
+      p.credit_to_bank_account?.nameAsPerBank ?? vendorRaw ?? '';
     const decryptedAcc = creditAcc ? decryptValue(String(creditAcc)) : '';
     const accLabel = decryptedAcc || String(creditAcc);
     const creditDisplay = accLabel
@@ -269,30 +317,63 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
         : accLabel
       : '-';
 
+    const preferredDisbursementDateRaw = p.preferred_disbursement_date ?? null;
+    const dueDateRaw = p.due_date ?? p.invoice_due_date ?? null;
+    const grnDateRaw = p.grn_date ?? null;
+    const tenorRaw = p.tenor_days ?? p.tenor ?? null;
+
+    const advanceInterestValue = resolveAdvanceInterestFromPreview(p);
+    const advanceInterestDisplay =
+      Number.isFinite(advanceInterestValue) && advanceInterestValue > 0
+        ? formatAmount(advanceInterestValue)
+        : '-';
+
     return {
-      primaryParty: dash(decryptValue(vendorRaw) || vendorRaw),
-      counterParty: dash(decryptValue(anchorRaw) || anchorRaw),
+      isVf,
+      anchor: dash(decryptValue(anchorRaw) || anchorRaw),
+      vendor: dash(decryptValue(vendorRaw) || vendorRaw),
+      dealerLabel: isVf ? 'Vendor' : 'Dealer',
+      loanOdAccount: dash(decryptValue(String(odRaw)) || odRaw),
+      vendorCode: dash(decryptValue(String(vendorCodeRaw)) || vendorCodeRaw),
+      creditToAccount: creditDisplay,
       requestDate: formatDateDDMMYYYY(
         p.preferred_disbursement_requested_at ??
           p.request_date ??
           p.invoice_date ??
           null,
       ),
-      grnDate: formatDateDDMMYYYY(p.grn_date ?? null),
-      dueDate: formatDateDDMMYYYY(p.due_date ?? p.invoice_due_date ?? null),
-      eligibleLoanAmount: formatAmount(p.eligible_loan_amount),
+      dueDate: formatDateDDMMYYYY(dueDateRaw),
+      grnDate: formatDateDDMMYYYY(grnDateRaw),
+      tenor:
+        tenorRaw != null && String(tenorRaw).trim() !== ''
+          ? String(Math.round(Number(tenorRaw)) || tenorRaw)
+          : '-',
       eligibility:
         p.eligibility_percent != null
           ? `${formatPercent(p.eligibility_percent)}%`
           : '-',
-      creditToAccount: creditDisplay,
-      requestedDisbursementDate: formatDateDDMMYYYY(
-        p.preferred_disbursement_date ?? null,
+      advanceInterest: advanceInterestDisplay,
+      usanceDays: resolveUsanceDays({
+        usanceDays: p.usance_days ?? p.usanceDays ?? null,
+        preferredDisbursementDate: preferredDisbursementDateRaw
+          ? formatDateDDMMYYYY(preferredDisbursementDateRaw)
+          : null,
+        dueDate: dueDateRaw ? formatDateDDMMYYYY(dueDateRaw) : null,
+        grnDate: grnDateRaw ? formatDateDDMMYYYY(grnDateRaw) : null,
+        invoiceDate: p.invoice_date
+          ? formatDateDDMMYYYY(p.invoice_date)
+          : null,
+        tenor: tenorRaw,
+      }),
+      netInvoiceAmount: formatAmount(
+        p.final_total ?? p.invoice_amount ?? p.net_disbursal_amount,
       ),
-      advanceInterest: formatAmount(resolveAdvanceInterestFromPreview(p)),
+      requestedDisbursementDate: formatDateDDMMYYYY(
+        preferredDisbursementDateRaw,
+      ),
       status: dash(p.status ?? p.invoice_status),
     };
-  }, [preview]);
+  }, [preview, effectiveCode, debitFrom]);
 
   const handleClose = () => {
     setDisbursementAction('');
@@ -429,14 +510,22 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                     nestedScrollEnabled>
                     <Text style={styles.sectionTitle}>Party Details</Text>
                     <View style={styles.detailsBox}>
+                      <DetailRow label="Anchor" value={display.anchor} />
                       <DetailRow
-                        label="Primary Party"
-                        value={display.primaryParty}
+                        label={display.dealerLabel}
+                        value={display.vendor}
                       />
                       <DetailRow
-                        label="Counter Party"
-                        value={display.counterParty}
-                        emphasize
+                        label="Loan OD Account Number"
+                        value={display.loanOdAccount}
+                      />
+                      <DetailRow
+                        label={`${display.dealerLabel} Code`}
+                        value={display.vendorCode}
+                      />
+                      <DetailRow
+                        label="Credit to account no."
+                        value={display.creditToAccount}
                       />
                     </View>
 
@@ -448,15 +537,25 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                         label="Request Date"
                         value={display.requestDate}
                       />
-                      <DetailRow label="GRN Date" value={display.grnDate} />
                       <DetailRow label="Due Date" value={display.dueDate} />
-                      <DetailRow
-                        label="Eligible Loan Amount"
-                        value={display.eligibleLoanAmount}
-                      />
+                      <DetailRow label="GRN Date" value={display.grnDate} />
+                      <DetailRow label="Tenor" value={display.tenor} />
                       <DetailRow
                         label="Eligibility"
                         value={display.eligibility}
+                        emphasize
+                      />
+                      <DetailRow
+                        label="Advance Interest"
+                        value={display.advanceInterest}
+                      />
+                      <DetailRow
+                        label="Usance Days"
+                        value={display.usanceDays}
+                      />
+                      <DetailRow
+                        label="Net Invoice Amount"
+                        value={display.netInvoiceAmount}
                         emphasize
                       />
                     </View>
@@ -466,16 +565,8 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                     </Text>
                     <View style={styles.detailsBox}>
                       <DetailRow
-                        label="Credit to account no."
-                        value={display.creditToAccount}
-                      />
-                      <DetailRow
                         label="Requested Disbursement Date"
                         value={display.requestedDisbursementDate}
-                      />
-                      <DetailRow
-                        label="Advance Interest"
-                        value={display.advanceInterest}
                       />
                       <DetailRow
                         label="Status"
@@ -484,8 +575,9 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                       />
                     </View>
 
+                    <Text style={styles.sectionTitle}>Disbursement Action</Text>
                     <View style={styles.actionFieldContainer}>
-                      <Text style={styles.inputLabel}>Disbursement Action</Text>
+                      <Text style={styles.inputLabel}>Select status</Text>
                       <TouchableOpacity
                         style={styles.actionDropdown}
                         activeOpacity={0.8}

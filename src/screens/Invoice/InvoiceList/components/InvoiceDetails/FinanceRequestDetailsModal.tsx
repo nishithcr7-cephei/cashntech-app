@@ -138,6 +138,45 @@ function isDateInPast(displayDate: string): boolean {
   return m.startOf('day').isBefore(moment().startOf('day'));
 }
 
+function parseFlexibleDate(value?: string | null): moment.Moment | null {
+  if (!value?.trim()) return null;
+  const strict = moment(value.trim(), DATE_FORMATS, true);
+  if (strict.isValid()) return strict.startOf('day');
+  const loose = moment(value.trim());
+  return loose.isValid() ? loose.startOf('day') : null;
+}
+
+/**
+ * Usage Days preview for Finance Request (matches backend usance_days when GRN-based):
+ * prefer Due Date − Disbursement Date; else tenor − (Disbursement − GRN/Invoice Date).
+ */
+function calculateUsageDays(params: {
+  preferredDisbursementDate: string;
+  dueDate?: string | null;
+  grnDate?: string | null;
+  invoiceDate?: string | null;
+  tenor?: number | string | null;
+}): string {
+  const disb = parseFlexibleDate(params.preferredDisbursementDate);
+  if (!disb) return '-';
+
+  const due = parseFlexibleDate(params.dueDate ?? null);
+  if (due) {
+    return String(due.diff(disb, 'days'));
+  }
+
+  const tenor = Number(params.tenor);
+  if (!Number.isFinite(tenor)) return '-';
+
+  const base =
+    parseFlexibleDate(params.grnDate ?? null) ||
+    parseFlexibleDate(params.invoiceDate ?? null);
+  if (!base) return '-';
+
+  const daysFromBaseToDisb = disb.diff(base, 'days');
+  return String(tenor - daysFromBaseToDisb);
+}
+
 function validateRequiredFutureOrTodayDate(
   label: string,
   value: string,
@@ -256,6 +295,22 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
     };
   }, [preview]);
 
+  const selectedDisbursementDateDisplay = preferredDisbursementDateInput.trim()
+    ? preferredDisbursementDateInput.trim()
+    : '-';
+
+  const usageDaysDisplay = useMemo(() => {
+    if (!preferredDisbursementDateInput.trim()) return '-';
+    const p = preview ?? {};
+    return calculateUsageDays({
+      preferredDisbursementDate: preferredDisbursementDateInput.trim(),
+      dueDate: p.due_date ?? p.invoice_due_date ?? null,
+      grnDate: p.grn_date ?? null,
+      invoiceDate: p.invoice_date ?? null,
+      tenor: p.tenor_days ?? p.tenor ?? null,
+    });
+  }, [preferredDisbursementDateInput, preview]);
+
   const handleSubmit = () => {
     if (loading || submitting || !preview) return;
 
@@ -358,6 +413,11 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                         label="Interest rate (%) (including base rate)"
                         value={display.interestRate}
                       />
+                      <DetailRow
+                        label="Disbursement Date"
+                        value={selectedDisbursementDateDisplay}
+                      />
+                      <DetailRow label="Usage Days" value={usageDaysDisplay} />
 
                       <SectionTitle title="Items" />
                       {display.items.length === 0 ? (

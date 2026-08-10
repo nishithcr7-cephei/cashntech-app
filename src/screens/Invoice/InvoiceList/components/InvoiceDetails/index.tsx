@@ -364,6 +364,7 @@ export const InvoiceDetails: React.FC = () => {
         invoiceId={selectedInvoiceId}
         invoiceNo={selectedInvoiceNo || undefined}
         productCode={effectiveProductCode}
+        allowGrnDateEdit={isAnchorMaker}
         variant={
           isCashnTechUser
             ? 'cashntech_verification'

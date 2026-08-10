@@ -90,6 +90,11 @@ type ApproveRejectModalProps = {
   detailsLoading?: boolean;
   /** Active product — drives Vendor vs Dealer labels. Defaults to DF. */
   productCode?: ProductCode | null;
+  /**
+   * VF only: allow editing GRN Date (Goods Received Date).
+   * Pass true for Anchor Maker; vendors/checkers must not update GRN.
+   */
+  allowGrnDateEdit?: boolean;
   onApprove?: (invoiceId: string, remarks?: string, grnDate?: string) => void;
   onReject?: (invoiceId: string, remarks?: string, grnDate?: string) => void;
   /** CashnTech admin verification — On Hold */
@@ -108,6 +113,42 @@ function isGrnDateInPast(displayDate: string): boolean {
   const m = moment(displayDate, GRN_DATE_FORMATS, true);
   if (!m.isValid()) return true;
   return m.startOf('day').isBefore(moment().startOf('day'));
+}
+
+/** Returns error message if GRN is invalid vs format / past / invoice date; otherwise null. */
+function getGrnDateValidationError(
+  grnDisplay: string,
+  invoiceDateRaw?: string | null,
+): string | null {
+  const parsed = moment(grnDisplay.trim(), GRN_DATE_FORMATS, true);
+  if (!parsed.isValid()) {
+    return 'Enter a valid GRN date (DD-MM-YYYY)';
+  }
+  if (isGrnDateInPast(grnDisplay.trim())) {
+    return 'GRN date cannot be in the past';
+  }
+  const invoiceDate = moment(
+    (invoiceDateRaw || '').trim(),
+    GRN_DATE_FORMATS,
+    true,
+  );
+  if (invoiceDate.isValid() && parsed.isBefore(invoiceDate, 'day')) {
+    return 'GRN Date must be on or after Invoice Date';
+  }
+  return null;
+}
+
+function getGrnMinimumDate(invoiceDateRaw?: string | null): Date {
+  const today = moment().startOf('day');
+  const invoiceDate = moment(
+    (invoiceDateRaw || '').trim(),
+    GRN_DATE_FORMATS,
+    true,
+  );
+  if (invoiceDate.isValid() && invoiceDate.isAfter(today, 'day')) {
+    return invoiceDate.toDate();
+  }
+  return today.toDate();
 }
 
 const dash = (val?: string | number | null) => {
@@ -138,6 +179,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   invoiceDetails,
   detailsLoading = false,
   productCode,
+  allowGrnDateEdit = false,
   onApprove,
   onReject,
   onHold,
@@ -159,13 +201,12 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   const productDisplayName = PRODUCT_DISPLAY_NAMES[effectiveCode];
 
   const isCashnTechVerification = variant === 'cashntech_verification';
-  const isAnchorCheckerVariant = variant === 'anchor_checker';
-  /** VF AM (and other non-checker approvers): editable GRN before Remark. */
+  /** VF Anchor Maker only: editable GRN (Goods Received Date) before Remark. */
   const showVfGrnDatePicker =
-    isVendorFinance && !isCashnTechVerification && !isAnchorCheckerVariant;
-  /** VF AC: read-only GRN label at bottom — date set by Anchor Maker. */
+    isVendorFinance && !isCashnTechVerification && allowGrnDateEdit;
+  /** VF non-editors (Vendor / Anchor Checker): read-only GRN. */
   const showVfGrnDateLabelOnly =
-    isVendorFinance && !isCashnTechVerification && isAnchorCheckerVariant;
+    isVendorFinance && !isCashnTechVerification && !allowGrnDateEdit;
 
   const invoiceLabel = invoiceNo || invoiceId || 'N/A';
   const modalTitle = isCashnTechVerification
@@ -198,13 +239,12 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
       setGrnDateError('GRN date is required');
       return false;
     }
-    const parsed = moment(grnDateInput.trim(), GRN_DATE_FORMATS, true);
-    if (!parsed.isValid()) {
-      setGrnDateError('Enter a valid GRN date (DD-MM-YYYY)');
-      return false;
-    }
-    if (isGrnDateInPast(grnDateInput.trim())) {
-      setGrnDateError('GRN date cannot be in the past');
+    const error = getGrnDateValidationError(
+      grnDateInput.trim(),
+      details.invoiceDate,
+    );
+    if (error) {
+      setGrnDateError(error);
       return false;
     }
     setGrnDateError(null);
@@ -232,12 +272,14 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
 
   const handleReject = () => {
     let grn: string | undefined;
-    if (
-      showVfGrnDatePicker &&
-      grnDateInput.trim() &&
-      !isGrnDateInPast(grnDateInput.trim())
-    ) {
-      grn = resolveGrnForApi();
+    if (showVfGrnDatePicker && grnDateInput.trim()) {
+      const error = getGrnDateValidationError(
+        grnDateInput.trim(),
+        details.invoiceDate,
+      );
+      if (!error) {
+        grn = resolveGrnForApi();
+      }
     }
     if (invoiceId && onReject) {
       onReject(invoiceId, remarks.trim() || undefined, grn);
@@ -375,10 +417,13 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                         value={dash(details.invoiceDate)}
                       />
                       <DetailRow label="GRN Date" value={dash(details.grnDate)} />
-                      <DetailRow
-                        label="Invoice Due Date"
-                        value={dash(details.invoiceDueDate || details.finalDueDate)}
-                      />
+                      {/* Hidden for now — restore when Due Date is needed on Approve/Reject */}
+                      {false && (
+                        <DetailRow
+                          label="Invoice Due Date"
+                          value={dash(details.invoiceDueDate || details.finalDueDate)}
+                        />
+                      )}
                       <DetailRow
                         label={isCashnTechVerification ? 'Po Ref No' : 'PO Ref'}
                         value={dash(details.poRefNo)}
@@ -547,11 +592,12 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                           onConfirm={date => {
                             const next = moment(date).format('DD-MM-YYYY');
                             setGrnDateInput(next);
-                            if (isGrnDateInPast(next)) {
-                              setGrnDateError('GRN date cannot be in the past');
-                            } else {
-                              setGrnDateError(null);
-                            }
+                            setGrnDateError(
+                              getGrnDateValidationError(
+                                next,
+                                details.invoiceDate,
+                              ),
+                            );
                           }}
                           placeholder="DD-MM-YYYY"
                           mode="date"
@@ -564,7 +610,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                                 ).toDate()
                               : new Date(),
                             mode: 'date',
-                            minimumDate: moment().startOf('day').toDate(),
+                            minimumDate: getGrnMinimumDate(details.invoiceDate),
                           }}
                           containerStyle={styles.grnDatePicker}
                         />

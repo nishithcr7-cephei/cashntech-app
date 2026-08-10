@@ -38,6 +38,7 @@ type InvoiceDetailData = {
   tax: {percent: number; amount: number};
   subTotal: number;
   tdsAmount: number;
+  advanceInterest: number;
   total: number;
   attachments: AttachmentItem[];
 };
@@ -100,15 +101,13 @@ const mapPreviewFieldsToInvoiceData = (
   const formTaxTotal = (Number(fields.cgst) || 0) + (Number(fields.sgst) || 0);
   const taxAmount = itemTaxTotal || formTaxTotal;
 
-  const sumOfItemTotals = normalizedItems.reduce(
-    (sum, it) => sum + (Number(it.total) || 0),
-    0,
-  );
   const subTotal = subTotalBeforeDiscountTax;
   const tdsAmount = Number(fields.tdsAmount) || 0;
-  // Advance interest is a financing charge, not part of the invoice value.
+  const advanceInterest = Number(fields.upfrontInterest) || 0;
+  // grandTotal from create already includes AI deduct (web Create parity).
   const total =
-    Number(fields.grandTotal) || Math.max(0, sumOfItemTotals - tdsAmount);
+    Number(fields.grandTotal) ||
+    subTotalBeforeDiscountTax - discountAmount + taxAmount - tdsAmount - advanceInterest;
 
   const discountPercent =
     subTotalBeforeDiscountTax > 0
@@ -134,6 +133,7 @@ const mapPreviewFieldsToInvoiceData = (
     tax: {percent: taxPercent, amount: taxAmount},
     subTotal,
     tdsAmount,
+    advanceInterest,
     total,
     attachments: attachment?.uri
       ? [
@@ -317,6 +317,19 @@ export const InvoiceUploadPreview: React.FC = () => {
               {fmtAmount(invoiceData.tdsAmount)}/-
             </Text>
           </View>
+          {(advanceInterestBreakdown?.chargeApplies ||
+            invoiceData.advanceInterest > 0) && (
+            <View style={styles.keyValueRow}>
+              <Text style={styles.keyLabel}>Advance Interest</Text>
+              <Text style={styles.keyValue}>
+                {fmtAmount(
+                  advanceInterestBreakdown?.advanceInterest ??
+                    invoiceData.advanceInterest,
+                )}
+                /-
+              </Text>
+            </View>
+          )}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total (Net)</Text>
             <Text style={styles.totalValue}>
@@ -324,33 +337,6 @@ export const InvoiceUploadPreview: React.FC = () => {
             </Text>
           </View>
         </View>
-
-        {advanceInterestBreakdown?.applicable && (
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Financing</Text>
-            <View style={styles.keyValueRow}>
-              <Text style={styles.keyLabel}>Eligible Loan Amount</Text>
-              <Text style={styles.keyValue}>
-                {fmtAmount(advanceInterestBreakdown.eligibleLoanAmount)}/-
-              </Text>
-            </View>
-            <View style={styles.keyValueRow}>
-              <Text style={styles.keyLabel}>Advance Interest</Text>
-              <Text style={styles.keyValue}>
-                {fmtAmount(advanceInterestBreakdown.advanceInterest)}/-
-              </Text>
-            </View>
-            <View style={styles.keyValueRow}>
-              <Text style={styles.keyLabel}>Net Disbursal</Text>
-              <Text style={styles.keyValue}>
-                {fmtAmount(advanceInterestBreakdown.netDisbursal)}/-
-              </Text>
-            </View>
-            <Text style={styles.financingNote}>
-              Indicative. Final amounts are confirmed at disbursement.
-            </Text>
-          </View>
-        )}
 
         <TouchableOpacity
           style={styles.closeFooterButton}

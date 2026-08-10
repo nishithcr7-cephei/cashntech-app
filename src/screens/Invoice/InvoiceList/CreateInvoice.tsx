@@ -588,9 +588,7 @@ export const CreateInvoice: React.FC = () => {
     };
   }, [dealerInfo?.party?.id]);
 
-  // Invoice value = Sub − Discount + Tax − TDS. Advance interest is excluded:
-  // it is a financing charge, and the backend applies eligibility to this
-  // amount when computing the disbursal.
+  // Web Create: invoice totals + AI on Sub Total only (not eligibility).
   const invoiceTotals = useMemo(() => {
     const {subTotal, discountTotal, taxTotal} = computeInvoiceLineAggregates(
       fields.items,
@@ -603,10 +601,7 @@ export const CreateInvoice: React.FC = () => {
       ytdInvoiceTotal,
       currentBase: base,
     });
-    return {
-      tds,
-      net: computeInvoiceNetTotal(subTotal, discountTotal, taxTotal, tds),
-    };
+    return {subTotal, discountTotal, taxTotal, tds};
   }, [
     fields.items,
     fields.cgst,
@@ -616,43 +611,41 @@ export const CreateInvoice: React.FC = () => {
     ytdInvoiceTotal,
   ]);
 
-  // Same inputs and rounding as the backend finance-request preview, so this
-  // figure matches what is actually deducted at disbursement.
+  // Web Create AI = Sub × ROI% × (Tenor/365). Discount/tax/eligibility ignored.
   const advanceInterestInfo = useMemo(
     () =>
       computeVendorFinanceAdvanceInterest({
         isVendorFinance,
         interestChargeType: dealerInfo?.interest_charge_type,
-        invoiceAmount: invoiceTotals.net,
-        eligibilityPercent: selectedParticipant?.eligibility,
+        subTotal: invoiceTotals.subTotal,
         roiPercent: extractRoiPercent(selectedParticipant?.interest_parameters),
         tenorDays: fields.tenor,
       }),
     [
       isVendorFinance,
       dealerInfo?.interest_charge_type,
-      invoiceTotals.net,
+      invoiceTotals.subTotal,
       selectedParticipant,
       fields.tenor,
     ],
   );
 
-  const showAdvanceInterest = advanceInterestInfo.applicable;
+  const showAdvanceInterest = advanceInterestInfo.chargeApplies;
 
   useEffect(() => {
     const nextTds = invoiceTotals.tds.toFixed(2);
-    const nextNet = invoiceTotals.net.toFixed(2);
-
-    // Rewrite the stored charge only when a figure can be stated, or when the
-    // charge plainly does not apply. While the program parameters are still
-    // loading (edit mode fetches them after the invoice) the existing amount
-    // is left alone rather than being zeroed.
-    const currentAdvanceInterest = parseFloat(fields.upfrontInterest || '0') || 0;
-    const nextAdvanceInterest = advanceInterestInfo.applicable
+    const nextAdvanceInterest = advanceInterestInfo.chargeApplies
       ? advanceInterestInfo.advanceInterest
-      : advanceInterestInfo.chargeApplies
-        ? currentAdvanceInterest
-        : 0;
+      : 0;
+    const nextNet = computeInvoiceNetTotal(
+      invoiceTotals.subTotal,
+      invoiceTotals.discountTotal,
+      invoiceTotals.taxTotal,
+      invoiceTotals.tds,
+      nextAdvanceInterest,
+    ).toFixed(2);
+
+    const currentAdvanceInterest = parseFloat(fields.upfrontInterest || '0') || 0;
 
     if (
       fields.tdsAmount === nextTds &&
@@ -1334,7 +1327,7 @@ export const CreateInvoice: React.FC = () => {
           dealerInfo?.party?.entity_name ||
           '',
         productType,
-        advanceInterestBreakdown: advanceInterestInfo.applicable
+        advanceInterestBreakdown: advanceInterestInfo.chargeApplies
           ? advanceInterestInfo
           : null,
       });
@@ -1556,15 +1549,17 @@ export const CreateInvoice: React.FC = () => {
     }
 
     // Final Total Integrity Check (0.01 precision)
-    // Invoice value = Sub − Disc + Tax − TDS (advance interest excluded)
+    // Web Create: Sub − Disc + Tax − TDS − Advance Interest
     const {subTotal: subTotalCalc, discountTotal: discCalc, taxTotal: taxCalc} =
       computeInvoiceLineAggregates(fields.items, fields);
     const tdsCalc = parseFloat(fields.tdsAmount || '0') || 0;
+    const aiCalc = parseFloat(fields.upfrontInterest || '0') || 0;
     const calculatedGrandTotal = computeInvoiceNetTotal(
       subTotalCalc,
       discCalc,
       taxCalc,
       tdsCalc,
+      aiCalc,
     );
     const reportedGrandTotal =
       parseFloat(fields.grandTotal || '0') || calculatedGrandTotal;
@@ -2098,8 +2093,6 @@ export const CreateInvoice: React.FC = () => {
             onLoadPartyTaxes={loadPartyTaxes}
             showAdvanceInterest={showAdvanceInterest}
             advanceInterest={advanceInterestInfo.advanceInterest}
-            eligibleLoanAmount={advanceInterestInfo.eligibleLoanAmount}
-            netDisbursal={advanceInterestInfo.netDisbursal}
             staleInvoicePeriodDays={dealerInfo?.basic_parameters?.stale_invoice_period_days != null ? Number(dealerInfo.basic_parameters.stale_invoice_period_days) : undefined}
             defaultPaymentTermsDays={dealerInfo?.basic_parameters?.default_payment_terms_days != null ? Number(dealerInfo.basic_parameters.default_payment_terms_days) : undefined}
             mode={mode}

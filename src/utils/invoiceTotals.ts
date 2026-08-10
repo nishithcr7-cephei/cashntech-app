@@ -1,10 +1,11 @@
 /**
- * Invoice totals helpers.
+ * Invoice totals helpers — aligned with web Create Invoice screen.
  *
- * Invoice value (`final_total`) = Sub − Discount + Tax − TDS.
- * Advance interest is a lender financing charge, not part of the invoice
- * value, so it is never deducted here — the backend applies eligibility to
- * `final_total` and would otherwise deduct the interest a second time.
+ * Total (Net) = Sub − Discount + Tax − TDS − Advance Interest
+ *
+ * Advance Interest (VF + Upfront only) uses Sub Total only:
+ *   Sub Total × (ROI% ÷ 100) × (Tenor ÷ 365)
+ * Discount / Tax / TDS / Eligibility do NOT change the AI base (web Create parity).
  */
 
 export function round2(n: number): number {
@@ -57,13 +58,15 @@ export function computeInvoiceLineAggregates(
   };
 }
 
+/** Web Create Total (Net) — includes Advance Interest deduct. */
 export function computeInvoiceNetTotal(
   subTotal: number,
   discountTotal: number,
   taxTotal: number,
   tdsAmount = 0,
+  advanceInterest = 0,
 ): number {
-  return Math.max(0, round2(subTotal - discountTotal + taxTotal - tdsAmount));
+  return round2(subTotal - discountTotal + taxTotal - tdsAmount - advanceInterest);
 }
 
 /** Amount before TDS (used as the TDS base). */
@@ -82,46 +85,26 @@ export function isTdsPartyTaxName(name: string | undefined | null): boolean {
 }
 
 export type AdvanceInterestBreakdown = {
-  /** True when the product and interest charge type make the charge payable. */
+  /** VF + Interest Charge Type Upfront. */
   chargeApplies: boolean;
-  /**
-   * True only when `chargeApplies` and every input is present. Callers use
-   * this to decide whether a figure can be stated at all — `chargeApplies`
-   * without `applicable` means the parameters are still missing.
-   */
+  /** Show AI row on create (web shows even at ₹0.00). */
   applicable: boolean;
-  eligibleLoanAmount: number;
   advanceInterest: number;
-  netDisbursal: number;
-};
-
-const NOT_CHARGEABLE: AdvanceInterestBreakdown = {
-  chargeApplies: false,
-  applicable: false,
-  eligibleLoanAmount: 0,
-  advanceInterest: 0,
-  netDisbursal: 0,
-};
-
-const CHARGEABLE_BUT_INCOMPLETE: AdvanceInterestBreakdown = {
-  ...NOT_CHARGEABLE,
-  chargeApplies: true,
 };
 
 /**
- * Vendor Finance advance (upfront) interest, mirroring the backend
- * finance-request preview — same per-step rounding and the same fixed
- * 365-day divisor — so the create screen and the disbursement flow can
- * never state different figures for the same invoice.
+ * Web Create Invoice Advance Interest (observed portal behaviour):
+ *   Advance Interest = Sub Total × (ROI% ÷ 100) × (Tenor ÷ 365)
  *
- * Interest applies to the eligible loan amount, not the full invoice value.
+ * Base is Sub Total only — discount, tax, TDS and eligibility are ignored.
+ * Finance-request / disbursement may still recalculate on eligible amount
+ * server-side; that is a separate step from create-screen display.
  */
 export function computeVendorFinanceAdvanceInterest(input: {
   isVendorFinance: boolean;
   interestChargeType?: string | null;
-  /** Invoice value sent as `final_total` (Sub − Discount + Tax − TDS). */
-  invoiceAmount: number;
-  eligibilityPercent?: number | string | null;
+  /** Web Create base = line Sub Total only. */
+  subTotal: number;
   roiPercent?: number | string | null;
   tenorDays?: number | string | null;
 }): AdvanceInterestBreakdown {
@@ -129,38 +112,21 @@ export function computeVendorFinanceAdvanceInterest(input: {
     .trim()
     .toLowerCase();
   if (!input.isVendorFinance || chargeType !== 'upfront') {
-    return NOT_CHARGEABLE;
+    return {chargeApplies: false, applicable: false, advanceInterest: 0};
   }
 
-  const invoiceAmount = Number(input.invoiceAmount) || 0;
-  const eligibilityPercent = Number(input.eligibilityPercent) || 0;
+  const subTotal = Number(input.subTotal) || 0;
   const roiPercent = Number(input.roiPercent) || 0;
   const tenorDays = Number(input.tenorDays) || 0;
 
-  // A missing parameter means no figure can be stated. Callers hide the row
-  // instead of rendering ₹0.00, which would read as a calculated result.
-  if (
-    invoiceAmount <= 0 ||
-    eligibilityPercent <= 0 ||
-    roiPercent <= 0 ||
-    tenorDays <= 0
-  ) {
-    return CHARGEABLE_BUT_INCOMPLETE;
+  if (subTotal <= 0 || roiPercent <= 0 || tenorDays <= 0) {
+    return {chargeApplies: true, applicable: true, advanceInterest: 0};
   }
-
-  const eligibleLoanAmount = round2(
-    (invoiceAmount * eligibilityPercent) / 100,
-  );
-  const advanceInterest = round2(
-    eligibleLoanAmount * (roiPercent / 100) * (tenorDays / 365),
-  );
 
   return {
     chargeApplies: true,
     applicable: true,
-    eligibleLoanAmount,
-    advanceInterest,
-    netDisbursal: round2(eligibleLoanAmount - advanceInterest),
+    advanceInterest: round2(subTotal * (roiPercent / 100) * (tenorDays / 365)),
   };
 }
 

@@ -97,12 +97,9 @@ type Props = {
   /** Active party taxes — GST dropdown only (TDS filtered out by parent). */
   partyTaxOptions?: PartyTaxOption[];
   onLoadPartyTaxes?: () => void;
-  /** Show the financing breakdown (VF + Upfront, with complete parameters). */
+  /** Show Advance Interest row (VF + Upfront) — web Create parity. */
   showAdvanceInterest?: boolean;
-  /** Financing figures — informational only, never part of the invoice value. */
   advanceInterest?: number;
-  eligibleLoanAmount?: number;
-  netDisbursal?: number;
   bankOptions?: DropdownOption[];
   selectedBankId?: string;
   onBankSelect?: (bankId: string) => void;
@@ -143,8 +140,6 @@ export const InvoiceForm: React.FC<Props> = ({
   onLoadPartyTaxes,
   showAdvanceInterest = false,
   advanceInterest = 0,
-  eligibleLoanAmount = 0,
-  netDisbursal = 0,
   staleInvoicePeriodDays = 30,
   defaultPaymentTermsDays = 60,
   submitButtonAppearsDisabled = false,
@@ -1108,13 +1103,10 @@ export const InvoiceForm: React.FC<Props> = ({
             (parseFloat(value.taxTotal || '0') || 0);
           const taxTotal = itemTaxSum > 0 ? itemTaxSum : ocrTaxFallback;
           
-          // Invoice value (Sub − Discount + Tax − TDS). Advance interest is a
-          // financing charge and is shown separately, never deducted here.
+          // Web Create: Total (Net) = Sub − Discount + Tax − TDS − Advance Interest
           const tdsAmount = parseFloat(value.tdsAmount || '0') || 0;
-          const total = Math.max(
-            0,
-            subTotal - discountTotal + taxTotal - tdsAmount,
-          );
+          const aiAmount = showAdvanceInterest ? advanceInterest : 0;
+          const total = subTotal - discountTotal + taxTotal - tdsAmount - aiAmount;
 
           return (
             <View style={styles.summaryContainer}>
@@ -1134,37 +1126,16 @@ export const InvoiceForm: React.FC<Props> = ({
                 <Text style={styles.summaryLabel}>TDS</Text>
                 <Text style={styles.summaryValue}>₹{tdsAmount.toFixed(2)}</Text>
               </View>
+              {showAdvanceInterest && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Advance Interest</Text>
+                  <Text style={styles.summaryValue}>₹{aiAmount.toFixed(2)}</Text>
+                </View>
+              )}
               <View style={[styles.summaryRow, styles.summaryTotalRow]}>
                 <Text style={styles.summaryTotalLabel}>Total (Net)</Text>
                 <Text style={styles.summaryTotalValue}>₹{total.toFixed(2)}</Text>
               </View>
-
-              {showAdvanceInterest && (
-                <View style={styles.financingSection}>
-                  <Text style={styles.financingTitle}>Financing</Text>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Eligible Loan Amount</Text>
-                    <Text style={styles.summaryValue}>
-                      ₹{eligibleLoanAmount.toFixed(2)}
-                    </Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Advance Interest</Text>
-                    <Text style={styles.summaryValue}>
-                      ₹{advanceInterest.toFixed(2)}
-                    </Text>
-                  </View>
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Net Disbursal</Text>
-                    <Text style={styles.summaryValue}>
-                      ₹{netDisbursal.toFixed(2)}
-                    </Text>
-                  </View>
-                  <Text style={styles.financingNote}>
-                    Indicative. Final amounts are confirmed at disbursement.
-                  </Text>
-                </View>
-              )}
             </View>
           );
         })()}
