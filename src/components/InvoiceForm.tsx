@@ -118,6 +118,12 @@ type Props = {
   canUploadFinal?: boolean;
   onAddAttachment?: () => void;
   selectedAttachment?: any; // To avoid import complexity now, using any for DocumentPickerResponse
+  /** Open invoice preview again to cross-check before submit. */
+  onPreview?: () => void;
+  /** When true, preview button looks disabled but stays pressable (toast feedback). */
+  previewButtonAppearsDisabled?: boolean;
+  /** Reason shown when preview is pressed while not ready. */
+  previewDisabledReason?: string;
   /** When true, item discount/tax dropdowns and delete actions are locked (OCR-filled invoice). */
   isOcrMode?: boolean;
   /** When true, form inputs are locked; Cancel remains available. */
@@ -151,6 +157,9 @@ export const InvoiceForm: React.FC<Props> = ({
   canUploadFinal = false,
   onAddAttachment,
   selectedAttachment,
+  onPreview,
+  previewButtonAppearsDisabled = false,
+  previewDisabledReason,
   isOcrMode = false,
   ocrLoading = false,
 }) => {
@@ -1425,59 +1434,94 @@ export const InvoiceForm: React.FC<Props> = ({
 
       </View>
 
-      {/* Submit and Cancel Buttons */}
+      {/* Preview + Submit / Cancel */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, styles.cancelButton]}
-          onPress={handleCancel}
-          disabled={loading}>
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.submitButton, (loading || ocrLoading || submitButtonAppearsDisabled) && styles.submitButtonDisabled]}
-          disabled={loading || ocrLoading}
-          onPress={() => {
-            console.log('[InvoiceForm] Submit pressed, disabledInternally:', submitButtonAppearsDisabled);
-            if (submitButtonAppearsDisabled) {
-              // Show a specific reason so the user knows exactly what to fix
-              const reason =
-                submitDisabledReason ||
-                (!value.invoiceNumber?.trim()
-                  ? 'Invoice / Unique Ref. No is required'
-                  : !value.dealer?.trim()
-                  ? 'Dealer Name is required'
-                  : !value.dealerCode?.trim()
-                  ? 'Dealer Code is required'
-                  : !value.invoiceDate?.trim()
-                  ? 'Invoice Date is required'
-                  : mode !== 'edit' &&
-                    !value.creditTo?.trim()
-                  ? 'Credit To is required'
-                  : mode !== 'edit' &&
-                    value.creditTo?.trim() &&
-                    !value.creditToAccountId?.trim()
-                  ? 'Please select a valid Credit To account from the list'
-                  : !value.items || value.items.length === 0
-                  ? 'Please add at least one item'
-                  : 'Please fill all required fields before submitting');
-              Toast.show({
-                type: 'error',
-                text1: reason,
-                visibilityTime: 3000,
-              });
-              return;
-            }
-            console.log('[InvoiceForm] Calling onSubmit props');
-            onSubmit?.();
-          }}>
-          {loading ? (
-            <Text style={styles.submitButtonText}>Submitting...</Text>
-          ) : ocrLoading ? (
-            <Text style={styles.submitButtonText}>Extracting OCR...</Text>
-          ) : (
-            <Text style={styles.submitButtonText}>{mode === 'edit' ? 'Update Invoice' : 'Submit'}</Text>
-          )}
-        </TouchableOpacity>
+        {!!onPreview && (
+          <TouchableOpacity
+            style={[
+              styles.button,
+              styles.previewButton,
+              (loading || ocrLoading || previewButtonAppearsDisabled) &&
+                styles.previewButtonDisabled,
+            ]}
+            onPress={() => {
+              if (loading || ocrLoading) return;
+              if (previewButtonAppearsDisabled) {
+                Toast.show({
+                  type: 'error',
+                  text1:
+                    previewDisabledReason ||
+                    'Please fill Party, Invoice Date and at least one item to preview',
+                  visibilityTime: 3000,
+                });
+                return;
+              }
+              onPreview();
+            }}
+            disabled={loading || ocrLoading}
+            activeOpacity={0.8}>
+            <Text
+              style={[
+                styles.previewButtonText,
+                previewButtonAppearsDisabled && styles.previewButtonTextDisabled,
+              ]}>
+              Invoice Preview
+            </Text>
+          </TouchableOpacity>
+        )}
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[styles.button, styles.cancelButton]}
+            onPress={handleCancel}
+            disabled={loading}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, styles.submitButton, (loading || ocrLoading || submitButtonAppearsDisabled) && styles.submitButtonDisabled]}
+            disabled={loading || ocrLoading}
+            onPress={() => {
+              console.log('[InvoiceForm] Submit pressed, disabledInternally:', submitButtonAppearsDisabled);
+              if (submitButtonAppearsDisabled) {
+                // Show a specific reason so the user knows exactly what to fix
+                const reason =
+                  submitDisabledReason ||
+                  (!value.invoiceNumber?.trim()
+                    ? 'Invoice / Unique Ref. No is required'
+                    : !value.dealer?.trim()
+                    ? 'Dealer Name is required'
+                    : !value.dealerCode?.trim()
+                    ? 'Dealer Code is required'
+                    : !value.invoiceDate?.trim()
+                    ? 'Invoice Date is required'
+                    : mode !== 'edit' &&
+                      !value.creditTo?.trim()
+                    ? 'Credit To is required'
+                    : mode !== 'edit' &&
+                      value.creditTo?.trim() &&
+                      !value.creditToAccountId?.trim()
+                    ? 'Please select a valid Credit To account from the list'
+                    : !value.items || value.items.length === 0
+                    ? 'Please add at least one item'
+                    : 'Please fill all required fields before submitting');
+                Toast.show({
+                  type: 'error',
+                  text1: reason,
+                  visibilityTime: 3000,
+                });
+                return;
+              }
+              console.log('[InvoiceForm] Calling onSubmit props');
+              onSubmit?.();
+            }}>
+            {loading ? (
+              <Text style={styles.submitButtonText}>Submitting...</Text>
+            ) : ocrLoading ? (
+              <Text style={styles.submitButtonText}>Extracting OCR...</Text>
+            ) : (
+              <Text style={styles.submitButtonText}>{mode === 'edit' ? 'Update Invoice' : 'Submit'}</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Attachments Section (Edit Mode) */}
@@ -2061,12 +2105,16 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   buttonContainer: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 12,
     padding: 16,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
   button: {
     flex: 1,
@@ -2075,6 +2123,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  previewButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: Colors.primaryColor,
+  },
+  previewButtonDisabled: {
+    opacity: 0.55,
+    borderColor: '#ccc',
+  },
+  previewButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.primaryColor,
+  },
+  previewButtonTextDisabled: {
+    color: '#999',
   },
   cancelButton: {
     backgroundColor: '#f5f5f5',

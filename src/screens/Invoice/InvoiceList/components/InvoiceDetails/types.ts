@@ -17,7 +17,46 @@ function readApprovalLogUserName(log: InvoiceApprovalLogApi | Record<string, any
 }
 
 function readApprovalLogRole(log: InvoiceApprovalLogApi | Record<string, any>): string {
-  return (log as any).action_by_role ?? (log as any).actionByRole ?? '';
+  const raw =
+    (log as any).action_by_role ??
+    (log as any).actionByRole ??
+    (log as any).role ??
+    '';
+  const trimmed = String(raw).trim();
+  if (!trimmed) return '';
+  // Backend sometimes sends "Vendor Maker (Workflow Name)" — show role only.
+  const parenIdx = trimmed.indexOf('(');
+  if (parenIdx > 0) {
+    return trimmed.slice(0, parenIdx).trim();
+  }
+  return trimmed;
+}
+
+/** Remark / rejection text from approval log (web parity). */
+function readApprovalLogRemark(
+  log: InvoiceApprovalLogApi | Record<string, any>,
+): string | undefined {
+  const action = String(log.action ?? '').toLowerCase();
+  const candidates = [
+    log.remark,
+    (log as any).approvalRemark,
+    (log as any).approval_remark,
+    (log as any).rejection_reason,
+    (log as any).rejectionReason,
+    (log as any).comments,
+  ];
+  for (const candidate of candidates) {
+    const text = String(candidate ?? '').trim();
+    if (!text || text === '-' || text === 'null' || text === 'undefined') {
+      continue;
+    }
+    return text;
+  }
+  // Reject without explicit remark — nothing to show
+  if (action.includes('reject')) {
+    return undefined;
+  }
+  return undefined;
 }
 
 /** Web-style timeline timestamp: "21 Jul, 04:48 PM" */
@@ -35,7 +74,7 @@ export function formatTimelineTimestamp(isoDate: string): string {
         hour12: true,
       })
       .replace(/\u202f/g, ' ');
-    return `${day} ${month}, ${time}`;
+    return `${day} ${month},\u00A0${time}`;
   } catch {
     return isoDate;
   }
@@ -60,6 +99,13 @@ export function mapApprovalLogToTimelineStep(
   const action = log.action ?? '';
   const rejectionReason =
     (log as any).rejection_reason ?? (log as any).rejectionReason ?? '';
+  const remark = readApprovalLogRemark(log);
+  const rejectionText =
+    (rejectionReason || '').trim() &&
+    (rejectionReason || '').trim() !== '-' &&
+    (rejectionReason || '').trim() !== remark
+      ? (rejectionReason || '').trim()
+      : undefined;
   return {
     id: log.id ?? String(Math.random()),
     action,
@@ -69,6 +115,8 @@ export function mapApprovalLogToTimelineStep(
       (log as any).action_at ?? (log as any).actionAt ?? '',
     ),
     status: resolveTimelineStatus(action, rejectionReason),
+    remark,
+    rejectionReason: rejectionText,
   };
 }
 
@@ -166,6 +214,7 @@ export type InvoiceRow = {
   /** From list API — drives Approve/Reject when present */
   actionable?: boolean;
   currentStepRole?: string;
+  currentStepActionType?: string;
   /** Backend edit gate: sequence_no <= 2 (or Draft/Rejected) */
   currentStepSequenceNo?: number | null;
 };
@@ -222,6 +271,7 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
     approvalLogsCount: Array.isArray(item.approvalLogs) ? item.approvalLogs.length : 0,
     actionable: typeof item.actionable === 'boolean' ? item.actionable : undefined,
     currentStepRole: item.current_step?.role,
+    currentStepActionType: item.current_step?.action_type,
     currentStepSequenceNo:
       typeof item.current_step?.sequence_no === 'number'
         ? item.current_step.sequence_no

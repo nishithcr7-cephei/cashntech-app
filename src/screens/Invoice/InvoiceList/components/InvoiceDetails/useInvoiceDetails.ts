@@ -349,11 +349,15 @@ export function useInvoiceDetails() {
           data?.primary_party_name ??
           program?.program_name ??
           '';
-        const anchorName =
+        let anchorName =
           decryptValue(rawAnchorName) ||
           rawAnchorName ||
           selectedListRow?.primaryParty ||
           '-';
+        let dealerNameResolved = dealerName;
+        if (effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE) {
+          [anchorName, dealerNameResolved] = [dealerNameResolved, anchorName];
+        }
 
         const partyCode =
           apm?.company_code_given_by_party ??
@@ -488,7 +492,7 @@ export function useInvoiceDetails() {
         })();
 
         setAnchorCheckerInvoiceDetails({
-          dealerName,
+          dealerName: dealerNameResolved,
           anchorName,
           partyCode,
           odAccountNumber,
@@ -523,7 +527,12 @@ export function useInvoiceDetails() {
     return () => {
       cancelled = true;
     };
-  }, [showApproveRejectModal, selectedInvoiceId, invoiceListRaw]);
+  }, [
+    showApproveRejectModal,
+    selectedInvoiceId,
+    invoiceListRaw,
+    effectiveProductCode,
+  ]);
 
   useEffect(() => {
     if (!showCheckerApprovalModal || !selectedInvoiceId) {
@@ -728,10 +737,15 @@ export function useInvoiceDetails() {
           ],
         );
         break;
-      case 'approveReject':
+      case 'approveReject': {
+        const isVfApproval =
+          effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE;
+        const listPrimaryParty = rowForAction?.primaryParty || '-';
+        const listCounterParty =
+          rowForAction?.dealerName || rowForAction?.counterParty || '-';
         setAnchorCheckerInvoiceDetails({
-          dealerName: rowForAction?.dealerName || rowForAction?.counterParty || '-',
-          anchorName: rowForAction?.primaryParty || '-',
+          dealerName: isVfApproval ? listPrimaryParty : listCounterParty,
+          anchorName: isVfApproval ? listCounterParty : listPrimaryParty,
           partyCode: rowForAction?.dealerCode || '',
           creditAccountNumber: rowForAction?.creditAccountNumber || '-',
           creditTo: rowForAction?.creditAccountNumber || '-',
@@ -748,10 +762,16 @@ export function useInvoiceDetails() {
         setSelectedInvoiceNo(invoiceNo);
         setShowApproveRejectModal(true);
         break;
-      case 'invoiceVerification':
+      }
+      case 'invoiceVerification': {
+        const isVfVerification =
+          effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE;
+        const verifyPrimaryParty = rowForAction?.primaryParty || '-';
+        const verifyCounterParty =
+          rowForAction?.dealerName || rowForAction?.counterParty || '-';
         setAnchorCheckerInvoiceDetails({
-          dealerName: rowForAction?.dealerName || rowForAction?.counterParty || '-',
-          anchorName: rowForAction?.primaryParty || '-',
+          dealerName: isVfVerification ? verifyPrimaryParty : verifyCounterParty,
+          anchorName: isVfVerification ? verifyCounterParty : verifyPrimaryParty,
           partyCode: rowForAction?.dealerCode || '',
           creditAccountNumber: rowForAction?.creditAccountNumber || '-',
           creditTo: rowForAction?.creditAccountNumber || '-',
@@ -763,6 +783,7 @@ export function useInvoiceDetails() {
         setSelectedInvoiceNo(invoiceNo);
         setShowApproveRejectModal(true);
         break;
+      }
       case 'financeRequest': {
         if (isCashnTechUser) {
           break;
@@ -1418,7 +1439,7 @@ export function useInvoiceDetails() {
       return;
     }
 
-    (navigation as any).navigate('CreateInvoice');
+    (navigation as any).navigate('CreateInvoice', {freshCreate: true});
   }, [navigation, canCreate, isCreateInvoiceEnabled, createInvoiceDisabledReason]);
 
   const userPartyType = isCashnTechUser ? 'cashntech' : (isAnchorMaker || isAnchorChecker) ? 'anchor' : 'dealer';
@@ -1613,6 +1634,8 @@ export function useInvoiceDetails() {
     selectedInvoiceRawApprovalStatus: selectedRowForMenu?.rawApprovalStatus,
     selectedInvoiceRawInvoiceStatus: selectedRowForMenu?.rawInvoiceStatus,
     selectedInvoiceActionable: selectedRowForMenu?.actionable,
+    selectedInvoiceCurrentStepActionType:
+      selectedRowForMenu?.currentStepActionType ?? null,
     selectedInvoiceApprovalLogsCount: selectedRowForMenu?.approvalLogsCount || 0,
     selectedInvoiceCurrentStepSequenceNo:
       selectedRowForMenu?.currentStepSequenceNo ?? null,

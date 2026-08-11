@@ -17,23 +17,46 @@ import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {decryptValue} from '@utils/decrypt';
 import type {AdvanceInterestBreakdown} from '@utils/invoiceTotals';
-import type {InvoiceFields} from '../../types/Invoice';
+import type {InvoiceFields} from '@type/Invoice';
 
 const fmtAmount = (n: number) =>
   n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
+const displayOrDash = (value?: string | number | null) => {
+  if (value === null || value === undefined) return '-';
+  const text = String(value).trim();
+  return text.length ? text : '-';
+};
+
 type AttachmentItem = {id: number; attachment_url: string; fullUrl: string};
 
+type PreviewLineItem = {
+  id: string;
+  itemName: string;
+  quantity: number;
+  unit: number | string;
+  price: number;
+  total: number;
+  lineTotal: number;
+  discountAmount: number;
+  taxAmount: number;
+};
+
 type InvoiceDetailData = {
-  dealerName: string;
-  dealerCode: string;
+  counterPartyName: string;
+  counterPartyCode: string;
   odAccountNumber: string;
   anchorName: string;
+  creditTo: string;
   remark: string;
   poRefNo: string;
   invoiceDate: string;
   invoiceDueDate: string;
-  items: Array<{id: string; itemName: string; quantity: number; unit: number | string; price: number; total: number}>;
+  paymentDate: string;
+  grnDate: string;
+  tenor: string;
+  earlyPaymentDiscount: string;
+  items: PreviewLineItem[];
   discount: {percent: number; amount: number};
   tax: {percent: number; amount: number};
   subTotal: number;
@@ -46,48 +69,54 @@ type InvoiceDetailData = {
 const mapPreviewFieldsToInvoiceData = (
   fields: InvoiceFields,
   attachment?: DocumentPickerResponse,
-  anchorName?: string,
+  partyNames?: {
+    anchorName?: string;
+    counterPartyName?: string;
+    counterPartyCode?: string;
+  },
 ): InvoiceDetailData => {
-  const normalizedItems = (fields.items || []).map((it: any, index) => {
-    const lineTotal = Number(it.total) || 0;
-    const discountType = it.discountType || '';
-    const discountValue = Number(it.discountValue) || 0;
-    let discountAmount = Number(it.discountAmount) || 0;
-    if (!discountAmount && discountType === 'percentage') {
-      discountAmount = (lineTotal * discountValue) / 100;
-    } else if (!discountAmount && discountType === 'value') {
-      discountAmount = discountValue;
-    }
-    const taxes = Array.isArray(it.taxes) ? it.taxes : [];
-    const taxFromTaxes = taxes.reduce(
-      (sum: number, t: any) => sum + (Number(t?.taxAmount) || 0),
-      0,
-    );
-    const taxAmount = taxFromTaxes || Number(it.taxAmount) || 0;
-    const netTotal = Math.max(0, lineTotal - discountAmount + taxAmount);
-    return {
-      id: `preview-item-${index}`,
-      itemName: it.itemName || '-',
-      quantity: Number(it.quantity) || 0,
-      unit: it.unit || '-',
-      price: Number(it.pricePerQuantity) || 0,
-      total: netTotal,
-      lineTotal,
-      discountAmount,
-      taxAmount,
-    };
-  });
+  const normalizedItems: PreviewLineItem[] = (fields.items || []).map(
+    (it: any, index) => {
+      const lineTotal = Number(it.total) || 0;
+      const discountType = it.discountType || '';
+      const discountValue = Number(it.discountValue) || 0;
+      let discountAmount = Number(it.discountAmount) || 0;
+      if (!discountAmount && discountType === 'percentage') {
+        discountAmount = (lineTotal * discountValue) / 100;
+      } else if (!discountAmount && discountType === 'value') {
+        discountAmount = discountValue;
+      }
+      const taxes = Array.isArray(it.taxes) ? it.taxes : [];
+      const taxFromTaxes = taxes.reduce(
+        (sum: number, t: any) => sum + (Number(t?.taxAmount) || 0),
+        0,
+      );
+      const taxAmount = taxFromTaxes || Number(it.taxAmount) || 0;
+      const netTotal = Math.max(0, lineTotal - discountAmount + taxAmount);
+      return {
+        id: `preview-item-${index}`,
+        itemName: it.itemName || '-',
+        quantity: Number(it.quantity) || 0,
+        unit: it.unit || '-',
+        price: Number(it.pricePerQuantity) || 0,
+        total: netTotal,
+        lineTotal,
+        discountAmount,
+        taxAmount,
+      };
+    },
+  );
 
   const subTotalBeforeDiscountTax = normalizedItems.reduce(
-    (sum, it: any) => sum + (Number(it.lineTotal) || 0),
+    (sum, it) => sum + (Number(it.lineTotal) || 0),
     0,
   );
   const itemDiscountTotal = normalizedItems.reduce(
-    (sum, it: any) => sum + (Number(it.discountAmount) || 0),
+    (sum, it) => sum + (Number(it.discountAmount) || 0),
     0,
   );
   const itemTaxTotal = normalizedItems.reduce(
-    (sum, it: any) => sum + (Number(it.taxAmount) || 0),
+    (sum, it) => sum + (Number(it.taxAmount) || 0),
     0,
   );
 
@@ -118,16 +147,25 @@ const mapPreviewFieldsToInvoiceData = (
       ? (taxAmount / subTotalBeforeDiscountTax) * 100
       : 0;
 
+  const fallbackCounterParty =
+    decryptValue(fields.dealer ?? '') || fields.dealer || '';
+  const fallbackCode = fields.dealerCode || '';
+
   return {
-    dealerName: decryptValue(fields.dealer ?? '') || fields.dealer || '',
-    dealerCode: fields.dealerCode || '',
+    counterPartyName: partyNames?.counterPartyName?.trim() || fallbackCounterParty,
+    counterPartyCode: partyNames?.counterPartyCode?.trim() || fallbackCode,
     odAccountNumber:
       decryptValue(fields.odAccountNumber ?? '') || fields.odAccountNumber || '',
-    anchorName: anchorName || '',
+    anchorName: partyNames?.anchorName?.trim() || '',
+    creditTo: fields.creditTo || '',
     remark: fields.remark || '',
     poRefNo: fields.associatedPO || '',
     invoiceDate: fields.invoiceDate || '',
     invoiceDueDate: fields.invoiceDueDate || '',
+    paymentDate: fields.paymentDate || '',
+    grnDate: fields.grnDate || '',
+    tenor: fields.tenor || '',
+    earlyPaymentDiscount: fields.earlyPaymentDiscount || '',
     items: normalizedItems,
     discount: {percent: discountPercent, amount: discountAmount},
     tax: {percent: taxPercent, amount: taxAmount},
@@ -143,9 +181,28 @@ const mapPreviewFieldsToInvoiceData = (
             fullUrl: attachment.uri,
           },
         ]
-      : [],
+      : (fields.attachments || []).map(att => ({
+          id: att.id,
+          attachment_url: att.attachment_url,
+          fullUrl: att.attachment_url,
+        })),
   };
 };
+
+const KeyValueRow = ({
+  label,
+  value,
+  isLast = false,
+}: {
+  label: string;
+  value: string;
+  isLast?: boolean;
+}) => (
+  <View style={isLast ? styles.keyValueRowLast : styles.keyValueRow}>
+    <Text style={styles.keyLabel}>{label}</Text>
+    <Text style={styles.keyValue}>{value}</Text>
+  </View>
+);
 
 export const InvoiceUploadPreview: React.FC = () => {
   const navigation = useNavigation();
@@ -157,29 +214,57 @@ export const InvoiceUploadPreview: React.FC = () => {
     | DocumentPickerResponse
     | undefined;
   const previewAnchorName = route?.params?.previewAnchorName as string | undefined;
+  const previewCounterPartyName = route?.params?.previewCounterPartyName as
+    | string
+    | undefined;
+  const previewCounterPartyCode = route?.params?.previewCounterPartyCode as
+    | string
+    | undefined;
   const productType =
     (route?.params?.productType as 'dealer_finance' | 'vendor_finance' | undefined) ||
     'dealer_finance';
   const isVendorFinance = productType === 'vendor_finance';
-  const counterpartyLabel = isVendorFinance ? 'Vendor Name' : 'Dealer Name';
-  const counterpartyCodeLabel = isVendorFinance ? 'Vendor Code' : 'Dealer Code';
+  // Web VF uses Counter Party; DF uses Dealer Name / Dealer Code.
+  const counterPartyLabel = isVendorFinance ? 'Counter Party' : 'Dealer Name';
+  const counterPartyCodeLabel = isVendorFinance
+    ? 'Counter Party Code'
+    : 'Dealer Code';
   const advanceInterestBreakdown = route?.params?.advanceInterestBreakdown as
     | AdvanceInterestBreakdown
     | null
     | undefined;
+
+  const fallbackAnchorName =
+    previewAnchorName ||
+    (dealerInfo?.party?.entity_name
+      ? decryptValue(dealerInfo.party.entity_name) || dealerInfo.party.entity_name
+      : '');
 
   const invoiceData = useMemo(
     () =>
       mapPreviewFieldsToInvoiceData(
         previewFields || ({} as InvoiceFields),
         previewAttachment,
-        previewAnchorName ||
-          (dealerInfo?.party?.entity_name
-            ? decryptValue(dealerInfo.party.entity_name) || dealerInfo.party.entity_name
-            : ''),
+        {
+          anchorName: fallbackAnchorName,
+          counterPartyName: previewCounterPartyName,
+          counterPartyCode: previewCounterPartyCode,
+        },
       ),
-    [previewFields, previewAttachment, previewAnchorName],
+    [
+      previewFields,
+      previewAttachment,
+      fallbackAnchorName,
+      previewCounterPartyName,
+      previewCounterPartyCode,
+    ],
   );
+
+  const earlyPaymentDiscountDisplay = useMemo(() => {
+    const raw = String(invoiceData.earlyPaymentDiscount || '').trim();
+    if (!raw) return '-';
+    return raw.includes('%') ? raw : `${raw}%`;
+  }, [invoiceData.earlyPaymentDiscount]);
 
   const closePreview = () => {
     (navigation as any).navigate('CreateInvoice', {
@@ -222,113 +307,156 @@ export const InvoiceUploadPreview: React.FC = () => {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
+        {/* Party Details — web Create/Preview parity */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Party Details</Text>
+          <KeyValueRow
+            label="Anchor"
+            value={displayOrDash(invoiceData.anchorName)}
+          />
+          <KeyValueRow
+            label="Loan OD Account Number"
+            value={displayOrDash(invoiceData.odAccountNumber)}
+          />
+          <KeyValueRow
+            label="Credit To"
+            value={displayOrDash(invoiceData.creditTo)}
+          />
+          <KeyValueRow
+            label={counterPartyLabel}
+            value={displayOrDash(invoiceData.counterPartyName)}
+          />
+          <KeyValueRow
+            label={counterPartyCodeLabel}
+            value={displayOrDash(invoiceData.counterPartyCode)}
+            isLast
+          />
+        </View>
+
+        {/* Invoice Details — web Create/Preview parity */}
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Invoice Details</Text>
-          <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>{counterpartyLabel}</Text>
-            <Text style={styles.keyValue}>{invoiceData.dealerName || '-'}</Text>
-          </View>
-          <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>{counterpartyCodeLabel}</Text>
-            <Text style={styles.keyValue}>{invoiceData.dealerCode || '-'}</Text>
-          </View>
-          <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>OD Account Number</Text>
-            <Text style={styles.keyValue}>{invoiceData.odAccountNumber || '-'}</Text>
-          </View>
-          <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>Anchor Name</Text>
-            <Text style={styles.keyValue}>{invoiceData.anchorName || '-'}</Text>
-          </View>
-          <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>PO Ref. No.</Text>
-            <Text style={styles.keyValue}>{invoiceData.poRefNo || '-'}</Text>
-          </View>
-          <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>Invoice Date</Text>
-            <Text style={styles.keyValue}>{invoiceData.invoiceDate || '-'}</Text>
-          </View>
-          <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>Invoice Due Date</Text>
-            <Text style={styles.keyValue}>{invoiceData.invoiceDueDate || '-'}</Text>
-          </View>
-          <View style={styles.keyValueRowLast}>
-            <Text style={styles.keyLabel}>Remark</Text>
-            <Text style={styles.keyValue}>{invoiceData.remark || '-'}</Text>
-          </View>
+          <KeyValueRow
+            label="Invoice Date"
+            value={displayOrDash(invoiceData.invoiceDate)}
+          />
+          <KeyValueRow
+            label="Invoice Due Date"
+            value={displayOrDash(invoiceData.invoiceDueDate)}
+          />
+          <KeyValueRow
+            label="Payment Date"
+            value={displayOrDash(invoiceData.paymentDate)}
+          />
+          <KeyValueRow
+            label="GRN Date"
+            value={displayOrDash(invoiceData.grnDate)}
+          />
+          <KeyValueRow label="Disbursement Date" value="-" />
+          <KeyValueRow
+            label="Po Ref No"
+            value={displayOrDash(invoiceData.poRefNo)}
+          />
+          <KeyValueRow label="Tenor" value={displayOrDash(invoiceData.tenor)} />
+          <KeyValueRow label="Usance Days" value="-" isLast />
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>Additional Information</Text>
+          <KeyValueRow
+            label="Early Payment Discount"
+            value={earlyPaymentDiscountDisplay}
+          />
+          <KeyValueRow
+            label="Remark"
+            value={displayOrDash(invoiceData.remark)}
+            isLast
+          />
         </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Description</Text>
-          {invoiceData.items.map((item, index) => (
-            <View key={item.id} style={styles.itemCard}>
-              <View style={styles.itemHeader}>
-                <Text style={styles.itemHeaderText}>Item {index + 1}</Text>
+          {invoiceData.items.length === 0 ? (
+            <Text style={styles.emptyHint}>No items found</Text>
+          ) : (
+            invoiceData.items.map((item, index) => (
+              <View key={item.id} style={styles.itemCard}>
+                <View style={styles.itemHeader}>
+                  <Text style={styles.itemHeaderText}>Item {index + 1}</Text>
+                </View>
+                <View style={styles.itemDetails}>
+                  <View style={styles.itemDetailRow}>
+                    <Text style={styles.itemDetailLabel}>Item Name:</Text>
+                    <Text style={styles.itemDetailValue}>{item.itemName}</Text>
+                  </View>
+                  <View style={styles.itemDetailRow}>
+                    <Text style={styles.itemDetailLabel}>Quantity:</Text>
+                    <Text style={styles.itemDetailValue}>{item.quantity}</Text>
+                  </View>
+                  <View style={styles.itemDetailRow}>
+                    <Text style={styles.itemDetailLabel}>Unit:</Text>
+                    <Text style={styles.itemDetailValue}>{item.unit}</Text>
+                  </View>
+                  <View style={styles.itemDetailRow}>
+                    <Text style={styles.itemDetailLabel}>Price:</Text>
+                    <Text style={styles.itemDetailValue}>
+                      {fmtAmount(item.price)}
+                    </Text>
+                  </View>
+                  <View style={styles.itemDetailRow}>
+                    <Text style={styles.itemDetailLabel}>Discount:</Text>
+                    <Text style={styles.itemDetailValue}>
+                      {item.discountAmount > 0
+                        ? fmtAmount(item.discountAmount)
+                        : '-'}
+                    </Text>
+                  </View>
+                  <View style={styles.itemDetailRow}>
+                    <Text style={styles.itemDetailLabel}>Tax:</Text>
+                    <Text style={styles.itemDetailValue}>
+                      {item.taxAmount > 0 ? fmtAmount(item.taxAmount) : '-'}
+                    </Text>
+                  </View>
+                  <View style={styles.itemDetailRowLast}>
+                    <Text style={styles.itemDetailLabel}>Total:</Text>
+                    <Text style={[styles.itemDetailValue, styles.itemTotalValue]}>
+                      {fmtAmount(item.total)}/-
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <View style={styles.itemDetails}>
-                <View style={styles.itemDetailRow}>
-                  <Text style={styles.itemDetailLabel}>Item Name:</Text>
-                  <Text style={styles.itemDetailValue}>{item.itemName}</Text>
-                </View>
-                <View style={styles.itemDetailRow}>
-                  <Text style={styles.itemDetailLabel}>Quantity:</Text>
-                  <Text style={styles.itemDetailValue}>{item.quantity}</Text>
-                </View>
-                <View style={styles.itemDetailRow}>
-                  <Text style={styles.itemDetailLabel}>Unit:</Text>
-                  <Text style={styles.itemDetailValue}>{item.unit}</Text>
-                </View>
-                <View style={styles.itemDetailRow}>
-                  <Text style={styles.itemDetailLabel}>Price:</Text>
-                  <Text style={styles.itemDetailValue}>{fmtAmount(item.price)}</Text>
-                </View>
-                <View style={styles.itemDetailRowLast}>
-                  <Text style={styles.itemDetailLabel}>Total:</Text>
-                  <Text style={[styles.itemDetailValue, styles.itemTotalValue]}>
-                    {fmtAmount(item.total)}/-
-                  </Text>
-                </View>
-              </View>
-            </View>
-          ))}
+            ))
+          )}
         </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Summary</Text>
-          <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>Sub Total</Text>
-            <Text style={styles.keyValue}>{fmtAmount(invoiceData.subTotal)}/-</Text>
-          </View>
-          <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>Discount Total</Text>
-            <Text style={styles.keyValue}>
-              {fmtAmount(invoiceData.discount.amount)}/-
-            </Text>
-          </View>
-          <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>Tax Total</Text>
-            <Text style={styles.keyValue}>
-              {fmtAmount(invoiceData.tax.amount)}/-
-            </Text>
-          </View>
-          <View style={styles.keyValueRow}>
-            <Text style={styles.keyLabel}>TDS</Text>
-            <Text style={styles.keyValue}>
-              {fmtAmount(invoiceData.tdsAmount)}/-
-            </Text>
-          </View>
+          <KeyValueRow
+            label="Sub Total"
+            value={`${fmtAmount(invoiceData.subTotal)}/-`}
+          />
+          <KeyValueRow
+            label="Discount Total"
+            value={`${fmtAmount(invoiceData.discount.amount)}/-`}
+          />
+          <KeyValueRow
+            label="Tax Total"
+            value={`${fmtAmount(invoiceData.tax.amount)}/-`}
+          />
+          <KeyValueRow
+            label="TDS"
+            value={`${fmtAmount(invoiceData.tdsAmount)}/-`}
+          />
           {(advanceInterestBreakdown?.chargeApplies ||
-            invoiceData.advanceInterest > 0) && (
-            <View style={styles.keyValueRow}>
-              <Text style={styles.keyLabel}>Advance Interest</Text>
-              <Text style={styles.keyValue}>
-                {fmtAmount(
-                  advanceInterestBreakdown?.advanceInterest ??
-                    invoiceData.advanceInterest,
-                )}
-                /-
-              </Text>
-            </View>
+            invoiceData.advanceInterest > 0 ||
+            isVendorFinance) && (
+            <KeyValueRow
+              label="Advance Interest"
+              value={`${fmtAmount(
+                advanceInterestBreakdown?.advanceInterest ??
+                  invoiceData.advanceInterest,
+              )}/-`}
+            />
           )}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total (Net)</Text>
@@ -348,7 +476,7 @@ export const InvoiceUploadPreview: React.FC = () => {
         {invoiceData.attachments.length > 0 && (
           <View style={styles.sectionCard}>
             <Text style={styles.attachmentSectionTitle}>Attachments</Text>
-            {invoiceData.attachments.map((att) => {
+            {invoiceData.attachments.map(att => {
               const fileName = att.attachment_url?.split('/').pop() || 'Attachment';
               const isPdf = fileName.toLowerCase().endsWith('.pdf');
               const isImage = /\.(png|jpe?g|webp|gif)$/i.test(fileName);
@@ -362,12 +490,18 @@ export const InvoiceUploadPreview: React.FC = () => {
                       resizeMode="contain"
                     />
                   ) : (
-                    <View style={[styles.attachmentIcon, isPdf && styles.attachmentIconPdf]}>
-                      <Text style={styles.attachmentIconText}>{isPdf ? 'PDF' : 'FILE'}</Text>
+                    <View
+                      style={[styles.attachmentIcon, isPdf && styles.attachmentIconPdf]}>
+                      <Text style={styles.attachmentIconText}>
+                        {isPdf ? 'PDF' : 'FILE'}
+                      </Text>
                     </View>
                   )}
                   <View style={styles.attachmentInfo}>
-                    <Text style={styles.attachmentLabel} numberOfLines={1} ellipsizeMode="middle">
+                    <Text
+                      style={styles.attachmentLabel}
+                      numberOfLines={1}
+                      ellipsizeMode="middle">
                       {fileName}
                     </Text>
                     <Text style={styles.attachmentMeta}>Preview attachment</Text>
@@ -439,6 +573,12 @@ const styles = StyleSheet.create({
     paddingVertical: scaleHeight(12),
     marginBottom: scaleHeight(14),
   },
+  emptyHint: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+    paddingVertical: scaleHeight(8),
+  },
   keyValueRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -473,12 +613,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
     marginBottom: scaleHeight(12),
-  },
-  financingNote: {
-    fontSize: scaleFont(11),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.graybase,
-    marginTop: scaleHeight(8),
   },
   itemCard: {
     borderWidth: 1,

@@ -8,7 +8,7 @@ import {
   TouchableWithoutFeedback,
   TextInput,
   ActivityIndicator,
-  ScrollView,
+  Dimensions,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
@@ -23,6 +23,7 @@ import {
 import {getEffectiveProductCode} from '@store/product/product.resolver';
 import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/AttachmentPreviewModal';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
+import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
 import {fileNameFromAttachmentUrl} from '@utils/invoiceAttachments';
 import {toYYYYMMDD} from '@services/api/invoice.api';
 
@@ -103,52 +104,74 @@ type ApproveRejectModalProps = {
 
 const GRN_DATE_FORMATS = ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'] as const;
 
+function parseMomentDate(raw?: string | null): moment.Moment | null {
+  if (!raw?.trim()) return null;
+  const parsed = moment(raw.trim(), GRN_DATE_FORMATS, true);
+  return parsed.isValid() ? parsed.startOf('day') : null;
+}
+
 function parseGrnDisplay(raw?: string | null): string {
   if (!raw?.trim()) return '';
   const m = moment(raw.trim(), GRN_DATE_FORMATS, true);
   return m.isValid() ? m.format('DD-MM-YYYY') : raw.trim();
 }
 
-function isGrnDateInPast(displayDate: string): boolean {
-  const m = moment(displayDate, GRN_DATE_FORMATS, true);
-  if (!m.isValid()) return true;
-  return m.startOf('day').isBefore(moment().startOf('day'));
+/** Earliest selectable GRN: today, or invoice date when invoice is in the future. */
+function getGrnMinimumDate(invoiceDateRaw?: string | null): Date {
+  const today = moment().startOf('day');
+  const invoiceDate = parseMomentDate(invoiceDateRaw);
+  if (invoiceDate?.isAfter(today, 'day')) {
+    return invoiceDate.toDate();
+  }
+  return today.toDate();
 }
 
-/** Returns error message if GRN is invalid vs format / past / invoice date; otherwise null. */
+/** Latest selectable GRN: invoice due date, or invoice date + tenor days. */
+function getGrnMaximumDate(
+  invoiceDateRaw?: string | null,
+  tenorDaysRaw?: string | number | null,
+  invoiceDueDateRaw?: string | null,
+): Date | undefined {
+  const dueDate = parseMomentDate(invoiceDueDateRaw);
+  if (dueDate) {
+    return dueDate.toDate();
+  }
+  const invoiceDate = parseMomentDate(invoiceDateRaw);
+  const tenorDays = Number(tenorDaysRaw);
+  if (invoiceDate && Number.isFinite(tenorDays) && tenorDays > 0) {
+    return invoiceDate.clone().add(tenorDays, 'days').toDate();
+  }
+  return undefined;
+}
+
+/** Returns error message if GRN is invalid; otherwise null. */
 function getGrnDateValidationError(
   grnDisplay: string,
   invoiceDateRaw?: string | null,
+  tenorDaysRaw?: string | number | null,
+  invoiceDueDateRaw?: string | null,
 ): string | null {
   const parsed = moment(grnDisplay.trim(), GRN_DATE_FORMATS, true);
   if (!parsed.isValid()) {
     return 'Enter a valid GRN date (DD-MM-YYYY)';
   }
-  if (isGrnDateInPast(grnDisplay.trim())) {
+  const grn = parsed.startOf('day');
+  const min = moment(getGrnMinimumDate(invoiceDateRaw)).startOf('day');
+  if (grn.isBefore(min, 'day')) {
     return 'GRN date cannot be in the past';
   }
-  const invoiceDate = moment(
-    (invoiceDateRaw || '').trim(),
-    GRN_DATE_FORMATS,
-    true,
+  const maxDate = getGrnMaximumDate(
+    invoiceDateRaw,
+    tenorDaysRaw,
+    invoiceDueDateRaw,
   );
-  if (invoiceDate.isValid() && parsed.isBefore(invoiceDate, 'day')) {
-    return 'GRN Date must be on or after Invoice Date';
+  if (maxDate) {
+    const max = moment(maxDate).startOf('day');
+    if (grn.isAfter(max, 'day')) {
+      return `GRN date cannot be after ${max.format('DD-MM-YYYY')}`;
+    }
   }
   return null;
-}
-
-function getGrnMinimumDate(invoiceDateRaw?: string | null): Date {
-  const today = moment().startOf('day');
-  const invoiceDate = moment(
-    (invoiceDateRaw || '').trim(),
-    GRN_DATE_FORMATS,
-    true,
-  );
-  if (invoiceDate.isValid() && invoiceDate.isAfter(today, 'day')) {
-    return invoiceDate.toDate();
-  }
-  return today.toDate();
 }
 
 const dash = (val?: string | number | null) => {
@@ -201,12 +224,14 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   const productDisplayName = PRODUCT_DISPLAY_NAMES[effectiveCode];
 
   const isCashnTechVerification = variant === 'cashntech_verification';
-  /** VF Anchor Maker only: editable GRN (Goods Received Date) before Remark. */
+  /** VF Anchor Maker: editable GRN picker before Remark. */
   const showVfGrnDatePicker =
     isVendorFinance && !isCashnTechVerification && allowGrnDateEdit;
-  /** VF non-editors (Vendor / Anchor Checker): read-only GRN. */
-  const showVfGrnDateLabelOnly =
-    isVendorFinance && !isCashnTechVerification && !allowGrnDateEdit;
+  /** VF Anchor Maker / Anchor Checker: GRN in Invoice Details (checker sees maker-entered date). */
+  const showVfGrnDateInDetails =
+    isVendorFinance &&
+    !isCashnTechVerification &&
+    (allowGrnDateEdit || variant === 'anchor_checker');
 
   const invoiceLabel = invoiceNo || invoiceId || 'N/A';
   const modalTitle = isCashnTechVerification
@@ -215,7 +240,16 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   const modalSubtitle = `${invoiceLabel} · ${productDisplayName}`;
 
   const details = invoiceDetails || {};
-  const grnDateDisplay = parseGrnDisplay(details.grnDate || grnDateInput);
+  const vfGrnDateDisplay = dash(
+    parseGrnDisplay(grnDateInput || details.grnDate),
+  );
+  const grnDueDateRaw = details.invoiceDueDate || details.finalDueDate;
+  const grnMaxDate = getGrnMaximumDate(
+    details.invoiceDate,
+    details.tenorDays,
+    grnDueDateRaw,
+  );
+  const grnMinDate = getGrnMinimumDate(details.invoiceDate);
 
   useEffect(() => {
     if (!visible) return;
@@ -242,6 +276,8 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
     const error = getGrnDateValidationError(
       grnDateInput.trim(),
       details.invoiceDate,
+      details.tenorDays,
+      grnDueDateRaw,
     );
     if (error) {
       setGrnDateError(error);
@@ -276,6 +312,8 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
       const error = getGrnDateValidationError(
         grnDateInput.trim(),
         details.invoiceDate,
+        details.tenorDays,
+        grnDueDateRaw,
       );
       if (!error) {
         grn = resolveGrnForApi();
@@ -327,14 +365,15 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
       visible={visible}
       animationType="fade"
       onRequestClose={handleClose}>
-      <TouchableWithoutFeedback onPress={handleClose}>
-        <View
-          style={[
-            styles.overlay,
-            {paddingTop: insets.top, paddingBottom: insets.bottom},
-          ]}>
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={[styles.modalContainer, styles.modalContainerRich]}>
+      <View
+        style={[
+          styles.overlay,
+          {paddingTop: insets.top, paddingBottom: insets.bottom},
+        ]}>
+        <TouchableWithoutFeedback onPress={handleClose}>
+          <View style={styles.backdrop} />
+        </TouchableWithoutFeedback>
+        <View style={[styles.modalContainer, styles.modalContainerRich]}>
               <View style={styles.modalHeader}>
                 <View style={styles.modalHeaderText}>
                   <Text style={styles.modalTitle} numberOfLines={2}>
@@ -378,12 +417,13 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                 </View>
               ) : (
                 <>
-                  <ScrollView
+                  <PersistentScrollView
                     style={styles.scroll}
                     contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator
-                    bounces={false}
-                    nestedScrollEnabled>
+                    keyboardShouldPersistTaps="handled"
+                    nestedScrollEnabled={false}
+                    bounces
+                    overScrollMode="always">
                     <Text style={styles.sectionTitle}>Party Details</Text>
                     <View style={styles.detailsTable}>
                       <DetailRow label="Anchor" value={dash(details.anchorName)} />
@@ -393,7 +433,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                       />
                       <DetailRow
                         label={
-                          isCashnTechVerification
+                          isCashnTechVerification || isVendorFinance
                             ? 'Loan OD Account Number'
                             : 'OD Account'
                         }
@@ -416,14 +456,13 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                         label="Invoice Date"
                         value={dash(details.invoiceDate)}
                       />
-                      <DetailRow label="GRN Date" value={dash(details.grnDate)} />
-                      {/* Hidden for now — restore when Due Date is needed on Approve/Reject */}
-                      {false && (
-                        <DetailRow
-                          label="Invoice Due Date"
-                          value={dash(details.invoiceDueDate || details.finalDueDate)}
-                        />
+                      {showVfGrnDateInDetails && (
+                        <DetailRow label="GRN Date" value={vfGrnDateDisplay} />
                       )}
+                      <DetailRow
+                        label="Invoice Due Date"
+                        value={dash(details.invoiceDueDate || details.finalDueDate)}
+                      />
                       <DetailRow
                         label={isCashnTechVerification ? 'Po Ref No' : 'PO Ref'}
                         value={dash(details.poRefNo)}
@@ -596,6 +635,8 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                               getGrnDateValidationError(
                                 next,
                                 details.invoiceDate,
+                                details.tenorDays,
+                                grnDueDateRaw,
                               ),
                             );
                           }}
@@ -608,24 +649,16 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                                   GRN_DATE_FORMATS,
                                   true,
                                 ).toDate()
-                              : new Date(),
+                              : grnMinDate,
                             mode: 'date',
-                            minimumDate: getGrnMinimumDate(details.invoiceDate),
+                            minimumDate: grnMinDate,
+                            ...(grnMaxDate ? {maximumDate: grnMaxDate} : {}),
                           }}
                           containerStyle={styles.grnDatePicker}
                         />
                         {!!grnDateError && (
                           <Text style={styles.grnDateError}>{grnDateError}</Text>
                         )}
-                      </View>
-                    )}
-
-                    {showVfGrnDateLabelOnly && (
-                      <View style={styles.grnDateReadOnlyContainer}>
-                        <Text style={styles.grnDateReadOnlyLabel}>GRN Date</Text>
-                        <Text style={styles.grnDateReadOnlyValue}>
-                          {dash(grnDateDisplay)}
-                        </Text>
                       </View>
                     )}
 
@@ -688,10 +721,11 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                         onChangeText={setRemarks}
                         multiline
                         numberOfLines={3}
+                        scrollEnabled={false}
                         textAlignVertical="top"
                       />
                     </View>
-                  </ScrollView>
+                  </PersistentScrollView>
 
                   <View style={styles.buttonContainerRich}>
                     {isCashnTechVerification ? (
@@ -736,10 +770,8 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                   </View>
                 </>
               )}
-            </View>
-          </TouchableWithoutFeedback>
         </View>
-      </TouchableWithoutFeedback>
+      </View>
     </Modal>
     <AttachmentPreviewModal
       visible={!!previewUrl}
@@ -766,6 +798,13 @@ const DetailRow: React.FC<{
   </View>
 );
 
+const WINDOW_HEIGHT = Dimensions.get('window').height;
+/** Tall scroll area — ~68% screen, same feel as original full-size approval modal. */
+const MODAL_SCROLL_MAX_HEIGHT = Math.max(
+  scaleHeight(480),
+  Math.round(WINDOW_HEIGHT * 0.68),
+);
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
@@ -773,15 +812,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
   modalContainer: {
     width: '85%',
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(12),
     overflow: 'hidden',
     maxHeight: '90%',
+    zIndex: 1,
   },
   modalContainerRich: {
     width: '94%',
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -846,12 +890,12 @@ const styles = StyleSheet.create({
     padding: scaleWidth(16),
   },
   scroll: {
-    maxHeight: scaleHeight(480),
+    maxHeight: MODAL_SCROLL_MAX_HEIGHT,
   },
   scrollContent: {
     paddingHorizontal: scaleWidth(16),
     paddingTop: scaleHeight(12),
-    paddingBottom: scaleHeight(8),
+    paddingBottom: scaleHeight(12),
   },
   sectionTitle: {
     fontSize: scaleFont(13),

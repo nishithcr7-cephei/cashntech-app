@@ -118,7 +118,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
     }
     const handler =
       onCreateInvoicePress ??
-      (() => navigation.navigate('CreateInvoice' as never));
+      (() => navigation.navigate('CreateInvoice' as never, {freshCreate: true} as never));
     handler();
   };
 

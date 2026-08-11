@@ -6,8 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   TouchableWithoutFeedback,
-  ScrollView,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
@@ -15,6 +15,7 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
 import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/AttachmentPreviewModal';
+import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
 import {
   fileNameFromAttachmentUrl,
   mapInvoiceAttachmentsWithUrls,
@@ -95,6 +96,11 @@ type Props = {
 };
 
 const DATE_FORMATS = ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'] as const;
+const WINDOW_HEIGHT = Dimensions.get('window').height;
+const MODAL_SCROLL_MAX_HEIGHT = Math.max(
+  scaleHeight(480),
+  Math.round(WINDOW_HEIGHT * 0.68),
+);
 
 function dash(value?: string | number | null): string {
   if (value == null) return '-';
@@ -266,6 +272,7 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
           ? `${formatPercent(p.eligibility_percent)}%`
           : '-',
       invoiceDate: formatDateDDMMYYYY(p.invoice_date ?? null),
+      grnDate: formatDateDDMMYYYY(p.grn_date ?? null),
       invoiceDueDate: formatDateDDMMYYYY(
         p.due_date ?? p.invoice_due_date ?? null,
       ),
@@ -368,11 +375,11 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                   </View>
                 ) : (
                   <>
-                    <ScrollView
+                    <PersistentScrollView
                       style={styles.scroll}
                       contentContainerStyle={styles.scrollContent}
-                      showsVerticalScrollIndicator
-                      bounces={false}>
+                      keyboardShouldPersistTaps="handled"
+                      bounces>
                       <SectionTitle title="Party Details" />
                       <DetailRow label="Anchor" value={display.anchor} />
                       <DetailRow label="Vendor" value={display.vendor} />
@@ -389,6 +396,7 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                         label="Invoice Date"
                         value={display.invoiceDate}
                       />
+                      <DetailRow label="GRN Date" value={display.grnDate} />
                       <DetailRow
                         label="Invoice Due Date"
                         value={display.invoiceDueDate}
@@ -514,7 +522,7 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                           <Text style={styles.dateError}>{preferredDateError}</Text>
                         )}
                       </View>
-                    </ScrollView>
+                    </PersistentScrollView>
 
                     <View style={styles.footer}>
                       <TouchableOpacity
@@ -615,7 +623,7 @@ const styles = StyleSheet.create({
     lineHeight: scaleFont(28),
   },
   scroll: {
-    maxHeight: scaleHeight(480),
+    maxHeight: MODAL_SCROLL_MAX_HEIGHT,
   },
   scrollContent: {
     paddingHorizontal: scaleWidth(16),

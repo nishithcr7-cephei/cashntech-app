@@ -89,6 +89,8 @@ type Props = {
   rawInvoiceStatus?: string;
   /** List-retained actionable flag — preferred over approval_status parsing */
   listActionable?: boolean;
+  /** Current workflow step action type from list API */
+  currentStepActionType?: string | null;
   userDepartment?: string;
   approvalLogsCount?: number;
   /** Backend updateInvoice editable when sequence_no <= 2 (or Draft/Rejected) */
@@ -115,6 +117,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   rawApprovalStatus,
   rawInvoiceStatus,
   listActionable,
+  currentStepActionType,
   userDepartment: _userDepartment,
   approvalLogsCount: _approvalLogsCount = 0,
   currentStepSequenceNo = null,
@@ -167,15 +170,18 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
     ''
   ).trim();
 
+  const actionRow = {
+    actionable: listActionable,
+    rawApprovalStatus,
+    rawAdminStatus,
+    rawInvoiceStatus,
+    currentStepActionType,
+  };
+
   const canShowApproveReject =
     !isCashnTechUser &&
     canShowWorkflowApproveReject(
-      {
-        actionable: listActionable,
-        rawApprovalStatus,
-        rawAdminStatus,
-        rawInvoiceStatus,
-      },
+      actionRow,
       canApprove || canReject,
       {
         isCashnTechUser,
@@ -186,22 +192,12 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
     );
 
   const showCashnTechVerification = canShowCashnTechInvoiceVerification(
-    {
-      actionable: listActionable,
-      rawAdminStatus,
-      rawApprovalStatus,
-      rawInvoiceStatus,
-    },
+    actionRow,
     canVerify,
   );
 
   const showFinanceRequest = canShowFinanceRequest(
-    {
-      actionable: listActionable,
-      rawAdminStatus,
-      rawApprovalStatus,
-      rawInvoiceStatus,
-    },
+    actionRow,
     canFinanceRequest,
     {isCashnTechUser},
   );

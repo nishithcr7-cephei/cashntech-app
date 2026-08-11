@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Modal,
-  InteractionManager,
   BackHandler,
 } from 'react-native';
 import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
@@ -190,6 +189,22 @@ export const CreateInvoice: React.FC = () => {
     dispatch(resetCreateInvoiceState());
   }, [dispatch]);
 
+  const lastPreviewTokenRef = useRef<number | undefined>();
+
+  const clearCreateInvoiceRouteParams = useCallback(() => {
+    try {
+      (navigation as any).setParams({
+        previewFields: undefined,
+        previewAttachment: undefined,
+        previewReturnToken: undefined,
+        freshCreate: undefined,
+      });
+    } catch {
+      // setParams can fail when this screen is not focused
+    }
+    lastPreviewTokenRef.current = undefined;
+  }, [navigation]);
+
   const goToInvoiceList = useCallback(
     (refreshList = true) => {
       (navigation as any).navigate(
@@ -200,59 +215,14 @@ export const CreateInvoice: React.FC = () => {
     [navigation],
   );
 
+  // Permissions refresh on focus only — do NOT flush form here.
+  // Leaving Create Invoice is handled by confirmLeaveCreateInvoice /
+  // beforeRemove so Preview / camera / picker can return safely.
   useFocusEffect(
     useCallback(() => {
       dispatch(fetchPermissionsRequest());
-      
-      const onBackPress = () => {
-        // When device back button is pressed, flush and allow default back behavior
-        resetScreenData();
-        return false;
-      };
-
-      const backHandler = BackHandler.addEventListener(
-        'hardwareBackPress',
-        onBackPress,
-      );
-
-      return () => {
-        backHandler.remove();
-      };
-    }, [dispatch, resetScreenData]),
+    }, [dispatch]),
   );
-
-  // Flush only when leaving Create Invoice for a non-preview route.
-  // Do NOT reset on every focus — returning from camera / document picker
-  // would wipe dealer, dates, invoice no. while items/OCR might remain
-  // (broken Invoice Preview for DF + VF alike).
-  useEffect(() => {
-    const isPreviewNavigation = (action: any) => {
-      const type = action?.type;
-      const name = action?.payload?.name;
-      return (
-        (type === 'NAVIGATE' || type === 'JUMP_TO') &&
-        name === 'InvoiceUploadPreview'
-      );
-    };
-
-    const removeListener = navigation.addListener('beforeRemove', (e) => {
-      if (!isPreviewNavigation(e.data.action)) {
-        resetScreenData();
-      }
-    });
-
-    return () => {
-      removeListener();
-    };
-  }, [navigation, resetScreenData]);
-
-  // Handle final flush only when the screen is actually unmounting
-  useEffect(() => {
-    return () => {
-      console.log('[CreateInvoice] Unmounting screen, flushing data');
-      resetScreenData();
-    };
-  }, [resetScreenData]);
 
   const dealerInfo = useSelector(selectDealerInfo);
   const dealerInfoError = useSelector(selectDealerInfoError);
@@ -822,9 +792,14 @@ export const CreateInvoice: React.FC = () => {
     }
   }, [dealerInfoError]);
 
-  // Restore form when returning from preview (Close X on preview page)
+  // Restore form when returning from preview (Close X on preview page).
+  // Apply once per previewReturnToken — stale route params must not re-fill
+  // after Leave & Clear.
   useEffect(() => {
+    if (route?.params?.freshCreate) return;
     if (!previewReturnToken) return;
+    if (lastPreviewTokenRef.current === previewReturnToken) return;
+    lastPreviewTokenRef.current = previewReturnToken;
     if (previewFieldsFromRoute) setFields(previewFieldsFromRoute);
     if (previewAttachmentFromRoute) setSelectedAttachment(previewAttachmentFromRoute);
     if (previewFieldsFromRoute?.dealer && dealerInfo?.participants?.length) {
@@ -840,6 +815,7 @@ export const CreateInvoice: React.FC = () => {
     previewFieldsFromRoute,
     previewAttachmentFromRoute,
     dealerInfo?.participants,
+    route?.params?.freshCreate,
   ]);
 
   // Fetch invoice details when in 'edit' or 'recreate' mode
@@ -1288,7 +1264,10 @@ export const CreateInvoice: React.FC = () => {
   };
 
   const openUploadPreview = useCallback(
-    (previewFields: InvoiceFields, previewAttachment: DocumentPickerResponse) => {
+    (
+      previewFields: InvoiceFields,
+      previewAttachment?: DocumentPickerResponse | null,
+    ) => {
       const participant = selectedParticipantRef.current;
       // Snapshot + fill gaps from selected participant so preview never shows
       // empty dealer/OD when the form had them (DF + VF alike).
@@ -1319,13 +1298,35 @@ export const CreateInvoice: React.FC = () => {
           previewFields.odAccountNumber?.trim() || odFromParticipant,
       };
 
+      // Web Party Details parity (Push vs Pull):
+      // Pull (VF vendor / DF dealer maker): party-info / form dealer = Anchor;
+      //   counterparty = logged-in party.
+      // Push (Anchor maker): party-info = Anchor; selected participant = counterparty.
+      const isPullMethod =
+        String(programSelection?.method || '').toLowerCase() === 'pull';
+      const partyInfoAnchor =
+        decryptValue(dealerInfo?.party?.entity_name ?? '') ||
+        dealerInfo?.party?.entity_name ||
+        '';
+      const formDealerName = snapshot.dealer?.trim() || '';
+      const formDealerCode = snapshot.dealerCode?.trim() || '';
+      const loggedInCounterparty =
+        decryptValue(userPartyName || '') || userPartyName || '';
+
+      const previewAnchorName = isPullMethod
+        ? formDealerName || partyInfoAnchor
+        : partyInfoAnchor || formDealerName;
+      const previewCounterPartyName = isPullMethod
+        ? loggedInCounterparty || dealerFromParticipant
+        : formDealerName || dealerFromParticipant;
+      const previewCounterPartyCode = formDealerCode || codeFromParticipant;
+
       (navigation as any).navigate('InvoiceUploadPreview', {
         previewFields: snapshot,
-        previewAttachment,
-        previewAnchorName:
-          decryptValue(dealerInfo?.party?.entity_name ?? '') ||
-          dealerInfo?.party?.entity_name ||
-          '',
+        previewAttachment: previewAttachment || undefined,
+        previewAnchorName,
+        previewCounterPartyName,
+        previewCounterPartyCode,
         productType,
         advanceInterestBreakdown: advanceInterestInfo.chargeApplies
           ? advanceInterestInfo
@@ -1337,8 +1338,38 @@ export const CreateInvoice: React.FC = () => {
       dealerInfo?.party?.entity_name,
       productType,
       advanceInterestInfo,
+      programSelection?.method,
+      userPartyName,
     ],
   );
+
+  const handleInvoicePreview = useCallback(() => {
+    openUploadPreview(fieldsRef.current, selectedAttachment);
+  }, [openUploadPreview, selectedAttachment]);
+
+  // Preview is lighter than Submit: Party + Invoice Date + ≥1 item.
+  // Attachment / tenor / credit-to are NOT required to open preview.
+  const canPreviewInvoice = useMemo(() => {
+    const hasParty = !!fields.dealer?.trim();
+    const hasInvoiceDate = !!fields.invoiceDate?.trim();
+    const hasItems = Array.isArray(fields.items) && fields.items.length > 0;
+    return hasParty && hasInvoiceDate && hasItems;
+  }, [fields.dealer, fields.invoiceDate, fields.items]);
+
+  const previewDisabledReasonInternal = useMemo(() => {
+    if (!fields.dealer?.trim()) {
+      return productType === 'vendor_finance'
+        ? 'Please select Party (Anchor/Vendor) to preview'
+        : 'Please select Dealer / Party to preview';
+    }
+    if (!fields.invoiceDate?.trim()) {
+      return 'Please enter Invoice Date to preview';
+    }
+    if (!fields.items || fields.items.length === 0) {
+      return 'Please add at least one item to preview';
+    }
+    return undefined;
+  }, [fields.dealer, fields.invoiceDate, fields.items, productType]);
 
   const handleProofUploadFile = async (
     file: DocumentPickerResponse | undefined,
@@ -1824,7 +1855,9 @@ export const CreateInvoice: React.FC = () => {
           text: 'Yes',
           style: 'destructive',
           onPress: () => {
+            allowLeaveRef.current = true;
             resetCreateInvoiceForm();
+            resetScreenData();
             goToInvoiceList(true);
           },
         },
@@ -1842,46 +1875,193 @@ export const CreateInvoice: React.FC = () => {
     setIsProofUploadModalVisible(false);
     setIsOcrPopulated(false);
     setOcrLoading(false);
-  }, []);
+    lastPreviewTokenRef.current = undefined;
+    clearCreateInvoiceRouteParams();
+  }, [clearCreateInvoiceRouteParams]);
 
-  useEffect(() => {
-    const unsubscribe = (navigation as any).addListener('beforeRemove', (e: any) => {
-      const actionType = e?.data?.action?.type;
-      const targetRouteName = e?.data?.action?.payload?.name;
-      const isGoingToPreview =
-        (actionType === 'NAVIGATE' || actionType === 'JUMP_TO') &&
-        targetRouteName === 'InvoiceUploadPreview';
-      if (!isGoingToPreview) {
-        dispatch(setProgramScope('all'));
-        InteractionManager.runAfterInteractions(() => {
-          resetCreateInvoiceForm();
+  // Fresh create from invoice list — always start with a blank form.
+  useFocusEffect(
+    useCallback(() => {
+      if (mode === 'edit' || mode === 'recreate') return;
+      if (!route?.params?.freshCreate) return;
+
+      resetCreateInvoiceForm();
+      resetScreenData();
+    }, [
+      mode,
+      route?.params?.freshCreate,
+      resetCreateInvoiceForm,
+      resetScreenData,
+    ]),
+  );
+
+  // After user confirms Leave/Cancel — skip second beforeRemove prompt
+  // (setState may not have flushed before navigate).
+  const allowLeaveRef = useRef(false);
+
+  // True when user has typed/selected anything worth protecting.
+  const isCreateFormDirty = useMemo(() => {
+    const f = fields;
+    return !!(
+      f.dealer?.trim() ||
+      f.dealerCode?.trim() ||
+      f.odAccountNumber?.trim() ||
+      f.invoiceNumber?.trim() ||
+      f.associatedPO?.trim() ||
+      f.tenor?.trim() ||
+      f.invoiceDate?.trim() ||
+      f.paymentDate?.trim() ||
+      f.invoiceDueDate?.trim() ||
+      f.grnDate?.trim() ||
+      f.earlyPaymentDiscount?.trim() ||
+      f.creditTo?.trim() ||
+      f.remark?.trim() ||
+      (f.items && f.items.length > 0) ||
+      selectedAttachment ||
+      (f.attachments && f.attachments.length > 0)
+    );
+  }, [fields, selectedAttachment]);
+
+  /**
+   * Leave Create Invoice:
+   * - Preview / OCR routes must NOT trigger this (handled in beforeRemove).
+   * - If form has data → ask user; Leave clears, Stay keeps form.
+   * - If empty → clear + leave silently.
+   */
+  const confirmLeaveCreateInvoice = useCallback(
+    (onLeave: () => void) => {
+      if (ocrLoading) {
+        Toast.show({
+          type: 'info',
+          text1: 'OCR in progress',
+          text2: 'Please wait for extraction to finish or tap Cancel.',
+          visibilityTime: 3000,
         });
+        return;
       }
-    });
+
+      const clearAndLeave = () => {
+        allowLeaveRef.current = true;
+        resetCreateInvoiceForm();
+        resetScreenData();
+        dispatch(setProgramScope('all'));
+        clearCreateInvoiceRouteParams();
+        onLeave();
+      };
+
+      if (!isCreateFormDirty) {
+        clearAndLeave();
+        return;
+      }
+
+      Alert.alert(
+        'Leave Create Invoice?',
+        'You have entered invoice details. If you go back, this information will be cleared.',
+        [
+          {text: 'Stay', style: 'cancel'},
+          {
+            text: 'Leave & Clear',
+            style: 'destructive',
+            onPress: clearAndLeave,
+          },
+        ],
+      );
+    },
+    [
+      ocrLoading,
+      isCreateFormDirty,
+      resetCreateInvoiceForm,
+      resetScreenData,
+      dispatch,
+      clearCreateInvoiceRouteParams,
+    ],
+  );
+
+  // Flush only when leaving Create Invoice for a non-preview route.
+  // If form is dirty, ask first (same UX as Cancel / back arrow).
+  useEffect(() => {
+    const isPreviewNavigation = (action: any) => {
+      const type = action?.type;
+      const name = action?.payload?.name;
+      return (
+        (type === 'NAVIGATE' || type === 'JUMP_TO') &&
+        name === 'InvoiceUploadPreview'
+      );
+    };
+
+    const unsubscribe = (navigation as any).addListener(
+      'beforeRemove',
+      (e: any) => {
+        if (isPreviewNavigation(e.data.action)) {
+          return;
+        }
+
+        // User already confirmed via Cancel / AppBar / hardware back.
+        if (allowLeaveRef.current) {
+          allowLeaveRef.current = false;
+          resetCreateInvoiceForm();
+          resetScreenData();
+          dispatch(setProgramScope('all'));
+          clearCreateInvoiceRouteParams();
+          return;
+        }
+
+        if (!isCreateFormDirty) {
+          resetCreateInvoiceForm();
+          resetScreenData();
+          dispatch(setProgramScope('all'));
+          clearCreateInvoiceRouteParams();
+          return;
+        }
+
+        // Block pop/navigate-away until user confirms.
+        e.preventDefault();
+        Alert.alert(
+          'Leave Create Invoice?',
+          'You have entered invoice details. If you go back, this information will be cleared.',
+          [
+            {text: 'Stay', style: 'cancel'},
+            {
+              text: 'Leave & Clear',
+              style: 'destructive',
+              onPress: () => {
+                allowLeaveRef.current = true;
+                resetCreateInvoiceForm();
+                resetScreenData();
+                dispatch(setProgramScope('all'));
+                clearCreateInvoiceRouteParams();
+                navigation.dispatch(e.data.action);
+              },
+            },
+          ],
+        );
+      },
+    );
 
     return unsubscribe;
-  }, [navigation, resetCreateInvoiceForm, dispatch]);
+  }, [
+    navigation,
+    isCreateFormDirty,
+    resetCreateInvoiceForm,
+    resetScreenData,
+    dispatch,
+    clearCreateInvoiceRouteParams,
+  ]);
 
   // Handle Android hardware back button
   useFocusEffect(
     useCallback(() => {
       const onBackPress = () => {
-        if (ocrLoading) {
-          Toast.show({
-            type: 'info',
-            text1: 'OCR in progress',
-            text2: 'Please wait for extraction to finish or tap Cancel.',
-            visibilityTime: 3000,
-          });
-          return true;
-        }
-        goToInvoiceList(true);
-        return true; // Prevent default behavior (going back to Home)
+        confirmLeaveCreateInvoice(() => goToInvoiceList(true));
+        return true; // Prevent default — we handle leave ourselves
       };
 
-      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      const subscription = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onBackPress,
+      );
       return () => subscription.remove();
-    }, [navigation, goToInvoiceList, ocrLoading]),
+    }, [confirmLeaveCreateInvoice, goToInvoiceList]),
   );
 
   const hasAnyAttachment = !!selectedAttachment || (fields.attachments && fields.attachments.length > 0);
@@ -1965,9 +2145,8 @@ export const CreateInvoice: React.FC = () => {
           navigation={navigation as any} 
           renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
           onPressLeftIcon={() => {
-          resetScreenData();
-          (navigation as any).navigate('InvoiceDetails');
-        }}
+            confirmLeaveCreateInvoice(() => goToInvoiceList(true));
+          }}
         />
         <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.white}}>
           <ActivityIndicator size="large" color={Colors.primaryColor} />
@@ -1987,16 +2166,7 @@ export const CreateInvoice: React.FC = () => {
         hideHamburger={true}
         renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
         onPressLeftIcon={() => {
-          if (ocrLoading) {
-            Toast.show({
-              type: 'info',
-              text1: 'OCR in progress',
-              text2: 'Please wait for extraction to finish or tap Cancel.',
-              visibilityTime: 3000,
-            });
-            return;
-          }
-          goToInvoiceList(true);
+          confirmLeaveCreateInvoice(() => goToInvoiceList(true));
         }}
       />
       <View style={styles.pageTitleBar}>
@@ -2102,6 +2272,9 @@ export const CreateInvoice: React.FC = () => {
             canUploadFinal={canUploadFinal}
             onAddAttachment={() => setIsProofUploadModalVisible(true)}
             selectedAttachment={selectedAttachment}
+            onPreview={handleInvoicePreview}
+            previewButtonAppearsDisabled={!canPreviewInvoice}
+            previewDisabledReason={previewDisabledReasonInternal}
             isOcrMode={isOcrPopulated}
             ocrLoading={ocrLoading}
           />

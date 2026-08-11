@@ -5,9 +5,9 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  TouchableWithoutFeedback,
   ScrollView,
   ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {Colors, Fonts} from '@constants/index';
@@ -22,6 +22,8 @@ export type WorkflowStep = {
   userName: string;
   timestamp: string;
   status: WorkflowStepStatus;
+  remark?: string;
+  rejectionReason?: string;
 };
 
 export type InvoiceTrackingModalProps = {
@@ -37,6 +39,8 @@ export type InvoiceTrackingModalProps = {
   programName?: string;
   steps?: WorkflowStep[];
 };
+
+const AVATAR_COLORS = ['#2563EB', '#EA580C', '#7C3AED', '#0891B2', '#BE185D'];
 
 function formatDisplayAmount(amount?: string): string {
   if (!amount || amount === '-') {
@@ -54,6 +58,21 @@ function displayOrDash(value?: string): string {
   return !v || v === '-' ? '-' : v;
 }
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ''}${parts[parts.length - 1][0] ?? ''}`.toUpperCase();
+}
+
+function avatarColorForName(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
 function MetaCell({label, value}: {label: string; value: string}) {
   return (
     <View style={styles.metaCell}>
@@ -61,6 +80,55 @@ function MetaCell({label, value}: {label: string; value: string}) {
       <Text style={styles.metaValue} numberOfLines={2}>
         {value}
       </Text>
+    </View>
+  );
+}
+
+function UserAvatar({name}: {name: string}) {
+  const initials = getInitials(name);
+  const bg = avatarColorForName(name);
+  return (
+    <View style={[styles.avatar, {backgroundColor: bg}]}>
+      <Text style={styles.avatarText}>{initials}</Text>
+    </View>
+  );
+}
+
+function RoleBadge({label}: {label: string}) {
+  if (!label.trim()) return null;
+  return (
+    <Text style={styles.roleUnderName} numberOfLines={2}>
+      {label}
+    </Text>
+  );
+}
+
+function RemarkBox({
+  remark,
+  userName,
+  isRejection,
+}: {
+  remark: string;
+  userName: string;
+  isRejection?: boolean;
+}) {
+  const trimmed = remark.trim();
+  if (!trimmed) return null;
+  const firstName = userName.trim().split(/\s+/)[0] || userName;
+  return (
+    <View style={[styles.remarkBox, isRejection && styles.remarkBoxRejected]}>
+      <View style={styles.remarkHeader}>
+        <FontAwesome6
+          name={isRejection ? 'circle-xmark' : 'comment'}
+          iconStyle="solid"
+          size={scaleWidth(13)}
+          color={isRejection ? '#C2410C' : Colors.graybase}
+        />
+        <Text style={styles.remarkTitle}>
+          {isRejection ? 'Rejection Reason' : `Remark By ${firstName}`}
+        </Text>
+      </View>
+      <Text style={styles.remarkText}>{trimmed}</Text>
     </View>
   );
 }
@@ -74,13 +142,15 @@ function TimelineStepRow({
 }) {
   const isRejected = step.status === 'rejected';
   const isPending = step.status === 'pending';
-  const roleUser =
-    step.roleLabel && step.userName
-      ? `${step.roleLabel} (${step.userName})`
-      : step.roleLabel || step.userName || '-';
 
   return (
     <View style={styles.stepRow}>
+      <View style={styles.timeCol}>
+        <Text style={styles.timeText} numberOfLines={1}>
+          {step.timestamp || '-'}
+        </Text>
+      </View>
+
       <View style={styles.railCol}>
         <View
           style={[
@@ -107,14 +177,34 @@ function TimelineStepRow({
           />
         )}
       </View>
-      <View style={[styles.stepContent, isLast && styles.stepContentLast]}>
-        <Text style={styles.stepAction} numberOfLines={2}>
-          {step.action || '-'}
-        </Text>
-        <Text style={styles.stepRoleUser} numberOfLines={2}>
-          {roleUser}
-        </Text>
-        <Text style={styles.stepTimestamp}>{step.timestamp || '-'}</Text>
+
+      <View style={[styles.stepCard, isLast && styles.stepCardLast]}>
+        <View style={styles.stepCardHeader}>
+          <View style={styles.stepTitleBlock}>
+            <Text style={styles.stepAction} numberOfLines={2}>
+              {step.action || '-'}
+            </Text>
+          </View>
+          <View style={styles.userBlock}>
+            <UserAvatar name={step.userName} />
+            <Text style={styles.userName} numberOfLines={2}>
+              {step.userName || '-'}
+            </Text>
+            <RoleBadge label={step.roleLabel} />
+          </View>
+        </View>
+
+        {step.remark ? (
+          <RemarkBox remark={step.remark} userName={step.userName} />
+        ) : null}
+
+        {step.rejectionReason ? (
+          <RemarkBox
+            remark={step.rejectionReason}
+            userName={step.userName}
+            isRejection
+          />
+        ) : null}
       </View>
     </View>
   );
@@ -133,115 +223,116 @@ export const InvoiceTrackingModal: React.FC<InvoiceTrackingModalProps> = ({
   programName,
   steps = [],
 }) => {
-  const activeStepsLabel = useMemo(() => {
+  const stepsCountLabel = useMemo(() => {
     const n = steps.length;
-    return `${n} active step${n === 1 ? '' : 's'}`;
+    return `${n} step${n === 1 ? '' : 's'}`;
   }, [steps.length]);
 
   return (
     <Modal
-      transparent
       visible={visible}
-      animationType="fade"
+      animationType="slide"
+      presentationStyle="fullScreen"
       onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.overlay}>
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Invoice Tracking</Text>
-                <TouchableOpacity
-                  onPress={onClose}
-                  style={styles.closeButton}
-                  hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-                  <Text style={styles.closeButtonText}>×</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView
-                style={styles.scroll}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator
-                bounces={false}>
-                <View style={styles.summaryBlock}>
-                  <Text style={styles.invoiceNoText} numberOfLines={1}>
-                    {displayOrDash(invoiceNo)}
-                  </Text>
-                  <Text style={styles.amountText}>
-                    {formatDisplayAmount(invoiceAmount)}
-                  </Text>
-
-                  <View style={styles.metaGrid}>
-                    <MetaCell
-                      label="Counter Party"
-                      value={displayOrDash(counterParty)}
-                    />
-                    <MetaCell
-                      label="Primary Party"
-                      value={displayOrDash(primaryParty)}
-                    />
-                    <MetaCell label="Raised On" value={displayOrDash(raisedOn)} />
-                    <MetaCell label="Due On" value={displayOrDash(dueOn)} />
-                  </View>
-                </View>
-
-                <View style={styles.workflowHeader}>
-                  <View style={styles.workflowHeaderLeft}>
-                    <Text style={styles.workflowTitle}>Workflow progress</Text>
-                    <Text style={styles.workflowSubtitle} numberOfLines={2}>
-                      {displayOrDash(programName)}
-                    </Text>
-                  </View>
-                  <View style={styles.stepsBadge}>
-                    <Text style={styles.stepsBadgeText}>{activeStepsLabel}</Text>
-                  </View>
-                </View>
-
-                {loading ? (
-                  <View style={styles.loadingRow}>
-                    <ActivityIndicator size="large" color={Colors.primaryColor} />
-                    <Text style={styles.loadingText}>Loading approval history...</Text>
-                  </View>
-                ) : steps.length === 0 ? (
-                  <View style={styles.emptyRow}>
-                    <Text style={styles.emptyText}>No approval history</Text>
-                  </View>
-                ) : (
-                  <View style={styles.timeline}>
-                    {steps.map((step, index) => (
-                      <TimelineStepRow
-                        key={step.id}
-                        step={step}
-                        isLast={index === steps.length - 1}
-                      />
-                    ))}
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-          </TouchableWithoutFeedback>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.modalHeader}>
+          <View style={styles.headerTextBlock}>
+            <Text style={styles.modalTitle}>Approval History</Text>
+            {!!invoiceNo?.trim() && (
+              <Text style={styles.invoiceNoSub} numberOfLines={1}>
+                {invoiceNo}
+              </Text>
+            )}
+          </View>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeButton}
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+            <FontAwesome6
+              name="xmark"
+              iconStyle="solid"
+              size={scaleWidth(18)}
+              color={Colors.darkblack}
+            />
+          </TouchableOpacity>
         </View>
-      </TouchableWithoutFeedback>
+
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator>
+          <View style={styles.summaryCard}>
+            <Text style={styles.amountText}>
+              {formatDisplayAmount(invoiceAmount)}
+            </Text>
+            <View style={styles.metaGrid}>
+              <MetaCell
+                label="Counter Party"
+                value={displayOrDash(counterParty)}
+              />
+              <MetaCell
+                label="Primary Party"
+                value={displayOrDash(primaryParty)}
+              />
+              <MetaCell label="Raised On" value={displayOrDash(raisedOn)} />
+              <MetaCell label="Due On" value={displayOrDash(dueOn)} />
+            </View>
+          </View>
+
+          <View style={styles.workflowHeader}>
+            <View style={styles.workflowHeaderLeft}>
+              <Text style={styles.workflowTitle}>Approval Timeline</Text>
+              {!!programName?.trim() && programName !== '-' && (
+                <Text style={styles.workflowSubtitle} numberOfLines={2}>
+                  {programName}
+                </Text>
+              )}
+            </View>
+            <View style={styles.stepsBadge}>
+              <Text style={styles.stepsBadgeText}>{stepsCountLabel}</Text>
+            </View>
+          </View>
+
+          {loading ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="large" color={Colors.primaryColor} />
+              <Text style={styles.loadingText}>Loading approval history...</Text>
+            </View>
+          ) : steps.length === 0 ? (
+            <View style={styles.emptyRow}>
+              <FontAwesome6
+                name="clock-rotate-left"
+                iconStyle="solid"
+                size={scaleWidth(32)}
+                color={Colors.graybase}
+              />
+              <Text style={styles.emptyText}>No approval history</Text>
+            </View>
+          ) : (
+            <View style={styles.timeline}>
+              {steps.map((step, index) => (
+                <TimelineStepRow
+                  key={step.id}
+                  step={step}
+                  isLast={index === steps.length - 1}
+                />
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
     </Modal>
   );
 };
 
 const DOT_SIZE = scaleWidth(22);
-const RAIL_WIDTH = scaleWidth(22);
+const TIME_COL_WIDTH = scaleWidth(96);
+const RAIL_WIDTH = scaleWidth(24);
 
 const styles = StyleSheet.create({
-  overlay: {
+  safeArea: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '92%',
-    maxHeight: '88%',
     backgroundColor: Colors.white,
-    borderRadius: scaleWidth(12),
-    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -251,43 +342,51 @@ const styles = StyleSheet.create({
     paddingVertical: scaleHeight(14),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E6E6E6',
+    backgroundColor: Colors.white,
+  },
+  headerTextBlock: {
+    flex: 1,
+    paddingRight: scaleWidth(8),
   },
   modalTitle: {
     fontSize: scaleFont(18),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
   },
+  invoiceNoSub: {
+    marginTop: scaleHeight(2),
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
   closeButton: {
-    width: scaleWidth(28),
-    height: scaleWidth(28),
+    width: scaleWidth(36),
+    height: scaleWidth(36),
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  closeButtonText: {
-    fontSize: scaleFont(26),
-    color: Colors.graybase,
-    fontWeight: '300',
-    lineHeight: scaleFont(28),
+    borderRadius: scaleWidth(18),
+    backgroundColor: '#F3F4F6',
   },
   scroll: {
-    maxHeight: scaleHeight(520),
+    flex: 1,
+    backgroundColor: '#F8F9FB',
   },
   scrollContent: {
     paddingHorizontal: scaleWidth(16),
-    paddingTop: scaleHeight(12),
-    paddingBottom: scaleHeight(20),
+    paddingTop: scaleHeight(14),
+    paddingBottom: scaleHeight(28),
   },
-  summaryBlock: {
+  summaryCard: {
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(10),
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    paddingHorizontal: scaleWidth(14),
+    paddingVertical: scaleHeight(14),
     marginBottom: scaleHeight(16),
   },
-  invoiceNoText: {
-    fontSize: scaleFont(13),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.graybase,
-    marginBottom: scaleHeight(4),
-  },
   amountText: {
-    fontSize: scaleFont(28),
+    fontSize: scaleFont(26),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
     marginBottom: scaleHeight(14),
@@ -316,7 +415,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: scaleHeight(14),
+    marginBottom: scaleHeight(12),
     gap: scaleWidth(8),
   },
   workflowHeaderLeft: {
@@ -340,7 +439,7 @@ const styles = StyleSheet.create({
     borderRadius: scaleWidth(14),
     paddingHorizontal: scaleWidth(10),
     paddingVertical: scaleHeight(4),
-    backgroundColor: '#F9FAFB',
+    backgroundColor: Colors.white,
   },
   stepsBadgeText: {
     fontSize: scaleFont(11),
@@ -348,11 +447,23 @@ const styles = StyleSheet.create({
     color: Colors.darkblack,
   },
   timeline: {
-    paddingLeft: scaleWidth(2),
+    paddingTop: scaleHeight(4),
   },
   stepRow: {
     flexDirection: 'row',
-    alignItems: 'stretch',
+    alignItems: 'flex-start',
+  },
+  timeCol: {
+    width: TIME_COL_WIDTH,
+    paddingTop: scaleHeight(4),
+    paddingRight: scaleWidth(2),
+    flexShrink: 0,
+  },
+  timeText: {
+    fontSize: scaleFont(10),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+    lineHeight: scaleFont(13),
   },
   railCol: {
     width: RAIL_WIDTH,
@@ -366,7 +477,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepDotCompleted: {
-    backgroundColor: Colors.green,
+    backgroundColor: '#6B7280',
   },
   stepDotRejected: {
     backgroundColor: '#E67E22',
@@ -377,45 +488,113 @@ const styles = StyleSheet.create({
   railLine: {
     flex: 1,
     width: scaleWidth(2),
-    minHeight: scaleHeight(18),
-    marginVertical: scaleHeight(2),
+    minHeight: scaleHeight(24),
+    marginVertical: scaleHeight(4),
   },
   railLineCompleted: {
-    backgroundColor: Colors.green,
+    backgroundColor: '#D1D5DB',
   },
   railLineRejected: {
-    backgroundColor: '#E67E22',
+    backgroundColor: '#FDBA74',
   },
-  stepContent: {
+  stepCard: {
     flex: 1,
-    paddingLeft: scaleWidth(12),
-    paddingBottom: scaleHeight(18),
+    backgroundColor: Colors.white,
+    borderRadius: scaleWidth(10),
+    borderWidth: 1,
+    borderColor: '#E6E6E6',
+    paddingHorizontal: scaleWidth(12),
+    paddingVertical: scaleHeight(12),
+    marginBottom: scaleHeight(14),
+    marginLeft: scaleWidth(6),
   },
-  stepContentLast: {
-    paddingBottom: scaleHeight(4),
+  stepCardLast: {
+    marginBottom: scaleHeight(4),
+  },
+  stepCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: scaleWidth(8),
+  },
+  stepTitleBlock: {
+    flex: 1,
+    flexShrink: 1,
+    justifyContent: 'center',
+    paddingRight: scaleWidth(8),
   },
   stepAction: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(15),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
   },
-  stepRoleUser: {
-    marginTop: scaleHeight(2),
-    fontSize: scaleFont(12),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.darkblack,
-  },
-  stepTimestamp: {
+  roleUnderName: {
     marginTop: scaleHeight(2),
     fontSize: scaleFont(11),
-    fontFamily: Fonts.GilroyRegular,
+    fontFamily: Fonts.GilroyMedium,
     color: Colors.graybase,
+    textAlign: 'right',
   },
-  emptyRow: {
-    minHeight: scaleHeight(100),
-    paddingVertical: scaleHeight(28),
+  userBlock: {
+    alignItems: 'flex-end',
+    maxWidth: scaleWidth(118),
+    flexShrink: 0,
+  },
+  avatar: {
+    width: scaleWidth(34),
+    height: scaleWidth(34),
+    borderRadius: scaleWidth(17),
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: scaleHeight(4),
+  },
+  avatarText: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.white,
+  },
+  userName: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.darkblack,
+    textAlign: 'right',
+  },
+  remarkBox: {
+    marginTop: scaleHeight(10),
+    backgroundColor: '#F9FAFB',
+    borderRadius: scaleWidth(8),
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(8),
+  },
+  remarkBoxRejected: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
+  },
+  remarkHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(6),
+    marginBottom: scaleHeight(4),
+  },
+  remarkTitle: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.graybase,
+  },
+  remarkText: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyRegular,
+    color: Colors.darkblack,
+    lineHeight: scaleFont(18),
+  },
+  emptyRow: {
+    minHeight: scaleHeight(160),
+    paddingVertical: scaleHeight(36),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scaleHeight(10),
   },
   emptyText: {
     fontSize: scaleFont(14),
@@ -423,7 +602,7 @@ const styles = StyleSheet.create({
     color: Colors.graybase,
   },
   loadingRow: {
-    paddingVertical: scaleHeight(36),
+    paddingVertical: scaleHeight(48),
     alignItems: 'center',
     justifyContent: 'center',
   },

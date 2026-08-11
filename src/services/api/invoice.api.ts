@@ -768,10 +768,14 @@ export const invoiceApi = {
       {authRequired: true} as any,
     );
     const body = response?.data as any;
+    const payload = body?.data ?? body?.result ?? body;
+    if (Array.isArray(payload)) return payload;
     if (Array.isArray(body?.data)) return body.data;
     if (Array.isArray(body)) return body;
     if (Array.isArray(body?.logs)) return body.logs;
     if (Array.isArray(body?.approvalHistory)) return body.approvalHistory;
+    if (Array.isArray(payload?.approvalHistory)) return payload.approvalHistory;
+    if (Array.isArray(payload?.logs)) return payload.logs;
     return [];
   },
 

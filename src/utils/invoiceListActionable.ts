@@ -5,7 +5,37 @@ type ActionableRow = {
   rawApprovalStatus?: string | null;
   rawAdminStatus?: string | null;
   rawInvoiceStatus?: string | null;
+  /** Workflow step action — Approve | Finance Request | Verify | Upload */
+  currentStepActionType?: string | null;
 };
+
+function normalizeStepActionType(value?: string | null): string {
+  return (value || '').trim().toLowerCase();
+}
+
+function isPartyApproveStep(row: ActionableRow): boolean {
+  const actionType = row.currentStepActionType;
+  if (actionType?.trim()) {
+    return normalizeStepActionType(actionType) === 'approve';
+  }
+  return true;
+}
+
+function isFinanceRequestStep(row: ActionableRow): boolean {
+  const actionType = row.currentStepActionType;
+  if (!actionType?.trim()) {
+    return false;
+  }
+  return normalizeStepActionType(actionType) === 'finance request';
+}
+
+function isAdminVerifyStep(row: ActionableRow): boolean {
+  const actionType = row.currentStepActionType;
+  if (actionType?.trim()) {
+    return normalizeStepActionType(actionType) === 'verify';
+  }
+  return true;
+}
 
 export type InvoiceEditRow = ActionableRow & {
   currentStepSequenceNo?: number | null;
@@ -37,7 +67,7 @@ export function canShowWorkflowApproveReject(
   }
 
   if (typeof row.actionable === 'boolean') {
-    return row.actionable && hasPermission;
+    return row.actionable && hasPermission && isPartyApproveStep(row);
   }
 
   const iStatus = (row.rawInvoiceStatus || '').toLowerCase();
@@ -83,7 +113,7 @@ export function canShowCashnTechInvoiceVerification(
     return false;
   }
   if (typeof row.actionable === 'boolean') {
-    return row.actionable;
+    return row.actionable && isAdminVerifyStep(row);
   }
   return isPendingVerificationStatus(row.rawAdminStatus);
 }
@@ -100,7 +130,9 @@ export function canShowFinanceRequest(
   if (options?.isCashnTechUser) {
     return false;
   }
-  return canFinanceRequest && row.actionable === true;
+  return (
+    canFinanceRequest && row.actionable === true && isFinanceRequestStep(row)
+  );
 }
 
 /**

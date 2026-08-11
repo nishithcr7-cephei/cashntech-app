@@ -39,6 +39,8 @@ function mapEntryToStep(entry: CheckerApprovalEntry): WorkflowStep {
     userName: entry.approvedBy || '',
     timestamp: entry.approvalDate || '',
     status: entry.status === 'Rejected' ? 'rejected' : 'completed',
+    remark: entry.remark?.trim() || undefined,
+    rejectionReason: entry.rejectionReason?.trim() || undefined,
   };
 }
 
