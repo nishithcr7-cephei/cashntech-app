@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   Modal,
   View,
@@ -14,6 +14,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import moment from 'moment';
 import {Colors, Fonts} from '@constants/index';
+import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {
   PRODUCT_CODES,
@@ -23,9 +24,12 @@ import {
 import {getEffectiveProductCode} from '@store/product/product.resolver';
 import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/AttachmentPreviewModal';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
+import {calculateInvoiceDueDate} from '@utils/invoiceDueDate';
 import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
 import {fileNameFromAttachmentUrl} from '@utils/invoiceAttachments';
 import {toYYYYMMDD} from '@services/api/invoice.api';
+
+const SUMMARY = INVOICE_SUMMARY_LABELS;
 
 export type ApproveRejectInvoiceItem = {
   id: string;
@@ -96,6 +100,8 @@ type ApproveRejectModalProps = {
    * Pass true for Anchor Maker; vendors/checkers must not update GRN.
    */
   allowGrnDateEdit?: boolean;
+  /** Program basic_parameters.due_date_calculated_from (e.g. GRN Date). */
+  dueDateCalculatedFrom?: string;
   onApprove?: (invoiceId: string, remarks?: string, grnDate?: string) => void;
   onReject?: (invoiceId: string, remarks?: string, grnDate?: string) => void;
   /** CashnTech admin verification — On Hold */
@@ -116,32 +122,57 @@ function parseGrnDisplay(raw?: string | null): string {
   return m.isValid() ? m.format('DD-MM-YYYY') : raw.trim();
 }
 
-/** Earliest selectable GRN: today, or invoice date when invoice is in the future. */
+/** Earliest selectable GRN: invoice date (GRN must be on or after invoice date). */
 function getGrnMinimumDate(invoiceDateRaw?: string | null): Date {
-  const today = moment().startOf('day');
   const invoiceDate = parseMomentDate(invoiceDateRaw);
-  if (invoiceDate?.isAfter(today, 'day')) {
+  if (invoiceDate) {
     return invoiceDate.toDate();
   }
-  return today.toDate();
+  return moment().startOf('day').toDate();
 }
 
-/** Latest selectable GRN: invoice due date, or invoice date + tenor days. */
+/** Latest selectable GRN: current date, capped by invoice due date when earlier. */
 function getGrnMaximumDate(
   invoiceDateRaw?: string | null,
   tenorDaysRaw?: string | number | null,
   invoiceDueDateRaw?: string | null,
-): Date | undefined {
+): Date {
+  const today = moment().startOf('day');
+  let max = today.clone();
+
   const dueDate = parseMomentDate(invoiceDueDateRaw);
-  if (dueDate) {
-    return dueDate.toDate();
+  if (dueDate?.isBefore(max, 'day')) {
+    max = dueDate;
+  } else if (!dueDate) {
+    const invoiceDate = parseMomentDate(invoiceDateRaw);
+    const tenorDays = Number(tenorDaysRaw);
+    if (invoiceDate && Number.isFinite(tenorDays) && tenorDays > 0) {
+      const computedDue = invoiceDate.clone().add(tenorDays, 'days');
+      if (computedDue.isBefore(max, 'day')) {
+        max = computedDue;
+      }
+    }
   }
-  const invoiceDate = parseMomentDate(invoiceDateRaw);
-  const tenorDays = Number(tenorDaysRaw);
-  if (invoiceDate && Number.isFinite(tenorDays) && tenorDays > 0) {
-    return invoiceDate.clone().add(tenorDays, 'days').toDate();
+
+  return max.toDate();
+}
+
+/** Picker bounds: clamp min when invoice date is after the effective max (future invoice). */
+function getGrnPickerBounds(
+  invoiceDateRaw?: string | null,
+  tenorDaysRaw?: string | number | null,
+  invoiceDueDateRaw?: string | null,
+): {minimumDate: Date; maximumDate: Date} {
+  const minimumDate = getGrnMinimumDate(invoiceDateRaw);
+  const maximumDate = getGrnMaximumDate(
+    invoiceDateRaw,
+    tenorDaysRaw,
+    invoiceDueDateRaw,
+  );
+  if (minimumDate.getTime() > maximumDate.getTime()) {
+    return {minimumDate: maximumDate, maximumDate};
   }
-  return undefined;
+  return {minimumDate, maximumDate};
 }
 
 /** Returns error message if GRN is invalid; otherwise null. */
@@ -156,20 +187,21 @@ function getGrnDateValidationError(
     return 'Enter a valid GRN date (DD-MM-YYYY)';
   }
   const grn = parsed.startOf('day');
-  const min = moment(getGrnMinimumDate(invoiceDateRaw)).startOf('day');
-  if (grn.isBefore(min, 'day')) {
-    return 'GRN date cannot be in the past';
+
+  const invoiceDate = parseMomentDate(invoiceDateRaw);
+  if (invoiceDate && grn.isBefore(invoiceDate, 'day')) {
+    return `GRN date cannot be before invoice date (${invoiceDate.format('DD-MM-YYYY')})`;
   }
-  const maxDate = getGrnMaximumDate(
-    invoiceDateRaw,
-    tenorDaysRaw,
-    invoiceDueDateRaw,
-  );
-  if (maxDate) {
-    const max = moment(maxDate).startOf('day');
-    if (grn.isAfter(max, 'day')) {
-      return `GRN date cannot be after ${max.format('DD-MM-YYYY')}`;
+
+  const max = moment(
+    getGrnMaximumDate(invoiceDateRaw, tenorDaysRaw, invoiceDueDateRaw),
+  ).startOf('day');
+  if (grn.isAfter(max, 'day')) {
+    const today = moment().startOf('day');
+    if (max.isSame(today, 'day')) {
+      return 'GRN date cannot be after current date';
     }
+    return `GRN date cannot be after invoice due date (${max.format('DD-MM-YYYY')})`;
   }
   return null;
 }
@@ -203,6 +235,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   detailsLoading = false,
   productCode,
   allowGrnDateEdit = false,
+  dueDateCalculatedFrom,
   onApprove,
   onReject,
   onHold,
@@ -243,13 +276,36 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   const vfGrnDateDisplay = dash(
     parseGrnDisplay(grnDateInput || details.grnDate),
   );
-  const grnDueDateRaw = details.invoiceDueDate || details.finalDueDate;
-  const grnMaxDate = getGrnMaximumDate(
+  const storedDueDateRaw = details.invoiceDueDate || details.finalDueDate;
+  const grnPickerBounds = getGrnPickerBounds(
     details.invoiceDate,
     details.tenorDays,
-    grnDueDateRaw,
+    storedDueDateRaw,
   );
-  const grnMinDate = getGrnMinimumDate(details.invoiceDate);
+
+  const displayInvoiceDueDate = useMemo(() => {
+    const fallback = storedDueDateRaw || '';
+    const grnForCalc = showVfGrnDatePicker
+      ? grnDateInput.trim()
+      : parseGrnDisplay(details.grnDate);
+    return (
+      calculateInvoiceDueDate({
+        dueDateCalculatedFrom,
+        invoiceDate: details.invoiceDate,
+        grnDate: grnForCalc,
+        tenorDays: details.tenorDays,
+        fallbackDueDate: fallback,
+      }) || fallback
+    );
+  }, [
+    storedDueDateRaw,
+    showVfGrnDatePicker,
+    grnDateInput,
+    details.grnDate,
+    details.invoiceDate,
+    details.tenorDays,
+    dueDateCalculatedFrom,
+  ]);
 
   useEffect(() => {
     if (!visible) return;
@@ -277,7 +333,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
       grnDateInput.trim(),
       details.invoiceDate,
       details.tenorDays,
-      grnDueDateRaw,
+      storedDueDateRaw,
     );
     if (error) {
       setGrnDateError(error);
@@ -313,7 +369,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
         grnDateInput.trim(),
         details.invoiceDate,
         details.tenorDays,
-        grnDueDateRaw,
+        storedDueDateRaw,
       );
       if (!error) {
         grn = resolveGrnForApi();
@@ -461,7 +517,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                       )}
                       <DetailRow
                         label="Invoice Due Date"
-                        value={dash(details.invoiceDueDate || details.finalDueDate)}
+                        value={dash(displayInvoiceDueDate)}
                       />
                       <DetailRow
                         label={isCashnTechVerification ? 'Po Ref No' : 'PO Ref'}
@@ -525,7 +581,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                     <Text style={styles.sectionTitle}>Summary</Text>
                     <View style={styles.detailsTable}>
                       <DetailRow
-                        label="Sub Total"
+                        label={SUMMARY.invoiceAmount}
                         value={
                           details.subTotalAmount != null
                             ? fmtAmount(details.subTotalAmount)
@@ -533,27 +589,25 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                         }
                       />
                       <DetailRow
-                        label={
-                          isCashnTechVerification ? 'Discount Total' : 'Discount'
-                        }
+                        label={SUMMARY.discount}
                         value={fmtAmount(details.discountAmount ?? 0)}
                       />
                       <DetailRow
-                        label={isCashnTechVerification ? 'Tax Total' : 'Tax'}
+                        label={SUMMARY.taxAmount}
                         value={fmtAmount(details.taxAmount ?? 0)}
                       />
                       <DetailRow
-                        label="TDS"
+                        label={SUMMARY.tdsDeduction}
                         value={fmtAmount(details.tdsAmount ?? 0)}
                       />
                       {showAdvanceInterest && (
                         <DetailRow
-                          label="Advance Interest"
+                          label={SUMMARY.advanceInterestDeduction}
                           value={fmtAmount(details.advanceInterest ?? 0)}
                         />
                       )}
                       <DetailRow
-                        label="Total (Net)"
+                        label={SUMMARY.netDisbursementAmount}
                         value={
                           details.totalAmount != null
                             ? fmtAmount(details.totalAmount)
@@ -636,7 +690,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                                 next,
                                 details.invoiceDate,
                                 details.tenorDays,
-                                grnDueDateRaw,
+                                storedDueDateRaw,
                               ),
                             );
                           }}
@@ -649,10 +703,10 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                                   GRN_DATE_FORMATS,
                                   true,
                                 ).toDate()
-                              : grnMinDate,
+                              : grnPickerBounds.maximumDate,
                             mode: 'date',
-                            minimumDate: grnMinDate,
-                            ...(grnMaxDate ? {maximumDate: grnMaxDate} : {}),
+                            minimumDate: grnPickerBounds.minimumDate,
+                            maximumDate: grnPickerBounds.maximumDate,
                           }}
                           containerStyle={styles.grnDatePicker}
                         />

@@ -30,6 +30,8 @@ export type InvoiceTrackingModalProps = {
   visible: boolean;
   onClose: () => void;
   loading?: boolean;
+  /** e.g. "Vendor Invoice" / "Dealer Invoice" — shown above invoice number */
+  productInvoiceLabel?: string;
   invoiceNo?: string;
   invoiceAmount?: string;
   counterParty?: string;
@@ -214,6 +216,7 @@ export const InvoiceTrackingModal: React.FC<InvoiceTrackingModalProps> = ({
   visible,
   onClose,
   loading = false,
+  productInvoiceLabel,
   invoiceNo,
   invoiceAmount,
   counterParty,
@@ -238,6 +241,11 @@ export const InvoiceTrackingModal: React.FC<InvoiceTrackingModalProps> = ({
         <View style={styles.modalHeader}>
           <View style={styles.headerTextBlock}>
             <Text style={styles.modalTitle}>Approval History</Text>
+            {!!productInvoiceLabel?.trim() && (
+              <Text style={styles.productInvoiceLabel} numberOfLines={1}>
+                {productInvoiceLabel}
+              </Text>
+            )}
             {!!invoiceNo?.trim() && (
               <Text style={styles.invoiceNoSub} numberOfLines={1}>
                 {invoiceNo}
@@ -352,6 +360,12 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(18),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
+  },
+  productInvoiceLabel: {
+    marginTop: scaleHeight(4),
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
   },
   invoiceNoSub: {
     marginTop: scaleHeight(2),

@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo} from 'react';
+import React, {useState, useEffect, useMemo, useCallback} from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  BackHandler,
 } from 'react-native';
-import {useNavigation, useRoute} from '@react-navigation/native';
+import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {selectInvoiceList} from '@store/invoice/inv.selector';
+import {selectIsVendorFinanceActive} from '@store/product/product.selectors';
 import {AppBar, Container, UploadModal} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
+import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Download, LeftChevron} from '@assets/Icons';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
@@ -25,6 +28,8 @@ import {decryptValue} from '@utils/decrypt';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
 import {mapInvoiceAttachmentsWithUrls, openInvoiceAttachment} from '@utils/invoiceAttachments';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
+
+const SUMMARY = INVOICE_SUMMARY_LABELS;
 
 const fmtAmount = (n: number) =>
   n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -63,6 +68,9 @@ type InvoiceDetailData = {
   invoiceDate: string;
   invoiceDueDate: string;
   paymentDate: string;
+  grnDate: string;
+  disbursementDate: string;
+  usanceDays: string;
   creditTo: string;
   workflowMethod: string;
   currency: string;
@@ -74,6 +82,7 @@ type InvoiceDetailData = {
   tdsAmount: number;
   advanceInterest: number;
   showAdvanceInterest: boolean;
+  isVendorFinance: boolean;
   total: number;
   attachments: AttachmentItem[];
   invoiceStatus: string;
@@ -93,6 +102,9 @@ const defaultInvoiceData: InvoiceDetailData = {
   invoiceDate: '',
   invoiceDueDate: '',
   paymentDate: '',
+  grnDate: '',
+  disbursementDate: '',
+  usanceDays: '',
   creditTo: '',
   workflowMethod: '',
   currency: 'INR',
@@ -104,6 +116,7 @@ const defaultInvoiceData: InvoiceDetailData = {
   tdsAmount: 0,
   advanceInterest: 0,
   showAdvanceInterest: false,
+  isVendorFinance: false,
   total: 0,
   attachments: [],
   invoiceStatus: '',
@@ -144,25 +157,21 @@ function getAdminStatusStyles(status: string) {
   return STATUS_COLORS.DEFAULT;
 }
 
-const DetailField: React.FC<{label: string; value: string}> = ({label, value}) => (
-  <View style={styles.detailField}>
-    <Text style={styles.detailLabel}>{label}</Text>
-    <Text style={styles.detailValue} selectable>
-      {value}
-    </Text>
-  </View>
-);
-
-const SummaryStat: React.FC<{label: string; value: string; isWide?: boolean}> = ({
-  label,
-  value,
-  isWide = false,
-}) => (
-  <View style={[styles.summaryStat, isWide && styles.summaryStatWide]}>
-    <Text style={styles.summaryStatLabel}>{label}</Text>
+/** Label-left / value-right row — matches ApproveRejectModal pattern. */
+const DetailRow: React.FC<{
+  label: string;
+  value: string;
+  isLast?: boolean;
+  emphasize?: boolean;
+}> = ({label, value, isLast, emphasize}) => (
+  <View style={[styles.detailRow, isLast && styles.detailRowLast]}>
     <Text
-      style={[styles.summaryStatValue, isWide && styles.summaryStatValueWide]}
-      numberOfLines={1}>
+      style={[styles.detailRowLabel, emphasize && styles.detailRowLabelEmphasize]}>
+      {label}
+    </Text>
+    <Text
+      style={[styles.detailRowValue, emphasize && styles.detailRowValueEmphasize]}
+      selectable>
       {value}
     </Text>
   </View>
@@ -172,6 +181,7 @@ export const InvoiceDetailView: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
   const programSelection = useSelector(selectProgramSelection);
+  const isVendorFinanceActive = useSelector(selectIsVendorFinanceActive);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isAnchorChecker = userRole === 'anchor_checker';
   const isDealerChecker = userRole === 'dealer_checker';
@@ -183,7 +193,12 @@ export const InvoiceDetailView: React.FC = () => {
 
   const rawInvoiceId = route?.params?.invoiceId || '';
   const invoiceNo = route?.params?.invoiceNo || '';
-  const returnRoute = route?.params?.returnRoute as keyof HomeNavigatorType | undefined;
+  const returnRoute = route?.params?.returnRoute as string | undefined;
+  const returnProgramId =
+    (route?.params?.programId as string | undefined) ||
+    programSelection?.programId ||
+    undefined;
+  const fromInvoiceDashboard = route?.params?.fromInvoiceDashboard === true;
   const listInvoiceStatus = route?.params?.listInvoiceStatus as string | undefined;
   const listApprovalStatus = route?.params?.listApprovalStatus as string | undefined;
   const listAdminStatus = route?.params?.listAdminStatus as string | undefined;
@@ -218,19 +233,35 @@ export const InvoiceDetailView: React.FC = () => {
     return trimmed;
   }, [rawInvoiceId, invoiceNo, invoiceListRaw]);
 
-  const goBackToList = () => {
-    if (returnRoute) {
-      (navigation as any).navigate(returnRoute);
-      return;
+  const goBackToList = useCallback(() => {
+    // Drawer screens do not reliably stack — always return to the explicit
+    // source screen (invoice list / disbursement / etc.) instead of goBack(),
+    // which often lands on Invoice Overview (drawer initial route).
+    const target = returnRoute || 'InvoiceDetails';
+    const params: Record<string, unknown> = {};
+    if (target === 'InvoiceDetails') {
+      if (returnProgramId) params.programId = returnProgramId;
+      if (fromInvoiceDashboard) params.fromInvoiceDashboard = true;
     }
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-      return;
-    }
-    (navigation as any).navigate('InvoiceDetails', {
-      programId: programSelection?.programId,
-    });
-  };
+    (navigation as any).navigate(
+      target,
+      Object.keys(params).length ? params : undefined,
+    );
+  }, [navigation, returnRoute, returnProgramId, fromInvoiceDashboard]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onHardwareBack = () => {
+        goBackToList();
+        return true;
+      };
+      const sub = BackHandler.addEventListener(
+        'hardwareBackPress',
+        onHardwareBack,
+      );
+      return () => sub.remove();
+    }, [goBackToList]),
+  );
 
   useEffect(() => {
     if (!invoiceId) {
@@ -284,8 +315,9 @@ export const InvoiceDetailView: React.FC = () => {
             listRowForInvoice?.product_name ||
             '',
         );
+        const isVendorFinanceInvoice = /vendor\s*finance/i.test(productName);
         const showAdvanceInterest =
-          /vendor\s*finance/i.test(productName) || advanceInterest > 0;
+          isVendorFinanceInvoice || advanceInterest > 0;
 
         const items: InvoiceItemRow[] = (data?.invoiceItems || []).map((it: any, idx: number) => {
           const lineTotal = Number(it.total) || 0;
@@ -343,6 +375,13 @@ export const InvoiceDetailView: React.FC = () => {
           invoiceDate: formatApiInvoiceDate(data?.invoice_date) || '-',
           invoiceDueDate: formatApiInvoiceDate(data?.invoice_due_date) || '-',
           paymentDate: formatApiInvoiceDate(data?.payment_date) || '-',
+          grnDate: formatApiInvoiceDate(data?.grn_date) || '',
+          disbursementDate:
+            formatApiInvoiceDate(data?.disbursement_date) || '',
+          usanceDays:
+            data?.usance_days != null && data?.usance_days !== ''
+              ? String(Math.round(Number(data.usance_days)) || data.usance_days)
+              : '',
           creditTo,
           workflowMethod:
             apm?.program?.method || data?.program?.method || data?.workflow_method || '',
@@ -355,6 +394,7 @@ export const InvoiceDetailView: React.FC = () => {
           tdsAmount,
           advanceInterest,
           showAdvanceInterest,
+          isVendorFinance: isVendorFinanceInvoice,
           total: finalTotal,
           attachments,
           invoiceStatus: formatStatus(
@@ -399,6 +439,12 @@ export const InvoiceDetailView: React.FC = () => {
 
   const headerTitle = invoiceData.invoiceRefNo || invoiceNo || invoiceId || 'N/A';
   const subtitle = invoiceData.anchorName || invoiceData.dealerName || '';
+  /** VF active product or invoice product name — web Vendor Invoice preview parity. */
+  const isVendorFinance =
+    isVendorFinanceActive || invoiceData.isVendorFinance;
+  const productInvoiceLabel = isVendorFinance
+    ? 'Vendor Invoice'
+    : 'Dealer Invoice';
 
   if (loading) {
     return (
@@ -469,6 +515,7 @@ export const InvoiceDetailView: React.FC = () => {
               </TouchableOpacity>
             )}
             <View style={styles.headerTextBlock}>
+              <Text style={styles.productInvoiceLabel}>{productInvoiceLabel}</Text>
               <Text style={styles.invoiceRefTitle}>{headerTitle}</Text>
               {!!subtitle && (
                 <Text style={styles.invoiceSubtitle} numberOfLines={2}>
@@ -536,152 +583,155 @@ export const InvoiceDetailView: React.FC = () => {
           )}
         </View>
 
-        {/* Summary stats — aligned with web */}
+        {/* Party Details — ApproveRejectModal pattern */}
         <View style={styles.card}>
-          <View style={styles.summaryStatsRow}>
-            <SummaryStat
-              label="Total Amount"
-              value={fmtAmount(invoiceData.total)}
-              isWide
+          <Text style={styles.sectionTitle}>Party Details</Text>
+          <View style={styles.detailsTable}>
+            <DetailRow
+              label="Anchor"
+              value={displayOrDash(invoiceData.anchorName)}
             />
-            <SummaryStat label="Items" value={String(invoiceData.items.length)} />
-            <SummaryStat label="Tax" value={fmtAmount(invoiceData.tax.amount)} />
-            <SummaryStat label="Discount" value={fmtAmount(invoiceData.discount.amount)} />
+            <DetailRow
+              label={isVendorFinance ? 'Vendor Name' : 'Dealer Name'}
+              value={displayOrDash(invoiceData.dealerName)}
+            />
+            <DetailRow
+              label={
+                isVendorFinance ? 'Loan OD Account Number' : 'OD Account'
+              }
+              value={displayOrDash(invoiceData.odAccountNumber)}
+            />
+            <DetailRow
+              label={isVendorFinance ? 'Vendor Code' : 'Dealer Code'}
+              value={displayOrDash(invoiceData.dealerCode)}
+            />
+            <DetailRow
+              label="Credit To"
+              value={displayOrDash(invoiceData.creditTo)}
+              isLast
+            />
           </View>
-        </View>
 
-        {/* Invoice details — full-width single column */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Invoice Information</Text>
-          <DetailField label="Anchor Name" value={displayOrDash(invoiceData.anchorName)} />
-          <DetailField label="Dealer Name" value={displayOrDash(invoiceData.dealerName)} />
-          <DetailField label="Dealer Code" value={displayOrDash(invoiceData.dealerCode)} />
-          <DetailField label="Loan OD Account Number" value={displayOrDash(invoiceData.odAccountNumber)} />
-          <DetailField label="Invoice Ref No" value={displayOrDash(invoiceData.invoiceRefNo)} />
-          <DetailField label="PO Ref No" value={displayOrDash(invoiceData.poRefNo)} />
-          <DetailField label="Invoice Date" value={displayOrDash(invoiceData.invoiceDate)} />
-          <DetailField label="Invoice Due Date" value={displayOrDash(invoiceData.invoiceDueDate)} />
-          <DetailField label="Payment Date" value={displayOrDash(invoiceData.paymentDate)} />
-          <DetailField label="Tenor (days)" value={displayOrDash(invoiceData.tenorDays)} />
-          <DetailField label="Credit To" value={displayOrDash(invoiceData.creditTo)} />
-          <DetailField label="WorkFlow Method" value={displayOrDash(invoiceData.workflowMethod)} />
-          <DetailField label="Currency" value={displayOrDash(invoiceData.currency)} />
-          <DetailField
-            label="Early Payment Discount"
-            value={
-              invoiceData.earlyPaymentDiscount > 0
-                ? fmtPercent(invoiceData.earlyPaymentDiscount)
-                : displayOrDash(null)
-            }
-          />
-          <DetailField label="Remark" value={displayOrDash(invoiceData.remark)} />
-        </View>
+          <Text style={styles.sectionTitle}>Invoice Details</Text>
+          <View style={styles.detailsTable}>
+            {/* Web Vendor Invoice preview order (VF + DF): */}
+            <DetailRow
+              label="Invoice Date"
+              value={displayOrDash(invoiceData.invoiceDate)}
+            />
+            <DetailRow
+              label="Invoice Due Date"
+              value={displayOrDash(invoiceData.invoiceDueDate)}
+            />
+            <DetailRow
+              label="Payment Date"
+              value={displayOrDash(invoiceData.paymentDate)}
+            />
+            <DetailRow
+              label="GRN Date"
+              value={displayOrDash(invoiceData.grnDate)}
+            />
+            <DetailRow
+              label="Disbursement Date"
+              value={displayOrDash(invoiceData.disbursementDate)}
+            />
+            <DetailRow
+              label="Po Ref No"
+              value={displayOrDash(invoiceData.poRefNo)}
+            />
+            <DetailRow
+              label="Tenor"
+              value={displayOrDash(invoiceData.tenorDays)}
+            />
+            <DetailRow
+              label="Usance Days"
+              value={displayOrDash(invoiceData.usanceDays)}
+              isLast
+            />
+          </View>
 
-        {/* Items table */}
-        <View style={styles.card}>
           <Text style={styles.sectionTitle}>Items</Text>
           {invoiceData.items.length === 0 ? (
             <Text style={styles.emptyHint}>No items found</Text>
           ) : (
-            <>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View>
-                  <View style={styles.tableHeaderRow}>
-                    <Text style={[styles.tableHeadCell, styles.colItem]}>Item</Text>
-                    <Text style={[styles.tableHeadCell, styles.colQty]}>Qty</Text>
-                    <Text style={[styles.tableHeadCell, styles.colUnit]}>Unit</Text>
-                    <Text style={[styles.tableHeadCell, styles.colPrice]}>Price</Text>
-                    <Text style={[styles.tableHeadCell, styles.colDiscount]}>Discount</Text>
-                    <Text style={[styles.tableHeadCell, styles.colTax]}>Tax</Text>
-                    <Text style={[styles.tableHeadCell, styles.colTotal]}>Total</Text>
-                  </View>
-                  {invoiceData.items.map(item => (
-                    <View key={item.id} style={styles.tableDataRow}>
-                      <View style={styles.colItem}>
-                        <Text style={styles.tableCellText}>{item.itemName}</Text>
-                        {!!item.description && (
-                          <Text style={styles.tableCellSubText} numberOfLines={2}>
-                            ({item.description})
-                          </Text>
-                        )}
-                      </View>
-                      <Text style={[styles.tableCellText, styles.colQty]}>
-                        {fmtAmount(item.quantity)}
-                      </Text>
-                      <Text style={[styles.tableCellText, styles.colUnit]}>{item.unit}</Text>
-                      <Text style={[styles.tableCellText, styles.colPrice]}>
-                        {fmtAmount(item.price)}
-                      </Text>
-                      <View style={styles.colDiscount}>
-                        <Text style={styles.tableCellText}>{fmtAmount(item.discountAmount)}</Text>
-                        {item.discountPercent > 0 && (
-                          <Text style={styles.tableCellSubText}>
-                            ({fmtPercent(item.discountPercent)}%)
-                          </Text>
-                        )}
-                      </View>
-                      <View style={styles.colTax}>
-                        <Text style={styles.tableCellText}>
-                          {item.taxAmount > 0 ? fmtAmount(item.taxAmount) : '-'}
-                        </Text>
-                        {item.taxAmount > 0 && (
-                          <Text style={styles.tableCellSubText} numberOfLines={1}>
-                            {item.taxLabel}
-                          </Text>
-                        )}
-                      </View>
-                      <Text style={[styles.tableCellText, styles.colTotal, styles.tableCellBold]}>
-                        {fmtAmount(item.total)}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </ScrollView>
+            invoiceData.items.map(item => {
+              const discountValue =
+                item.discountPercent > 0
+                  ? `${fmtAmount(item.discountAmount)} (${fmtPercent(item.discountPercent)}%)`
+                  : fmtAmount(item.discountAmount);
+              const taxValue =
+                item.taxAmount > 0
+                  ? item.taxLabel
+                    ? `${fmtAmount(item.taxAmount)} ${item.taxLabel}`
+                    : fmtAmount(item.taxAmount)
+                  : '-';
+              const itemTitle = item.description
+                ? `${item.itemName || '-'} (${item.description})`
+                : item.itemName || '-';
 
-              <View style={styles.totalsBox}>
-                <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel}>Sub Total</Text>
-                  <Text style={styles.totalsValue}>{fmtAmount(invoiceData.subTotal)}</Text>
+              return (
+                <View key={item.id} style={styles.itemCard}>
+                  <Text style={styles.itemCardTitle}>{itemTitle}</Text>
+                  <DetailRow label="Qty" value={fmtAmount(item.quantity)} />
+                  <DetailRow label="Unit" value={displayOrDash(item.unit)} />
+                  <DetailRow label="Price" value={fmtAmount(item.price)} />
+                  <DetailRow label="Discount" value={discountValue} />
+                  <DetailRow label="Tax" value={taxValue} />
+                  <DetailRow
+                    label="Total"
+                    value={fmtAmount(item.total)}
+                    isLast
+                    emphasize
+                  />
                 </View>
-                <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel}>Discount Total</Text>
-                  <Text style={styles.totalsValue}>{fmtAmount(invoiceData.discount.amount)}</Text>
-                </View>
-                <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel}>Tax Total</Text>
-                  <Text style={styles.totalsValue}>{fmtAmount(invoiceData.tax.amount)}</Text>
-                </View>
-                <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel}>TDS</Text>
-                  <Text style={styles.totalsValue}>{fmtAmount(invoiceData.tdsAmount)}</Text>
-                </View>
-                {invoiceData.showAdvanceInterest && (
-                  <View style={styles.totalsRow}>
-                    <Text style={styles.totalsLabel}>Advance Interest</Text>
-                    <Text style={styles.totalsValue}>
-                      {fmtAmount(invoiceData.advanceInterest)}
-                    </Text>
-                  </View>
-                )}
-                <View style={[styles.totalsRow, styles.totalsRowFinal]}>
-                  <Text style={styles.totalsLabelFinal}>Total (Net)</Text>
-                  <Text style={styles.totalsValueFinal}>{fmtAmount(invoiceData.total)}</Text>
-                </View>
-              </View>
-            </>
+              );
+            })
           )}
-        </View>
 
-        {/* Attachments */}
-        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Summary</Text>
+          <View style={styles.detailsTable}>
+            <DetailRow
+              label={SUMMARY.invoiceAmount}
+              value={fmtAmount(invoiceData.subTotal)}
+            />
+            <DetailRow
+              label={SUMMARY.discount}
+              value={fmtAmount(invoiceData.discount.amount)}
+            />
+            <DetailRow
+              label={SUMMARY.taxAmount}
+              value={fmtAmount(invoiceData.tax.amount)}
+            />
+            <DetailRow
+              label={SUMMARY.tdsDeduction}
+              value={fmtAmount(invoiceData.tdsAmount)}
+            />
+            {invoiceData.showAdvanceInterest && (
+              <DetailRow
+                label={SUMMARY.advanceInterestDeduction}
+                value={fmtAmount(invoiceData.advanceInterest)}
+              />
+            )}
+            <DetailRow
+              label={SUMMARY.netDisbursementAmount}
+              value={fmtAmount(invoiceData.total)}
+              isLast
+              emphasize
+            />
+          </View>
+
           <Text style={styles.sectionTitle}>
-            Attachments{invoiceData.attachments.length > 0 ? ` · ${invoiceData.attachments.length}` : ''}
+            Attachments
+            {invoiceData.attachments.length > 0
+              ? ` · ${invoiceData.attachments.length}`
+              : ''}
           </Text>
           {invoiceData.attachments.length === 0 ? (
             <Text style={styles.emptyHint}>No attachments</Text>
           ) : (
             invoiceData.attachments.map((att, idx) => {
-              const fileName = att.attachment_url?.split('/').pop() || `Attachment ${idx + 1}`;
+              const fileName =
+                att.attachment_url?.split('/').pop() || `Attachment ${idx + 1}`;
               const ext = fileName.split('.').pop()?.toUpperCase() || 'FILE';
               const isPdf = ext === 'PDF';
               return (
@@ -690,8 +740,14 @@ export const InvoiceDetailView: React.FC = () => {
                   style={styles.attachmentCard}
                   onPress={() => openAttachment(att.fullUrl)}
                   activeOpacity={0.7}>
-                  <View style={[styles.attachmentIcon, isPdf && styles.attachmentIconPdf]}>
-                    <Text style={styles.attachmentIconText}>{isPdf ? 'PDF' : ext.slice(0, 3)}</Text>
+                  <View
+                    style={[
+                      styles.attachmentIcon,
+                      isPdf && styles.attachmentIconPdf,
+                    ]}>
+                    <Text style={styles.attachmentIconText}>
+                      {isPdf ? 'PDF' : ext.slice(0, 3)}
+                    </Text>
                   </View>
                   <View style={styles.attachmentInfo}>
                     <Text style={styles.attachmentName} numberOfLines={1}>
@@ -700,7 +756,12 @@ export const InvoiceDetailView: React.FC = () => {
                     <Text style={styles.attachmentMeta}>Tap to view</Text>
                   </View>
                   <View style={styles.viewButton}>
-                    <FontAwesome6 name="eye" iconStyle="regular" size={scaleWidth(14)} color={Colors.primaryColor} />
+                    <FontAwesome6
+                      name="eye"
+                      iconStyle="regular"
+                      size={scaleWidth(14)}
+                      color={Colors.primaryColor}
+                    />
                     <Text style={styles.viewButtonText}>View</Text>
                   </View>
                 </TouchableOpacity>
@@ -762,6 +823,12 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: scaleWidth(8),
   },
+  productInvoiceLabel: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.primaryColor,
+    marginBottom: scaleHeight(4),
+  },
   invoiceRefTitle: {
     fontSize: scaleFont(17),
     fontFamily: Fonts.GilroySemiBold,
@@ -802,147 +869,66 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(11),
     fontFamily: Fonts.GilroySemiBold,
   },
-  summaryStatsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: scaleWidth(8),
-  },
-  summaryStat: {
-    flexGrow: 1,
-    flexBasis: '22%',
-    minWidth: scaleWidth(72),
-    backgroundColor: '#F7F8FB',
-    borderRadius: scaleWidth(8),
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(8),
-    alignItems: 'center',
-  },
-  summaryStatWide: {
-    flexBasis: '44%',
-    minWidth: scaleWidth(150),
-  },
-  summaryStatLabel: {
-    fontSize: scaleFont(11),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.graybase,
-    marginBottom: scaleHeight(4),
-    textAlign: 'center',
-  },
-  summaryStatValue: {
-    fontSize: scaleFont(13),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.darkblack,
-    textAlign: 'center',
-  },
-  summaryStatValueWide: {
-    fontSize: scaleFont(14),
-  },
   sectionTitle: {
     fontSize: scaleFont(15),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-    marginBottom: scaleHeight(12),
+    marginBottom: scaleHeight(10),
   },
-  detailField: {
-    paddingVertical: scaleHeight(10),
+  detailsTable: {
+    backgroundColor: '#F7F8FB',
+    borderRadius: scaleWidth(8),
+    padding: scaleWidth(12),
+    marginBottom: scaleHeight(14),
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: scaleHeight(7),
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#EEF0F2',
+    borderBottomColor: '#E6E6E6',
+    gap: scaleWidth(8),
   },
-  detailLabel: {
-    fontSize: scaleFont(12),
+  detailRowLast: {
+    borderBottomWidth: 0,
+  },
+  detailRowLabel: {
+    fontSize: scaleFont(13),
     fontFamily: Fonts.GilroyMedium,
-    color: Colors.graybase,
-    marginBottom: scaleHeight(4),
+    color: Colors.darkblack,
+    flex: 1,
   },
-  detailValue: {
-    fontSize: scaleFont(14),
+  detailRowLabelEmphasize: {
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  detailRowValue: {
+    fontSize: scaleFont(13),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-    lineHeight: scaleFont(20),
+    flex: 1.2,
+    textAlign: 'right',
+  },
+  detailRowValueEmphasize: {
+    fontSize: scaleFont(14),
   },
   emptyHint: {
     fontSize: scaleFont(13),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.graybase,
+    marginBottom: scaleHeight(14),
   },
-  tableHeaderRow: {
-    flexDirection: 'row',
-    backgroundColor: '#F7F8FB',
-    borderRadius: scaleWidth(8),
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(8),
-    marginBottom: scaleHeight(4),
-  },
-  tableDataRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(8),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#EEF0F2',
-  },
-  tableHeadCell: {
-    fontSize: scaleFont(12),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.graybase,
-  },
-  tableCellText: {
-    fontSize: scaleFont(13),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.darkblack,
-  },
-  tableCellSubText: {
-    fontSize: scaleFont(11),
-    fontFamily: Fonts.GilroyRegular,
-    color: Colors.graybase,
-    marginTop: scaleHeight(2),
-  },
-  tableCellBold: {
-    fontFamily: Fonts.GilroySemiBold,
-  },
-  colItem: {width: scaleWidth(120)},
-  colQty: {width: scaleWidth(56), textAlign: 'right'},
-  colUnit: {width: scaleWidth(48), textAlign: 'center'},
-  colPrice: {width: scaleWidth(72), textAlign: 'right'},
-  colDiscount: {width: scaleWidth(88), alignItems: 'flex-end'},
-  colTax: {width: scaleWidth(88), alignItems: 'flex-end'},
-  colTotal: {width: scaleWidth(80), textAlign: 'right'},
-  totalsBox: {
-    marginTop: scaleHeight(12),
+  itemCard: {
     backgroundColor: '#F7F8FB',
     borderRadius: scaleWidth(8),
     padding: scaleWidth(12),
+    marginBottom: scaleHeight(10),
   },
-  totalsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: scaleHeight(6),
-  },
-  totalsRowFinal: {
-    marginTop: scaleHeight(4),
-    paddingTop: scaleHeight(10),
-    borderTopWidth: 1,
-    borderTopColor: '#DDE1E6',
-  },
-  totalsLabel: {
-    fontSize: scaleFont(13),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.graybase,
-  },
-  totalsValue: {
-    fontSize: scaleFont(13),
+  itemCardTitle: {
+    fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-  },
-  totalsLabelFinal: {
-    fontSize: scaleFont(15),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.darkblack,
-  },
-  totalsValueFinal: {
-    fontSize: scaleFont(15),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.primaryColor,
+    marginBottom: scaleHeight(8),
   },
   attachmentCard: {
     flexDirection: 'row',

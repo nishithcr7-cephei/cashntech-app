@@ -12,6 +12,7 @@ import {
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {Colors, Fonts} from '@constants/index';
+import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
 import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/AttachmentPreviewModal';
@@ -23,6 +24,14 @@ import {
 import {decryptValue} from '@utils/decrypt';
 import {toYYYYMMDD} from '@services/api/invoice.api';
 import {resolveAdvanceInterestFromPreview} from '@utils/invoiceTotals';
+import {
+  PRODUCT_CODES,
+  PRODUCT_DISPLAY_NAMES,
+  ProductCode,
+} from '@store/product/product.types';
+import {getEffectiveProductCode} from '@store/product/product.resolver';
+
+const SUMMARY = INVOICE_SUMMARY_LABELS;
 
 export type FinanceRequestPreview = {
   vendor_name?: string | null;
@@ -32,6 +41,8 @@ export type FinanceRequestPreview = {
   invoice_date?: string | null;
   due_date?: string | null;
   invoice_due_date?: string | null;
+  payment_date?: string | null;
+  po_ref_no?: string | null;
   tenor_days?: number | string | null;
   tenor?: number | string | null;
   invoice_amount?: number | string | null;
@@ -50,6 +61,7 @@ export type FinanceRequestPreview = {
   sub_total?: number | string | null;
   discount_total?: number | string | null;
   tax_total?: number | string | null;
+  tds_amount?: number | string | null;
   final_total?: number | string | null;
   upfront_interest_amount?: number | string | null;
   upfront_interest?: number | string | null;
@@ -92,6 +104,7 @@ type Props = {
   loading?: boolean;
   submitting?: boolean;
   preview?: FinanceRequestPreview | null;
+  productCode?: ProductCode | string | null;
   onSubmit: (payload: FinanceRequestSubmitPayload) => void;
 };
 
@@ -144,45 +157,6 @@ function isDateInPast(displayDate: string): boolean {
   return m.startOf('day').isBefore(moment().startOf('day'));
 }
 
-function parseFlexibleDate(value?: string | null): moment.Moment | null {
-  if (!value?.trim()) return null;
-  const strict = moment(value.trim(), DATE_FORMATS, true);
-  if (strict.isValid()) return strict.startOf('day');
-  const loose = moment(value.trim());
-  return loose.isValid() ? loose.startOf('day') : null;
-}
-
-/**
- * Usage Days preview for Finance Request (matches backend usance_days when GRN-based):
- * prefer Due Date − Disbursement Date; else tenor − (Disbursement − GRN/Invoice Date).
- */
-function calculateUsageDays(params: {
-  preferredDisbursementDate: string;
-  dueDate?: string | null;
-  grnDate?: string | null;
-  invoiceDate?: string | null;
-  tenor?: number | string | null;
-}): string {
-  const disb = parseFlexibleDate(params.preferredDisbursementDate);
-  if (!disb) return '-';
-
-  const due = parseFlexibleDate(params.dueDate ?? null);
-  if (due) {
-    return String(due.diff(disb, 'days'));
-  }
-
-  const tenor = Number(params.tenor);
-  if (!Number.isFinite(tenor)) return '-';
-
-  const base =
-    parseFlexibleDate(params.grnDate ?? null) ||
-    parseFlexibleDate(params.invoiceDate ?? null);
-  if (!base) return '-';
-
-  const daysFromBaseToDisb = disb.diff(base, 'days');
-  return String(tenor - daysFromBaseToDisb);
-}
-
 function validateRequiredFutureOrTodayDate(
   label: string,
   value: string,
@@ -194,19 +168,30 @@ function validateRequiredFutureOrTodayDate(
   return null;
 }
 
-function DetailRow({label, value}: {label: string; value: string}) {
+function DetailRow({
+  label,
+  value,
+  isLast,
+  emphasize,
+}: {
+  label: string;
+  value: string;
+  isLast?: boolean;
+  emphasize?: boolean;
+}) {
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue} numberOfLines={3}>
+    <View style={[styles.tableRow, isLast && styles.tableRowLast]}>
+      <Text
+        style={[styles.tableLabel, emphasize && styles.tableLabelEmphasize]}>
+        {label}
+      </Text>
+      <Text
+        style={[styles.tableValue, emphasize && styles.tableValueEmphasize]}
+        numberOfLines={3}>
         {value}
       </Text>
     </View>
   );
-}
-
-function SectionTitle({title}: {title: string}) {
-  return <Text style={styles.sectionTitle}>{title}</Text>;
 }
 
 export const FinanceRequestDetailsModal: React.FC<Props> = ({
@@ -215,8 +200,16 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
   loading = false,
   submitting = false,
   preview,
+  productCode,
   onSubmit,
 }) => {
+  const effectiveCode = getEffectiveProductCode(productCode);
+  const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
+  const partyLabel = isVendorFinance ? 'Vendor' : 'Dealer';
+  const productDisplayName = PRODUCT_DISPLAY_NAMES[effectiveCode];
+  const modalTitle = isVendorFinance
+    ? 'Vendor Finance Request'
+    : 'Dealer Finance Request';
   const [preferredDisbursementDateInput, setPreferredDisbursementDateInput] =
     useState('');
   const [preferredDateError, setPreferredDateError] = useState<string | null>(
@@ -259,6 +252,11 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
     });
 
     const attachments = mapInvoiceAttachmentsWithUrls(p);
+    const creditRaw =
+      p.credit_to_bank_account?.accountNumber ?? p.credit_to ?? '';
+    const creditDecrypted = creditRaw
+      ? decryptValue(String(creditRaw)) || String(creditRaw)
+      : '';
 
     return {
       invoiceRef: dash(p.invoice_ref_no),
@@ -272,10 +270,12 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
           ? `${formatPercent(p.eligibility_percent)}%`
           : '-',
       invoiceDate: formatDateDDMMYYYY(p.invoice_date ?? null),
-      grnDate: formatDateDDMMYYYY(p.grn_date ?? null),
       invoiceDueDate: formatDateDDMMYYYY(
         p.due_date ?? p.invoice_due_date ?? null,
       ),
+      paymentDate: formatDateDDMMYYYY(p.payment_date ?? null),
+      grnDate: formatDateDDMMYYYY(p.grn_date ?? null),
+      poRefNo: dash(p.po_ref_no),
       tenor:
         p.tenor_days != null || p.tenor != null
           ? String(p.tenor_days ?? p.tenor)
@@ -284,9 +284,7 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
       requestedLoan: formatAmount(
         p.requested_loan_amount ?? p.eligible_loan_amount,
       ),
-      creditAccount: dash(
-        p.credit_to_bank_account?.accountNumber ?? p.credit_to,
-      ),
+      creditAccount: dash(creditDecrypted),
       status: dash(p.status ?? p.invoice_status),
       interestRate:
         p.interest_rate_percent != null
@@ -295,28 +293,15 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
       subTotal: formatAmount(p.sub_total),
       discountTotal: formatAmount(p.discount_total),
       taxTotal: formatAmount(p.tax_total),
+      tdsAmount: formatAmount(p.tds_amount ?? 0),
       advanceInterest: formatAmount(resolveAdvanceInterestFromPreview(p)),
-      total: formatAmount(p.final_total ?? p.invoice_amount),
+      total: formatAmount(
+        p.net_disbursal_amount ?? p.final_total ?? p.invoice_amount,
+      ),
       items,
       attachments,
     };
   }, [preview]);
-
-  const selectedDisbursementDateDisplay = preferredDisbursementDateInput.trim()
-    ? preferredDisbursementDateInput.trim()
-    : '-';
-
-  const usageDaysDisplay = useMemo(() => {
-    if (!preferredDisbursementDateInput.trim()) return '-';
-    const p = preview ?? {};
-    return calculateUsageDays({
-      preferredDisbursementDate: preferredDisbursementDateInput.trim(),
-      dueDate: p.due_date ?? p.invoice_due_date ?? null,
-      grnDate: p.grn_date ?? null,
-      invoiceDate: p.invoice_date ?? null,
-      tenor: p.tenor_days ?? p.tenor ?? null,
-    });
-  }, [preferredDisbursementDateInput, preview]);
 
   const handleSubmit = () => {
     if (loading || submitting || !preview) return;
@@ -351,10 +336,27 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
               <View style={styles.modalContainer}>
                 <View style={styles.modalHeader}>
                   <View style={styles.modalHeaderText}>
-                    <Text style={styles.modalTitle}>Vendor Finance Request</Text>
+                    <Text style={styles.modalTitle}>{modalTitle}</Text>
                     <Text style={styles.modalSubtitle}>
-                      {display.invoiceRef} · Vendor Finance
+                      {display.invoiceRef} · {productDisplayName}
                     </Text>
+                    <View
+                      style={[
+                        styles.productBadge,
+                        isVendorFinance
+                          ? styles.productBadgeVf
+                          : styles.productBadgeDf,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.productBadgeText,
+                          isVendorFinance
+                            ? styles.productBadgeTextVf
+                            : styles.productBadgeTextDf,
+                        ]}>
+                        {productDisplayName}
+                      </Text>
+                    </View>
                   </View>
                   <TouchableOpacity
                     onPress={onClose}
@@ -380,54 +382,84 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                       contentContainerStyle={styles.scrollContent}
                       keyboardShouldPersistTaps="handled"
                       bounces>
-                      <SectionTitle title="Party Details" />
-                      <DetailRow label="Anchor" value={display.anchor} />
-                      <DetailRow label="Vendor" value={display.vendor} />
-                      <DetailRow
-                        label="Loan OD Account Number"
-                        value={display.odAccount}
-                      />
-                      <DetailRow label="Vendor Code" value={display.vendorCode} />
-                      <DetailRow label="Program name" value={display.program} />
-                      <DetailRow label="Eligibility" value={display.eligibility} />
+                      <Text style={styles.sectionTitle}>Party Details</Text>
+                      <View style={styles.detailsTable}>
+                        <DetailRow label="Anchor" value={display.anchor} />
+                        <DetailRow
+                          label={partyLabel}
+                          value={display.vendor}
+                        />
+                        <DetailRow
+                          label={
+                            isVendorFinance
+                              ? 'Loan OD Account Number'
+                              : 'OD Account'
+                          }
+                          value={display.odAccount}
+                        />
+                        <DetailRow
+                          label={`${partyLabel} Code`}
+                          value={display.vendorCode}
+                        />
+                        <DetailRow
+                          label="Program name"
+                          value={display.program}
+                        />
+                        <DetailRow
+                          label="Eligibility"
+                          value={display.eligibility}
+                          isLast
+                        />
+                      </View>
 
-                      <SectionTitle title="Invoice Details" />
-                      <DetailRow
-                        label="Invoice Date"
-                        value={display.invoiceDate}
-                      />
-                      <DetailRow label="GRN Date" value={display.grnDate} />
-                      <DetailRow
-                        label="Invoice Due Date"
-                        value={display.invoiceDueDate}
-                      />
-                      <DetailRow label="Tenor" value={display.tenor} />
-                      <DetailRow
-                        label="Eligible loan amount"
-                        value={display.eligibleLoan}
-                      />
-                      <DetailRow
-                        label="Requested loan amount"
-                        value={display.requestedLoan}
-                      />
+                      <Text style={styles.sectionTitle}>Invoice Details</Text>
+                      <View style={styles.detailsTable}>
+                        <DetailRow
+                          label="Invoice Date"
+                          value={display.invoiceDate}
+                        />
+                        <DetailRow
+                          label="Invoice Due Date"
+                          value={display.invoiceDueDate}
+                        />
+                        <DetailRow
+                          label="Payment Date"
+                          value={display.paymentDate}
+                        />
+                        <DetailRow label="GRN Date" value={display.grnDate} />
+                        <DetailRow
+                          label="Po Ref No"
+                          value={display.poRefNo}
+                        />
+                        <DetailRow label="Tenor" value={display.tenor} />
+                        <DetailRow
+                          label="Eligible loan amount"
+                          value={display.eligibleLoan}
+                        />
+                        <DetailRow
+                          label="Requested loan amount"
+                          value={display.requestedLoan}
+                          isLast
+                        />
+                      </View>
 
-                      <SectionTitle title="Disbursement Details" />
-                      <DetailRow
-                        label="Credit to account no."
-                        value={display.creditAccount}
-                      />
-                      <DetailRow label="Status" value={display.status} />
-                      <DetailRow
-                        label="Interest rate (%) (including base rate)"
-                        value={display.interestRate}
-                      />
-                      <DetailRow
-                        label="Disbursement Date"
-                        value={selectedDisbursementDateDisplay}
-                      />
-                      <DetailRow label="Usage Days" value={usageDaysDisplay} />
+                      <Text style={styles.sectionTitle}>
+                        Disbursement Details
+                      </Text>
+                      <View style={styles.detailsTable}>
+                        <DetailRow
+                          label="Credit to account no."
+                          value={display.creditAccount}
+                        />
+                        <DetailRow label="Status" value={display.status} />
+                        <DetailRow
+                          label="Interest rate (%) (including base rate)"
+                          value={display.interestRate}
+                          isLast
+                        />
+                      </View>
 
-                      <SectionTitle title="Items" />
+                      <Text style={styles.sectionTitle}>Items</Text>
                       {display.items.length === 0 ? (
                         <Text style={styles.emptyHint}>No items found</Text>
                       ) : (
@@ -437,28 +469,52 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                             <DetailRow label="Qty" value={item.quantity} />
                             <DetailRow label="Unit" value={item.unit} />
                             <DetailRow label="Price" value={item.price} />
-                            <DetailRow label="Discount" value={item.discount} />
+                            <DetailRow
+                              label="Discount"
+                              value={item.discount}
+                            />
                             <DetailRow label="Tax" value={item.tax} />
-                            <DetailRow label="Total" value={item.total} />
+                            <DetailRow
+                              label="Total"
+                              value={item.total}
+                              isLast
+                              emphasize
+                            />
                           </View>
                         ))
                       )}
 
-                      <View style={styles.summaryBox}>
-                        <DetailRow label="Sub Total" value={display.subTotal} />
+                      <Text style={styles.sectionTitle}>Summary</Text>
+                      <View style={styles.detailsTable}>
                         <DetailRow
-                          label="Discount Total"
+                          label={SUMMARY.invoiceAmount}
+                          value={display.subTotal}
+                        />
+                        <DetailRow
+                          label={SUMMARY.discount}
                           value={display.discountTotal}
                         />
-                        <DetailRow label="Tax Total" value={display.taxTotal} />
                         <DetailRow
-                          label="Advance Interest"
+                          label={SUMMARY.taxAmount}
+                          value={display.taxTotal}
+                        />
+                        <DetailRow
+                          label={SUMMARY.tdsDeduction}
+                          value={display.tdsAmount}
+                        />
+                        <DetailRow
+                          label={SUMMARY.advanceInterestDeduction}
                           value={display.advanceInterest}
                         />
-                        <DetailRow label="Total" value={display.total} />
+                        <DetailRow
+                          label={SUMMARY.netDisbursementAmount}
+                          value={display.total}
+                          isLast
+                          emphasize
+                        />
                       </View>
 
-                      <SectionTitle title="Attachments" />
+                      <Text style={styles.sectionTitle}>Attachments</Text>
                       {display.attachments.length === 0 ? (
                         <Text style={styles.emptyHint}>No attachments</Text>
                       ) : (
@@ -481,7 +537,9 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                                 size={16}
                                 color={Colors.graybase}
                               />
-                              <Text style={styles.attachmentName} numberOfLines={1}>
+                              <Text
+                                style={styles.attachmentName}
+                                numberOfLines={1}>
                                 {fileName}
                               </Text>
                               <Text style={styles.viewLink}>View</Text>
@@ -519,7 +577,9 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                           }}
                         />
                         {!!preferredDateError && (
-                          <Text style={styles.dateError}>{preferredDateError}</Text>
+                          <Text style={styles.dateError}>
+                            {preferredDateError}
+                          </Text>
                         )}
                       </View>
                     </PersistentScrollView>
@@ -610,6 +670,29 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroyMedium,
     color: Colors.graybase,
   },
+  productBadge: {
+    alignSelf: 'flex-start',
+    marginTop: scaleHeight(8),
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(4),
+    borderRadius: scaleWidth(4),
+  },
+  productBadgeVf: {
+    backgroundColor: '#E8F4FD',
+  },
+  productBadgeDf: {
+    backgroundColor: '#FFF3E0',
+  },
+  productBadgeText: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  productBadgeTextVf: {
+    color: '#1565C0',
+  },
+  productBadgeTextDf: {
+    color: '#E65100',
+  },
   closeButton: {
     width: scaleWidth(28),
     height: scaleWidth(28),
@@ -632,54 +715,62 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginTop: scaleHeight(12),
-    marginBottom: scaleHeight(6),
-    fontSize: scaleFont(13),
+    marginBottom: scaleHeight(8),
+    fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
   },
-  row: {
+  detailsTable: {
+    backgroundColor: '#F7F8FB',
+    borderRadius: scaleWidth(8),
+    padding: scaleWidth(12),
+    marginBottom: scaleHeight(4),
+  },
+  tableRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingVertical: scaleHeight(7),
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ECECEC',
-    gap: scaleWidth(10),
+    borderBottomColor: '#E6E6E6',
+    gap: scaleWidth(8),
   },
-  rowLabel: {
-    flex: 1.1,
-    fontSize: scaleFont(12),
+  tableRowLast: {
+    borderBottomWidth: 0,
+  },
+  tableLabel: {
+    fontSize: scaleFont(13),
     fontFamily: Fonts.GilroyMedium,
-    color: Colors.graybase,
-  },
-  rowValue: {
+    color: Colors.darkblack,
     flex: 1,
-    textAlign: 'right',
+  },
+  tableLabelEmphasize: {
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  tableValue: {
     fontSize: scaleFont(13),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
+    flex: 1.2,
+    textAlign: 'right',
+  },
+  tableValueEmphasize: {
+    fontSize: scaleFont(14),
   },
   itemCard: {
     backgroundColor: '#F7F8FB',
     borderRadius: scaleWidth(8),
-    padding: scaleWidth(10),
-    marginBottom: scaleHeight(8),
+    padding: scaleWidth(12),
+    marginBottom: scaleHeight(10),
   },
   itemTitle: {
-    fontSize: scaleFont(13),
+    fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-    marginBottom: scaleHeight(4),
-  },
-  summaryBox: {
-    backgroundColor: '#F7F8FB',
-    borderRadius: scaleWidth(8),
-    paddingHorizontal: scaleWidth(10),
-    paddingVertical: scaleHeight(4),
     marginBottom: scaleHeight(8),
   },
   emptyHint: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(13),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.graybase,
     marginBottom: scaleHeight(8),

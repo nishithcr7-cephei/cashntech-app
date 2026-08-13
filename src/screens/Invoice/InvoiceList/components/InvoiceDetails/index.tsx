@@ -29,6 +29,7 @@ import {SendForApprovalModal} from './SendForApprovalModal';
 import {InvoiceActionMenuModal} from './InvoiceActionMenuModal';
 import {FinanceRequestDetailsModal} from './FinanceRequestDetailsModal';
 import {styles} from './InvoiceDetails.styles';
+import {PRODUCT_CODES} from '@store/product/product.types';
 
 export const InvoiceDetails: React.FC = () => {
   const {
@@ -82,6 +83,7 @@ export const InvoiceDetails: React.FC = () => {
     selectedInvoiceDetails,
     anchorCheckerInvoiceDetails,
     anchorCheckerDetailsLoading,
+    dueDateCalculatedFrom,
     effectiveProductCode,
     showAttachmentModal,
     setShowAttachmentModal,
@@ -342,6 +344,11 @@ export const InvoiceDetails: React.FC = () => {
         }}
         steps={approvalHistoryEntries}
         loading={approvalHistoryLoading}
+        productInvoiceLabel={
+          effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE
+            ? 'Vendor Invoice'
+            : 'Dealer Invoice'
+        }
         invoiceNo={selectedInvoiceNo || undefined}
         invoiceAmount={approvalHistorySummary.invoiceAmount}
         counterParty={approvalHistorySummary.counterParty}
@@ -357,6 +364,7 @@ export const InvoiceDetails: React.FC = () => {
         loading={financeRequestLoading}
         submitting={financeRequestSubmitting}
         preview={financeRequestPreview}
+        productCode={effectiveProductCode}
         onSubmit={submitFinanceRequest}
       />
 
@@ -366,6 +374,7 @@ export const InvoiceDetails: React.FC = () => {
         invoiceNo={selectedInvoiceNo || undefined}
         productCode={effectiveProductCode}
         allowGrnDateEdit={isAnchorMaker}
+        dueDateCalculatedFrom={dueDateCalculatedFrom}
         variant={
           isCashnTechUser
             ? 'cashntech_verification'

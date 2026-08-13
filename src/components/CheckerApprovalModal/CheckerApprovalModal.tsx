@@ -21,6 +21,8 @@ type CheckerApprovalModalProps = {
   onClose: () => void;
   approvalEntries?: CheckerApprovalEntry[];
   loading?: boolean;
+  /** e.g. "Vendor Invoice" / "Dealer Invoice" */
+  productInvoiceLabel?: string;
   invoiceNo?: string;
   invoiceAmount?: string;
   counterParty?: string;
@@ -53,6 +55,7 @@ export const CheckerApprovalModal: React.FC<CheckerApprovalModalProps> = ({
   onClose,
   approvalEntries = [],
   loading = false,
+  productInvoiceLabel,
   invoiceNo,
   invoiceAmount,
   counterParty,
@@ -74,6 +77,7 @@ export const CheckerApprovalModal: React.FC<CheckerApprovalModalProps> = ({
       visible={visible}
       onClose={onClose}
       loading={loading}
+      productInvoiceLabel={productInvoiceLabel}
       invoiceNo={invoiceNo}
       invoiceAmount={invoiceAmount}
       counterParty={counterParty}

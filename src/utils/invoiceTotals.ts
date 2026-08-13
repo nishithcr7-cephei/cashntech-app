@@ -3,14 +3,41 @@
  *
  * Total (Net) = Sub − Discount + Tax − TDS − Advance Interest
  *
- * Advance Interest (VF + Upfront only) uses Sub Total only:
- *   Sub Total × (ROI% ÷ 100) × (Tenor ÷ 365)
- * Discount / Tax / TDS / Eligibility do NOT change the AI base (web Create parity).
+ * Advance Interest (VF + Upfront only) uses the net invoice value before deductions:
+ *   (Sub Total − Discount Total + Tax Total) × (ROI% ÷ 100) × (Tenor ÷ 365)
+ * TDS / Eligibility do NOT change the AI base.
  */
 
 export function round2(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/** Keep digits and a single decimal; strip commas/other chars. */
+export function stripAmountInput(text: string): string {
+  const cleaned = String(text || '').replace(/,/g, '').replace(/[^\d.]/g, '');
+  const dot = cleaned.indexOf('.');
+  if (dot === -1) return cleaned;
+  return `${cleaned.slice(0, dot + 1)}${cleaned.slice(dot + 1).replace(/\./g, '')}`;
+}
+
+/** Display helper for amount TextInputs (Indian grouping, preserves trailing decimal). */
+export function formatIndianAmountInput(raw: string): string {
+  const stripped = stripAmountInput(raw);
+  if (!stripped) return '';
+  const hasDot = stripped.includes('.');
+  const [intPart, dec = ''] = stripped.split('.');
+  const formattedInt = (intPart === '' ? '0' : Number(intPart)).toLocaleString(
+    'en-IN',
+  );
+  return hasDot ? `${formattedInt}.${dec}` : formattedInt;
+}
+
+export function formatIndianCurrency(n: number): string {
+  return (Number.isFinite(n) ? n : 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 type LineItemLike = {
@@ -93,18 +120,17 @@ export type AdvanceInterestBreakdown = {
 };
 
 /**
- * Web Create Invoice Advance Interest (observed portal behaviour):
- *   Advance Interest = Sub Total × (ROI% ÷ 100) × (Tenor ÷ 365)
- *
- * Base is Sub Total only — discount, tax, TDS and eligibility are ignored.
- * Finance-request / disbursement may still recalculate on eligible amount
- * server-side; that is a separate step from create-screen display.
+ * Client-confirmed VF + Upfront Advance Interest:
+ *   Advance Interest =
+ *     (Sub Total − Discount Total + Tax Total) × ROI% × (Tenor ÷ 365)
  */
 export function computeVendorFinanceAdvanceInterest(input: {
   isVendorFinance: boolean;
   interestChargeType?: string | null;
-  /** Web Create base = line Sub Total only. */
+  /** VF Upfront AI base = Sub Total − Discount + Tax. */
   subTotal: number;
+  discountTotal?: number | string | null;
+  taxTotal?: number | string | null;
   roiPercent?: number | string | null;
   tenorDays?: number | string | null;
 }): AdvanceInterestBreakdown {
@@ -116,17 +142,23 @@ export function computeVendorFinanceAdvanceInterest(input: {
   }
 
   const subTotal = Number(input.subTotal) || 0;
+  const discountTotal = Number(input.discountTotal) || 0;
+  const taxTotal = Number(input.taxTotal) || 0;
+  const aiBase = Math.max(
+    0,
+    round2(subTotal - discountTotal + taxTotal),
+  );
   const roiPercent = Number(input.roiPercent) || 0;
   const tenorDays = Number(input.tenorDays) || 0;
 
-  if (subTotal <= 0 || roiPercent <= 0 || tenorDays <= 0) {
+  if (aiBase <= 0 || roiPercent <= 0 || tenorDays <= 0) {
     return {chargeApplies: true, applicable: true, advanceInterest: 0};
   }
 
   return {
     chargeApplies: true,
     applicable: true,
-    advanceInterest: round2(subTotal * (roiPercent / 100) * (tenorDays / 365)),
+    advanceInterest: round2(aiBase * (roiPercent / 100) * (tenorDays / 365)),
   };
 }
 
@@ -140,6 +172,8 @@ export function computeTdsAmount(input: {
   threshold?: number | null;
   ytdInvoiceTotal?: number | null;
   currentBase: number;
+  /** VF Upfront applies TDS only after purchases exceed the threshold. */
+  requireThresholdExceeded?: boolean;
 }): number {
   const rate = Number(input.ratePercent) || 0;
   const base = Number(input.currentBase) || 0;
@@ -150,7 +184,12 @@ export function computeTdsAmount(input: {
     input.threshold == null ? null : Number(input.threshold);
   const ytd = Number(input.ytdInvoiceTotal) || 0;
   if (threshold != null && Number.isFinite(threshold) && threshold > 0) {
-    if (ytd + base < threshold) {
+    const purchaseTotal = ytd + base;
+    if (
+      input.requireThresholdExceeded
+        ? purchaseTotal <= threshold
+        : purchaseTotal < threshold
+    ) {
       return 0;
     }
   }

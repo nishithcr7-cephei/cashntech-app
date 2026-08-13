@@ -38,6 +38,7 @@ import {
   computeVendorFinanceAdvanceInterest,
   extractRoiPercent,
   isTdsPartyTaxName,
+  round2,
 } from '@utils/invoiceTotals';
 import {invoiceApi} from '@services/api/invoice.api';
 import {
@@ -558,19 +559,37 @@ export const CreateInvoice: React.FC = () => {
     };
   }, [dealerInfo?.party?.id]);
 
-  // Web Create: invoice totals + AI on Sub Total only (not eligibility).
+  const isVendorFinanceUpfront =
+    isVendorFinance &&
+    String(dealerInfo?.interest_charge_type || '').trim().toLowerCase() ===
+      'upfront';
+
+  // Client-confirmed VF Upfront: TDS excludes GST; preserve existing base for other flows.
   const invoiceTotals = useMemo(() => {
     const {subTotal, discountTotal, taxTotal} = computeInvoiceLineAggregates(
       fields.items,
-      fields,
+      {
+        cgst: fields.cgst,
+        sgst: fields.sgst,
+        taxTotal: fields.taxTotal,
+      },
     );
-    const base = computeInvoiceTaxableBase(subTotal, discountTotal, taxTotal);
-    const tds = computeTdsAmount({
-      ratePercent: tdsTaxConfig?.ratePercent,
-      threshold: tdsTaxConfig?.threshold,
-      ytdInvoiceTotal,
-      currentBase: base,
+    const base = isVendorFinanceUpfront
+      ? Math.max(0, round2(subTotal - discountTotal))
+      : computeInvoiceTaxableBase(subTotal, discountTotal, taxTotal);
+    const hasSelectedTax = (fields.items || []).some(item => {
+      if (String(item.taxType || '').trim()) return true;
+      return (item.taxes || []).some(tax => String(tax.taxType || '').trim());
     });
+    const tds = hasSelectedTax
+      ? computeTdsAmount({
+          ratePercent: tdsTaxConfig?.ratePercent,
+          threshold: tdsTaxConfig?.threshold,
+          ytdInvoiceTotal,
+          currentBase: base,
+          requireThresholdExceeded: isVendorFinanceUpfront,
+        })
+      : 0;
     return {subTotal, discountTotal, taxTotal, tds};
   }, [
     fields.items,
@@ -579,15 +598,18 @@ export const CreateInvoice: React.FC = () => {
     fields.taxTotal,
     tdsTaxConfig,
     ytdInvoiceTotal,
+    isVendorFinanceUpfront,
   ]);
 
-  // Web Create AI = Sub × ROI% × (Tenor/365). Discount/tax/eligibility ignored.
+  // Client-confirmed VF Upfront AI = (Sub − Discount + Tax) × ROI% × (Tenor/365).
   const advanceInterestInfo = useMemo(
     () =>
       computeVendorFinanceAdvanceInterest({
         isVendorFinance,
         interestChargeType: dealerInfo?.interest_charge_type,
         subTotal: invoiceTotals.subTotal,
+        discountTotal: invoiceTotals.discountTotal,
+        taxTotal: invoiceTotals.taxTotal,
         roiPercent: extractRoiPercent(selectedParticipant?.interest_parameters),
         tenorDays: fields.tenor,
       }),
@@ -595,6 +617,8 @@ export const CreateInvoice: React.FC = () => {
       isVendorFinance,
       dealerInfo?.interest_charge_type,
       invoiceTotals.subTotal,
+      invoiceTotals.discountTotal,
+      invoiceTotals.taxTotal,
       selectedParticipant,
       fields.tenor,
     ],

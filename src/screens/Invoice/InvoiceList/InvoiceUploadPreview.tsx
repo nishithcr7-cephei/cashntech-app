@@ -12,12 +12,15 @@ import {useSelector} from 'react-redux';
 import {selectDealerInfo} from '@store/invoice/inv.selector';
 import {AppBar, Container} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
+import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {decryptValue} from '@utils/decrypt';
 import type {AdvanceInterestBreakdown} from '@utils/invoiceTotals';
 import type {InvoiceFields} from '@type/Invoice';
+
+const SUMMARY = INVOICE_SUMMARY_LABELS;
 
 const fmtAmount = (n: number) =>
   n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -266,6 +269,11 @@ export const InvoiceUploadPreview: React.FC = () => {
     return raw.includes('%') ? raw : `${raw}%`;
   }, [invoiceData.earlyPaymentDiscount]);
 
+  const showAdvanceInterestRow =
+    advanceInterestBreakdown?.chargeApplies ||
+    invoiceData.advanceInterest > 0 ||
+    isVendorFinance;
+
   const closePreview = () => {
     (navigation as any).navigate('CreateInvoice', {
       previewFields,
@@ -432,26 +440,25 @@ export const InvoiceUploadPreview: React.FC = () => {
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Summary</Text>
           <KeyValueRow
-            label="Sub Total"
+            label={SUMMARY.invoiceAmount}
             value={`${fmtAmount(invoiceData.subTotal)}/-`}
           />
           <KeyValueRow
-            label="Discount Total"
+            label={SUMMARY.discount}
             value={`${fmtAmount(invoiceData.discount.amount)}/-`}
           />
           <KeyValueRow
-            label="Tax Total"
+            label={SUMMARY.taxAmount}
             value={`${fmtAmount(invoiceData.tax.amount)}/-`}
           />
+          <View style={styles.summaryDivider} />
           <KeyValueRow
-            label="TDS"
+            label={SUMMARY.tdsDeduction}
             value={`${fmtAmount(invoiceData.tdsAmount)}/-`}
           />
-          {(advanceInterestBreakdown?.chargeApplies ||
-            invoiceData.advanceInterest > 0 ||
-            isVendorFinance) && (
+          {showAdvanceInterestRow && (
             <KeyValueRow
-              label="Advance Interest"
+              label={SUMMARY.advanceInterestDeduction}
               value={`${fmtAmount(
                 advanceInterestBreakdown?.advanceInterest ??
                   invoiceData.advanceInterest,
@@ -459,7 +466,7 @@ export const InvoiceUploadPreview: React.FC = () => {
             />
           )}
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total (Net)</Text>
+            <Text style={styles.totalLabel}>{SUMMARY.netDisbursementAmount}</Text>
             <Text style={styles.totalValue}>
               {fmtAmount(invoiceData.total)}/-
             </Text>
@@ -665,6 +672,11 @@ const styles = StyleSheet.create({
   itemTotalValue: {
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
+  },
+  summaryDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#D0D5DD',
+    marginVertical: scaleHeight(10),
   },
   totalRow: {
     flexDirection: 'row',

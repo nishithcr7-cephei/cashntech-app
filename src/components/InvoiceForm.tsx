@@ -13,14 +13,26 @@ import {
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
+import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {useSelector} from 'react-redux';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
+import {
+  formatIndianAmountInput,
+  formatIndianCurrency,
+  stripAmountInput,
+} from '@utils/invoiceTotals';
 
-export type DropdownOption = {label: string; value: string};
+const AMOUNT_ITEM_FIELDS = new Set<keyof InvoiceLineItem>([
+  'quantity',
+  'pricePerQuantity',
+  'discountValue',
+]);
+
+const SUMMARY = INVOICE_SUMMARY_LABELS;
 
 /**
  * Credit-to bank account option. `accountId` carries the party-info
@@ -169,11 +181,11 @@ export const InvoiceForm: React.FC<Props> = ({
   const taxTypeDropdownData: DropdownOption[] =
     partyTaxOptions && partyTaxOptions.length > 0
       ? [
-          {label: 'Select', value: ''},
+          {label: 'None', value: ''},
           ...partyTaxOptions.map(t => ({label: t.label, value: t.value})),
         ]
       : [
-          {label: 'Select', value: ''},
+          {label: 'None', value: ''},
           {label: 'GST', value: 'GST'},
           {label: 'CGST', value: 'CGST'},
           {label: 'OTHER', value: 'OTHER'},
@@ -386,7 +398,11 @@ export const InvoiceForm: React.FC<Props> = ({
       };
     }
     const normalizedText =
-      field === 'unit' ? normalizeUnitInput(text) : text;
+      field === 'unit'
+        ? normalizeUnitInput(text)
+        : AMOUNT_ITEM_FIELDS.has(field)
+          ? stripAmountInput(text)
+          : text;
     newItems[index] = {...newItems[index], [field]: normalizedText};
     
     // Auto-calculate line total (qty * price)
@@ -424,6 +440,10 @@ export const InvoiceForm: React.FC<Props> = ({
     const rawTaxes = newItems[index].taxes?.length ? newItems[index].taxes! : (newItems[index].taxType ? [{taxType: newItems[index].taxType!, taxPercentage: newItems[index].taxPercentage || '', taxAmount: newItems[index].taxAmount || ''}] : []);
     const taxes = rawTaxes.map(t => ({...t}));
     taxes.forEach((t, i) => {
+      if (!t.taxType) {
+        taxes[i] = {...t, taxPercentage: '', taxAmount: '0.00'};
+        return;
+      }
       const pct = parseFloat(t.taxPercentage || '0') || 0;
       taxes[i] = {...t, taxAmount: roundToTwo((taxableBase * pct) / 100).toFixed(2)};
     });
@@ -444,6 +464,10 @@ export const InvoiceForm: React.FC<Props> = ({
     const itemSubTotal = parseFloat(item.total) || 0;
 
     taxes.forEach((t, i) => {
+      if (!t.taxType) {
+        taxes[i] = {...t, taxPercentage: '', taxAmount: '0.00'};
+        return;
+      }
       const pct = parseFloat(t.taxPercentage || '0') || 0;
       taxes[i] = {...t, taxAmount: roundToTwo((itemSubTotal * pct) / 100).toFixed(2)};
     });
@@ -476,11 +500,20 @@ export const InvoiceForm: React.FC<Props> = ({
     if (!taxes[taxIndex]) {
       taxes[taxIndex] = {taxType: '', taxPercentage: '', taxAmount: ''};
     }
-    taxes[taxIndex] = {...taxes[taxIndex], taxType: taxName, taxPercentage: pct};
+    taxes[taxIndex] = {
+      ...taxes[taxIndex],
+      taxType: taxName,
+      taxPercentage: taxName ? pct : '',
+      taxAmount: taxName ? taxes[taxIndex].taxAmount : '0.00',
+    };
 
     const itemSubTotal = parseFloat(item.total) || 0;
 
     taxes.forEach((t, i) => {
+      if (!t.taxType) {
+        taxes[i] = {...t, taxPercentage: '', taxAmount: '0.00'};
+        return;
+      }
       const taxPct = parseFloat(t.taxPercentage || '0') || 0;
       taxes[i] = {
         ...t,
@@ -921,7 +954,7 @@ export const InvoiceForm: React.FC<Props> = ({
                 <L label="Quantity *">
                   <TextInput 
                     style={[styles.input, errors.items && errors.items.includes(`Item ${index + 1}`) && errors.items.includes('Quantity') && styles.inputError]} 
-                    value={item.quantity} 
+                    value={formatIndianAmountInput(item.quantity)} 
                     onChangeText={(text) => updateItem(index, 'quantity', text)} 
                     placeholder="Value" 
                     keyboardType="decimal-pad" 
@@ -942,7 +975,7 @@ export const InvoiceForm: React.FC<Props> = ({
                 <L label="Price *">
                   <TextInput 
                     style={[styles.input, errors.items && errors.items.includes(`Item ${index + 1}`) && errors.items.includes('Price') && styles.inputError]} 
-                    value={item.pricePerQuantity} 
+                    value={formatIndianAmountInput(item.pricePerQuantity)} 
                     onChangeText={(text) => updateItem(index, 'pricePerQuantity', text)} 
                     placeholder="Value" 
                     keyboardType="decimal-pad" 
@@ -954,7 +987,7 @@ export const InvoiceForm: React.FC<Props> = ({
               <Text style={styles.errorText}>{errors.items}</Text>
             )}
             <L label="Total">
-              <TextInput style={[styles.input, styles.autoCalculated]} value={item.total} editable={false} placeholder="Auto Calculated" />
+              <TextInput style={[styles.input, styles.autoCalculated]} value={item.total ? formatIndianAmountInput(item.total) : ''} editable={false} placeholder="Auto Calculated" />
             </L>
             
             {/* Item-level Discount */}
@@ -988,7 +1021,7 @@ export const InvoiceForm: React.FC<Props> = ({
                   <View style={styles.itemDiscountTaxInputsVertical}>
                     <TextInput
                       style={[styles.itemDiscountTaxInputVertical, isOcrMode && styles.ocrDisabledInput]}
-                      value={item.discountValue || ''}
+                      value={formatIndianAmountInput(item.discountValue || '')}
                       onChangeText={(text) => updateItem(index, 'discountValue', text)}
                       placeholder="Value"
                       keyboardType="decimal-pad"
@@ -996,7 +1029,7 @@ export const InvoiceForm: React.FC<Props> = ({
                     />
                     <TextInput
                       style={[styles.itemDiscountTaxInputVertical, styles.autoCalculated]}
-                      value={item.discountAmount || '0.00'}
+                      value={formatIndianAmountInput(item.discountAmount || '0.00')}
                       editable={false}
                       placeholder="0.00"
                     />
@@ -1062,7 +1095,7 @@ export const InvoiceForm: React.FC<Props> = ({
                         </View>
                         <TextInput
                           style={[styles.itemDiscountTaxInputVertical, styles.autoCalculated]}
-                          value={tax.taxAmount || '0.00'}
+                          value={formatIndianAmountInput(tax.taxAmount || '0.00')}
                           editable={false}
                           placeholder="0.00"
                         />
@@ -1120,30 +1153,35 @@ export const InvoiceForm: React.FC<Props> = ({
           return (
             <View style={styles.summaryContainer}>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Sub Total</Text>
-                <Text style={styles.summaryValue}>₹{subTotal.toFixed(2)}</Text>
+                <Text style={styles.summaryLabel}>{SUMMARY.invoiceAmount}</Text>
+                <Text style={styles.summaryValue}>₹{formatIndianCurrency(subTotal)}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Discount Total</Text>
-                <Text style={styles.summaryValue}>₹{discountTotal.toFixed(2)}</Text>
+                <Text style={styles.summaryLabel}>{SUMMARY.discount}</Text>
+                <Text style={styles.summaryValue}>₹{formatIndianCurrency(discountTotal)}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Tax Total</Text>
-                <Text style={styles.summaryValue}>₹{taxTotal.toFixed(2)}</Text>
+                <Text style={styles.summaryLabel}>{SUMMARY.taxAmount}</Text>
+                <Text style={styles.summaryValue}>₹{formatIndianCurrency(taxTotal)}</Text>
               </View>
+              <View style={styles.summaryDivider} />
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>TDS</Text>
-                <Text style={styles.summaryValue}>₹{tdsAmount.toFixed(2)}</Text>
+                <Text style={styles.summaryLabel}>{SUMMARY.tdsDeduction}</Text>
+                <Text style={styles.summaryValue}>₹{formatIndianCurrency(tdsAmount)}</Text>
               </View>
               {showAdvanceInterest && (
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Advance Interest</Text>
-                  <Text style={styles.summaryValue}>₹{aiAmount.toFixed(2)}</Text>
+                  <Text style={styles.summaryLabel}>
+                    {SUMMARY.advanceInterestDeduction}
+                  </Text>
+                  <Text style={styles.summaryValue}>₹{formatIndianCurrency(aiAmount)}</Text>
                 </View>
               )}
               <View style={[styles.summaryRow, styles.summaryTotalRow]}>
-                <Text style={styles.summaryTotalLabel}>Total (Net)</Text>
-                <Text style={styles.summaryTotalValue}>₹{total.toFixed(2)}</Text>
+                <Text style={styles.summaryTotalLabel}>
+                  {SUMMARY.netDisbursementAmount}
+                </Text>
+                <Text style={styles.summaryTotalValue}>₹{formatIndianCurrency(total)}</Text>
               </View>
             </View>
           );
@@ -1918,6 +1956,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    width: '100%',
+  },
+  summaryDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+    marginVertical: 8,
     width: '100%',
   },
   summaryLabel: {

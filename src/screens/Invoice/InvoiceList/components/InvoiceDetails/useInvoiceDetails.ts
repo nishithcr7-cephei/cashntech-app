@@ -10,6 +10,7 @@ import {
   updateInvoiceStatusRequest,
   updateInvoiceVerificationRequest,
   bulkUpdateInvoiceRequest,
+  fetchDealerInfoRequest,
 } from '@store/invoice/inv.slice';
 import { fetchPermissionsRequest } from '@store/permissions';
 import {
@@ -21,6 +22,7 @@ import {
   selectInvoiceList,
   selectInvoiceListLoading,
   selectInvoiceListError,
+  selectDealerInfo,
 } from '@store/invoice/inv.selector';
 import {
   selectProgramSelection,
@@ -57,6 +59,7 @@ import {
 } from '@store/product/product.selectors';
 import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {readDueDateCalculatedFrom} from '@utils/invoiceDueDate';
 
 export function useInvoiceDetails() {
   const navigation = useNavigation();
@@ -67,6 +70,7 @@ export function useInvoiceDetails() {
   const invoiceListRaw = useSelector(selectInvoiceList) as InvoiceListItemApi[];
   const invoiceListLoading = useSelector(selectInvoiceListLoading);
   const invoiceListError = useSelector(selectInvoiceListError);
+  const dealerInfo = useSelector(selectDealerInfo);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const userInfoFull = useSelector(userSelector.getUserInfo);
   const userDepartment = (userInfoFull as any)?.department || '';
@@ -311,6 +315,16 @@ export function useInvoiceDetails() {
       dispatch(fetchPermissionsRequest());
       // setSearchText(''); // REMOVED: Search should persist when returning from detail view
     }, [dispatch]),
+  );
+
+  useEffect(() => {
+    if (!showApproveRejectModal || !programId) return;
+    dispatch(fetchDealerInfoRequest(programId));
+  }, [showApproveRejectModal, programId, dispatch]);
+
+  const dueDateCalculatedFrom = useMemo(
+    () => readDueDateCalculatedFrom(dealerInfo?.basic_parameters),
+    [dealerInfo?.basic_parameters],
   );
 
   useEffect(() => {
@@ -625,6 +639,7 @@ export function useInvoiceDetails() {
         invoiceNo,
         programId,
         fromInvoiceDashboard,
+        returnRoute: 'InvoiceDetails',
         listInvoiceStatus: row?.rawInvoiceStatus,
         listApprovalStatus: row?.rawApprovalStatus,
         listAdminStatus: row?.rawAdminStatus,
@@ -653,6 +668,7 @@ export function useInvoiceDetails() {
           invoiceNo,
           programId,
           fromInvoiceDashboard,
+          returnRoute: 'InvoiceDetails',
           listInvoiceStatus: rowForAction?.rawInvoiceStatus,
           listApprovalStatus: rowForAction?.rawApprovalStatus,
           listAdminStatus: rowForAction?.rawAdminStatus,
@@ -1217,6 +1233,7 @@ export function useInvoiceDetails() {
             invoiceNo: invNo || invoiceId,
             programId,
             fromInvoiceDashboard,
+            returnRoute: 'InvoiceDetails',
           }),
       }),
     );
@@ -1595,6 +1612,7 @@ export function useInvoiceDetails() {
     selectedInvoiceDetails,
     anchorCheckerInvoiceDetails,
     anchorCheckerDetailsLoading,
+    dueDateCalculatedFrom,
     effectiveProductCode,
     showAttachmentModal,
     setShowAttachmentModal,
