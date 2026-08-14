@@ -26,8 +26,11 @@ import {
 } from '@store/product/product.types';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
 import {
+  isVfUpfrontChargeType,
   resolveAdvanceInterestFromPreview,
-  resolveDefaultDisbursalAmount,
+  resolveDisbursementUsanceDaysDisplay,
+  resolveNetInvoiceAmountFromPreview,
+  resolveVfDisbursementModalAmounts,
 } from '@utils/invoiceTotals';
 
 type MarkAsDisbursedModalProps = {
@@ -49,6 +52,8 @@ type MarkAsDisbursedModalProps = {
     rejectionReason?: string;
     holdCategory?: string;
     expectedReleaseDate?: string;
+    finalTotal?: number;
+    upfrontInterest?: number;
   }) => void | Promise<void>;
 };
 
@@ -172,7 +177,6 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   onClose,
   invoiceId,
   invoiceNo,
-  invoiceAmount,
   productCode,
   onSubmit,
 }) => {
@@ -186,6 +190,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [disbursedAmount, setDisbursedAmount] = useState('');
+  const [amountError, setAmountError] = useState<string | null>(null);
   const [date, setDate] = useState('');
   const [utrNo, setUtrNo] = useState('');
   const [transactionNo, setTransactionNo] = useState('');
@@ -200,6 +205,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     setActionDropdownOpen(false);
     setActionError(null);
     setDisbursedAmount('');
+    setAmountError(null);
     setDate('');
     setUtrNo('');
     setTransactionNo('');
@@ -213,25 +219,49 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     if (!visible || !invoiceId) return;
     let cancelled = false;
     setPreviewLoading(true);
-    invoiceApi
-      .getFinanceRequestPreview(invoiceId)
-      .then((res: any) => {
+    Promise.all([
+      invoiceApi.getInvoiceDetails(invoiceId),
+      invoiceApi.getBankAccountsForDisbursement(invoiceId).catch(() => null),
+    ])
+      .then(([invoiceRes, bankRes]) => {
         if (cancelled) return;
-        const data = res?.data ?? res?.result ?? res ?? {};
+        const invoiceData = invoiceRes ?? {};
+        const bankData = bankRes?.data ?? bankRes ?? {};
+        const apm = invoiceData.anchorParticipantMapping ?? {};
+
+        const data = {
+          ...invoiceData,
+          vendor_name: apm.party?.entity_name,
+          anchor_name: invoiceData.program?.party?.entity_name,
+          eligibility_percent:
+            apm.eligibility ?? invoiceData.program?.eligibility ?? null,
+          interest_charge_type:
+            invoiceData.program?.productConfig?.interest_charge_type ?? null,
+          interest_rate_percent:
+            invoiceData.total_roi_percent ??
+            apm.interest_parameters?.total_roi_percent ??
+            null,
+          transaction_interest_rate:
+            bankData.interest_rate ?? bankData.interestRate ?? null,
+          credit_to_bank_account:
+            bankData.creditToBankAccount ??
+            bankData.credit_to_bank_account ??
+            invoiceData.creditToBankAccount ??
+            null,
+        };
         setPreview(data);
 
-        const apm = data?.anchorParticipantMapping ?? {};
         const odRaw = apm.od_account_no ?? '';
         const odDisplay = decryptValue(String(odRaw)) || String(odRaw);
         setDebitFrom(odDisplay);
 
         const creditAcc =
-          data?.credit_to_bank_account?.accountNumber ??
-          data?.credit_to ??
+          data.credit_to_bank_account?.accountNumber ??
+          data.credit_to ??
           '';
         const creditName =
-          data?.credit_to_bank_account?.nameAsPerBank ??
-          data?.anchor_name ??
+          data.credit_to_bank_account?.nameAsPerBank ??
+          data.vendor_name ??
           '';
         const decryptedAcc = creditAcc ? decryptValue(String(creditAcc)) : '';
         const accLabel = decryptedAcc || String(creditAcc);
@@ -239,17 +269,6 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
           ? `${accLabel} (${decryptValue(String(creditName)) || creditName})`
           : accLabel;
         setCreditTo(creditLabel);
-
-        const defaultAmt =
-          resolveDefaultDisbursalAmount(data) ||
-          Number(invoiceAmount?.replace(/[,\s₹/-]/g, '') || '') ||
-          0;
-        const amtNum = Number(defaultAmt);
-        setDisbursedAmount(
-          !Number.isNaN(amtNum) && amtNum > 0
-            ? String(amtNum)
-            : invoiceAmount?.replace(/[,\s₹/-]/g, '') || '0',
-        );
       })
       .catch((err: any) => {
         if (cancelled) return;
@@ -259,7 +278,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
           text2:
             err?.response?.data?.message ||
             err?.message ||
-            'Could not load invoice preview',
+            'Could not load invoice details',
         });
       })
       .finally(() => {
@@ -268,7 +287,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [visible, invoiceId, invoiceAmount]);
+  }, [visible, invoiceId]);
 
   useEffect(() => {
     if (disbursementAction === 'Disbursed') {
@@ -294,14 +313,30 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   const invoiceLabel = invoiceNo || preview?.invoice_ref_no || invoiceId || 'N/A';
   const modalSubtitle = `${invoiceLabel} · ${productDisplayName}`;
 
+  const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
+  const isVfUpfront =
+    isVendorFinance && isVfUpfrontChargeType(preview?.interest_charge_type);
+
+  const vfAmounts = useMemo(() => {
+    if (!isVfUpfront || !preview) return null;
+    return resolveVfDisbursementModalAmounts(preview);
+  }, [isVfUpfront, preview]);
+
+  const invoiceAmountCap = useMemo(() => {
+    if (!preview) return 0;
+    if (vfAmounts) return vfAmounts.netInvoiceAmount;
+    return resolveNetInvoiceAmountFromPreview(preview, {isVendorFinance});
+  }, [preview, isVendorFinance, vfAmounts]);
+
   const display = useMemo(() => {
     const p = preview ?? {};
     const apm = p.anchorParticipantMapping ?? {};
-    const isVf = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
+    const isVf = isVendorFinance;
 
     const vendorRaw =
       p.vendor_name ?? apm.party?.entity_name ?? '';
-    const anchorRaw = p.anchor_name ?? p.program?.party?.entity_name ?? '';
+    const anchorRaw =
+      p.anchor_name ?? p.program?.party?.entity_name ?? p.party?.entity_name ?? '';
     const odRaw = apm.od_account_no ?? debitFrom ?? '';
     const vendorCodeRaw = apm.company_code_given_by_party ?? '';
 
@@ -318,15 +353,22 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       : '-';
 
     const preferredDisbursementDateRaw = p.preferred_disbursement_date ?? null;
-    const dueDateRaw = p.due_date ?? p.invoice_due_date ?? null;
+    const dueDateRaw = p.invoice_due_date ?? p.due_date ?? null;
     const grnDateRaw = p.grn_date ?? null;
-    const tenorRaw = p.tenor_days ?? p.tenor ?? null;
+    const tenorRaw = p.tenor ?? p.tenor_days ?? null;
+    const eligibilityRaw =
+      p.eligibility_percent ?? apm.eligibility ?? p.program?.eligibility ?? null;
 
-    const advanceInterestValue = resolveAdvanceInterestFromPreview(p);
+    const advanceInterestValue = vfAmounts
+      ? vfAmounts.advanceInterest
+      : resolveAdvanceInterestFromPreview(p, {isVendorFinance: isVf});
     const advanceInterestDisplay =
       Number.isFinite(advanceInterestValue) && advanceInterestValue > 0
         ? formatAmount(advanceInterestValue)
         : '-';
+    const netInvoiceValue = vfAmounts
+      ? vfAmounts.netInvoiceAmount
+      : resolveNetInvoiceAmountFromPreview(p, {isVendorFinance: isVf});
 
     return {
       isVf,
@@ -338,7 +380,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       creditToAccount: creditDisplay,
       requestDate: formatDateDDMMYYYY(
         p.preferred_disbursement_requested_at ??
-          p.request_date ??
+          p.grn_date ??
           p.invoice_date ??
           null,
       ),
@@ -349,37 +391,56 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
           ? String(Math.round(Number(tenorRaw)) || tenorRaw)
           : '-',
       eligibility:
-        p.eligibility_percent != null
-          ? `${formatPercent(p.eligibility_percent)}%`
+        eligibilityRaw != null
+          ? `${formatPercent(eligibilityRaw)}%`
           : '-',
       advanceInterest: advanceInterestDisplay,
-      usanceDays: resolveUsanceDays({
-        usanceDays: p.usance_days ?? p.usanceDays ?? null,
-        preferredDisbursementDate: preferredDisbursementDateRaw
-          ? formatDateDDMMYYYY(preferredDisbursementDateRaw)
-          : null,
-        dueDate: dueDateRaw ? formatDateDDMMYYYY(dueDateRaw) : null,
-        grnDate: grnDateRaw ? formatDateDDMMYYYY(grnDateRaw) : null,
-        invoiceDate: p.invoice_date
-          ? formatDateDDMMYYYY(p.invoice_date)
-          : null,
-        tenor: tenorRaw,
-      }),
+      usanceDays: isVfUpfront
+        ? resolveDisbursementUsanceDaysDisplay(
+            p.usance_days ?? p.usanceDays ?? null,
+            tenorRaw,
+          )
+        : resolveUsanceDays({
+            usanceDays: p.usance_days ?? p.usanceDays ?? null,
+            preferredDisbursementDate: preferredDisbursementDateRaw
+              ? formatDateDDMMYYYY(preferredDisbursementDateRaw)
+              : null,
+            dueDate: dueDateRaw ? formatDateDDMMYYYY(dueDateRaw) : null,
+            grnDate: grnDateRaw ? formatDateDDMMYYYY(grnDateRaw) : null,
+            invoiceDate: p.invoice_date
+              ? formatDateDDMMYYYY(p.invoice_date)
+              : null,
+            tenor: tenorRaw,
+          }),
       netInvoiceAmount: formatAmount(
-        p.final_total ?? p.invoice_amount ?? p.net_disbursal_amount,
+        netInvoiceValue > 0
+          ? netInvoiceValue
+          : p.final_total ?? p.invoice_amount,
       ),
       requestedDisbursementDate: formatDateDDMMYYYY(
         preferredDisbursementDateRaw,
       ),
-      status: dash(p.status ?? p.invoice_status),
+      status: dash(p.invoice_status ?? p.status),
     };
-  }, [preview, effectiveCode, debitFrom]);
+  }, [preview, isVendorFinance, isVfUpfront, debitFrom]);
 
   const handleClose = () => {
     setDisbursementAction('');
     setActionDropdownOpen(false);
     setActionError(null);
+    setAmountError(null);
     onClose();
+  };
+
+  const validateDisbursedAmount = (rawAmount: string): string | null => {
+    const amountNum = Number(rawAmount.replace(/[,\s₹]/g, '').trim());
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      return null;
+    }
+    if (invoiceAmountCap > 0 && amountNum > invoiceAmountCap) {
+      return 'Disbursed amount cannot exceed invoice amount';
+    }
+    return null;
   };
 
   const handleSubmit = async () => {
@@ -399,6 +460,12 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
         Toast.show({type: 'error', text1: 'Disburse amount is required'});
         return;
       }
+      const exceedErr = validateDisbursedAmount(amount);
+      if (exceedErr) {
+        setAmountError(exceedErr);
+        return;
+      }
+      setAmountError(null);
       if (!date) {
         Toast.show({type: 'error', text1: 'Disbursement date is required'});
         return;
@@ -425,6 +492,15 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       return;
     }
 
+    const submitAmounts = vfAmounts ?? {
+      advanceInterest: resolveAdvanceInterestFromPreview(preview, {
+        isVendorFinance,
+      }),
+      netInvoiceAmount: resolveNetInvoiceAmountFromPreview(preview, {
+        isVendorFinance,
+      }),
+    };
+
     if (onSubmit) {
       await onSubmit({
         debitFrom,
@@ -436,6 +512,11 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
         remark: remark.trim(),
         transactionNo: disbursementAction === 'Disbursed' ? transactionNo.trim() : '',
         rejectionReason: disbursementAction === 'Reject' ? remark.trim() : '',
+        finalTotal:
+          submitAmounts.netInvoiceAmount > 0
+            ? submitAmounts.netInvoiceAmount
+            : undefined,
+        upfrontInterest: submitAmounts.advanceInterest,
       });
     }
     handleClose();
@@ -443,6 +524,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
 
   const isSubmitDisabled =
     !disbursementAction ||
+    !!amountError ||
     (disbursementAction === 'Disbursed' &&
       (!date || !utrNo.trim() || !transactionNo.trim() || !disbursedAmount));
 
@@ -628,11 +710,17 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                             <TextInput
                               style={styles.input}
                               value={disbursedAmount}
-                              onChangeText={setDisbursedAmount}
+                              onChangeText={text => {
+                                setDisbursedAmount(text);
+                                setAmountError(validateDisbursedAmount(text));
+                              }}
                               keyboardType="numeric"
                               placeholder="0.00"
                               placeholderTextColor={Colors.graybase}
                             />
+                            {!!amountError && (
+                              <Text style={styles.fieldError}>{amountError}</Text>
+                            )}
                           </View>
                           <View style={styles.inputRow}>
                             <Text style={styles.inputLabel}>

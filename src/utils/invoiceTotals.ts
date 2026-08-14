@@ -196,20 +196,131 @@ export function computeTdsAmount(input: {
   return round2(base * (rate / 100));
 }
 
-/** Finance preview: DB upfront_interest is often 0; derive from net disbursal when needed. */
+type InvoiceAmountPreview = {
+  upfront_interest_amount?: number | string | null;
+  upfront_interest?: number | string | null;
+  eligible_loan_amount?: number | string | null;
+  net_disbursal_amount?: number | string | null;
+  sub_total?: number | string | null;
+  discount_total?: number | string | null;
+  tax_total?: number | string | null;
+  tds_amount?: number | string | null;
+  final_total?: number | string | null;
+  invoice_amount?: number | string | null;
+  eligibility_percent?: number | string | null;
+  requested_loan_amount?: number | string | null;
+  interest_charge_type?: string | null;
+  interest_rate_percent?: number | string | null;
+  transaction_interest_rate?: number | string | null;
+  tenor_days?: number | string | null;
+  tenor?: number | string | null;
+  program?: {eligibility?: number | string | null} | null;
+  anchorParticipantMapping?:
+    | {interest_parameters?: unknown; [key: string]: unknown}
+    | null;
+};
+
+export type VfDisbursementModalAmounts = {
+  grossTaxable: number;
+  advanceInterest: number;
+  netInvoiceAmount: number;
+};
+
+export function isVfUpfrontChargeType(
+  interestChargeType?: string | null,
+): boolean {
+  return String(interestChargeType || '')
+    .trim()
+    .toLowerCase() === 'upfront';
+}
+
+/**
+ * Web VF disbursement modal (details + transaction-account APIs).
+ * Recalculates advance interest at modal time — not DB upfront_interest.
+ */
+export function resolveVfDisbursementModalAmounts(
+  details: InvoiceAmountPreview | null | undefined,
+): VfDisbursementModalAmounts {
+  const empty: VfDisbursementModalAmounts = {
+    grossTaxable: 0,
+    advanceInterest: 0,
+    netInvoiceAmount: 0,
+  };
+  if (!details) return empty;
+
+  const sub = Number(details.sub_total) || 0;
+  const disc = Number(details.discount_total) || 0;
+  const tax = Number(details.tax_total) || 0;
+  const tds = Number(details.tds_amount) || 0;
+  const grossTaxable = round2(sub - disc + tax - tds);
+
+  const eligPct = Number(
+    details.eligibility_percent ?? details.program?.eligibility ?? 100,
+  );
+  const eligibility = Number.isFinite(eligPct) && eligPct > 0 ? eligPct : 100;
+
+  const roi = Number(
+    details.transaction_interest_rate ??
+      details.interest_rate_percent ??
+      extractRoiPercent(details.anchorParticipantMapping?.interest_parameters),
+  );
+
+  const tenorDays = Number(details.tenor ?? details.tenor_days ?? 0);
+
+  // Interest base excludes tax and is taken before any advance interest deduction.
+  const aiBase = round2((sub - disc) * (eligibility / 100));
+  const advanceInterest =
+    aiBase > 0 && roi > 0 && tenorDays > 0
+      ? round2(aiBase * (roi / 100) * (tenorDays / 365))
+      : 0;
+
+  const netInvoiceAmount = round2(Math.max(0, grossTaxable - advanceInterest));
+
+  return {grossTaxable, advanceInterest, netInvoiceAmount};
+}
+
+/** Web disbursement usance display: API value, else tenor. */
+export function resolveDisbursementUsanceDaysDisplay(
+  usanceDays?: number | string | null,
+  tenor?: number | string | null,
+): string {
+  const fromApi = Number(usanceDays);
+  if (Number.isFinite(fromApi) && usanceDays != null && usanceDays !== '') {
+    return String(Math.round(fromApi));
+  }
+  const tenorNum = Number(tenor);
+  if (Number.isFinite(tenorNum) && tenorNum > 0) {
+    return String(Math.round(tenorNum));
+  }
+  return '-';
+}
+
+/** Finance preview: prefer stored AI, else VF Upfront formula, else eligible − net. */
 export function resolveAdvanceInterestFromPreview(
-  preview: {
-    upfront_interest_amount?: number | string | null;
-    upfront_interest?: number | string | null;
-    eligible_loan_amount?: number | string | null;
-    net_disbursal_amount?: number | string | null;
-  } | null | undefined,
+  preview: InvoiceAmountPreview | null | undefined,
+  opts?: {isVendorFinance?: boolean},
 ): number {
   if (!preview) return 0;
   const db = Number(preview.upfront_interest_amount ?? preview.upfront_interest);
   if (Number.isFinite(db) && db > 0) {
     return round2(db);
   }
+
+  const computed = computeVendorFinanceAdvanceInterest({
+    isVendorFinance: opts?.isVendorFinance === true,
+    interestChargeType: preview.interest_charge_type,
+    subTotal: Number(preview.sub_total) || 0,
+    discountTotal: preview.discount_total,
+    taxTotal: preview.tax_total,
+    roiPercent:
+      preview.interest_rate_percent ??
+      extractRoiPercent(preview.anchorParticipantMapping?.interest_parameters),
+    tenorDays: preview.tenor_days ?? preview.tenor,
+  });
+  if (computed.advanceInterest > 0) {
+    return computed.advanceInterest;
+  }
+
   const eligible = Number(preview.eligible_loan_amount);
   const net = Number(preview.net_disbursal_amount);
   if (Number.isFinite(eligible) && Number.isFinite(net) && eligible >= net) {
@@ -218,27 +329,27 @@ export function resolveAdvanceInterestFromPreview(
   return 0;
 }
 
-/** Default disbursement amount: prefer net disbursal (VF Upfront), else eligible loan. */
-export function resolveDefaultDisbursalAmount(
-  preview: {
-    net_disbursal_amount?: number | string | null;
-    eligible_loan_amount?: number | string | null;
-    requested_loan_amount?: number | string | null;
-    final_total?: number | string | null;
-    invoice_amount?: number | string | null;
-  } | null | undefined,
+/**
+ * Web disbursement "Net Invoice Amount": Sub − Disc + Tax − TDS
+ * (advance interest is shown separately, not deducted here).
+ */
+export function resolveNetInvoiceAmountFromPreview(
+  preview: InvoiceAmountPreview | null | undefined,
+  opts?: {isVendorFinance?: boolean},
 ): number {
   if (!preview) return 0;
-  const candidates = [
-    preview.net_disbursal_amount,
-    preview.eligible_loan_amount,
-    preview.requested_loan_amount,
-    preview.final_total,
-    preview.invoice_amount,
-  ];
-  for (const raw of candidates) {
-    const n = Number(raw);
-    if (Number.isFinite(n) && n > 0) return round2(n);
+  const sub = Number(preview.sub_total);
+  const disc = Number(preview.discount_total) || 0;
+  const tax = Number(preview.tax_total) || 0;
+  const tds = Number(preview.tds_amount) || 0;
+  if (Number.isFinite(sub) && sub > 0) {
+    return round2(sub - disc + tax - tds);
+  }
+
+  const finalTotal = Number(preview.final_total ?? preview.invoice_amount);
+  const ai = resolveAdvanceInterestFromPreview(preview, opts);
+  if (Number.isFinite(finalTotal) && finalTotal > 0) {
+    return round2(finalTotal + (ai > 0 ? ai : 0));
   }
   return 0;
 }

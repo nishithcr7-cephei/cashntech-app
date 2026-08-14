@@ -300,6 +300,8 @@ export type MarkAsDisbursedPayload = {
   rejection_reason?: string;
   hold_category?: string;
   expected_release_date?: string;
+  final_total?: number;
+  upfront_interest?: number;
 };
 
 /** API response shape for invoice approval log (GET /invoice/logs/:invoiceId) */

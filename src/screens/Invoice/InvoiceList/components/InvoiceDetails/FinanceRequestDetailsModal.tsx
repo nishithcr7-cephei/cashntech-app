@@ -294,7 +294,9 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
       discountTotal: formatAmount(p.discount_total),
       taxTotal: formatAmount(p.tax_total),
       tdsAmount: formatAmount(p.tds_amount ?? 0),
-      advanceInterest: formatAmount(resolveAdvanceInterestFromPreview(p)),
+      advanceInterest: formatAmount(
+        resolveAdvanceInterestFromPreview(p, {isVendorFinance}),
+      ),
       total: formatAmount(
         p.net_disbursal_amount ?? p.final_total ?? p.invoice_amount,
       ),

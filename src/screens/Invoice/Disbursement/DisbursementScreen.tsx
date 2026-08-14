@@ -23,6 +23,7 @@ import {
   FilterModal,
   ProgramBreadcrumb,
 } from '@components/index';
+import {getApiErrorMessage} from '@utils/apiErrorMessage';
 import {MarkAsDisbursedModal} from './components/MarkAsDisbursedModal';
 import {BulkMarkAsDisbursedModal} from './components/BulkMarkAsDisbursedModal';
 import {BulkInvoiceEmailModal} from './components/BulkInvoiceEmailModal';
@@ -1388,6 +1389,8 @@ export const DisbursementScreen: React.FC = () => {
               rejection_reason: isReject ? data.rejectionReason : undefined,
               hold_category: isHold ? data.holdCategory : undefined,
               expected_release_date: isHold ? holdReleaseDate : undefined,
+              final_total: isDisbursed ? (data.finalTotal ?? 0) : undefined,
+              upfront_interest: isDisbursed ? (data.upfrontInterest ?? 0) : undefined,
             });
             Toast.show({
               type: 'success',
@@ -1400,8 +1403,8 @@ export const DisbursementScreen: React.FC = () => {
           } catch (err: any) {
             Toast.show({
               type: 'error',
-              text1: err?.message || 'Failed to mark as disbursed',
-              visibilityTime: 3000,
+              text1: getApiErrorMessage(err, 'Failed to mark as disbursed'),
+              visibilityTime: 4000,
             });
           }
         }}
