@@ -23,8 +23,14 @@ import {
 } from '@store/product/product.types';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
 import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/AttachmentPreviewModal';
+import {
+  AdvanceInterestFormulaModal,
+  AdvanceInterestInfoButton,
+} from '@components/AdvanceInterestFormulaModal';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
 import {calculateInvoiceDueDate} from '@utils/invoiceDueDate';
+import {computeInvoiceTaxableBase} from '@utils/invoiceTotals';
+import {InvoiceStatusBadges} from '@components/InvoiceStatusBadges';
 import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
 import {fileNameFromAttachmentUrl} from '@utils/invoiceAttachments';
 import {toYYYYMMDD} from '@services/api/invoice.api';
@@ -79,8 +85,12 @@ export type ApproveRejectInvoiceDetails = {
   advanceInterest?: number;
   tdsAmount?: number;
   totalAmount?: number;
+  roiPercent?: number;
   items?: ApproveRejectInvoiceItem[];
   attachments?: ApproveRejectAttachment[];
+  invoiceStatus?: string;
+  approvalStatus?: string;
+  adminStatus?: string;
 };
 
 type ApproveRejectModalProps = {
@@ -250,6 +260,8 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   >(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [showAdvanceInterestFormula, setShowAdvanceInterestFormula] =
+    useState(false);
 
   const effectiveCode = getEffectiveProductCode(productCode);
   const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
@@ -457,6 +469,13 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                       {productDisplayName}
                     </Text>
                   </View>
+                  <InvoiceStatusBadges
+                    invoiceStatus={details.invoiceStatus}
+                    approvalStatus={details.approvalStatus}
+                    adminStatus={details.adminStatus}
+                    mode="live"
+                    style={styles.statusBadges}
+                  />
                 </View>
                 <TouchableOpacity
                   onPress={handleClose}
@@ -597,6 +616,16 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                         value={fmtAmount(details.taxAmount ?? 0)}
                       />
                       <DetailRow
+                        label={SUMMARY.grossInvoiceValue}
+                        value={fmtAmount(
+                          computeInvoiceTaxableBase(
+                            details.subTotalAmount ?? 0,
+                            details.discountAmount ?? 0,
+                            details.taxAmount ?? 0,
+                          ),
+                        )}
+                      />
+                      <DetailRow
                         label={SUMMARY.tdsDeduction}
                         value={fmtAmount(details.tdsAmount ?? 0)}
                       />
@@ -604,6 +633,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                         <DetailRow
                           label={SUMMARY.advanceInterestDeduction}
                           value={fmtAmount(details.advanceInterest ?? 0)}
+                          onInfoPress={() => setShowAdvanceInterestFormula(true)}
                         />
                       )}
                       <DetailRow
@@ -832,6 +862,19 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
       urlOrPath={previewUrl}
       onClose={() => setPreviewUrl(null)}
     />
+    <AdvanceInterestFormulaModal
+      visible={showAdvanceInterestFormula}
+      onClose={() => setShowAdvanceInterestFormula(false)}
+      amounts={{
+        basicAmount: details.subTotalAmount ?? 0,
+        discount: details.discountAmount ?? 0,
+        gstAmount: details.taxAmount ?? 0,
+        tdsAmount: details.tdsAmount ?? 0,
+        advanceInterest: details.advanceInterest ?? 0,
+        roiPercent: details.roiPercent,
+        tenorDays: details.tenorDays,
+      }}
+    />
     </>
   );
 };
@@ -841,11 +884,17 @@ const DetailRow: React.FC<{
   value: string;
   isLast?: boolean;
   emphasize?: boolean;
-}> = ({label, value, isLast, emphasize}) => (
+  onInfoPress?: () => void;
+}> = ({label, value, isLast, emphasize, onInfoPress}) => (
   <View style={[styles.tableRow, isLast && styles.tableRowLast]}>
-    <Text style={[styles.tableLabel, emphasize && styles.tableLabelEmphasize]}>
-      {label}
-    </Text>
+    <View style={styles.tableLabelWrap}>
+      <Text
+        style={[styles.tableLabel, emphasize && styles.tableLabelEmphasize]}
+        numberOfLines={2}>
+        {label}
+      </Text>
+      {onInfoPress ? <AdvanceInterestInfoButton onPress={onInfoPress} /> : null}
+    </View>
     <Text style={[styles.tableValue, emphasize && styles.tableValueEmphasize]}>
       {value}
     </Text>
@@ -929,6 +978,9 @@ const styles = StyleSheet.create({
   productBadgeTextDf: {
     color: '#E65100',
   },
+  statusBadges: {
+    marginTop: scaleHeight(8),
+  },
   closeButton: {
     width: scaleWidth(24),
     height: scaleWidth(24),
@@ -987,11 +1039,18 @@ const styles = StyleSheet.create({
   tableRowLast: {
     borderBottomWidth: 0,
   },
+  tableLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: scaleWidth(6),
+    marginRight: scaleWidth(4),
+  },
   tableLabel: {
     fontSize: scaleFont(13),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
-    flex: 1,
+    flexShrink: 1,
   },
   tableLabelEmphasize: {
     fontFamily: Fonts.GilroySemiBold,
@@ -1000,7 +1059,7 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(13),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-    flex: 1.2,
+    flexShrink: 0,
     textAlign: 'right',
   },
   tableValueEmphasize: {

@@ -40,6 +40,7 @@ import {
   isTdsPartyTaxName,
   round2,
 } from '@utils/invoiceTotals';
+import {expectedNextApprovalAfterCreate} from '@utils/invoiceStatusDisplay';
 import {invoiceApi} from '@services/api/invoice.api';
 import {
   fetchDealerInfoRequest,
@@ -1352,18 +1353,27 @@ export const CreateInvoice: React.FC = () => {
         previewCounterPartyName,
         previewCounterPartyCode,
         productType,
+        previewInvoiceStatus: 'Draft',
+        previewApprovalStatus: expectedNextApprovalAfterCreate({
+          method: programSelection?.method,
+          isVendorFinance: productType === 'vendor_finance',
+          userRole,
+        }),
         advanceInterestBreakdown: advanceInterestInfo.chargeApplies
           ? advanceInterestInfo
           : null,
+        roiPercent: extractRoiPercent(selectedParticipant?.interest_parameters),
       });
     },
     [
       navigation,
       dealerInfo?.party?.entity_name,
       productType,
+      userRole,
       advanceInterestInfo,
       programSelection?.method,
       userPartyName,
+      selectedParticipant,
     ],
   );
 
@@ -2287,6 +2297,7 @@ export const CreateInvoice: React.FC = () => {
             onLoadPartyTaxes={loadPartyTaxes}
             showAdvanceInterest={showAdvanceInterest}
             advanceInterest={advanceInterestInfo.advanceInterest}
+            roiPercent={extractRoiPercent(selectedParticipant?.interest_parameters)}
             staleInvoicePeriodDays={dealerInfo?.basic_parameters?.stale_invoice_period_days != null ? Number(dealerInfo.basic_parameters.stale_invoice_period_days) : undefined}
             defaultPaymentTermsDays={dealerInfo?.basic_parameters?.default_payment_terms_days != null ? Number(dealerInfo.basic_parameters.default_payment_terms_days) : undefined}
             mode={mode}

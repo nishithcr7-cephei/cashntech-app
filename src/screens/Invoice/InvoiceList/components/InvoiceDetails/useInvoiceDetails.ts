@@ -33,12 +33,14 @@ import { userSelector } from '@store/user';
 import { AppRole, ROLE_LABELS } from '@constants/roles';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
 import {PRODUCT_CODES} from '@store/product/product.types';
-import { mapApiToRow, formatDateDash, mapApprovalLogToTimelineStep } from './types';
+import { mapApiToRow, formatDateDash, mapApprovalLogToTimelineStep, formatStatus } from './types';
 import { InvoiceListItemApi } from '@store/invoice/inv.types';
 import { invoiceApi } from '@services/api/invoice.api';
 import { useHasPermission } from '@hooks/useHasPermission';
 import { PERMISSIONS } from '@constants/permissions';
 import { decryptValue } from '@utils/decrypt';
+import { resolveInvoiceRoiPercent } from '@utils/invoiceTotals';
+import { resolveApprovalStatusLabel } from '@utils/invoiceStatusDisplay';
 import { formatApiInvoiceDate } from '@utils/invoiceDateFormat';
 import { mapInvoiceAttachmentsWithUrls, buildInvoiceAttachmentUrl, type InvoiceAttachmentItem } from '@utils/invoiceAttachments';
 import type { WorkflowStep } from '@components/InvoiceTrackingModal/InvoiceTrackingModal';
@@ -526,10 +528,21 @@ export function useInvoiceDetails() {
           advanceInterest,
           tdsAmount,
           totalAmount,
+          roiPercent: resolveInvoiceRoiPercent(data),
           finalPayableAmount: invoiceAmount,
           finalDueDate: invoiceDueDate,
           items,
           attachments,
+          invoiceStatus: formatStatus(
+            data?.invoice_status || selectedListRow?.invoiceStatus || '',
+          ),
+          approvalStatus: resolveApprovalStatusLabel(
+            data?.approval_status || selectedListRow?.rawApprovalStatus,
+            data?.current_step?.role,
+          ),
+          adminStatus: formatStatus(
+            data?.admin_status || selectedListRow?.adminStatus || '',
+          ),
         });
       })
       .catch(() => {
@@ -773,6 +786,9 @@ export function useInvoiceDetails() {
           finalPayableAmount: rowForAction?.invoiceAmount || '-',
           items: [],
           attachments: [],
+          invoiceStatus: rowForAction?.invoiceStatus || '',
+          approvalStatus: rowForAction?.approvalStatus || '',
+          adminStatus: rowForAction?.adminStatus || '',
         });
         setSelectedInvoiceId(invoiceId);
         setSelectedInvoiceNo(invoiceNo);
@@ -794,6 +810,9 @@ export function useInvoiceDetails() {
           invoiceDate: rowForAction?.invoiceDate || '',
           invoiceDueDate: rowForAction?.dueDate || '',
           invoiceAmount: rowForAction?.invoiceAmount || 'Rs. 0 /-',
+          invoiceStatus: rowForAction?.invoiceStatus || '',
+          approvalStatus: rowForAction?.approvalStatus || '',
+          adminStatus: rowForAction?.adminStatus || '',
         });
         setSelectedInvoiceId(invoiceId);
         setSelectedInvoiceNo(invoiceNo);
@@ -1032,6 +1051,9 @@ export function useInvoiceDetails() {
       withholdingAmount: undefined,
       finalPayableAmount: selectedRow.invoiceAmount,
       finalDueDate: selectedRow.dueDate,
+      invoiceStatus: selectedRow.invoiceStatus || '',
+      approvalStatus: selectedRow.approvalStatus || '',
+      adminStatus: selectedRow.adminStatus || '',
     }
     : undefined;
 

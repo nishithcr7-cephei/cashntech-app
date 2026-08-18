@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,11 @@ import {
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
 import {selectDealerInfo} from '@store/invoice/inv.selector';
-import {AppBar, Container} from '@components/index';
+import {AppBar, Container, InvoiceStatusBadges} from '@components/index';
+import {
+  AdvanceInterestFormulaModal,
+  AdvanceInterestInfoButton,
+} from '@components/AdvanceInterestFormulaModal';
 import {Colors, Fonts} from '@constants/index';
 import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -18,6 +22,7 @@ import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {decryptValue} from '@utils/decrypt';
 import type {AdvanceInterestBreakdown} from '@utils/invoiceTotals';
+import {computeInvoiceTaxableBase} from '@utils/invoiceTotals';
 import type {InvoiceFields} from '@type/Invoice';
 
 const SUMMARY = INVOICE_SUMMARY_LABELS;
@@ -196,13 +201,18 @@ const KeyValueRow = ({
   label,
   value,
   isLast = false,
+  onInfoPress,
 }: {
   label: string;
   value: string;
   isLast?: boolean;
+  onInfoPress?: () => void;
 }) => (
   <View style={isLast ? styles.keyValueRowLast : styles.keyValueRow}>
-    <Text style={styles.keyLabel}>{label}</Text>
+    <View style={styles.keyLabelRow}>
+      <Text style={styles.keyLabel}>{label}</Text>
+      {onInfoPress ? <AdvanceInterestInfoButton onPress={onInfoPress} /> : null}
+    </View>
     <Text style={styles.keyValue}>{value}</Text>
   </View>
 );
@@ -227,6 +237,10 @@ export const InvoiceUploadPreview: React.FC = () => {
     (route?.params?.productType as 'dealer_finance' | 'vendor_finance' | undefined) ||
     'dealer_finance';
   const isVendorFinance = productType === 'vendor_finance';
+  const previewInvoiceStatus =
+    (route?.params?.previewInvoiceStatus as string | undefined) || 'Draft';
+  const previewApprovalStatus =
+    (route?.params?.previewApprovalStatus as string | undefined) || '';
   // Web VF uses Counter Party; DF uses Dealer Name / Dealer Code.
   const counterPartyLabel = isVendorFinance ? 'Counter Party' : 'Dealer Name';
   const counterPartyCodeLabel = isVendorFinance
@@ -236,6 +250,9 @@ export const InvoiceUploadPreview: React.FC = () => {
     | AdvanceInterestBreakdown
     | null
     | undefined;
+  const roiPercent = Number(route?.params?.roiPercent) || 0;
+  const [showAdvanceInterestFormula, setShowAdvanceInterestFormula] =
+    useState(false);
 
   const fallbackAnchorName =
     previewAnchorName ||
@@ -310,6 +327,11 @@ export const InvoiceUploadPreview: React.FC = () => {
             />
           </TouchableOpacity>
         </View>
+        <InvoiceStatusBadges
+          invoiceStatus={previewInvoiceStatus}
+          approvalStatus={previewApprovalStatus}
+          mode="preview"
+        />
       </View>
 
       <ScrollView
@@ -453,6 +475,16 @@ export const InvoiceUploadPreview: React.FC = () => {
           />
           <View style={styles.summaryDivider} />
           <KeyValueRow
+            label={SUMMARY.grossInvoiceValue}
+            value={`${fmtAmount(
+              computeInvoiceTaxableBase(
+                invoiceData.subTotal,
+                invoiceData.discount.amount,
+                invoiceData.tax.amount,
+              ),
+            )}/-`}
+          />
+          <KeyValueRow
             label={SUMMARY.tdsDeduction}
             value={`${fmtAmount(invoiceData.tdsAmount)}/-`}
           />
@@ -463,6 +495,7 @@ export const InvoiceUploadPreview: React.FC = () => {
                 advanceInterestBreakdown?.advanceInterest ??
                   invoiceData.advanceInterest,
               )}/-`}
+              onInfoPress={() => setShowAdvanceInterestFormula(true)}
             />
           )}
           <View style={styles.totalRow}>
@@ -519,6 +552,21 @@ export const InvoiceUploadPreview: React.FC = () => {
           </View>
         )}
       </ScrollView>
+      <AdvanceInterestFormulaModal
+        visible={showAdvanceInterestFormula}
+        onClose={() => setShowAdvanceInterestFormula(false)}
+        amounts={{
+          basicAmount: invoiceData.subTotal,
+          discount: invoiceData.discount.amount,
+          gstAmount: invoiceData.tax.amount,
+          tdsAmount: invoiceData.tdsAmount,
+          advanceInterest:
+            advanceInterestBreakdown?.advanceInterest ??
+            invoiceData.advanceInterest,
+          roiPercent,
+          tenorDays: invoiceData.tenor,
+        }}
+      />
     </Container>
   );
 };
@@ -606,7 +654,14 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.graybase,
+    flexShrink: 1,
+  },
+  keyLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
+    gap: scaleWidth(6),
+    marginRight: scaleWidth(8),
   },
   keyValue: {
     fontSize: scaleFont(14),

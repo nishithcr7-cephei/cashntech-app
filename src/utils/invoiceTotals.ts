@@ -96,7 +96,7 @@ export function computeInvoiceNetTotal(
   return round2(subTotal - discountTotal + taxTotal - tdsAmount - advanceInterest);
 }
 
-/** Amount before TDS (used as the TDS base). */
+/** Web Create "Sub Total" = Basic − Discount + Tax (also TDS base). */
 export function computeInvoiceTaxableBase(
   subTotal: number,
   discountTotal: number,
@@ -226,6 +226,46 @@ export type VfDisbursementModalAmounts = {
   netInvoiceAmount: number;
 };
 
+/**
+ * Web disbursement auto-fill when Disbursement Date is selected (VF Upfront):
+ *   Eligible = final_total × Eligibility%
+ *   AI       = Eligible × ROI% × (Usance ÷ 365)
+ *   Disbursed = Eligible − AI − TDS
+ * DF / non-upfront: Disbursed = Eligible (no extra AI/TDS cut).
+ */
+export function computeDisbursedAmountLikeWeb(input: {
+  netInvoice: number;
+  eligibilityPercent?: number | string | null;
+  roiPercent?: number | string | null;
+  usanceDays: number;
+  tdsAmount?: number | string | null;
+  applyUpfrontInterest: boolean;
+}): {eligible: number; advanceInterest: number; disbursedAmount: number} {
+  const net = Number(input.netInvoice) || 0;
+  const eligPct = Number(input.eligibilityPercent);
+  const eligibility =
+    Number.isFinite(eligPct) && eligPct > 0 ? eligPct : 100;
+  const eligible = round2(net * (eligibility / 100));
+  const roi = Number(input.roiPercent) || 0;
+  const usance = Number(input.usanceDays) || 0;
+  const tds = Number(input.tdsAmount) || 0;
+
+  if (!input.applyUpfrontInterest) {
+    return {eligible, advanceInterest: 0, disbursedAmount: eligible};
+  }
+
+  const advanceInterest =
+    eligible > 0 && roi > 0 && usance > 0
+      ? round2(eligible * (roi / 100) * (usance / 365))
+      : 0;
+
+  return {
+    eligible,
+    advanceInterest,
+    disbursedAmount: round2(Math.max(0, eligible - advanceInterest - tds)),
+  };
+}
+
 export function isVfUpfrontChargeType(
   interestChargeType?: string | null,
 ): boolean {
@@ -352,6 +392,21 @@ export function resolveNetInvoiceAmountFromPreview(
     return round2(finalTotal + (ai > 0 ? ai : 0));
   }
   return 0;
+}
+
+export function resolveInvoiceRoiPercent(source: {
+  transaction_interest_rate?: number | string | null;
+  interest_rate_percent?: number | string | null;
+  anchorParticipantMapping?: {interest_parameters?: unknown} | null;
+} | null | undefined): number {
+  if (!source) return 0;
+  const direct = Number(
+    source.transaction_interest_rate ?? source.interest_rate_percent,
+  );
+  if (Number.isFinite(direct) && direct > 0) {
+    return direct;
+  }
+  return extractRoiPercent(source.anchorParticipantMapping?.interest_parameters);
 }
 
 export function extractRoiPercent(interestParameters: unknown): number {

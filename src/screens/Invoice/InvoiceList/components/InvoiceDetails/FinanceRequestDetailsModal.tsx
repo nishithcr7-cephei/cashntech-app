@@ -16,6 +16,10 @@ import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
 import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/AttachmentPreviewModal';
+import {
+  AdvanceInterestFormulaModal,
+  AdvanceInterestInfoButton,
+} from '@components/AdvanceInterestFormulaModal';
 import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
 import {
   fileNameFromAttachmentUrl,
@@ -23,7 +27,11 @@ import {
 } from '@utils/invoiceAttachments';
 import {decryptValue} from '@utils/decrypt';
 import {toYYYYMMDD} from '@services/api/invoice.api';
-import {resolveAdvanceInterestFromPreview} from '@utils/invoiceTotals';
+import {
+  computeInvoiceTaxableBase,
+  resolveAdvanceInterestFromPreview,
+  resolveInvoiceRoiPercent,
+} from '@utils/invoiceTotals';
 import {
   PRODUCT_CODES,
   PRODUCT_DISPLAY_NAMES,
@@ -91,6 +99,7 @@ export type FinanceRequestPreview = {
     od_account_no?: string | null;
     company_code_given_by_party?: string | null;
     party?: {entity_name?: string | null};
+    interest_parameters?: unknown;
   } | null;
 };
 
@@ -173,18 +182,24 @@ function DetailRow({
   value,
   isLast,
   emphasize,
+  onInfoPress,
 }: {
   label: string;
   value: string;
   isLast?: boolean;
   emphasize?: boolean;
+  onInfoPress?: () => void;
 }) {
   return (
     <View style={[styles.tableRow, isLast && styles.tableRowLast]}>
-      <Text
-        style={[styles.tableLabel, emphasize && styles.tableLabelEmphasize]}>
-        {label}
-      </Text>
+      <View style={styles.tableLabelWrap}>
+        <Text
+          style={[styles.tableLabel, emphasize && styles.tableLabelEmphasize]}
+          numberOfLines={2}>
+          {label}
+        </Text>
+        {onInfoPress ? <AdvanceInterestInfoButton onPress={onInfoPress} /> : null}
+      </View>
       <Text
         style={[styles.tableValue, emphasize && styles.tableValueEmphasize]}
         numberOfLines={3}>
@@ -216,12 +231,15 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
     null,
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showAdvanceInterestFormula, setShowAdvanceInterestFormula] =
+    useState(false);
 
   useEffect(() => {
     if (!visible) return;
     setPreferredDateError(null);
     setPreferredDisbursementDateInput('');
     setPreviewUrl(null);
+    setShowAdvanceInterestFormula(false);
   }, [visible, preview?.invoice_ref_no]);
 
   const display = useMemo(() => {
@@ -293,6 +311,13 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
       subTotal: formatAmount(p.sub_total),
       discountTotal: formatAmount(p.discount_total),
       taxTotal: formatAmount(p.tax_total),
+      webSubTotal: formatAmount(
+        computeInvoiceTaxableBase(
+          Number(p.sub_total) || 0,
+          Number(p.discount_total) || 0,
+          Number(p.tax_total) || 0,
+        ),
+      ),
       tdsAmount: formatAmount(p.tds_amount ?? 0),
       advanceInterest: formatAmount(
         resolveAdvanceInterestFromPreview(p, {isVendorFinance}),
@@ -300,10 +325,21 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
       total: formatAmount(
         p.net_disbursal_amount ?? p.final_total ?? p.invoice_amount,
       ),
+      formula: {
+        basicAmount: Number(p.sub_total) || 0,
+        discount: Number(p.discount_total) || 0,
+        gstAmount: Number(p.tax_total) || 0,
+        tdsAmount: Number(p.tds_amount) || 0,
+        advanceInterest: resolveAdvanceInterestFromPreview(p, {
+          isVendorFinance,
+        }),
+        roiPercent: resolveInvoiceRoiPercent(p),
+        tenorDays: p.tenor_days ?? p.tenor,
+      },
       items,
       attachments,
     };
-  }, [preview]);
+  }, [preview, isVendorFinance]);
 
   const handleSubmit = () => {
     if (loading || submitting || !preview) return;
@@ -501,13 +537,22 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                           value={display.taxTotal}
                         />
                         <DetailRow
+                          label={SUMMARY.grossInvoiceValue}
+                          value={display.webSubTotal}
+                        />
+                        <DetailRow
                           label={SUMMARY.tdsDeduction}
                           value={display.tdsAmount}
                         />
-                        <DetailRow
-                          label={SUMMARY.advanceInterestDeduction}
-                          value={display.advanceInterest}
-                        />
+                        {isVendorFinance && (
+                          <DetailRow
+                            label={SUMMARY.advanceInterestDeduction}
+                            value={display.advanceInterest}
+                            onInfoPress={() =>
+                              setShowAdvanceInterestFormula(true)
+                            }
+                          />
+                        )}
                         <DetailRow
                           label={SUMMARY.netDisbursementAmount}
                           value={display.total}
@@ -630,6 +675,13 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
         urlOrPath={previewUrl}
         onClose={() => setPreviewUrl(null)}
       />
+      {isVendorFinance && (
+        <AdvanceInterestFormulaModal
+          visible={showAdvanceInterestFormula}
+          onClose={() => setShowAdvanceInterestFormula(false)}
+          amounts={display.formula}
+        />
+      )}
     </>
   );
 };
@@ -740,11 +792,18 @@ const styles = StyleSheet.create({
   tableRowLast: {
     borderBottomWidth: 0,
   },
+  tableLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: scaleWidth(6),
+    marginRight: scaleWidth(4),
+  },
   tableLabel: {
     fontSize: scaleFont(13),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
-    flex: 1,
+    flexShrink: 1,
   },
   tableLabelEmphasize: {
     fontFamily: Fonts.GilroySemiBold,
@@ -753,7 +812,7 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(13),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-    flex: 1.2,
+    flexShrink: 0,
     textAlign: 'right',
   },
   tableValueEmphasize: {

@@ -22,6 +22,7 @@ export * from './UploadModelComponent/UploadModel';
 export * from './CheckerApprovalModal/CheckerApprovalModal';
 export * from './InvoiceTrackingModal/InvoiceTrackingModal';
 export * from './ApproveRejectModal/ApproveRejectModal';
+export * from './InvoiceStatusBadges';
 export * from './BulkReviewModal/BulkReviewModal';
 export * from './AddFundModal/AddFundModal';
 export * from './FilterModal/FilterModal';

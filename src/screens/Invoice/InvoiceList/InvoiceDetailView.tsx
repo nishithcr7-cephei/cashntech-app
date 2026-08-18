@@ -15,6 +15,10 @@ import {selectProgramSelection} from '@store/programSelection/programSelection.s
 import {selectInvoiceList} from '@store/invoice/inv.selector';
 import {selectIsVendorFinanceActive} from '@store/product/product.selectors';
 import {AppBar, Container, UploadModal} from '@components/index';
+import {
+  AdvanceInterestFormulaModal,
+  AdvanceInterestInfoButton,
+} from '@components/AdvanceInterestFormulaModal';
 import {Colors, Fonts} from '@constants/index';
 import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -27,6 +31,7 @@ import {formatStatus} from './components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
 import {mapInvoiceAttachmentsWithUrls, openInvoiceAttachment} from '@utils/invoiceAttachments';
+import {computeInvoiceTaxableBase, resolveInvoiceRoiPercent} from '@utils/invoiceTotals';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 
 const SUMMARY = INVOICE_SUMMARY_LABELS;
@@ -83,6 +88,7 @@ type InvoiceDetailData = {
   advanceInterest: number;
   showAdvanceInterest: boolean;
   isVendorFinance: boolean;
+  roiPercent: number;
   total: number;
   attachments: AttachmentItem[];
   invoiceStatus: string;
@@ -117,6 +123,7 @@ const defaultInvoiceData: InvoiceDetailData = {
   advanceInterest: 0,
   showAdvanceInterest: false,
   isVendorFinance: false,
+  roiPercent: 0,
   total: 0,
   attachments: [],
   invoiceStatus: '',
@@ -163,12 +170,17 @@ const DetailRow: React.FC<{
   value: string;
   isLast?: boolean;
   emphasize?: boolean;
-}> = ({label, value, isLast, emphasize}) => (
+  onInfoPress?: () => void;
+}> = ({label, value, isLast, emphasize, onInfoPress}) => (
   <View style={[styles.detailRow, isLast && styles.detailRowLast]}>
-    <Text
-      style={[styles.detailRowLabel, emphasize && styles.detailRowLabelEmphasize]}>
-      {label}
-    </Text>
+    <View style={styles.detailRowLabelWrap}>
+      <Text
+        style={[styles.detailRowLabel, emphasize && styles.detailRowLabelEmphasize]}
+        numberOfLines={2}>
+        {label}
+      </Text>
+      {onInfoPress ? <AdvanceInterestInfoButton onPress={onInfoPress} /> : null}
+    </View>
     <Text
       style={[styles.detailRowValue, emphasize && styles.detailRowValueEmphasize]}
       selectable>
@@ -190,6 +202,8 @@ export const InvoiceDetailView: React.FC = () => {
   const [invoiceData, setInvoiceData] = useState<InvoiceDetailData>(defaultInvoiceData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAdvanceInterestFormula, setShowAdvanceInterestFormula] =
+    useState(false);
 
   const rawInvoiceId = route?.params?.invoiceId || '';
   const invoiceNo = route?.params?.invoiceNo || '';
@@ -395,6 +409,7 @@ export const InvoiceDetailView: React.FC = () => {
           advanceInterest,
           showAdvanceInterest,
           isVendorFinance: isVendorFinanceInvoice,
+          roiPercent: resolveInvoiceRoiPercent(data),
           total: finalTotal,
           attachments,
           invoiceStatus: formatStatus(
@@ -703,6 +718,16 @@ export const InvoiceDetailView: React.FC = () => {
               value={fmtAmount(invoiceData.tax.amount)}
             />
             <DetailRow
+              label={SUMMARY.grossInvoiceValue}
+              value={fmtAmount(
+                computeInvoiceTaxableBase(
+                  invoiceData.subTotal,
+                  invoiceData.discount.amount,
+                  invoiceData.tax.amount,
+                ),
+              )}
+            />
+            <DetailRow
               label={SUMMARY.tdsDeduction}
               value={fmtAmount(invoiceData.tdsAmount)}
             />
@@ -710,6 +735,7 @@ export const InvoiceDetailView: React.FC = () => {
               <DetailRow
                 label={SUMMARY.advanceInterestDeduction}
                 value={fmtAmount(invoiceData.advanceInterest)}
+                onInfoPress={() => setShowAdvanceInterestFormula(true)}
               />
             )}
             <DetailRow
@@ -775,6 +801,19 @@ export const InvoiceDetailView: React.FC = () => {
         visible={showUploadModal}
         allowedFileTypes={['jpg', 'jpeg', 'png', 'pdf']}
         onClose={handleAttachmentUpload}
+      />
+      <AdvanceInterestFormulaModal
+        visible={showAdvanceInterestFormula}
+        onClose={() => setShowAdvanceInterestFormula(false)}
+        amounts={{
+          basicAmount: invoiceData.subTotal,
+          discount: invoiceData.discount.amount,
+          gstAmount: invoiceData.tax.amount,
+          tdsAmount: invoiceData.tdsAmount,
+          advanceInterest: invoiceData.advanceInterest,
+          roiPercent: invoiceData.roiPercent,
+          tenorDays: invoiceData.tenorDays,
+        }}
       />
     </Container>
   );
@@ -893,11 +932,18 @@ const styles = StyleSheet.create({
   detailRowLast: {
     borderBottomWidth: 0,
   },
+  detailRowLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: scaleWidth(6),
+    marginRight: scaleWidth(4),
+  },
   detailRowLabel: {
     fontSize: scaleFont(13),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
-    flex: 1,
+    flexShrink: 1,
   },
   detailRowLabelEmphasize: {
     fontFamily: Fonts.GilroySemiBold,
@@ -906,7 +952,7 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(13),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
-    flex: 1.2,
+    flexShrink: 0,
     textAlign: 'right',
   },
   detailRowValueEmphasize: {

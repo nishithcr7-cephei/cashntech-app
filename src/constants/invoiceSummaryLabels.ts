@@ -1,10 +1,10 @@
-/** DF + VF invoice summary row labels (GPT / finance UX naming). */
+/** DF + VF invoice summary row labels — match web Create / Preview. */
 export const INVOICE_SUMMARY_LABELS = {
-  invoiceAmount: 'Invoice Amount',
+  invoiceAmount: 'Basic Amount',
   discount: 'Discount',
   taxAmount: 'GST / Tax Amount',
-  grossInvoiceValue: 'Gross Invoice Value',
+  grossInvoiceValue: 'Sub Total',
   tdsDeduction: 'TDS Deduction',
-  advanceInterestDeduction: 'Advance Interest Deduction',
+  advanceInterestDeduction: 'Advance Interest',
   netDisbursementAmount: 'Net Disbursement Amount',
 } as const;

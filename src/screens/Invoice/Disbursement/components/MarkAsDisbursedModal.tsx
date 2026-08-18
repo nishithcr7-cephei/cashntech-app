@@ -26,9 +26,11 @@ import {
 } from '@store/product/product.types';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
 import {
+  computeDisbursedAmountLikeWeb,
   isVfUpfrontChargeType,
   resolveAdvanceInterestFromPreview,
   resolveDisbursementUsanceDaysDisplay,
+  resolveInvoiceRoiPercent,
   resolveNetInvoiceAmountFromPreview,
   resolveVfDisbursementModalAmounts,
 } from '@utils/invoiceTotals';
@@ -316,6 +318,45 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
   const isVfUpfront =
     isVendorFinance && isVfUpfrontChargeType(preview?.interest_charge_type);
+
+  useEffect(() => {
+    if (disbursementAction !== 'Disbursed' || !preview || !date) {
+      return;
+    }
+
+    const netInvoice = Number(preview.final_total) || 0;
+    if (netInvoice <= 0) {
+      return;
+    }
+
+    const tenor = Number(preview.tenor ?? preview.tenor_days ?? 0);
+    const disb = parseFlexibleDate(date);
+    const grn = parseFlexibleDate(
+      preview.grn_date ? formatDateDDMMYYYY(preview.grn_date) : null,
+    );
+    const diffDays =
+      disb && grn ? disb.diff(grn, 'days') : 0;
+    const usanceDays = Math.max(0, tenor - diffDays);
+    const roi = resolveInvoiceRoiPercent(preview);
+    const computed = computeDisbursedAmountLikeWeb({
+      netInvoice,
+      eligibilityPercent:
+        preview.eligibility_percent ??
+        preview.anchorParticipantMapping?.eligibility ??
+        100,
+      roiPercent: roi,
+      usanceDays,
+      tdsAmount: preview.tds_amount ?? 0,
+      applyUpfrontInterest: isVfUpfront,
+    });
+
+    if (computed.disbursedAmount <= 0) {
+      return;
+    }
+
+    setDisbursedAmount(formatAmount(computed.disbursedAmount));
+    setAmountError(null);
+  }, [disbursementAction, preview, date, isVfUpfront]);
 
   const vfAmounts = useMemo(() => {
     if (!isVfUpfront || !preview) return null;
@@ -708,12 +749,17 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                               Disburse Amount *
                             </Text>
                             <TextInput
-                              style={styles.input}
+                              style={[
+                                styles.input,
+                                isVendorFinance && styles.inputLocked,
+                              ]}
                               value={disbursedAmount}
                               onChangeText={text => {
+                                if (isVendorFinance) return;
                                 setDisbursedAmount(text);
                                 setAmountError(validateDisbursedAmount(text));
                               }}
+                              editable={!isVendorFinance}
                               keyboardType="numeric"
                               placeholder="0.00"
                               placeholderTextColor={Colors.graybase}
@@ -968,6 +1014,10 @@ const styles = StyleSheet.create({
     color: Colors.darkblack,
     backgroundColor: Colors.white,
     minHeight: scaleHeight(40),
+  },
+  inputLocked: {
+    backgroundColor: '#F4F5F7',
+    color: Colors.darkblack,
   },
   datePickerContainer: {
     marginBottom: 0,

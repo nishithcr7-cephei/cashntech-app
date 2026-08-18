@@ -12,6 +12,10 @@ import {
 } from 'react-native';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
+import {
+  AdvanceInterestFormulaModal,
+  AdvanceInterestInfoButton,
+} from '@components/AdvanceInterestFormulaModal';
 import {Colors, Fonts} from '@constants/index';
 import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -21,6 +25,8 @@ import {useSelector} from 'react-redux';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {
+  computeInvoiceLineAggregates,
+  computeInvoiceTaxableBase,
   formatIndianAmountInput,
   formatIndianCurrency,
   stripAmountInput,
@@ -112,6 +118,8 @@ type Props = {
   /** Show Advance Interest row (VF + Upfront) — web Create parity. */
   showAdvanceInterest?: boolean;
   advanceInterest?: number;
+  /** ROI used in VF Upfront Advance Interest formula tooltip. */
+  roiPercent?: number;
   bankOptions?: DropdownOption[];
   selectedBankId?: string;
   onBankSelect?: (bankId: string) => void;
@@ -158,6 +166,7 @@ export const InvoiceForm: React.FC<Props> = ({
   onLoadPartyTaxes,
   showAdvanceInterest = false,
   advanceInterest = 0,
+  roiPercent = 0,
   staleInvoicePeriodDays = 30,
   defaultPaymentTermsDays = 60,
   submitButtonAppearsDisabled = false,
@@ -200,6 +209,8 @@ export const InvoiceForm: React.FC<Props> = ({
   const [showCGSTTooltip, setShowCGSTTooltip] = useState(false);
   const [showSGSTTooltip, setShowSGSTTooltip] = useState(false);
   const [showPaymentDateTooltip, setShowPaymentDateTooltip] = useState(false);
+  const [showAdvanceInterestFormula, setShowAdvanceInterestFormula] =
+    useState(false);
 
   // Role-based entity type: use entityType prop if provided, otherwise derive from productType or user role
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
@@ -222,6 +233,33 @@ export const InvoiceForm: React.FC<Props> = ({
     if (Number.isFinite(parsed) && parsed > 0) return parsed;
     return undefined;
   }, [value.tenor]);
+
+  const advanceInterestFormulaAmounts = useMemo(() => {
+    const {subTotal, discountTotal, taxTotal} = computeInvoiceLineAggregates(
+      value.items,
+      value,
+    );
+    return {
+      basicAmount: subTotal,
+      discount: discountTotal,
+      gstAmount: taxTotal,
+      tdsAmount: parseFloat(value.tdsAmount || '0') || 0,
+      advanceInterest: showAdvanceInterest ? advanceInterest : 0,
+      roiPercent,
+      tenorDays: selectedTenorDays ?? value.tenor,
+    };
+  }, [
+    value.items,
+    value.cgst,
+    value.sgst,
+    value.taxTotal,
+    value.tdsAmount,
+    value.tenor,
+    selectedTenorDays,
+    showAdvanceInterest,
+    advanceInterest,
+    roiPercent,
+  ]);
 
   const tenureDaysForDueDate = selectedTenorDays ?? TENURE_DAYS;
 
@@ -1148,6 +1186,11 @@ export const InvoiceForm: React.FC<Props> = ({
           // Web Create: Total (Net) = Sub − Discount + Tax − TDS − Advance Interest
           const tdsAmount = parseFloat(value.tdsAmount || '0') || 0;
           const aiAmount = showAdvanceInterest ? advanceInterest : 0;
+          const webSubTotal = computeInvoiceTaxableBase(
+            subTotal,
+            discountTotal,
+            taxTotal,
+          );
           const total = subTotal - discountTotal + taxTotal - tdsAmount - aiAmount;
 
           return (
@@ -1166,15 +1209,26 @@ export const InvoiceForm: React.FC<Props> = ({
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>{SUMMARY.grossInvoiceValue}</Text>
+                <Text style={styles.summaryValue}>₹{formatIndianCurrency(webSubTotal)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>{SUMMARY.tdsDeduction}</Text>
                 <Text style={styles.summaryValue}>₹{formatIndianCurrency(tdsAmount)}</Text>
               </View>
               {showAdvanceInterest && (
                 <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>
-                    {SUMMARY.advanceInterestDeduction}
+                  <View style={styles.summaryLabelWithInfo}>
+                    <Text style={styles.summaryLabel} numberOfLines={1}>
+                      {SUMMARY.advanceInterestDeduction}
+                    </Text>
+                    <AdvanceInterestInfoButton
+                      onPress={() => setShowAdvanceInterestFormula(true)}
+                    />
+                  </View>
+                  <Text style={styles.summaryValue}>
+                    ₹{formatIndianCurrency(aiAmount)}
                   </Text>
-                  <Text style={styles.summaryValue}>₹{formatIndianCurrency(aiAmount)}</Text>
                 </View>
               )}
               <View style={[styles.summaryRow, styles.summaryTotalRow]}>
@@ -1187,6 +1241,12 @@ export const InvoiceForm: React.FC<Props> = ({
           );
         })()}
       </View>
+
+      <AdvanceInterestFormulaModal
+        visible={showAdvanceInterestFormula}
+        onClose={() => setShowAdvanceInterestFormula(false)}
+        amounts={advanceInterestFormulaAmounts}
+      />
 
       {/* Invoice Number Tooltip Modal */}
       <Modal
@@ -1968,6 +2028,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#555',
+  },
+  summaryLabelWithInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+    gap: 6,
   },
   summaryValue: {
     fontSize: 14,
