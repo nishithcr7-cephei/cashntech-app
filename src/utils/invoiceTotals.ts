@@ -1,11 +1,11 @@
 /**
- * Invoice totals helpers — aligned with web Create Invoice screen.
+ * Invoice totals helpers — Santram waterfall (VF + DF).
  *
- * Total (Net) = Sub − Discount + Tax − TDS − Advance Interest
- *
- * Advance Interest (VF + Upfront only) uses the net invoice value before deductions:
- *   (Sub Total − Discount Total + Tax Total) × (ROI% ÷ 100) × (Tenor ÷ 365)
- * TDS / Eligibility do NOT change the AI base.
+ * Invoice Amount = Basic − Discount + Tax
+ * Disbursement Requested Amount = Invoice Amount − TDS
+ * Advance Interest (VF + Upfront) on Requested Amount:
+ *   (Invoice Amount − TDS) × (ROI% ÷ 100) × (Tenor ÷ 365)
+ * Net Disbursement = Requested Amount − Advance Interest
  */
 
 export function round2(n: number): number {
@@ -96,13 +96,26 @@ export function computeInvoiceNetTotal(
   return round2(subTotal - discountTotal + taxTotal - tdsAmount - advanceInterest);
 }
 
-/** Web Create "Sub Total" = Basic − Discount + Tax (also TDS base). */
+/** Invoice Amount = Basic − Discount + Tax (no TDS). */
 export function computeInvoiceTaxableBase(
   subTotal: number,
   discountTotal: number,
   taxTotal: number,
 ): number {
   return Math.max(0, round2(subTotal - discountTotal + taxTotal));
+}
+
+/** Disbursement Requested Amount = Invoice Amount − TDS. */
+export function computeInvoiceSubTotalAfterTds(
+  subTotal: number,
+  discountTotal: number,
+  taxTotal: number,
+  tdsAmount = 0,
+): number {
+  return Math.max(
+    0,
+    round2(subTotal - discountTotal + taxTotal - (Number(tdsAmount) || 0)),
+  );
 }
 
 export function isTdsPartyTaxName(name: string | undefined | null): boolean {
@@ -120,17 +133,18 @@ export type AdvanceInterestBreakdown = {
 };
 
 /**
- * Client-confirmed VF + Upfront Advance Interest:
- *   Advance Interest =
- *     (Sub Total − Discount Total + Tax Total) × ROI% × (Tenor ÷ 365)
+ * VF + Upfront Advance Interest on Disbursement Requested Amount:
+ *   AI = (Invoice Amount − TDS) × ROI% × (Tenor ÷ 365)
+ *   Invoice Amount = Basic − Discount + Tax
  */
 export function computeVendorFinanceAdvanceInterest(input: {
   isVendorFinance: boolean;
   interestChargeType?: string | null;
-  /** VF Upfront AI base = Sub Total − Discount + Tax. */
+  /** Basic (line subtotal). */
   subTotal: number;
   discountTotal?: number | string | null;
   taxTotal?: number | string | null;
+  tdsAmount?: number | string | null;
   roiPercent?: number | string | null;
   tenorDays?: number | string | null;
 }): AdvanceInterestBreakdown {
@@ -144,9 +158,10 @@ export function computeVendorFinanceAdvanceInterest(input: {
   const subTotal = Number(input.subTotal) || 0;
   const discountTotal = Number(input.discountTotal) || 0;
   const taxTotal = Number(input.taxTotal) || 0;
+  const tdsAmount = Number(input.tdsAmount) || 0;
   const aiBase = Math.max(
     0,
-    round2(subTotal - discountTotal + taxTotal),
+    round2(subTotal - discountTotal + taxTotal - tdsAmount),
   );
   const roiPercent = Number(input.roiPercent) || 0;
   const tenorDays = Number(input.tenorDays) || 0;
@@ -352,6 +367,7 @@ export function resolveAdvanceInterestFromPreview(
     subTotal: Number(preview.sub_total) || 0,
     discountTotal: preview.discount_total,
     taxTotal: preview.tax_total,
+    tdsAmount: preview.tds_amount,
     roiPercent:
       preview.interest_rate_percent ??
       extractRoiPercent(preview.anchorParticipantMapping?.interest_parameters),

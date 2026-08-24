@@ -43,6 +43,7 @@ export const SOADealerList: React.FC = () => {
   const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
   const partyLabel = isVendorFinance ? 'Vendor' : 'Dealer';
   const partyLabelPlural = isVendorFinance ? 'Vendors' : 'Dealers';
+  const partyNameLabel = isVendorFinance ? 'Vendor Name' : 'Dealer Name';
 
   const selectedProgramIds = useMemo(
     () =>
@@ -111,7 +112,7 @@ export const SOADealerList: React.FC = () => {
 
           <View style={styles.infoGrid}>
             <View style={styles.infoColumn}>
-              <Text style={styles.infoLabel}>Counter Party Name</Text>
+              <Text style={styles.infoLabel}>{partyNameLabel}</Text>
               <Text style={styles.infoValue}>{item.counterPartyName}</Text>
             </View>
             <View style={styles.infoColumn}>

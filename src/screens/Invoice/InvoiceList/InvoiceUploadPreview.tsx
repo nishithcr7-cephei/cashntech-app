@@ -11,21 +11,15 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
 import {selectDealerInfo} from '@store/invoice/inv.selector';
 import {AppBar, Container, InvoiceStatusBadges} from '@components/index';
-import {
-  AdvanceInterestFormulaModal,
-  AdvanceInterestInfoButton,
-} from '@components/AdvanceInterestFormulaModal';
+import {AdvanceInterestFormulaModal} from '@components/AdvanceInterestFormulaModal';
+import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {Colors, Fonts} from '@constants/index';
-import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {decryptValue} from '@utils/decrypt';
 import type {AdvanceInterestBreakdown} from '@utils/invoiceTotals';
-import {computeInvoiceTaxableBase} from '@utils/invoiceTotals';
 import type {InvoiceFields} from '@type/Invoice';
-
-const SUMMARY = INVOICE_SUMMARY_LABELS;
 
 const fmtAmount = (n: number) =>
   n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -201,17 +195,14 @@ const KeyValueRow = ({
   label,
   value,
   isLast = false,
-  onInfoPress,
 }: {
   label: string;
   value: string;
   isLast?: boolean;
-  onInfoPress?: () => void;
 }) => (
   <View style={isLast ? styles.keyValueRowLast : styles.keyValueRow}>
     <View style={styles.keyLabelRow}>
       <Text style={styles.keyLabel}>{label}</Text>
-      {onInfoPress ? <AdvanceInterestInfoButton onPress={onInfoPress} /> : null}
     </View>
     <Text style={styles.keyValue}>{value}</Text>
   </View>
@@ -461,49 +452,22 @@ export const InvoiceUploadPreview: React.FC = () => {
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Summary</Text>
-          <KeyValueRow
-            label={SUMMARY.invoiceAmount}
-            value={`${fmtAmount(invoiceData.subTotal)}/-`}
+          <InvoiceAccountingSummary
+            basicAmount={invoiceData.subTotal}
+            discount={invoiceData.discount.amount}
+            gstAmount={invoiceData.tax.amount}
+            tdsAmount={invoiceData.tdsAmount}
+            advanceInterest={
+              advanceInterestBreakdown?.advanceInterest ??
+              invoiceData.advanceInterest
+            }
+            netDisbursementAmount={invoiceData.total}
+            showAdvanceInterest={showAdvanceInterestRow}
+            onAdvanceInterestInfoPress={() =>
+              setShowAdvanceInterestFormula(true)
+            }
+            amountSuffix="/-"
           />
-          <KeyValueRow
-            label={SUMMARY.discount}
-            value={`${fmtAmount(invoiceData.discount.amount)}/-`}
-          />
-          <KeyValueRow
-            label={SUMMARY.taxAmount}
-            value={`${fmtAmount(invoiceData.tax.amount)}/-`}
-          />
-          <View style={styles.summaryDivider} />
-          <KeyValueRow
-            label={SUMMARY.grossInvoiceValue}
-            value={`${fmtAmount(
-              computeInvoiceTaxableBase(
-                invoiceData.subTotal,
-                invoiceData.discount.amount,
-                invoiceData.tax.amount,
-              ),
-            )}/-`}
-          />
-          <KeyValueRow
-            label={SUMMARY.tdsDeduction}
-            value={`${fmtAmount(invoiceData.tdsAmount)}/-`}
-          />
-          {showAdvanceInterestRow && (
-            <KeyValueRow
-              label={SUMMARY.advanceInterestDeduction}
-              value={`${fmtAmount(
-                advanceInterestBreakdown?.advanceInterest ??
-                  invoiceData.advanceInterest,
-              )}/-`}
-              onInfoPress={() => setShowAdvanceInterestFormula(true)}
-            />
-          )}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>{SUMMARY.netDisbursementAmount}</Text>
-            <Text style={styles.totalValue}>
-              {fmtAmount(invoiceData.total)}/-
-            </Text>
-          </View>
         </View>
 
         <TouchableOpacity

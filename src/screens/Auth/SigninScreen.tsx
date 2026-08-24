@@ -42,8 +42,8 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
   //const [email, setEmail] = useState('piyush.sharma@cepheiinfotech.com');
   //const [passwordValue, setPassword] = useState('admin@123');
 
-  //const [email, setEmail] = useState('sunilpatil23@yopmail.com');
-  const [email, setEmail] = useState('satishpatil54@yopmail.com');
+  const [email, setEmail] = useState('sunilpatil23@yopmail.com');
+  //const [email, setEmail] = useState('satishpatil54@yopmail.com');
   //const [email, setEmail] = useState('vishalm32@yopmail.com');
   //const [email, setEmail] = useState('vimalkale34@yopmail.com');
 

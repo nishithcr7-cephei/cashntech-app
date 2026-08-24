@@ -12,12 +12,9 @@ import {
 } from 'react-native';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
-import {
-  AdvanceInterestFormulaModal,
-  AdvanceInterestInfoButton,
-} from '@components/AdvanceInterestFormulaModal';
+import {AdvanceInterestFormulaModal} from '@components/AdvanceInterestFormulaModal';
+import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {Colors, Fonts} from '@constants/index';
-import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
@@ -26,9 +23,8 @@ import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {
   computeInvoiceLineAggregates,
-  computeInvoiceTaxableBase,
+  computeInvoiceNetTotal,
   formatIndianAmountInput,
-  formatIndianCurrency,
   stripAmountInput,
 } from '@utils/invoiceTotals';
 
@@ -37,8 +33,6 @@ const AMOUNT_ITEM_FIELDS = new Set<keyof InvoiceLineItem>([
   'pricePerQuantity',
   'discountValue',
 ]);
-
-const SUMMARY = INVOICE_SUMMARY_LABELS;
 
 /**
  * Credit-to bank account option. `accountId` carries the party-info
@@ -1183,60 +1177,31 @@ export const InvoiceForm: React.FC<Props> = ({
             (parseFloat(value.taxTotal || '0') || 0);
           const taxTotal = itemTaxSum > 0 ? itemTaxSum : ocrTaxFallback;
           
-          // Web Create: Total (Net) = Sub − Discount + Tax − TDS − Advance Interest
           const tdsAmount = parseFloat(value.tdsAmount || '0') || 0;
           const aiAmount = showAdvanceInterest ? advanceInterest : 0;
-          const webSubTotal = computeInvoiceTaxableBase(
+          const total = computeInvoiceNetTotal(
             subTotal,
             discountTotal,
             taxTotal,
+            tdsAmount,
+            aiAmount,
           );
-          const total = subTotal - discountTotal + taxTotal - tdsAmount - aiAmount;
 
           return (
-            <View style={styles.summaryContainer}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>{SUMMARY.invoiceAmount}</Text>
-                <Text style={styles.summaryValue}>₹{formatIndianCurrency(subTotal)}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>{SUMMARY.discount}</Text>
-                <Text style={styles.summaryValue}>₹{formatIndianCurrency(discountTotal)}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>{SUMMARY.taxAmount}</Text>
-                <Text style={styles.summaryValue}>₹{formatIndianCurrency(taxTotal)}</Text>
-              </View>
-              <View style={styles.summaryDivider} />
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>{SUMMARY.grossInvoiceValue}</Text>
-                <Text style={styles.summaryValue}>₹{formatIndianCurrency(webSubTotal)}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>{SUMMARY.tdsDeduction}</Text>
-                <Text style={styles.summaryValue}>₹{formatIndianCurrency(tdsAmount)}</Text>
-              </View>
-              {showAdvanceInterest && (
-                <View style={styles.summaryRow}>
-                  <View style={styles.summaryLabelWithInfo}>
-                    <Text style={styles.summaryLabel} numberOfLines={1}>
-                      {SUMMARY.advanceInterestDeduction}
-                    </Text>
-                    <AdvanceInterestInfoButton
-                      onPress={() => setShowAdvanceInterestFormula(true)}
-                    />
-                  </View>
-                  <Text style={styles.summaryValue}>
-                    ₹{formatIndianCurrency(aiAmount)}
-                  </Text>
-                </View>
-              )}
-              <View style={[styles.summaryRow, styles.summaryTotalRow]}>
-                <Text style={styles.summaryTotalLabel}>
-                  {SUMMARY.netDisbursementAmount}
-                </Text>
-                <Text style={styles.summaryTotalValue}>₹{formatIndianCurrency(total)}</Text>
-              </View>
+            <View style={styles.summaryWrap}>
+              <InvoiceAccountingSummary
+                basicAmount={subTotal}
+                discount={discountTotal}
+                gstAmount={taxTotal}
+                tdsAmount={tdsAmount}
+                advanceInterest={aiAmount}
+                netDisbursementAmount={total}
+                showAdvanceInterest={showAdvanceInterest}
+                onAdvanceInterestInfoPress={() =>
+                  setShowAdvanceInterestFormula(true)
+                }
+                amountPrefix="₹"
+              />
             </View>
           );
         })()}
@@ -2002,64 +1967,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  summaryContainer: {
+  summaryWrap: {
     marginTop: 16,
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    alignItems: 'flex-end',
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
     width: '100%',
-  },
-  summaryDivider: {
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    marginVertical: 8,
-    width: '100%',
-  },
-  summaryLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#555',
-  },
-  summaryLabelWithInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
-    gap: 6,
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    minWidth: 100,
-    textAlign: 'right',
-  },
-  summaryTotalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    paddingTop: 12,
-    marginTop: 4,
-  },
-  summaryTotalLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#333',
-  },
-  summaryTotalValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#dc3545',
-    minWidth: 100,
-    textAlign: 'right',
   },
   financingSection: {
     width: '100%',

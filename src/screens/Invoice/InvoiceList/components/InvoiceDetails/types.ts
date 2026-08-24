@@ -187,6 +187,39 @@ export function formatStatus(str: string): string {
     .join(' ');
 }
 
+function formatListAmount(value: number | string | null | undefined): string {
+  if (value == null || value === '') return '-';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '-';
+  return `${n.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}/-`;
+}
+
+/**
+ * DRA from API waterfall only:
+ *   Invoice Amount (= sub − discount + tax) − TDS
+ * Never use final_total (that is Net Disbursement).
+ * List API usually omits these → returns '-'.
+ */
+function resolveDisbursementRequestedAmount(
+  item: InvoiceListItemApi,
+): string {
+  if (item.sub_total == null || item.sub_total === '') {
+    return '-';
+  }
+  const subTotal = Number(item.sub_total);
+  if (!Number.isFinite(subTotal)) {
+    return '-';
+  }
+  const discountTotal = Number(item.discount_total) || 0;
+  const taxTotal = Number(item.tax_total) || 0;
+  const tdsAmount = Number(item.tds_amount) || 0;
+  const invoiceAmount = Math.max(0, subTotal - discountTotal + taxTotal);
+  return formatListAmount(Math.max(0, invoiceAmount - tdsAmount));
+}
+
 export type InvoiceRow = {
   id: string;
   dealerName: string;
@@ -194,9 +227,13 @@ export type InvoiceRow = {
   creditAccountNumber?: string;
   invoiceNo: string;
   invoiceAmount: string;
+  /** From API waterfall when present; else '-' (do not invent from final_total) */
+  disbursementRequestedAmount: string;
   invoiceDate: string;
   requestDate: string;
   dueDate: string;
+  /** VF list column — empty string when not set */
+  grnDate: string;
   invoiceStatus: string;
   approvalStatus: string;
   adminStatus: string;
@@ -231,6 +268,11 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
   const creditAccountNumber =
     decryptValue(rawAccountNumber) || rawAccountNumber || '-';
 
+  const finalTotal =
+    item.final_total != null && item.final_total !== ''
+      ? Number(item.final_total)
+      : NaN;
+
   return {
     id: item.id,
     dealerName: counterParty,
@@ -239,12 +281,12 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
     invoiceNo: item.invoice_ref_no,
     invoiceAmount:
       item.invoice_amount ??
-      (item.final_total != null
-        ? `${Number(item.final_total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/-`
-        : '-'),
+      (Number.isFinite(finalTotal) ? formatListAmount(finalTotal) : '-'),
+    disbursementRequestedAmount: resolveDisbursementRequestedAmount(item),
     invoiceDate: formatDateDash(item.invoice_date),
     requestDate: formatDateDash(item.request_date ?? item.created_at ?? ''),
     dueDate: formatDateDash(item.invoice_due_date),
+    grnDate: item.grn_date ? formatDateDash(String(item.grn_date)) : '',
     invoiceStatus: item.invoice_status ? formatStatus(item.invoice_status) : '',
     approvalStatus: item.approval_status ? formatStatus(item.approval_status) : '',
     adminStatus: item.admin_status ? formatStatus(item.admin_status) : '',

@@ -55,11 +55,13 @@ import {
 } from '@store/invoice';
 import {useDispatch} from 'react-redux';
 import {
+  selectActiveProductId,
   selectActiveProductName,
   selectActiveProductCode,
+  selectEffectiveProductCode,
 } from '@store/product/product.selectors';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
-import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 
 const STATUS_COLORS = {
   PENDING: { bg: '#FFF4E5', text: '#FF8C00' },
@@ -340,6 +342,28 @@ export const DisbursementScreen: React.FC = () => {
     ],
   );
 
+  const activeProductId = useSelector(selectActiveProductId);
+  const effectiveCode = useSelector(selectEffectiveProductCode);
+
+  /** PR5/PR7 pattern: optional productId for VF list/KPI filters; omitted for DF default. */
+  const overviewProductId = useMemo(() => {
+    if (
+      programSelection?.programScope === 'selected' &&
+      programSelection?.productId
+    ) {
+      return programSelection.productId;
+    }
+    if (effectiveCode === PRODUCT_CODES.VENDOR_FINANCE && activeProductId) {
+      return activeProductId;
+    }
+    return null;
+  }, [
+    programSelection?.programScope,
+    programSelection?.productId,
+    effectiveCode,
+    activeProductId,
+  ]);
+
   const fetchDisbursementData = useCallback(async () => {
     const requestId = ++fetchRequestId.current;
     setLoading(true);
@@ -357,9 +381,17 @@ export const DisbursementScreen: React.FC = () => {
           };
         }
       }
+      if (overviewProductId) {
+        apiFilters = {...apiFilters, productId: overviewProductId};
+      }
       const [verifiedList, kpisResponse] = await Promise.all([
         invoiceApi.getVerifiedList(programIds, apiFilters),
-        invoiceApi.getDisbursementKpis(programIds).catch(() => null)
+        invoiceApi
+          .getDisbursementKpis(
+            programIds,
+            overviewProductId ? {productId: overviewProductId} : undefined,
+          )
+          .catch(() => null),
       ]);
       
       if (requestId !== fetchRequestId.current) return;
@@ -415,7 +447,7 @@ export const DisbursementScreen: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [programIds, isCashnTechUser, appliedFilters]);
+  }, [programIds, isCashnTechUser, appliedFilters, overviewProductId]);
 
   useEffect(() => {
     fetchDisbursementData();

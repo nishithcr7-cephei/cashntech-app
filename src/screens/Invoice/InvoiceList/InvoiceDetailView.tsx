@@ -15,12 +15,9 @@ import {selectProgramSelection} from '@store/programSelection/programSelection.s
 import {selectInvoiceList} from '@store/invoice/inv.selector';
 import {selectIsVendorFinanceActive} from '@store/product/product.selectors';
 import {AppBar, Container, UploadModal} from '@components/index';
-import {
-  AdvanceInterestFormulaModal,
-  AdvanceInterestInfoButton,
-} from '@components/AdvanceInterestFormulaModal';
+import {AdvanceInterestFormulaModal} from '@components/AdvanceInterestFormulaModal';
+import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {Colors, Fonts} from '@constants/index';
-import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {Download, LeftChevron} from '@assets/Icons';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
@@ -31,10 +28,8 @@ import {formatStatus} from './components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
 import {mapInvoiceAttachmentsWithUrls, openInvoiceAttachment} from '@utils/invoiceAttachments';
-import {computeInvoiceTaxableBase, resolveInvoiceRoiPercent} from '@utils/invoiceTotals';
+import {resolveInvoiceRoiPercent} from '@utils/invoiceTotals';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
-
-const SUMMARY = INVOICE_SUMMARY_LABELS;
 
 const fmtAmount = (n: number) =>
   n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -170,8 +165,7 @@ const DetailRow: React.FC<{
   value: string;
   isLast?: boolean;
   emphasize?: boolean;
-  onInfoPress?: () => void;
-}> = ({label, value, isLast, emphasize, onInfoPress}) => (
+}> = ({label, value, isLast, emphasize}) => (
   <View style={[styles.detailRow, isLast && styles.detailRowLast]}>
     <View style={styles.detailRowLabelWrap}>
       <Text
@@ -179,7 +173,6 @@ const DetailRow: React.FC<{
         numberOfLines={2}>
         {label}
       </Text>
-      {onInfoPress ? <AdvanceInterestInfoButton onPress={onInfoPress} /> : null}
     </View>
     <Text
       style={[styles.detailRowValue, emphasize && styles.detailRowValueEmphasize]}
@@ -704,47 +697,18 @@ export const InvoiceDetailView: React.FC = () => {
           )}
 
           <Text style={styles.sectionTitle}>Summary</Text>
-          <View style={styles.detailsTable}>
-            <DetailRow
-              label={SUMMARY.invoiceAmount}
-              value={fmtAmount(invoiceData.subTotal)}
-            />
-            <DetailRow
-              label={SUMMARY.discount}
-              value={fmtAmount(invoiceData.discount.amount)}
-            />
-            <DetailRow
-              label={SUMMARY.taxAmount}
-              value={fmtAmount(invoiceData.tax.amount)}
-            />
-            <DetailRow
-              label={SUMMARY.grossInvoiceValue}
-              value={fmtAmount(
-                computeInvoiceTaxableBase(
-                  invoiceData.subTotal,
-                  invoiceData.discount.amount,
-                  invoiceData.tax.amount,
-                ),
-              )}
-            />
-            <DetailRow
-              label={SUMMARY.tdsDeduction}
-              value={fmtAmount(invoiceData.tdsAmount)}
-            />
-            {invoiceData.showAdvanceInterest && (
-              <DetailRow
-                label={SUMMARY.advanceInterestDeduction}
-                value={fmtAmount(invoiceData.advanceInterest)}
-                onInfoPress={() => setShowAdvanceInterestFormula(true)}
-              />
-            )}
-            <DetailRow
-              label={SUMMARY.netDisbursementAmount}
-              value={fmtAmount(invoiceData.total)}
-              isLast
-              emphasize
-            />
-          </View>
+          <InvoiceAccountingSummary
+            basicAmount={invoiceData.subTotal}
+            discount={invoiceData.discount.amount}
+            gstAmount={invoiceData.tax.amount}
+            tdsAmount={invoiceData.tdsAmount}
+            advanceInterest={invoiceData.advanceInterest}
+            netDisbursementAmount={invoiceData.total}
+            showAdvanceInterest={invoiceData.showAdvanceInterest}
+            onAdvanceInterestInfoPress={() =>
+              setShowAdvanceInterestFormula(true)
+            }
+          />
 
           <Text style={styles.sectionTitle}>
             Attachments

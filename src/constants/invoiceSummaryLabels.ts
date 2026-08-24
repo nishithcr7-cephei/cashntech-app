@@ -3,8 +3,9 @@ export const INVOICE_SUMMARY_LABELS = {
   invoiceAmount: 'Basic Amount',
   discount: 'Discount',
   taxAmount: 'GST / Tax Amount',
-  grossInvoiceValue: 'Sub Total',
+  grossInvoiceValue: 'Invoice Amount',
   tdsDeduction: 'TDS Deduction',
+  disbursementRequestedAmount: 'Disbursement Requested Amount',
   advanceInterestDeduction: 'Advance Interest',
   netDisbursementAmount: 'Net Disbursement Amount',
 } as const;

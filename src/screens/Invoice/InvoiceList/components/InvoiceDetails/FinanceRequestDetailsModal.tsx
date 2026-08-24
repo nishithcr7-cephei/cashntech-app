@@ -12,14 +12,11 @@ import {
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {Colors, Fonts} from '@constants/index';
-import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
 import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/AttachmentPreviewModal';
-import {
-  AdvanceInterestFormulaModal,
-  AdvanceInterestInfoButton,
-} from '@components/AdvanceInterestFormulaModal';
+import {AdvanceInterestFormulaModal} from '@components/AdvanceInterestFormulaModal';
+import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
 import {
   fileNameFromAttachmentUrl,
@@ -28,7 +25,6 @@ import {
 import {decryptValue} from '@utils/decrypt';
 import {toYYYYMMDD} from '@services/api/invoice.api';
 import {
-  computeInvoiceTaxableBase,
   resolveAdvanceInterestFromPreview,
   resolveInvoiceRoiPercent,
 } from '@utils/invoiceTotals';
@@ -38,8 +34,6 @@ import {
   ProductCode,
 } from '@store/product/product.types';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
-
-const SUMMARY = INVOICE_SUMMARY_LABELS;
 
 export type FinanceRequestPreview = {
   vendor_name?: string | null;
@@ -182,13 +176,11 @@ function DetailRow({
   value,
   isLast,
   emphasize,
-  onInfoPress,
 }: {
   label: string;
   value: string;
   isLast?: boolean;
   emphasize?: boolean;
-  onInfoPress?: () => void;
 }) {
   return (
     <View style={[styles.tableRow, isLast && styles.tableRowLast]}>
@@ -198,7 +190,6 @@ function DetailRow({
           numberOfLines={2}>
           {label}
         </Text>
-        {onInfoPress ? <AdvanceInterestInfoButton onPress={onInfoPress} /> : null}
       </View>
       <Text
         style={[styles.tableValue, emphasize && styles.tableValueEmphasize]}
@@ -311,13 +302,6 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
       subTotal: formatAmount(p.sub_total),
       discountTotal: formatAmount(p.discount_total),
       taxTotal: formatAmount(p.tax_total),
-      webSubTotal: formatAmount(
-        computeInvoiceTaxableBase(
-          Number(p.sub_total) || 0,
-          Number(p.discount_total) || 0,
-          Number(p.tax_total) || 0,
-        ),
-      ),
       tdsAmount: formatAmount(p.tds_amount ?? 0),
       advanceInterest: formatAmount(
         resolveAdvanceInterestFromPreview(p, {isVendorFinance}),
@@ -333,6 +317,9 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
         advanceInterest: resolveAdvanceInterestFromPreview(p, {
           isVendorFinance,
         }),
+        netDisbursementAmount:
+          Number(p.net_disbursal_amount ?? p.final_total ?? p.invoice_amount) ||
+          0,
         roiPercent: resolveInvoiceRoiPercent(p),
         tenorDays: p.tenor_days ?? p.tenor,
       },
@@ -523,43 +510,20 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                       )}
 
                       <Text style={styles.sectionTitle}>Summary</Text>
-                      <View style={styles.detailsTable}>
-                        <DetailRow
-                          label={SUMMARY.invoiceAmount}
-                          value={display.subTotal}
-                        />
-                        <DetailRow
-                          label={SUMMARY.discount}
-                          value={display.discountTotal}
-                        />
-                        <DetailRow
-                          label={SUMMARY.taxAmount}
-                          value={display.taxTotal}
-                        />
-                        <DetailRow
-                          label={SUMMARY.grossInvoiceValue}
-                          value={display.webSubTotal}
-                        />
-                        <DetailRow
-                          label={SUMMARY.tdsDeduction}
-                          value={display.tdsAmount}
-                        />
-                        {isVendorFinance && (
-                          <DetailRow
-                            label={SUMMARY.advanceInterestDeduction}
-                            value={display.advanceInterest}
-                            onInfoPress={() =>
-                              setShowAdvanceInterestFormula(true)
-                            }
-                          />
-                        )}
-                        <DetailRow
-                          label={SUMMARY.netDisbursementAmount}
-                          value={display.total}
-                          isLast
-                          emphasize
-                        />
-                      </View>
+                      <InvoiceAccountingSummary
+                        basicAmount={display.formula.basicAmount}
+                        discount={display.formula.discount}
+                        gstAmount={display.formula.gstAmount}
+                        tdsAmount={display.formula.tdsAmount}
+                        advanceInterest={display.formula.advanceInterest}
+                        netDisbursementAmount={
+                          display.formula.netDisbursementAmount
+                        }
+                        showAdvanceInterest={isVendorFinance}
+                        onAdvanceInterestInfoPress={() =>
+                          setShowAdvanceInterestFormula(true)
+                        }
+                      />
 
                       <Text style={styles.sectionTitle}>Attachments</Text>
                       {display.attachments.length === 0 ? (

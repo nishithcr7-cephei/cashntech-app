@@ -14,7 +14,6 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import moment from 'moment';
 import {Colors, Fonts} from '@constants/index';
-import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {
   PRODUCT_CODES,
@@ -23,19 +22,15 @@ import {
 } from '@store/product/product.types';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
 import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/AttachmentPreviewModal';
-import {
-  AdvanceInterestFormulaModal,
-  AdvanceInterestInfoButton,
-} from '@components/AdvanceInterestFormulaModal';
+import {AdvanceInterestFormulaModal} from '@components/AdvanceInterestFormulaModal';
+import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
 import {calculateInvoiceDueDate} from '@utils/invoiceDueDate';
-import {computeInvoiceTaxableBase} from '@utils/invoiceTotals';
+import {computeInvoiceNetTotal} from '@utils/invoiceTotals';
 import {InvoiceStatusBadges} from '@components/InvoiceStatusBadges';
 import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
 import {fileNameFromAttachmentUrl} from '@utils/invoiceAttachments';
 import {toYYYYMMDD} from '@services/api/invoice.api';
-
-const SUMMARY = INVOICE_SUMMARY_LABELS;
 
 export type ApproveRejectInvoiceItem = {
   id: string;
@@ -598,58 +593,30 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                     )}
 
                     <Text style={styles.sectionTitle}>Summary</Text>
-                    <View style={styles.detailsTable}>
-                      <DetailRow
-                        label={SUMMARY.invoiceAmount}
-                        value={
-                          details.subTotalAmount != null
-                            ? fmtAmount(details.subTotalAmount)
-                            : dash(details.subTotal)
-                        }
-                      />
-                      <DetailRow
-                        label={SUMMARY.discount}
-                        value={fmtAmount(details.discountAmount ?? 0)}
-                      />
-                      <DetailRow
-                        label={SUMMARY.taxAmount}
-                        value={fmtAmount(details.taxAmount ?? 0)}
-                      />
-                      <DetailRow
-                        label={SUMMARY.grossInvoiceValue}
-                        value={fmtAmount(
-                          computeInvoiceTaxableBase(
-                            details.subTotalAmount ?? 0,
-                            details.discountAmount ?? 0,
-                            details.taxAmount ?? 0,
-                          ),
-                        )}
-                      />
-                      <DetailRow
-                        label={SUMMARY.tdsDeduction}
-                        value={fmtAmount(details.tdsAmount ?? 0)}
-                      />
-                      {showAdvanceInterest && (
-                        <DetailRow
-                          label={SUMMARY.advanceInterestDeduction}
-                          value={fmtAmount(details.advanceInterest ?? 0)}
-                          onInfoPress={() => setShowAdvanceInterestFormula(true)}
-                        />
-                      )}
-                      <DetailRow
-                        label={SUMMARY.netDisbursementAmount}
-                        value={
-                          details.totalAmount != null
-                            ? fmtAmount(details.totalAmount)
-                            : dash(
-                                details.finalPayableAmount ||
-                                  details.invoiceAmount,
-                              )
-                        }
-                        isLast
-                        emphasize
-                      />
-                    </View>
+                    <InvoiceAccountingSummary
+                      basicAmount={details.subTotalAmount ?? 0}
+                      discount={details.discountAmount ?? 0}
+                      gstAmount={details.taxAmount ?? 0}
+                      tdsAmount={details.tdsAmount ?? 0}
+                      advanceInterest={details.advanceInterest ?? 0}
+                      netDisbursementAmount={
+                        details.totalAmount != null
+                          ? details.totalAmount
+                          : computeInvoiceNetTotal(
+                              details.subTotalAmount ?? 0,
+                              details.discountAmount ?? 0,
+                              details.taxAmount ?? 0,
+                              details.tdsAmount ?? 0,
+                              showAdvanceInterest
+                                ? details.advanceInterest ?? 0
+                                : 0,
+                            )
+                      }
+                      showAdvanceInterest={showAdvanceInterest}
+                      onAdvanceInterestInfoPress={() =>
+                        setShowAdvanceInterestFormula(true)
+                      }
+                    />
 
                     <Text style={styles.sectionTitle}>
                       Attachments
@@ -884,8 +851,7 @@ const DetailRow: React.FC<{
   value: string;
   isLast?: boolean;
   emphasize?: boolean;
-  onInfoPress?: () => void;
-}> = ({label, value, isLast, emphasize, onInfoPress}) => (
+}> = ({label, value, isLast, emphasize}) => (
   <View style={[styles.tableRow, isLast && styles.tableRowLast]}>
     <View style={styles.tableLabelWrap}>
       <Text
@@ -893,7 +859,6 @@ const DetailRow: React.FC<{
         numberOfLines={2}>
         {label}
       </Text>
-      {onInfoPress ? <AdvanceInterestInfoButton onPress={onInfoPress} /> : null}
     </View>
     <Text style={[styles.tableValue, emphasize && styles.tableValueEmphasize]}>
       {value}

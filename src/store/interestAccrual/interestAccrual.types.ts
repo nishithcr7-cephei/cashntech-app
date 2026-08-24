@@ -51,4 +51,6 @@ export type FetchDailyInterestRequest = {
 export type FetchInterestAccrualListRequest = {
   programIds?: string[];
   byInvoiceStatus?: string[];
+  /** Optional — included when VF product context is active; omitted for DF default. */
+  productId?: string | null;
 };

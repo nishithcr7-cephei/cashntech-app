@@ -67,8 +67,16 @@ export type InvoiceListItemApi = {
   counter_party_name: string;
   counter_party_code: string;
   invoice_amount?: string;
-  /** Backend returns final_total from invoice_master */
+  /** Backend returns final_total from invoice_master (= Net Disbursement, not Invoice Amount) */
   final_total?: number | string;
+  /** Optional waterfall fields — list may omit; details API always has them */
+  sub_total?: number | string | null;
+  discount_total?: number | string | null;
+  tax_total?: number | string | null;
+  tds_amount?: number | string | null;
+  upfront_interest?: number | string | null;
+  /** VF list column — Goods Receipt Note date */
+  grn_date?: string | null;
   invoice_date: string;
   request_date?: string;
   created_at?: string;

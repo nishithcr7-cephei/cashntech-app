@@ -28,9 +28,10 @@ import {
 import {
   selectActiveProductName,
   selectActiveProductCode,
+  selectEffectiveProductCode,
 } from '@store/product/product.selectors';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
-import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 
 export const StatementOfAccount: React.FC = () => {
   const navigation = useNavigation();
@@ -40,6 +41,9 @@ export const StatementOfAccount: React.FC = () => {
   const allProgramIds = useSelector(selectAllProgramIds);
   const activeProductName = useSelector(selectActiveProductName);
   const activeProductCode = useSelector(selectActiveProductCode);
+  const effectiveProductCode = useSelector(selectEffectiveProductCode);
+  const isVendorFinance = effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE;
+  const primaryPartyLabel = isVendorFinance ? 'Anchor' : 'Primary Party';
   const productBreadcrumbLabel =
     activeProductName ||
     PRODUCT_DISPLAY_NAMES[getEffectiveProductCode(activeProductCode)];
@@ -119,7 +123,7 @@ export const StatementOfAccount: React.FC = () => {
               <Text style={styles.infoValue}>{item.programName || '-'}</Text>
             </View>
             <View style={styles.infoColumn}>
-              <Text style={styles.infoLabel}>Primary Party</Text>
+              <Text style={styles.infoLabel}>{primaryPartyLabel}</Text>
               <Text style={styles.infoValue}>{item.partyName || '-'}</Text>
             </View>
             <View style={styles.infoColumn}>

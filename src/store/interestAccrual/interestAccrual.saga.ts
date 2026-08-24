@@ -1,6 +1,7 @@
 import {call, put, takeLatest} from 'redux-saga/effects';
 import {PayloadAction} from '@reduxjs/toolkit';
 import {invoiceApi} from '@services/api/invoice.api';
+import {selectOptionalProductId} from '@store/product/productContext.saga';
 import {
   fetchDailyInterestRequest,
   fetchDailyInterestSuccess,
@@ -38,11 +39,14 @@ function getApiErrorMessage(error: any, fallback: string): string {
 
 function* fetchInterestAccrualListWorker(action: PayloadAction<FetchInterestAccrualListRequest>): Generator<any, void, any> {
   try {
+    const productId: string | null =
+      action.payload.productId ?? (yield call(selectOptionalProductId));
     const response = yield call(
       invoiceApi.getDisbursedList,
       action.payload.programIds,
       {
         byInvoiceStatus: action.payload.byInvoiceStatus ?? ['Disbursed', 'Closed'],
+        productId: productId ?? undefined,
       },
     );
     yield put(fetchInterestAccrualListSuccess(response || []));

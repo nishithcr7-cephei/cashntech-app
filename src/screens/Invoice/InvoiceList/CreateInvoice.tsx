@@ -602,7 +602,7 @@ export const CreateInvoice: React.FC = () => {
     isVendorFinanceUpfront,
   ]);
 
-  // Client-confirmed VF Upfront AI = (Sub − Discount + Tax) × ROI% × (Tenor/365).
+  // VF Upfront AI = (Invoice Amount − TDS) × ROI% × (Tenor/365).
   const advanceInterestInfo = useMemo(
     () =>
       computeVendorFinanceAdvanceInterest({
@@ -611,6 +611,7 @@ export const CreateInvoice: React.FC = () => {
         subTotal: invoiceTotals.subTotal,
         discountTotal: invoiceTotals.discountTotal,
         taxTotal: invoiceTotals.taxTotal,
+        tdsAmount: invoiceTotals.tds,
         roiPercent: extractRoiPercent(selectedParticipant?.interest_parameters),
         tenorDays: fields.tenor,
       }),
@@ -620,6 +621,7 @@ export const CreateInvoice: React.FC = () => {
       invoiceTotals.subTotal,
       invoiceTotals.discountTotal,
       invoiceTotals.taxTotal,
+      invoiceTotals.tds,
       selectedParticipant,
       fields.tenor,
     ],

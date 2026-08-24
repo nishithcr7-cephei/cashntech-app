@@ -25,11 +25,14 @@ import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 import {invoiceApi, InterestAccrualKpisResponse} from '@services/api/invoice.api';
 import {
+  selectActiveProductId,
   selectActiveProductName,
   selectActiveProductCode,
+  selectEffectiveProductCode,
+  selectIsVendorFinanceActive,
 } from '@store/product/product.selectors';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
-import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 
 type InterestAccrualInvoiceRow = {
   id: string;
@@ -63,9 +66,14 @@ export const InterestAccrualsScreen: React.FC = () => {
   const allProgramIds = useSelector(selectAllProgramIds);
   const activeProductName = useSelector(selectActiveProductName);
   const activeProductCode = useSelector(selectActiveProductCode);
+  const activeProductId = useSelector(selectActiveProductId);
+  const effectiveCode = useSelector(selectEffectiveProductCode);
+  const isVendorFinance = useSelector(selectIsVendorFinanceActive);
   const productBreadcrumbLabel =
     activeProductName ||
     PRODUCT_DISPLAY_NAMES[getEffectiveProductCode(activeProductCode)];
+  const primaryPartyLabel = isVendorFinance ? 'Vendor' : 'Primary Party';
+  const counterPartyLabel = isVendorFinance ? 'Anchor' : 'Counter Party';
   const programName = programSelection?.programName ?? '';
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
@@ -74,6 +82,10 @@ export const InterestAccrualsScreen: React.FC = () => {
   const [listError, setListError] = useState<string | null>(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    setAppliedFilters({});
+  }, [isVendorFinance]);
   const programIds = useMemo(
     () =>
       programSelection?.programScope === 'all' && allProgramIds?.length
@@ -99,6 +111,25 @@ export const InterestAccrualsScreen: React.FC = () => {
   }, [programSelection?.programScope, programSelection?.programId]);
   const programIdsKey = JSON.stringify(programIds ?? []);
   const kpiProgramIdsKey = JSON.stringify(kpiProgramIds);
+
+  /** PR5/PR7 pattern: optional productId for VF list/KPI filters; omitted for DF default. */
+  const overviewProductId = useMemo(() => {
+    if (
+      programSelection?.programScope === 'selected' &&
+      programSelection?.productId
+    ) {
+      return programSelection.productId;
+    }
+    if (effectiveCode === PRODUCT_CODES.VENDOR_FINANCE && activeProductId) {
+      return activeProductId;
+    }
+    return null;
+  }, [
+    programSelection?.programScope,
+    programSelection?.productId,
+    effectiveCode,
+    activeProductId,
+  ]);
 
   const [apiKpis, setApiKpis] = useState<InterestAccrualKpisResponse | null>(null);
   const [interestList, setInterestList] = useState<any[]>([]);
@@ -128,7 +159,9 @@ export const InterestAccrualsScreen: React.FC = () => {
     setListError(null);
 
     const listPromise = invoiceApi
-      .getDisbursedList(programIds)
+      .getDisbursedList(programIds, {
+        productId: overviewProductId ?? undefined,
+      })
       .then(res => {
         if (requestId !== fetchRequestId.current) return;
         setInterestList(Array.isArray(res) ? res : []);
@@ -145,7 +178,10 @@ export const InterestAccrualsScreen: React.FC = () => {
       });
 
     const kpisPromise = invoiceApi
-      .getInterestAccrualKpis(kpiProgramIds)
+      .getInterestAccrualKpis(
+        kpiProgramIds,
+        overviewProductId ? {productId: overviewProductId} : undefined,
+      )
       .then(res => {
         if (requestId !== fetchRequestId.current) return;
         setApiKpis(res);
@@ -161,7 +197,7 @@ export const InterestAccrualsScreen: React.FC = () => {
       });
 
     await Promise.allSettled([listPromise, kpisPromise]);
-  }, [programIds, kpiProgramIds]);
+  }, [programIds, kpiProgramIds, overviewProductId]);
 
   useEffect(() => {
     fetchInterestAccrualData();
@@ -229,11 +265,11 @@ export const InterestAccrualsScreen: React.FC = () => {
     const passesProgram =
       !f['Program']?.length || f['Program']!.includes(item.programName);
     const passesPrimary =
-      !f['Primary Party']?.length ||
-      f['Primary Party']!.includes(item.primaryParty);
+      !f[primaryPartyLabel]?.length ||
+      f[primaryPartyLabel]!.includes(item.primaryParty);
     const passesCounter =
-      !f['Counter Party']?.length ||
-      f['Counter Party']!.includes(item.counterParty);
+      !f[counterPartyLabel]?.length ||
+      f[counterPartyLabel]!.includes(item.counterParty);
     return (
       passesBank &&
       passesProduct &&
@@ -313,11 +349,11 @@ export const InterestAccrualsScreen: React.FC = () => {
             <Text style={styles.infoValue}>{row.programName}</Text>
           </View>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Primary Party</Text>
+            <Text style={styles.infoLabel}>{primaryPartyLabel}</Text>
             <Text style={styles.infoValue}>{row.primaryParty}</Text>
           </View>
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Counter Party</Text>
+            <Text style={styles.infoLabel}>{counterPartyLabel}</Text>
             <Text style={styles.infoValue}>{row.counterParty}</Text>
           </View>
           <View style={styles.infoColumn}>
@@ -507,12 +543,12 @@ export const InterestAccrualsScreen: React.FC = () => {
           ].length
             ? [...new Set(rows.map(r => r.programName).filter(Boolean))]
             : ['No data'],
-          'Primary Party': [
+          [primaryPartyLabel]: [
             ...new Set(rows.map(r => r.primaryParty).filter(Boolean)),
           ].length
             ? [...new Set(rows.map(r => r.primaryParty).filter(Boolean))]
             : ['No data'],
-          'Counter Party': [
+          [counterPartyLabel]: [
             ...new Set(rows.map(r => r.counterParty).filter(Boolean)),
           ].length
             ? [...new Set(rows.map(r => r.counterParty).filter(Boolean))]

@@ -7,9 +7,6 @@ import {
   View,
   TextInput,
   ActivityIndicator,
-  Modal,
-  Pressable,
-  Dimensions,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -26,8 +23,7 @@ import {
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
-import {Search, Filter, Dots} from '@assets/Icons';
-import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
+import {Search, Filter} from '@assets/Icons';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
@@ -35,19 +31,24 @@ import {
   selectActiveProductId,
   selectActiveProductName,
   selectEffectiveProductCode,
+  selectIsVendorFinanceActive,
 } from '@store/product/product.selectors';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 import {FetchRepaymentListRequest} from '@store/repayment/repayment.types';
 import {decryptValue} from '@utils/decrypt';
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
-import {PaymentHistoryModal} from '../DPDPenalInterest/components/PaymentHistoryModal';
-import {RequestWaiverModal} from '../DPDPenalInterest/components/RequestWaiverModal';
 import {invoiceApi, RepaymentKpisResponse} from '@services/api/invoice.api';
 
 // Summary metrics for Repayment & Settlement will be dynamically built inside the component
 
-const repaymentFilterData = {
+const repaymentFilterDataDf = {
   'Primary Party': ['Sun Pharma', 'Hero Finanace', 'ABC Finance'],
+  'Bank Name': ['UGRO', 'TCL'],
+  'Loan Ref No.': ['125423', '125424', '125425'],
+};
+
+const repaymentFilterDataVf = {
+  Vendor: ['Sun Pharma', 'Hero Finanace', 'ABC Finance'],
   'Bank Name': ['UGRO', 'TCL'],
   'Loan Ref No.': ['125423', '125424', '125425'],
 };
@@ -62,12 +63,19 @@ export const RepaymentSettlementScreen: React.FC = () => {
   const effectiveCode = useSelector(selectEffectiveProductCode);
   const activeProductId = useSelector(selectActiveProductId);
   const activeProductName = useSelector(selectActiveProductName);
+  const isVendorFinance = useSelector(selectIsVendorFinanceActive);
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
+  const primaryPartyLabel = isVendorFinance ? 'Vendor' : 'Primary Party';
+  const counterPartyLabel = isVendorFinance ? 'Anchor' : 'Counter Party';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    setAppliedFilters({});
+  }, [isVendorFinance]);
   
   const dispatch = useDispatch();
   const repaymentData = useSelector(repaymentSelectors.selectRepaymentList);
@@ -98,59 +106,6 @@ export const RepaymentSettlementScreen: React.FC = () => {
     }
     return PRODUCT_DISPLAY_NAMES[effectiveCode];
   }, [activeProductName, effectiveCode]);
-
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [menuAnchor, setMenuAnchor] = useState<{x: number; y: number; width: number; height: number} | null>(null);
-  const menuButtonRefs = React.useRef<Record<string, any>>({});
-  const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
-  const [showRequestWaiverModal, setShowRequestWaiverModal] = useState(false);
-  const [selectedRow, setSelectedRow] = useState<any | null>(null);
-
-  const handleMenuToggle = (rowId: string) => {
-    if (openMenuId === rowId) {
-      setOpenMenuId(null);
-      setMenuAnchor(null);
-      return;
-    }
-    const ref = menuButtonRefs.current[rowId] as any;
-    if (ref?.measureInWindow) {
-      ref.measureInWindow((x: number, y: number, width: number, height: number) => {
-        setMenuAnchor({x, y, width, height});
-        setOpenMenuId(rowId);
-      });
-    } else {
-      setMenuAnchor(null);
-      setOpenMenuId(rowId);
-    }
-  };
-
-  const handleMenuAction = (action: string, rowId: string) => {
-    setOpenMenuId(null);
-    setMenuAnchor(null);
-    const row = filteredData.find(r => r.id === rowId) ?? null;
-    setSelectedRow(row);
-    switch (action) {
-      case 'paymentHistory':
-        setShowPaymentHistoryModal(true);
-        break;
-      case 'requestWaiver':
-        setShowRequestWaiverModal(true);
-        break;
-    }
-  };
-
-  const getMenuPosition = (anchor: {x: number; y: number; width: number; height: number} | null) => {
-    const screen = Dimensions.get('window');
-    const menuWidth = scaleWidth(200);
-    const horizontalPadding = scaleWidth(12);
-    const topPadding = scaleHeight(8);
-    if (!anchor) {
-      return {position: 'absolute' as const, top: topPadding + scaleHeight(60), right: horizontalPadding};
-    }
-    const desiredLeft = anchor.x + anchor.width - menuWidth;
-    const left = Math.max(horizontalPadding, Math.min(desiredLeft, screen.width - menuWidth - horizontalPadding));
-    return {position: 'absolute' as const, top: anchor.y + anchor.height + topPadding, left};
-  };
 
   const [apiKpis, setApiKpis] = useState<RepaymentKpisResponse | null>(null);
 
@@ -333,9 +288,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
           Products {'>'} {productBreadcrumbLabel} {'>'} Transactions
         </Text>
       </View>
-      <ScrollView 
-        contentContainerStyle={styles.content}
-        onScrollBeginDrag={() => { setOpenMenuId(null); setMenuAnchor(null); }}>
+      <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.pageTitleBar}>
           <Text style={styles.pageTitleText}>Repayment and Settlement</Text>
         </View>
@@ -413,13 +366,6 @@ export const RepaymentSettlementScreen: React.FC = () => {
                     <View style={styles.indexBadge}>
                       <Text style={styles.indexText}>{filteredData.indexOf(row) + 1}</Text>
                     </View>
-                    <TouchableOpacity
-                    ref={r => { if (r) menuButtonRefs.current[row.id] = r; }}
-                    style={styles.threeDotsButton}
-                    onPress={() => handleMenuToggle(row.id)}
-                    activeOpacity={0.7}>
-                    <Dots width={scaleWidth(20)} height={scaleHeight(20)} style={{transform: [{rotate: '90deg'}, {scale: 1.05}]}} />
-                  </TouchableOpacity>
                   <View style={styles.infoGrid}>
                     <View style={styles.infoColumn}>
                       <Text style={styles.infoLabel}>Loan Ref No.</Text>
@@ -448,11 +394,11 @@ export const RepaymentSettlementScreen: React.FC = () => {
                       <Text style={styles.infoValue}>{row.programName}</Text>
                     </View>
                     <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Primary Party</Text>
+                      <Text style={styles.infoLabel}>{primaryPartyLabel}</Text>
                       <Text style={styles.infoValue}>{row.primaryParty}</Text>
                     </View>
                     <View style={styles.infoColumn}>
-                      <Text style={styles.infoLabel}>Counter Party</Text>
+                      <Text style={styles.infoLabel}>{counterPartyLabel}</Text>
                       <Text style={styles.infoValue}>{row.counterParty}</Text>
                     </View>
                     <View style={styles.infoColumn}>
@@ -498,42 +444,8 @@ export const RepaymentSettlementScreen: React.FC = () => {
           setAppliedFilters(filters);
           setShowFilterModal(false);
         }}
-        filterData={repaymentFilterData}
+        filterData={isVendorFinance ? repaymentFilterDataVf : repaymentFilterDataDf}
         appliedFilters={appliedFilters}
-      />
-
-      <Modal transparent visible={!!openMenuId} animationType="fade" onRequestClose={() => { setOpenMenuId(null); setMenuAnchor(null); }}>
-        <Pressable style={styles.menuOverlay} onPress={() => { setOpenMenuId(null); setMenuAnchor(null); }}>
-          <Pressable style={[styles.actionMenu, getMenuPosition(menuAnchor)]} onPress={e => e.stopPropagation()}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuAction('paymentHistory', openMenuId as string)}>
-              <FontAwesome6 name="calendar-check" iconStyle="solid" color={Colors.darkblack} size={16} />
-              <Text style={styles.menuItemText}>Payment History</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => handleMenuAction('requestWaiver', openMenuId as string)}>
-              <FontAwesome6 name="calendar-check" iconStyle="solid" color={Colors.darkblack} size={16} />
-              <Text style={styles.menuItemText}>Request Waiver</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <PaymentHistoryModal
-        visible={showPaymentHistoryModal}
-        onClose={() => { setShowPaymentHistoryModal(false); setSelectedRow(null); }}
-        accountNo={selectedRow?.loanRefNo}
-      />
-
-      <RequestWaiverModal
-        visible={showRequestWaiverModal}
-        onClose={() => { setShowRequestWaiverModal(false); setSelectedRow(null); }}
-        loanRefNo={selectedRow?.loanRefNo ?? ''}
-        outstandingAmount={selectedRow?.totalOutstandingAmount?.replace('/-', '') ?? '15,556'}
-        onSubmit={data => {
-          void selectedRow?.id;
-          void data;
-          setShowRequestWaiverModal(false);
-          setSelectedRow(null);
-        }}
       />
     </Container>
   );
@@ -611,7 +523,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(12),
     padding: scaleWidth(16),
-    paddingRight: scaleWidth(50),
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E6E6E6',
     shadowColor: '#00000035',
@@ -620,11 +531,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
-  threeDotsButton: { position: 'absolute', top: scaleHeight(12), right: scaleWidth(12), width: scaleWidth(32), height: scaleWidth(32), borderRadius: scaleWidth(16), backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center', zIndex: 10 },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.1)' },
-  actionMenu: { backgroundColor: Colors.white, borderRadius: scaleWidth(8), paddingVertical: scaleHeight(8), paddingHorizontal: scaleWidth(12), minWidth: scaleWidth(180), elevation: 8, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.25, shadowRadius: 4 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: scaleWidth(12), paddingVertical: scaleHeight(8) },
-  menuItemText: { fontSize: scaleFont(14), fontFamily: Fonts.GilroyMedium, color: Colors.darkblack },
   infoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: scaleWidth(12) },
   infoColumn: { width: '47%', backgroundColor: '#F7F8FB', borderRadius: scaleWidth(10), padding: scaleWidth(12) },
   infoLabel: { fontSize: scaleFont(12), color: Colors.graybase, marginBottom: scaleHeight(4) },
