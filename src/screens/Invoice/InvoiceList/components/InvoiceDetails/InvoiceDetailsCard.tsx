@@ -9,7 +9,7 @@ import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
 import {useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
-import {isCashnTechPendingRow} from '@utils/invoiceListActionable';
+import {isPendingInvoiceApprovalRow} from '@utils/invoiceListActionable';
 
 const STATUS_COLORS = {
   ATTACHMENT_PENDING: { bg: '#FFF4E5', text: '#FF8C00' },
@@ -102,31 +102,22 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   const approvalStatusLower = (row.approvalStatus || '').toLowerCase();
   const adminStatusLower = (row.adminStatus || '').toLowerCase();
 
-  // Role-based Blue Dot Logic (Case-insensitive check)
-  const roleCheckStr = `Pending ${storedUserRole || ''}`.trim().toLowerCase();
-  const isPendingMyRole = !!storedUserRole && (approvalStatusLower === roleCheckStr || approvalStatusLower.includes(roleCheckStr));
-  
-  const rawAdminStatusLower = (row.rawAdminStatus || '').toLowerCase();
-  const isNotVerified = rawAdminStatusLower !== 'verified' && rawAdminStatusLower !== 'pending_verification' && adminStatusLower !== 'verified' && adminStatusLower !== 'pending verification';
-  
-  const rawApprovalStatusLower = (row.rawApprovalStatus || '').toLowerCase();
-  const isNotCompletedOrRejected = rawApprovalStatusLower !== 'approval_complete' && rawApprovalStatusLower !== 'completed' && !approvalStatusLower.includes('completed') && !approvalStatusLower.includes('rejected');
-
   const statusLower = (row.rawInvoiceStatus || '').toLowerCase();
-  const approvalSUpper = (row.rawApprovalStatus || '').trim().toUpperCase().replace(/_/g, ' ');
 
-  // CashnTech: same rule as pending badge / bulk select (actionable + verify perm)
-  let showPendingBlueDot = false;
-  if (isCashnTechUser) {
-    showPendingBlueDot = isCashnTechPendingRow(row, canVerify);
-  } else if (isAnchorAllAccess) {
-    showPendingBlueDot = approvalSUpper.includes('PENDING ANCHOR MAKER') || approvalSUpper.includes('PENDING ANCHOR CHECKER');
-  } else if (isDealerAllAccess) {
-    showPendingBlueDot = approvalSUpper.includes('PENDING DEALER MAKER') || approvalSUpper.includes('PENDING DEALER CHECKER');
-  } else if (storedUserRole) {
-    const expected = `PENDING ${(storedUserRole || '').trim().toUpperCase()}`;
-    showPendingBlueDot = approvalSUpper.includes(expected);
-  }
+  // Keep blue-dot in sync with top "Pending Invoice Approval" count
+  const showPendingBlueDot = isPendingInvoiceApprovalRow(row, {
+    isCashnTechUser,
+    canVerify,
+    isAnchorMaker,
+    isDealerMaker,
+    isAnchorChecker,
+    isDealerChecker,
+    isAnchorAllAccess,
+    isDealerAllAccess,
+    canApprove,
+    canReject,
+    roleLabel: storedUserRole,
+  });
 
   const showDraftOrangeDot = statusLower === 'draft';
   const showActionRequiredRedDot = statusLower === 'rejected';

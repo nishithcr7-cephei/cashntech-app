@@ -39,7 +39,11 @@ import { invoiceApi } from '@services/api/invoice.api';
 import { useHasPermission } from '@hooks/useHasPermission';
 import { PERMISSIONS } from '@constants/permissions';
 import { decryptValue } from '@utils/decrypt';
-import { resolveInvoiceRoiPercent } from '@utils/invoiceTotals';
+import {
+  computeInvoiceTaxableBase,
+  resolveInvoiceRoiPercent,
+  resolveNetDisbursementAmountFromInvoice,
+} from '@utils/invoiceTotals';
 import { resolveApprovalStatusLabel } from '@utils/invoiceStatusDisplay';
 import { formatApiInvoiceDate } from '@utils/invoiceDateFormat';
 import { mapInvoiceAttachmentsWithUrls, buildInvoiceAttachmentUrl, type InvoiceAttachmentItem } from '@utils/invoiceAttachments';
@@ -53,7 +57,7 @@ import {
   getInvoiceApprovalLevel,
   getInvoiceApprovalLevelForId,
 } from '@utils/getInvoiceApprovalLevel';
-import {isInvoiceBulkSelectable, isCashnTechPendingRow} from '@utils/invoiceListActionable';
+import {isInvoiceBulkSelectable, isPendingInvoiceApprovalRow} from '@utils/invoiceListActionable';
 import type {InvoiceListFilters} from '@store/invoice/inv.types';
 import {
   selectActiveProductName,
@@ -408,10 +412,15 @@ export function useInvoiceDetails() {
         const taxAmount = Number(data?.tax_total) || 0;
         const advanceInterest = Number(data?.upfront_interest) || 0;
         const tdsAmount = Number(data?.tds_amount) || 0;
-        const totalAmount = Number(data?.final_total ?? data?.sub_total) || 0;
+        const netDisbursementAmount = resolveNetDisbursementAmountFromInvoice(data);
+        const invoiceAmountValue = computeInvoiceTaxableBase(
+          subTotalAmount,
+          discountAmount,
+          taxAmount,
+        );
         const invoiceAmount =
-          totalAmount > 0
-            ? `Rs. ${totalAmount.toLocaleString('en-IN', {
+          invoiceAmountValue > 0
+            ? `Rs. ${invoiceAmountValue.toLocaleString('en-IN', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })} /-`
@@ -527,7 +536,7 @@ export function useInvoiceDetails() {
           taxAmount,
           advanceInterest,
           tdsAmount,
-          totalAmount,
+          netDisbursementAmount,
           roiPercent: resolveInvoiceRoiPercent(data),
           finalPayableAmount: invoiceAmount,
           finalDueDate: invoiceDueDate,
@@ -1493,7 +1502,6 @@ export function useInvoiceDetails() {
     invoiceData.forEach(row => {
       const iStatusRaw = (row.rawInvoiceStatus || '').trim();
       const approvalStatus = (row.rawApprovalStatus || '').trim();
-      const approvalS = approvalStatus.toLowerCase().replace(/_/g, ' ');
 
       // Fix 1 — Draft badge logic
       const isDraftState =
@@ -1514,50 +1522,22 @@ export function useInvoiceDetails() {
         actionRequired++;
       }
 
-      // Fix 2 — Pending Invoice Approval logic (web Ze parity)
-      if (userPartyType === 'cashntech') {
-        if (
-          isCashnTechPendingRow(
-            {
-              actionable: row.actionable,
-              rawAdminStatus: row.rawAdminStatus,
-              rawApprovalStatus: row.rawApprovalStatus,
-              rawInvoiceStatus: row.rawInvoiceStatus,
-            },
-            canVerify,
-          )
-        ) {
-          pending++;
-        }
-      } else {
-        const isMakerPendingRow =
-          (isAnchorMaker || isDealerMaker) &&
-          iStatusRaw === 'Created' &&
-          approvalStatus !== 'Pending Attachment' &&
-          approvalStatus !== 'Rejected';
-        if (isMakerPendingRow) {
-          pending++;
-          return;
-        }
-
-        const isActionable = canApprove || canReject;
-
-        if (typeof row.actionable === 'boolean') {
-          if (isActionable && row.actionable && iStatusRaw === 'Created') {
-            pending++;
-          }
-        } else {
-          // Legacy: approval_status stage matching when actionable not in list response
-          const isMyLevel =
-            approvalStatus === myApprovalLevel ||
-            (isAnchorChecker && approvalS.includes('pending anchor checker')) ||
-            (isDealerMaker && approvalS.includes('pending dealer maker')) ||
-            (isDealerChecker && approvalS.includes('pending dealer checker'));
-
-          if (isActionable && isMyLevel && iStatusRaw === 'Created') {
-            pending++;
-          }
-        }
+      // Fix 2 — Pending Invoice Approval logic (web Ze parity) — same as blue-dot
+      if (
+        isPendingInvoiceApprovalRow(row, {
+          isCashnTechUser: userPartyType === 'cashntech',
+          canVerify,
+          isAnchorMaker,
+          isDealerMaker,
+          isAnchorChecker,
+          isDealerChecker,
+          canApprove,
+          canReject,
+          roleLabel: storedUserRole,
+          approvalLevel: myApprovalLevel,
+        })
+      ) {
+        pending++;
       }
     });
 
@@ -1575,6 +1555,7 @@ export function useInvoiceDetails() {
     canReject,
     canVerify,
     approvalLevel,
+    storedUserRole,
   ]);
 
   return {

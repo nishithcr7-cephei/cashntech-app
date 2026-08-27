@@ -69,6 +69,11 @@ export type InvoiceListItemApi = {
   invoice_amount?: string;
   /** Backend returns final_total from invoice_master (= Net Disbursement, not Invoice Amount) */
   final_total?: number | string;
+  /** DRA = Invoice Amount − TDS (main DB column) */
+  final_total_after_tds?: number | string | null;
+  /** Stored net disbursement (main); prefer over recalculating from final_total */
+  net_disbursement_amount?: number | string | null;
+  netDisbursementAmount?: number | string | null;
   /** Optional waterfall fields — list may omit; details API always has them */
   sub_total?: number | string | null;
   discount_total?: number | string | null;

@@ -15,6 +15,7 @@ import {
 import {
   computeInvoiceLineAggregates,
   computeInvoiceNetTotal,
+  computeInvoiceSubTotalAfterTds,
 } from '@utils/invoiceTotals';
 
 // Unit mapping: PCS=1, KG=2, LTR=3, etc. (backend accepts any number)
@@ -145,8 +146,16 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
   const {subTotal: subtotal, discountTotal, taxTotal} =
     computeInvoiceLineAggregates(fields.items, fields);
   const tdsAmount = parseFloat(fields.tdsAmount || '0') || 0;
-  // Web Create: final_total = Sub − Disc + Tax − TDS − Advance Interest
   const upfrontInterest = parseFloat(fields.upfrontInterest || '0') || 0;
+  // DRA = Invoice Amount − TDS (backend: final_total_after_tds)
+  const finalTotalAfterTds = computeInvoiceSubTotalAfterTds(
+    subtotal,
+    discountTotal,
+    taxTotal,
+    tdsAmount,
+  );
+  // Net = DRA − Advance Interest (backend: net_disbursement_amount)
+  // Keep final_total as net for existing mobile/list semantics.
   const finalTotalValue = computeInvoiceNetTotal(
     subtotal,
     discountTotal,
@@ -212,6 +221,8 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     discount_total: Ue(discountTotal),
     tax_total: Ue(taxTotal),
     final_total: Ue(finalTotalValue),
+    final_total_after_tds: Ue(finalTotalAfterTds),
+    net_disbursement_amount: Ue(finalTotalValue),
     upfront_interest: Ue(upfrontInterest),
     tds_amount: Ue(tdsAmount),
     items,
@@ -1102,8 +1113,13 @@ export const invoiceApi = {
     const {subTotal: subtotal, discountTotal, taxTotal} =
       computeInvoiceLineAggregates(fields.items, fields);
     const tdsAmount = parseFloat(fields.tdsAmount || '0') || 0;
-    // Web Create parity: final_total includes Advance Interest deduct.
     const upfrontInterest = parseFloat(fields.upfrontInterest || '0') || 0;
+    const finalTotalAfterTds = computeInvoiceSubTotalAfterTds(
+      subtotal,
+      discountTotal,
+      taxTotal,
+      tdsAmount,
+    );
     const finalTotalValue = computeInvoiceNetTotal(
       subtotal,
       discountTotal,
@@ -1158,9 +1174,9 @@ export const invoiceApi = {
       discount_total: Ue(discountTotal),
       tax_total: Ue(taxTotal),
       final_total: Ue(finalTotalValue),
+      final_total_after_tds: Ue(finalTotalAfterTds),
+      net_disbursement_amount: Ue(finalTotalValue),
       tds_amount: Ue(tdsAmount),
-      // Backend UpdateInvoiceDto may strip this until DTO adds the field;
-      // still send for forward-compat / when whitelist allows.
       upfront_interest: Ue(upfrontInterest),
       // Add counter-party information for update
       counter_party_name: fields.dealer || '',

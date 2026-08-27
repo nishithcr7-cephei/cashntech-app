@@ -15,7 +15,11 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
 import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/AttachmentPreviewModal';
-import {AdvanceInterestFormulaModal} from '@components/AdvanceInterestFormulaModal';
+import {
+  AdvanceInterestFormulaModal,
+  DisbursementRequestedFormulaModal,
+  InvoiceAmountFormulaModal,
+} from '@components/AdvanceInterestFormulaModal';
 import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
 import {
@@ -27,6 +31,7 @@ import {toYYYYMMDD} from '@services/api/invoice.api';
 import {
   resolveAdvanceInterestFromPreview,
   resolveInvoiceRoiPercent,
+  resolveNetDisbursementAmountFromInvoice,
 } from '@utils/invoiceTotals';
 import {
   PRODUCT_CODES,
@@ -51,6 +56,8 @@ export type FinanceRequestPreview = {
   eligibility_percent?: number | string | null;
   eligible_loan_amount?: number | string | null;
   requested_loan_amount?: number | string | null;
+  net_disbursement_amount?: number | string | null;
+  netDisbursementAmount?: number | string | null;
   net_disbursal_amount?: number | string | null;
   credit_to_bank_account?: {
     id?: string | number | null;
@@ -224,6 +231,10 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showAdvanceInterestFormula, setShowAdvanceInterestFormula] =
     useState(false);
+  const [showInvoiceAmountFormula, setShowInvoiceAmountFormula] =
+    useState(false);
+  const [showDisbursementRequestedFormula, setShowDisbursementRequestedFormula] =
+    useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -231,6 +242,8 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
     setPreferredDisbursementDateInput('');
     setPreviewUrl(null);
     setShowAdvanceInterestFormula(false);
+    setShowInvoiceAmountFormula(false);
+    setShowDisbursementRequestedFormula(false);
   }, [visible, preview?.invoice_ref_no]);
 
   const display = useMemo(() => {
@@ -306,9 +319,7 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
       advanceInterest: formatAmount(
         resolveAdvanceInterestFromPreview(p, {isVendorFinance}),
       ),
-      total: formatAmount(
-        p.net_disbursal_amount ?? p.final_total ?? p.invoice_amount,
-      ),
+      total: formatAmount(resolveNetDisbursementAmountFromInvoice(p)),
       formula: {
         basicAmount: Number(p.sub_total) || 0,
         discount: Number(p.discount_total) || 0,
@@ -317,9 +328,7 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
         advanceInterest: resolveAdvanceInterestFromPreview(p, {
           isVendorFinance,
         }),
-        netDisbursementAmount:
-          Number(p.net_disbursal_amount ?? p.final_total ?? p.invoice_amount) ||
-          0,
+        netDisbursementAmount: resolveNetDisbursementAmountFromInvoice(p),
         roiPercent: resolveInvoiceRoiPercent(p),
         tenorDays: p.tenor_days ?? p.tenor,
       },
@@ -520,6 +529,12 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                           display.formula.netDisbursementAmount
                         }
                         showAdvanceInterest={isVendorFinance}
+                        onInvoiceAmountInfoPress={() =>
+                          setShowInvoiceAmountFormula(true)
+                        }
+                        onDisbursementRequestedInfoPress={() =>
+                          setShowDisbursementRequestedFormula(true)
+                        }
                         onAdvanceInterestInfoPress={() =>
                           setShowAdvanceInterestFormula(true)
                         }
@@ -646,6 +661,16 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
           amounts={display.formula}
         />
       )}
+      <InvoiceAmountFormulaModal
+        visible={showInvoiceAmountFormula}
+        onClose={() => setShowInvoiceAmountFormula(false)}
+        amounts={display.formula}
+      />
+      <DisbursementRequestedFormulaModal
+        visible={showDisbursementRequestedFormula}
+        onClose={() => setShowDisbursementRequestedFormula(false)}
+        amounts={display.formula}
+      />
     </>
   );
 };

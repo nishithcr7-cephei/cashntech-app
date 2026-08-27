@@ -312,6 +312,116 @@ export const AdvanceInterestFormulaModal: React.FC<Props> = ({
 
 
 
+export type InvoiceSummaryFormulaAmounts = {
+  basicAmount: number;
+  discount: number;
+  gstAmount: number;
+  tdsAmount?: number;
+};
+
+type SummaryFormulaModalProps = {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  lines: string[];
+};
+
+const SummaryFormulaModal: React.FC<SummaryFormulaModalProps> = ({
+  visible,
+  onClose,
+  title,
+  lines,
+}) => (
+  <Modal
+    transparent
+    visible={visible}
+    animationType="fade"
+    onRequestClose={onClose}>
+    <TouchableWithoutFeedback onPress={onClose}>
+      <View style={styles.overlay}>
+        <TouchableWithoutFeedback onPress={() => {}}>
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <Text style={styles.title}>{title}</Text>
+              <TouchableOpacity
+                onPress={onClose}
+                style={styles.closeButton}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <Text style={styles.closeText}>{'\u00d7'}</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.content}
+              showsVerticalScrollIndicator={false}>
+              <FormulaBlock last lines={lines} />
+            </ScrollView>
+          </View>
+        </TouchableWithoutFeedback>
+      </View>
+    </TouchableWithoutFeedback>
+  </Modal>
+);
+
+export const InvoiceAmountFormulaModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  amounts: Pick<
+    InvoiceSummaryFormulaAmounts,
+    'basicAmount' | 'discount' | 'gstAmount'
+  >;
+}> = ({visible, onClose, amounts}) => {
+  const invoiceAmount = computeInvoiceTaxableBase(
+    amounts.basicAmount,
+    amounts.discount,
+    amounts.gstAmount,
+  );
+
+  return (
+    <SummaryFormulaModal
+      visible={visible}
+      onClose={onClose}
+      title="Invoice Amount"
+      lines={[
+        `Invoice Amount = Basic ${MINUS} Discount + GST`,
+        `          = ${fmtMoney(amounts.basicAmount)} ${MINUS} ${fmtMoney(amounts.discount)} + ${fmtMoney(amounts.gstAmount)}`,
+        `          = ${fmtMoney(invoiceAmount)}`,
+      ]}
+    />
+  );
+};
+
+export const DisbursementRequestedFormulaModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  amounts: InvoiceSummaryFormulaAmounts;
+}> = ({visible, onClose, amounts}) => {
+  const invoiceAmount = computeInvoiceTaxableBase(
+    amounts.basicAmount,
+    amounts.discount,
+    amounts.gstAmount,
+  );
+  const requestedAmount = computeInvoiceSubTotalAfterTds(
+    amounts.basicAmount,
+    amounts.discount,
+    amounts.gstAmount,
+    amounts.tdsAmount ?? 0,
+  );
+
+  return (
+    <SummaryFormulaModal
+      visible={visible}
+      onClose={onClose}
+      title="Disbursement Requested Amount"
+      lines={[
+        `DRA = Invoice Amount ${MINUS} TDS`,
+        `    = ${fmtMoney(invoiceAmount)} ${MINUS} ${fmtMoney(amounts.tdsAmount ?? 0)}`,
+        `    = ${fmtMoney(requestedAmount)}`,
+      ]}
+    />
+  );
+};
+
 function FormulaBlock({
 
   lines,

@@ -143,6 +143,7 @@ export type DisbursementRow = {
   counterParty: string;
   invoiceAmount: string;
   invoiceDate: string;
+  grnDate: string;
   dueDate: string;
   disburseDate: string;
   utrNo: string;
@@ -217,6 +218,7 @@ function mapToDisbursementRow(item: any): DisbursementRow {
     counterPartyId,
     invoiceAmount,
     invoiceDate: formatDateDash(item.invoice_date ?? item.invoiceDate ?? ''),
+    grnDate: formatDateDash(item.grn_date ?? item.grnDate ?? ''),
     dueDate: formatDateDash(item.invoice_due_date ?? item.invoiceDueDate ?? ''),
     disburseDate: formatDateDash(
       item.disbursement_date ?? item.disbursementDate ?? '',
@@ -344,6 +346,14 @@ export const DisbursementScreen: React.FC = () => {
 
   const activeProductId = useSelector(selectActiveProductId);
   const effectiveCode = useSelector(selectEffectiveProductCode);
+  const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
+  const disbursementListTitle = isVendorFinance
+    ? 'Vendor Wise Invoice Details'
+    : isCashnTechUser
+      ? 'Invoice'
+      : isDealerMaker || isDealerChecker
+        ? 'Anchor Wise Invoice Details'
+        : 'Dealer Wise Invoice Details';
 
   /** PR5/PR7 pattern: optional productId for VF list/KPI filters; omitted for DF default. */
   const overviewProductId = useMemo(() => {
@@ -898,6 +908,54 @@ export const DisbursementScreen: React.FC = () => {
     </View>
   );
 
+  const renderGrnDateField = (row: DisbursementRow) =>
+    isVendorFinance ? (
+      <View style={styles.infoColumn}>
+        <Text style={styles.infoLabel}>GRN Date</Text>
+        <Text style={styles.infoValue}>
+          {!row.grnDate || row.grnDate === 'dd-mm-yyyy' ? '-' : row.grnDate}
+        </Text>
+      </View>
+    ) : null;
+
+  const renderAmountStatusAndUtr = (row: DisbursementRow) => (
+    <>
+      <View style={styles.infoColumn}>
+        <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+        <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
+      </View>
+      <View style={styles.infoRowPair}>
+        <View style={styles.infoColumnInPair}>
+          <Text style={styles.infoLabel}>Disbursement Amount (₹)</Text>
+          <Text style={styles.infoValue}>
+            {formatAmountInr(row.disbursedAmount)}
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.infoColumnInPair,
+            {backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg},
+          ]}>
+          <Text style={styles.infoLabel}>Invoice Status</Text>
+          <Text
+            style={[
+              styles.infoValue,
+              {
+                color: getInvoiceStatusStyles(row.invoiceStatus).text,
+                fontFamily: Fonts.GilroySemiBold,
+              },
+            ]}>
+            {row.invoiceStatus}
+          </Text>
+        </View>
+      </View>
+      <View style={[styles.infoColumn, styles.infoColumnUtr]}>
+        <Text style={styles.infoLabel}>UTR No.</Text>
+        <Text style={styles.infoValue}>{row.utrNo}</Text>
+      </View>
+    </>
+  );
+
 
   const renderDisbursementRow = ({item: row, index}: {item: DisbursementRow; index: number}) => {
     const isSelected = selectedBulkIds.has(row.id);
@@ -957,7 +1015,7 @@ export const DisbursementScreen: React.FC = () => {
           <View style={styles.infoGrid}>
           {isAnchorMaker ? (
             <>
-              {/* Anchor Maker Order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Date → Due Date → Disbursement Date → Invoice Amount (₹) → Disbursement Amount (₹) → UTR No. → Invoice Status */}
+              {/* Anchor Maker Order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Date → GRN Date (VF) → Due Date → Disbursement Date → Invoice Amount (₹) → Disbursement Amount (₹) → UTR No. → Invoice Status */}
               {renderInvoiceNoField(row)}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Bank Name</Text>
@@ -979,6 +1037,7 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoLabel}>Invoice Date</Text>
                 <Text style={styles.infoValue}>{row.invoiceDate}</Text>
               </View>
+              {renderGrnDateField(row)}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Due Date</Text>
                 <Text style={styles.infoValue}>{row.dueDate}</Text>
@@ -987,26 +1046,7 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoLabel}>Disbursement Date</Text>
                 <Text style={styles.infoValue}>{row.disburseDate}</Text>
               </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Disbursement Amount (₹)</Text>
-                <Text style={styles.infoValue}>
-                  {formatAmountInr(row.disbursedAmount)}
-                </Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>UTR No.</Text>
-                <Text style={styles.infoValue}>{row.utrNo}</Text>
-              </View>
-              <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
-                <Text style={styles.infoLabel}>Invoice Status</Text>
-                <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
-                  {row.invoiceStatus}
-                </Text>
-              </View>
+              {renderAmountStatusAndUtr(row)}
             </>
           ) : isAnchorChecker ? (
             <>
@@ -1031,6 +1071,7 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoLabel}>Invoice Date</Text>
                 <Text style={styles.infoValue}>{row.invoiceDate}</Text>
               </View>
+              {renderGrnDateField(row)}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Due Date</Text>
                 <Text style={styles.infoValue}>{row.dueDate}</Text>
@@ -1039,26 +1080,7 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoLabel}>Disbursement Date</Text>
                 <Text style={styles.infoValue}>{row.disburseDate}</Text>
               </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Disbursement Amount (₹)</Text>
-                <Text style={styles.infoValue}>
-                  {formatAmountInr(row.disbursedAmount)}
-                </Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>UTR No.</Text>
-                <Text style={styles.infoValue}>{row.utrNo}</Text>
-              </View>
-              <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
-                <Text style={styles.infoLabel}>Invoice Status</Text>
-                <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
-                  {row.invoiceStatus}
-                </Text>
-              </View>
+              {renderAmountStatusAndUtr(row)}
             </>
           ) : (
             <>
@@ -1091,6 +1113,7 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoLabel}>Invoice Date</Text>
                 <Text style={styles.infoValue}>{row.invoiceDate}</Text>
               </View>
+              {renderGrnDateField(row)}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Due Date</Text>
                 <Text style={styles.infoValue}>{row.dueDate}</Text>
@@ -1099,26 +1122,7 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoLabel}>Disbursement Date</Text>
                 <Text style={styles.infoValue}>{row.disburseDate}</Text>
               </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Disbursement Amount (₹)</Text>
-                <Text style={styles.infoValue}>
-                  {formatAmountInr(row.disbursedAmount)}
-                </Text>
-              </View>
-              <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>UTR No.</Text>
-                <Text style={styles.infoValue}>{row.utrNo}</Text>
-              </View>
-              <View style={[styles.infoColumn, { backgroundColor: getInvoiceStatusStyles(row.invoiceStatus).bg }]}>
-                <Text style={styles.infoLabel}>Invoice Status</Text>
-                <Text style={[styles.infoValue, { color: getInvoiceStatusStyles(row.invoiceStatus).text, fontFamily: Fonts.GilroySemiBold }]}>
-                  {row.invoiceStatus}
-                </Text>
-              </View>
+              {renderAmountStatusAndUtr(row)}
             </>
           )}
         </View>
@@ -1186,7 +1190,7 @@ export const DisbursementScreen: React.FC = () => {
               <>
                 {!(isDealerMaker || isDealerChecker) && (
                   <View style={styles.invoicesHeader}>
-                    <Text style={styles.invoicesLabel}>Invoice</Text>
+                    <Text style={styles.invoicesLabel}>{disbursementListTitle}</Text>
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>{filteredData.length}</Text>
                     </View>
@@ -1254,7 +1258,7 @@ export const DisbursementScreen: React.FC = () => {
                 </View>
                 {(isDealerMaker || isDealerChecker) && (
                   <View style={[styles.invoicesHeader, {marginTop: scaleHeight(12)}]}>
-                    <Text style={styles.invoicesLabel}>Invoice</Text>
+                    <Text style={styles.invoicesLabel}>{disbursementListTitle}</Text>
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>{filteredData.length}</Text>
                     </View>
@@ -1636,8 +1640,8 @@ const styles = StyleSheet.create({
   listCard: {
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(12),
-    padding: scaleWidth(16),
-    paddingRight: scaleWidth(50),
+    padding: scaleWidth(14),
+    paddingRight: scaleWidth(44),
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E6E6E6',
     shadowColor: '#00000035',
@@ -1733,13 +1737,30 @@ const styles = StyleSheet.create({
   infoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scaleWidth(12),
+    justifyContent: 'space-between',
+    rowGap: scaleHeight(10),
   },
   infoColumn: {
-    width: '47%',
+    width: '48.8%',
     backgroundColor: '#F7F8FB',
     borderRadius: scaleWidth(10),
-    padding: scaleWidth(12),
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: scaleWidth(10),
+  },
+  infoRowPair: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  infoColumnInPair: {
+    width: '48.8%',
+    backgroundColor: '#F7F8FB',
+    borderRadius: scaleWidth(10),
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: scaleWidth(10),
+  },
+  infoColumnUtr: {
+    width: '70%',
   },
   infoLabel: {
     fontSize: scaleFont(12),
@@ -1750,6 +1771,7 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(14),
     color: Colors.darkblack,
     fontFamily: Fonts.GilroyMedium,
+    flexShrink: 1,
   },
   linkText: {
     color: Colors.primaryColor,

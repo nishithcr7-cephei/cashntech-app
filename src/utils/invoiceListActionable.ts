@@ -254,6 +254,83 @@ export function isCashnTechPendingRow(
   return isPendingVerificationStatus(row.rawAdminStatus);
 }
 
+type PendingApprovalDotContext = {
+  isCashnTechUser?: boolean;
+  canVerify?: boolean;
+  isAnchorMaker?: boolean;
+  isDealerMaker?: boolean;
+  isAnchorChecker?: boolean;
+  isDealerChecker?: boolean;
+  isAnchorAllAccess?: boolean;
+  isDealerAllAccess?: boolean;
+  canApprove?: boolean;
+  canReject?: boolean;
+  /** ROLE_LABELS value, e.g. "Anchor Checker" */
+  roleLabel?: string;
+  /** Workflow approval level string when present */
+  approvalLevel?: string;
+};
+
+/**
+ * Same rules as invoice-list "Pending Invoice Approval" badge count.
+ * Use for blue-dot on list cards so count and dots stay in sync.
+ */
+export function isPendingInvoiceApprovalRow(
+  row: ActionableRow,
+  context: PendingApprovalDotContext,
+): boolean {
+  if (context.isCashnTechUser) {
+    return isCashnTechPendingRow(row, !!context.canVerify);
+  }
+
+  const iStatusRaw = (row.rawInvoiceStatus || '').trim();
+  const approvalStatus = (row.rawApprovalStatus || '').trim();
+  const approvalS = approvalStatus.toLowerCase().replace(/_/g, ' ');
+  const approvalSUpper = approvalStatus.toUpperCase().replace(/_/g, ' ');
+
+  // Maker: Created invoices already in approval flow
+  if (
+    (context.isAnchorMaker || context.isDealerMaker) &&
+    iStatusRaw === 'Created' &&
+    approvalStatus !== 'Pending Attachment' &&
+    approvalStatus !== 'Rejected'
+  ) {
+    return true;
+  }
+
+  const isActionablePerm = !!(context.canApprove || context.canReject);
+
+  if (typeof row.actionable === 'boolean') {
+    return isActionablePerm && row.actionable === true && iStatusRaw === 'Created';
+  }
+
+  if (context.isAnchorAllAccess) {
+    return (
+      iStatusRaw === 'Created' &&
+      (approvalSUpper.includes('PENDING ANCHOR MAKER') ||
+        approvalSUpper.includes('PENDING ANCHOR CHECKER'))
+    );
+  }
+  if (context.isDealerAllAccess) {
+    return (
+      iStatusRaw === 'Created' &&
+      (approvalSUpper.includes('PENDING DEALER MAKER') ||
+        approvalSUpper.includes('PENDING DEALER CHECKER'))
+    );
+  }
+
+  const myApprovalLevel = String(context.approvalLevel || '');
+  const roleLabel = (context.roleLabel || '').trim().toUpperCase();
+  const isMyLevel =
+    (!!myApprovalLevel && approvalStatus === myApprovalLevel) ||
+    (context.isAnchorChecker && approvalS.includes('pending anchor checker')) ||
+    (context.isDealerMaker && approvalS.includes('pending dealer maker')) ||
+    (context.isDealerChecker && approvalS.includes('pending dealer checker')) ||
+    (!!roleLabel && approvalSUpper.includes(`PENDING ${roleLabel}`));
+
+  return isActionablePerm && isMyLevel && iStatusRaw === 'Created';
+}
+
 export function readActionableFromApi(
   item: InvoiceListItemApi,
 ): boolean | undefined {

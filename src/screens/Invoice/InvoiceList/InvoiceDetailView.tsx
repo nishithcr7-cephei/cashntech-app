@@ -15,7 +15,11 @@ import {selectProgramSelection} from '@store/programSelection/programSelection.s
 import {selectInvoiceList} from '@store/invoice/inv.selector';
 import {selectIsVendorFinanceActive} from '@store/product/product.selectors';
 import {AppBar, Container, UploadModal} from '@components/index';
-import {AdvanceInterestFormulaModal} from '@components/AdvanceInterestFormulaModal';
+import {
+  AdvanceInterestFormulaModal,
+  DisbursementRequestedFormulaModal,
+  InvoiceAmountFormulaModal,
+} from '@components/AdvanceInterestFormulaModal';
 import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -28,7 +32,10 @@ import {formatStatus} from './components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
 import {mapInvoiceAttachmentsWithUrls, openInvoiceAttachment} from '@utils/invoiceAttachments';
-import {resolveInvoiceRoiPercent} from '@utils/invoiceTotals';
+import {
+  resolveInvoiceRoiPercent,
+  resolveNetDisbursementAmountFromInvoice,
+} from '@utils/invoiceTotals';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 
 const fmtAmount = (n: number) =>
@@ -38,6 +45,12 @@ const displayOrDash = (val?: string | number | null) => {
   if (val === undefined || val === null) return '-';
   const s = String(val).trim();
   return s !== '' ? s : '-';
+};
+
+const displayEarlyPaymentDiscount = (val?: string | number | null) => {
+  const raw = String(val ?? '').trim();
+  if (!raw || raw === '0') return '-';
+  return raw.includes('%') ? raw : `${raw}%`;
 };
 
 type AttachmentItem = {id: number; attachment_url: string; fullUrl: string};
@@ -74,7 +87,7 @@ type InvoiceDetailData = {
   creditTo: string;
   workflowMethod: string;
   currency: string;
-  earlyPaymentDiscount: number;
+  earlyPaymentDiscount: string;
   subTotal: number;
   items: InvoiceItemRow[];
   discount: {percent: number; amount: number};
@@ -109,7 +122,7 @@ const defaultInvoiceData: InvoiceDetailData = {
   creditTo: '',
   workflowMethod: '',
   currency: 'INR',
-  earlyPaymentDiscount: 0,
+  earlyPaymentDiscount: '',
   subTotal: 0,
   items: [],
   discount: {percent: 0, amount: 0},
@@ -196,6 +209,10 @@ export const InvoiceDetailView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAdvanceInterestFormula, setShowAdvanceInterestFormula] =
+    useState(false);
+  const [showInvoiceAmountFormula, setShowInvoiceAmountFormula] =
+    useState(false);
+  const [showDisbursementRequestedFormula, setShowDisbursementRequestedFormula] =
     useState(false);
 
   const rawInvoiceId = route?.params?.invoiceId || '';
@@ -313,6 +330,7 @@ export const InvoiceDetailView: React.FC = () => {
         const taxTotal = Number(data?.tax_total) || 0;
         const discountTotal = Number(data?.discount_total) || 0;
         const finalTotal = Number(data?.final_total) || 0;
+        const netDisbursementAmount = resolveNetDisbursementAmountFromInvoice(data);
         const tdsAmount = Number(data?.tds_amount) || 0;
         const advanceInterest = Number(data?.upfront_interest) || 0;
         const productName = String(
@@ -393,7 +411,11 @@ export const InvoiceDetailView: React.FC = () => {
           workflowMethod:
             apm?.program?.method || data?.program?.method || data?.workflow_method || '',
           currency: data?.currency || 'INR',
-          earlyPaymentDiscount: Number(data?.early_payment_discount) || 0,
+          earlyPaymentDiscount:
+            data?.early_payment_discount != null &&
+            String(data.early_payment_discount).trim() !== ''
+              ? String(data.early_payment_discount).trim()
+              : '',
           subTotal,
           items,
           discount: {percent: discountPercent, amount: discountTotal},
@@ -403,7 +425,7 @@ export const InvoiceDetailView: React.FC = () => {
           showAdvanceInterest,
           isVendorFinance: isVendorFinanceInvoice,
           roiPercent: resolveInvoiceRoiPercent(data),
-          total: finalTotal,
+          total: netDisbursementAmount || finalTotal,
           attachments,
           invoiceStatus: formatStatus(
             data?.invoice_status || listInvoiceStatus || listRowForInvoice?.invoice_status || '',
@@ -658,6 +680,19 @@ export const InvoiceDetailView: React.FC = () => {
             />
           </View>
 
+          <Text style={styles.sectionTitle}>Additional Information</Text>
+          <View style={styles.detailsTable}>
+            <DetailRow
+              label="Early Payment Discount"
+              value={displayEarlyPaymentDiscount(invoiceData.earlyPaymentDiscount)}
+            />
+            <DetailRow
+              label="Remark"
+              value={displayOrDash(invoiceData.remark)}
+              isLast
+            />
+          </View>
+
           <Text style={styles.sectionTitle}>Items</Text>
           {invoiceData.items.length === 0 ? (
             <Text style={styles.emptyHint}>No items found</Text>
@@ -705,6 +740,10 @@ export const InvoiceDetailView: React.FC = () => {
             advanceInterest={invoiceData.advanceInterest}
             netDisbursementAmount={invoiceData.total}
             showAdvanceInterest={invoiceData.showAdvanceInterest}
+            onInvoiceAmountInfoPress={() => setShowInvoiceAmountFormula(true)}
+            onDisbursementRequestedInfoPress={() =>
+              setShowDisbursementRequestedFormula(true)
+            }
             onAdvanceInterestInfoPress={() =>
               setShowAdvanceInterestFormula(true)
             }
@@ -777,6 +816,25 @@ export const InvoiceDetailView: React.FC = () => {
           advanceInterest: invoiceData.advanceInterest,
           roiPercent: invoiceData.roiPercent,
           tenorDays: invoiceData.tenorDays,
+        }}
+      />
+      <InvoiceAmountFormulaModal
+        visible={showInvoiceAmountFormula}
+        onClose={() => setShowInvoiceAmountFormula(false)}
+        amounts={{
+          basicAmount: invoiceData.subTotal,
+          discount: invoiceData.discount.amount,
+          gstAmount: invoiceData.tax.amount,
+        }}
+      />
+      <DisbursementRequestedFormulaModal
+        visible={showDisbursementRequestedFormula}
+        onClose={() => setShowDisbursementRequestedFormula(false)}
+        amounts={{
+          basicAmount: invoiceData.subTotal,
+          discount: invoiceData.discount.amount,
+          gstAmount: invoiceData.tax.amount,
+          tdsAmount: invoiceData.tdsAmount,
         }}
       />
     </Container>

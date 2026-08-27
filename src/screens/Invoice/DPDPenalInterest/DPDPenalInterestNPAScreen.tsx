@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -30,10 +31,12 @@ import {
   selectActiveProductId,
   selectActiveProductName,
   selectEffectiveProductCode,
+  selectIsVendorFinanceActive,
 } from '@store/product/product.selectors';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 import {FetchDPDListRequest} from '@store/dpd/dpd.types';
 import {invoiceApi, DpdKpisResponse} from '@services/api/invoice.api';
+import {decryptValue} from '@utils/decrypt';
 
 // DPD Metrics will be dynamically populated in the component
 
@@ -57,10 +60,20 @@ const BUCKET_VALUE_MAP: Record<string, string> = {
 };
 
 const formatDate = (dateStr?: string) => {
-  if (!dateStr) return '';
+  if (!dateStr) return '-';
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
   return `${d.getDate().toString().padStart(2, '0')}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getFullYear()}`;
+};
+
+const formatMoney = (value?: string | number | null) => {
+  if (value == null || value === '') return '-';
+  const num = Number(value);
+  if (!Number.isFinite(num)) return String(value);
+  return `₹${num.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 };
 
 export const DPDPenalInterestNPAScreen: React.FC = () => {
@@ -73,8 +86,11 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
   const effectiveCode = useSelector(selectEffectiveProductCode);
   const activeProductId = useSelector(selectActiveProductId);
   const activeProductName = useSelector(selectActiveProductName);
+  const isVendorFinance = useSelector(selectIsVendorFinanceActive);
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
+  const primaryPartyLabel = isVendorFinance ? 'Vendor' : 'Primary Party';
+  const counterPartyLabel = isVendorFinance ? 'Anchor' : 'Counter Party';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -82,6 +98,7 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
 
   const dispatch = useDispatch();
   const dpdRows = useSelector(dpdSelectors.selectDPDList);
+  const loading = useSelector(dpdSelectors.selectDPDLoading);
 
   const [apiKpis, setApiKpis] = useState<DpdKpisResponse | null>(null);
 
@@ -360,84 +377,273 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
         )}
 
         <View style={styles.verticalList}>
-          {filteredData.map((row, index) => (
+          {loading ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator size="large" color={Colors.primaryColor} />
+            </View>
+          ) : filteredData.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>NO DATA</Text>
+            </View>
+          ) : (
+            filteredData.map((row, index) => (
             <View key={row.id} style={styles.cardWrapper}>
               <View style={styles.listCard}>
                 <View style={styles.indexBadge}>
                   <Text style={styles.indexText}>{index + 1}</Text>
                 </View>
                 <View style={styles.infoGrid}>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Loan Ref No.</Text>
-                    <Text style={styles.infoValue}>{row.loan_ref_no ?? '-'}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice No.</Text>
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => handleInvoiceNoPress(row)}
-                      disabled={!row.id || !row.invoice_ref_no}>
-                      <Text style={[styles.infoValue, styles.linkText]}>
-                        {row.invoice_ref_no ?? '-'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Program Name</Text>
-                    <Text style={styles.infoValue}>{row.program_name ?? '-'}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice Date</Text>
-                    <Text style={styles.infoValue}>{formatDate(row.invoice_date) || '-'}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Due Date</Text>
-                    <Text style={styles.infoValue}>{formatDate(row.invoice_due_date) || '-'}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Disbursement Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.disbursed_amount ?? '-'}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Invoice Accrued Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.interest_accrued ?? '-'}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>Disbursed Amount</Text>
-                    <Text style={styles.infoValue}>{row.disbursed_amount ?? '-'}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>DPD Days</Text>
-                    <Text style={styles.infoValue}>
-                      {row.dpd_days != null ? String(row.dpd_days) : '-'}
-                    </Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>O/S Principal Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.outstanding_principal ?? '-'}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>O/S Interest Accrued Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.interest_accrued ?? '-'}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>O/S Penal Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.penal_interest ?? '-'}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>O/S Total Amount (₹)</Text>
-                    <Text style={styles.infoValue}>{row.total_outstanding ?? '-'}</Text>
-                  </View>
-                  <View style={styles.infoColumn}>
-                    <Text style={styles.infoLabel}>NPA Status</Text>
-                    <Text style={[styles.infoValue, {color: row.npa_status === true ? Colors.red : row.npa_status === false ? Colors.green : Colors.darkblack}]}>
-                      {row.npa_status === true ? 'Yes' : row.npa_status === false ? 'No' : '-'}
-                    </Text>
-                  </View>
+                  {isVendorFinance ? (
+                    <>
+                      {/* VF DPD web labels: Invoice No → Bank → Product → Vendor → Anchor → Invoice Date → GRN Date → Due Date → Disbursement Date → Invoice Amount → Disbursed Amount → DPD Days → O/S Principal → O/S Interest Accrued → O/S Penal → O/S Total → NPA Status */}
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Invoice No</Text>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => handleInvoiceNoPress(row)}
+                          disabled={!row.id || !row.invoice_ref_no}>
+                          <Text style={[styles.infoValue, styles.linkText]}>
+                            {row.invoice_ref_no ?? '-'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Bank Name</Text>
+                        <Text style={styles.infoValue}>
+                          {row.bankName ?? row.bank_name ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Product Name</Text>
+                        <Text style={styles.infoValue}>
+                          {row.productName ?? row.name ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>{primaryPartyLabel}</Text>
+                        <Text style={styles.infoValue}>
+                          {decryptValue(row.counterPartyName ?? '') || '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>{counterPartyLabel}</Text>
+                        <Text style={styles.infoValue}>
+                          {decryptValue(row.partyName ?? '') || '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Invoice Date</Text>
+                        <Text style={styles.infoValue}>
+                          {formatDate(row.invoice_date)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>GRN Date</Text>
+                        <Text style={styles.infoValue}>
+                          {formatDate(row.grn_date)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Due Date</Text>
+                        <Text style={styles.infoValue}>
+                          {formatDate(row.invoice_due_date)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Disbursement Date</Text>
+                        <Text style={styles.infoValue}>
+                          {formatDate(row.disbursement_date)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                        <Text style={styles.infoValue}>
+                          {formatMoney(row.final_total)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Disbursed Amount</Text>
+                        <Text style={styles.infoValue}>
+                          {formatMoney(row.disbursed_amount)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>DPD Days</Text>
+                        <Text style={styles.infoValue}>
+                          {row.dpd_days != null ? String(row.dpd_days) : '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>
+                          O/S Principal Amount (₹)
+                        </Text>
+                        <Text style={styles.infoValue}>
+                          {formatMoney(row.outstanding_principal)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>
+                          O/S Interest Accrued Amount (₹)
+                        </Text>
+                        <Text style={styles.infoValue}>
+                          {formatMoney(row.interest_accrued)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>O/S Penal Amount (₹)</Text>
+                        <Text style={styles.infoValue}>
+                          {formatMoney(row.penal_interest)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>O/S Total Amount (₹)</Text>
+                        <Text style={styles.infoValue}>
+                          {formatMoney(row.total_outstanding)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>NPA Status</Text>
+                        <Text
+                          style={[
+                            styles.infoValue,
+                            {
+                              color:
+                                row.npa_status === true
+                                  ? Colors.red
+                                  : row.npa_status === false
+                                    ? Colors.green
+                                    : Colors.darkblack,
+                            },
+                          ]}>
+                          {row.npa_status === true
+                            ? 'Yes'
+                            : row.npa_status === false
+                              ? 'No'
+                              : '-'}
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Loan Ref No.</Text>
+                        <Text style={styles.infoValue}>
+                          {row.loan_ref_no ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Invoice No.</Text>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => handleInvoiceNoPress(row)}
+                          disabled={!row.id || !row.invoice_ref_no}>
+                          <Text style={[styles.infoValue, styles.linkText]}>
+                            {row.invoice_ref_no ?? '-'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Program Name</Text>
+                        <Text style={styles.infoValue}>
+                          {row.program_name ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Invoice Date</Text>
+                        <Text style={styles.infoValue}>
+                          {formatDate(row.invoice_date)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Due Date</Text>
+                        <Text style={styles.infoValue}>
+                          {formatDate(row.invoice_due_date)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>
+                          Disbursement Amount (₹)
+                        </Text>
+                        <Text style={styles.infoValue}>
+                          {row.disbursed_amount ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>
+                          Invoice Accrued Amount (₹)
+                        </Text>
+                        <Text style={styles.infoValue}>
+                          {row.interest_accrued ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Disbursed Amount</Text>
+                        <Text style={styles.infoValue}>
+                          {row.disbursed_amount ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>DPD Days</Text>
+                        <Text style={styles.infoValue}>
+                          {row.dpd_days != null ? String(row.dpd_days) : '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>
+                          O/S Principal Amount (₹)
+                        </Text>
+                        <Text style={styles.infoValue}>
+                          {row.outstanding_principal ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>
+                          O/S Interest Accrued Amount (₹)
+                        </Text>
+                        <Text style={styles.infoValue}>
+                          {row.interest_accrued ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>O/S Penal Amount (₹)</Text>
+                        <Text style={styles.infoValue}>
+                          {row.penal_interest ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>O/S Total Amount (₹)</Text>
+                        <Text style={styles.infoValue}>
+                          {row.total_outstanding ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>NPA Status</Text>
+                        <Text
+                          style={[
+                            styles.infoValue,
+                            {
+                              color:
+                                row.npa_status === true
+                                  ? Colors.red
+                                  : row.npa_status === false
+                                    ? Colors.green
+                                    : Colors.darkblack,
+                            },
+                          ]}>
+                          {row.npa_status === true
+                            ? 'Yes'
+                            : row.npa_status === false
+                              ? 'No'
+                              : '-'}
+                        </Text>
+                      </View>
+                    </>
+                  )}
                 </View>
               </View>
             </View>
-          ))}
+          ))
+          )}
         </View>
       </ScrollView>
 
@@ -495,6 +701,17 @@ const styles = StyleSheet.create({
   filterButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primaryColor, paddingHorizontal: scaleWidth(16), paddingVertical: scaleHeight(12), borderRadius: scaleWidth(12), gap: scaleWidth(6) },
   filterButtonText: { color: Colors.white, fontSize: scaleFont(14), fontFamily: Fonts.GilroySemiBold },
   verticalList: { gap: scaleHeight(12) },
+  emptyState: {
+    paddingVertical: scaleHeight(40),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    fontSize: scaleFont(16),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.graybase,
+    letterSpacing: 0.5,
+  },
   cardWrapper: { position: 'relative' },
   listCard: {
     backgroundColor: Colors.white,

@@ -22,11 +22,15 @@ import {
 } from '@store/product/product.types';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
 import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/AttachmentPreviewModal';
-import {AdvanceInterestFormulaModal} from '@components/AdvanceInterestFormulaModal';
+import {
+  AdvanceInterestFormulaModal,
+  DisbursementRequestedFormulaModal,
+  InvoiceAmountFormulaModal,
+} from '@components/AdvanceInterestFormulaModal';
 import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
 import {calculateInvoiceDueDate} from '@utils/invoiceDueDate';
-import {computeInvoiceNetTotal} from '@utils/invoiceTotals';
+import {resolveNetDisbursementAmountFromInvoice} from '@utils/invoiceTotals';
 import {InvoiceStatusBadges} from '@components/InvoiceStatusBadges';
 import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
 import {fileNameFromAttachmentUrl} from '@utils/invoiceAttachments';
@@ -80,6 +84,7 @@ export type ApproveRejectInvoiceDetails = {
   advanceInterest?: number;
   tdsAmount?: number;
   totalAmount?: number;
+  netDisbursementAmount?: number;
   roiPercent?: number;
   items?: ApproveRejectInvoiceItem[];
   attachments?: ApproveRejectAttachment[];
@@ -256,6 +261,10 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [showAdvanceInterestFormula, setShowAdvanceInterestFormula] =
+    useState(false);
+  const [showInvoiceAmountFormula, setShowInvoiceAmountFormula] =
+    useState(false);
+  const [showDisbursementRequestedFormula, setShowDisbursementRequestedFormula] =
     useState(false);
 
   const effectiveCode = getEffectiveProductCode(productCode);
@@ -600,19 +609,24 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                       tdsAmount={details.tdsAmount ?? 0}
                       advanceInterest={details.advanceInterest ?? 0}
                       netDisbursementAmount={
-                        details.totalAmount != null
-                          ? details.totalAmount
-                          : computeInvoiceNetTotal(
-                              details.subTotalAmount ?? 0,
-                              details.discountAmount ?? 0,
-                              details.taxAmount ?? 0,
-                              details.tdsAmount ?? 0,
-                              showAdvanceInterest
-                                ? details.advanceInterest ?? 0
-                                : 0,
-                            )
+                        details.netDisbursementAmount ??
+                        resolveNetDisbursementAmountFromInvoice({
+                          net_disbursal_amount: undefined,
+                          final_total: details.totalAmount,
+                          upfront_interest: details.advanceInterest,
+                          sub_total: details.subTotalAmount,
+                          discount_total: details.discountAmount,
+                          tax_total: details.taxAmount,
+                          tds_amount: details.tdsAmount,
+                        })
                       }
                       showAdvanceInterest={showAdvanceInterest}
+                      onInvoiceAmountInfoPress={() =>
+                        setShowInvoiceAmountFormula(true)
+                      }
+                      onDisbursementRequestedInfoPress={() =>
+                        setShowDisbursementRequestedFormula(true)
+                      }
                       onAdvanceInterestInfoPress={() =>
                         setShowAdvanceInterestFormula(true)
                       }
@@ -840,6 +854,25 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
         advanceInterest: details.advanceInterest ?? 0,
         roiPercent: details.roiPercent,
         tenorDays: details.tenorDays,
+      }}
+    />
+    <InvoiceAmountFormulaModal
+      visible={showInvoiceAmountFormula}
+      onClose={() => setShowInvoiceAmountFormula(false)}
+      amounts={{
+        basicAmount: details.subTotalAmount ?? 0,
+        discount: details.discountAmount ?? 0,
+        gstAmount: details.taxAmount ?? 0,
+      }}
+    />
+    <DisbursementRequestedFormulaModal
+      visible={showDisbursementRequestedFormula}
+      onClose={() => setShowDisbursementRequestedFormula(false)}
+      amounts={{
+        basicAmount: details.subTotalAmount ?? 0,
+        discount: details.discountAmount ?? 0,
+        gstAmount: details.taxAmount ?? 0,
+        tdsAmount: details.tdsAmount ?? 0,
       }}
     />
     </>

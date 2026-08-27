@@ -3,18 +3,26 @@ export type DPDRecord = {
   invoice_ref_no?: string;
   loan_ref_no?: string;
   invoice_date?: string;
+  grn_date?: string;
   invoice_due_date?: string;
-  disbursed_amount?: string;
-  total_outstanding?: string;
+  disbursement_date?: string;
+  final_total?: number | string;
+  disbursed_amount?: number | string;
+  total_outstanding?: number | string;
   invoice_status?: string;
+  bank_name?: string;
+  bankName?: string;
+  name?: string;
+  productName?: string;
   program_name?: string;
   partyName?: string;
   counterPartyName?: string;
-  outstanding_principal?: string;
+  outstanding_principal?: number | string;
+  upfront_interest?: number | string;
   dpd_days?: number;
   npa_status?: any;
-  interest_accrued?: string;
-  penal_interest?: string;
+  interest_accrued?: number | string;
+  penal_interest?: number | string;
 };
 
 export type DPDState = {

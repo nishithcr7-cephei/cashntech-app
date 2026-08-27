@@ -118,6 +118,58 @@ export function computeInvoiceSubTotalAfterTds(
   );
 }
 
+export type InvoiceNetDisbursementSource = {
+  /** DB / getInvoiceDetails (main) */
+  net_disbursement_amount?: number | string | null;
+  /** CamelCase alias on some list queries */
+  netDisbursementAmount?: number | string | null;
+  /** Legacy finance-preview computed field */
+  net_disbursal_amount?: number | string | null;
+  final_total?: number | string | null;
+  upfront_interest?: number | string | null;
+  sub_total?: number | string | null;
+  discount_total?: number | string | null;
+  tax_total?: number | string | null;
+  tds_amount?: number | string | null;
+};
+
+/**
+ * Net Disbursement from API fields only.
+ * `final_total` is not always net (often Invoice Amount or DRA) — do not use it alone.
+ */
+export function resolveNetDisbursementAmountFromInvoice(
+  data: InvoiceNetDisbursementSource | null | undefined,
+): number {
+  if (!data) return 0;
+
+  const netFromApi = Number(
+    data.net_disbursement_amount ??
+      data.netDisbursementAmount ??
+      data.net_disbursal_amount,
+  );
+  if (Number.isFinite(netFromApi) && netFromApi >= 0) {
+    return round2(netFromApi);
+  }
+
+  const upfront = Number(data.upfront_interest) || 0;
+  const sub = Number(data.sub_total);
+  if (Number.isFinite(sub) && sub > 0) {
+    const dra = computeInvoiceSubTotalAfterTds(
+      sub,
+      Number(data.discount_total) || 0,
+      Number(data.tax_total) || 0,
+      Number(data.tds_amount) || 0,
+    );
+    return round2(Math.max(0, upfront > 0 ? dra - upfront : dra));
+  }
+
+  const finalTotal = Number(data.final_total);
+  if (Number.isFinite(finalTotal) && finalTotal > 0) {
+    return round2(Math.max(0, finalTotal - upfront));
+  }
+  return 0;
+}
+
 export function isTdsPartyTaxName(name: string | undefined | null): boolean {
   return String(name || '')
     .toLowerCase()
@@ -215,6 +267,8 @@ type InvoiceAmountPreview = {
   upfront_interest_amount?: number | string | null;
   upfront_interest?: number | string | null;
   eligible_loan_amount?: number | string | null;
+  net_disbursement_amount?: number | string | null;
+  netDisbursementAmount?: number | string | null;
   net_disbursal_amount?: number | string | null;
   sub_total?: number | string | null;
   discount_total?: number | string | null;
@@ -378,7 +432,11 @@ export function resolveAdvanceInterestFromPreview(
   }
 
   const eligible = Number(preview.eligible_loan_amount);
-  const net = Number(preview.net_disbursal_amount);
+  const net = Number(
+    preview.net_disbursement_amount ??
+      preview.netDisbursementAmount ??
+      preview.net_disbursal_amount,
+  );
   if (Number.isFinite(eligible) && Number.isFinite(net) && eligible >= net) {
     return round2(eligible - net);
   }

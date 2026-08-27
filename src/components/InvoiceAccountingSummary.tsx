@@ -19,6 +19,8 @@ export type InvoiceAccountingSummaryProps = {
   advanceInterest?: number;
   netDisbursementAmount: number;
   showAdvanceInterest?: boolean;
+  onInvoiceAmountInfoPress?: () => void;
+  onDisbursementRequestedInfoPress?: () => void;
   onAdvanceInterestInfoPress?: () => void;
   /** Prefix before the formatted amount, e.g. `₹`. */
   amountPrefix?: string;
@@ -95,6 +97,8 @@ export const InvoiceAccountingSummary: React.FC<
   advanceInterest = 0,
   netDisbursementAmount,
   showAdvanceInterest = false,
+  onInvoiceAmountInfoPress,
+  onDisbursementRequestedInfoPress,
   onAdvanceInterestInfoPress,
   amountPrefix = '',
   amountSuffix = '',
@@ -133,6 +137,11 @@ export const InvoiceAccountingSummary: React.FC<
         label={SUMMARY.grossInvoiceValue}
         value={money(invoiceAmount)}
         kind="subtotal"
+        trailing={
+          onInvoiceAmountInfoPress ? (
+            <AdvanceInterestInfoButton onPress={onInvoiceAmountInfoPress} />
+          ) : null
+        }
       />
       <AccountingRow
         sign={MINUS}
@@ -144,6 +153,13 @@ export const InvoiceAccountingSummary: React.FC<
         label={SUMMARY.disbursementRequestedAmount}
         value={money(requestedAmount)}
         kind="subtotal"
+        trailing={
+          onDisbursementRequestedInfoPress ? (
+            <AdvanceInterestInfoButton
+              onPress={onDisbursementRequestedInfoPress}
+            />
+          ) : null
+        }
       />
       {showAdvanceInterest ? (
         <AccountingRow

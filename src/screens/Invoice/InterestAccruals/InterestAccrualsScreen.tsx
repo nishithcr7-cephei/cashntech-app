@@ -45,9 +45,11 @@ type InterestAccrualInvoiceRow = {
   counterParty: string;
   invoiceAmount: string;
   invoiceDate: string;
+  grnDate: string;
   dueDate: string;
   disburseDate: string;
   disburseAmount: string;
+  advanceInterest: string;
   totalAccInterest: string;
   totalInterestPaid: string;
   // raw numeric fields for summary calculations
@@ -206,18 +208,26 @@ export const InterestAccrualsScreen: React.FC = () => {
   const rows = useMemo(() => {
     return (interestList || []).map((item: any) => {
       const fmtMoney = (v: any) =>
-        v != null
+        v != null && v !== ''
           ? `${Number(v).toLocaleString('en-IN', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}/-`
           : '-';
       const invoiceDate = formatDateDash(item.invoice_date ?? '');
+      const grnRaw = item.grn_date ?? item.grnDate ?? '';
+      const grnDate = grnRaw
+        ? formatDateDash(String(grnRaw))
+        : '-';
       const dueDate = formatDateDash(item.invoice_due_date ?? '');
       const disburseDate = formatDateDash(item.disbursement_date ?? '');
       const finalTotalRaw = Number(item.final_total ?? 0);
       const disbursedAmountRaw = Number(item.disbursed_amount ?? 0);
-      const cumulativeInterestRaw = Number(item.cumulative_interest ?? 0);
+      const upfrontInterestRaw = Number(item.upfront_interest ?? 0) || 0;
+      // VF Accrued Interest uses API `interest_accrued`; DF Total Accrual uses `cumulative_interest`.
+      const displayAccrualRaw = isVendorFinance
+        ? Number(item.interest_accrued ?? 0) || 0
+        : Number(item.cumulative_interest ?? 0) || 0;
       return {
         id: item.id,
         loanRefNo: item.loan_ref_no ?? '-',
@@ -228,18 +238,22 @@ export const InterestAccrualsScreen: React.FC = () => {
         primaryParty: decryptValue(item.partyName ?? '') || '-',
         counterParty: decryptValue(item.counterPartyName ?? '') || '-',
         invoiceAmount: fmtMoney(item.final_total),
-        invoiceDate,
-        dueDate,
-        disburseDate,
+        invoiceDate:
+          !invoiceDate || invoiceDate === 'dd-mm-yyyy' ? '-' : invoiceDate,
+        grnDate: !grnDate || grnDate === 'dd-mm-yyyy' ? '-' : grnDate,
+        dueDate: !dueDate || dueDate === 'dd-mm-yyyy' ? '-' : dueDate,
+        disburseDate:
+          !disburseDate || disburseDate === 'dd-mm-yyyy' ? '-' : disburseDate,
         disburseAmount: fmtMoney(item.disbursed_amount),
-        totalAccInterest: fmtMoney(item.cumulative_interest),
+        advanceInterest: fmtMoney(upfrontInterestRaw),
+        totalAccInterest: fmtMoney(displayAccrualRaw),
         totalInterestPaid: fmtMoney(item.total_paid_interest),
         finalTotalRaw,
         disbursedAmountRaw,
-        cumulativeInterestRaw,
+        cumulativeInterestRaw: displayAccrualRaw,
       };
     });
-  }, [interestList]);
+  }, [interestList, isVendorFinance]);
 
   // Client-side filter + search
   const filteredBySearch = !searchText.trim()
@@ -360,6 +374,12 @@ export const InterestAccrualsScreen: React.FC = () => {
             <Text style={styles.infoLabel}>Invoice Date</Text>
             <Text style={styles.infoValue}>{row.invoiceDate}</Text>
           </View>
+          {isVendorFinance ? (
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>GRN Date</Text>
+              <Text style={styles.infoValue}>{row.grnDate}</Text>
+            </View>
+          ) : null}
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Due Date</Text>
             <Text style={styles.infoValue}>{row.dueDate}</Text>
@@ -376,8 +396,18 @@ export const InterestAccrualsScreen: React.FC = () => {
             <Text style={styles.infoLabel}>Disbursed Amount (₹)</Text>
             <Text style={styles.infoValue}>{row.disburseAmount}</Text>
           </View>
+          {isVendorFinance ? (
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Advance Interest (₹)</Text>
+              <Text style={styles.infoValue}>{row.advanceInterest}</Text>
+            </View>
+          ) : null}
           <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Total Accrual Interest (₹)</Text>
+            <Text style={styles.infoLabel}>
+              {isVendorFinance
+                ? 'Accrued Interest (₹)'
+                : 'Total Accrual Interest (₹)'}
+            </Text>
             <Text style={styles.infoValue}>{row.totalAccInterest}</Text>
           </View>
           <View style={styles.infoColumn}>

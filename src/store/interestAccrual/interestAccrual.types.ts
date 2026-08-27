@@ -24,10 +24,14 @@ export type InterestAccrualRecord = {
   counterPartyName?: string;
   final_total?: number | string;
   invoice_date?: string;
+  grn_date?: string;
   invoice_due_date?: string;
   disbursement_date?: string;
   disbursed_amount?: number | string;
+  upfront_interest?: number | string;
   cumulative_interest?: number | string;
+  interest_accrued?: number | string;
+  total_paid_interest?: number | string;
 };
 
 export type InterestAccrualState = {
