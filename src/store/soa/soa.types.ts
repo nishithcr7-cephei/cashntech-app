@@ -25,6 +25,8 @@ export const initialSOAState: SOAState = {
 };
 
 export type FetchProgramListRequest = {
-  programIds: string[];
+  programIds?: string[];
+  /** Web SOA: product-scoped list only — do not lock to login-selected program. */
+  productId?: string | null;
   isInitialLoad?: boolean;
 };

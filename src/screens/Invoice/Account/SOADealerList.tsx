@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,11 @@ import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
 import {PRODUCT_CODES} from '@store/product/product.types';
+import {soaDetailsApi, ProgramSummaryApi} from '@services/api/soa_details.api';
+import {
+  SHOW_SOA_VENDOR_LIST_PROGRAM_HEADER,
+  SOAVendorListProgramHeader,
+} from './SOAVendorListProgramHeader';
 
 export const SOADealerList: React.FC = () => {
   const navigation = useNavigation();
@@ -37,6 +42,11 @@ export const SOADealerList: React.FC = () => {
   const routeProgramId = (route.params as any)?.programId || '';
   const routeProgramIds = (route.params as any)?.programIds;
   const programName = (route.params as any)?.programName || 'Program name';
+  const routeBankName = (route.params as any)?.bankName;
+  const routePartyName = (route.params as any)?.partyName;
+  const routeStatus = (route.params as any)?.status;
+  const routeProgramLimit = (route.params as any)?.totalSanctionedAmount;
+  const routeTotalOutstanding = (route.params as any)?.totalOutstanding;
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isDealerChecker = userRole === 'dealer_checker';
   const effectiveCode = useSelector(selectEffectiveProductCode);
@@ -60,6 +70,9 @@ export const SOADealerList: React.FC = () => {
   const loading = useSelector(dealerLoadingSelector);
   const totalDealers = useSelector(totalDealersSelector);
   const dealerError = useSelector(dealerErrorSelector);
+  const [programSummary, setProgramSummary] = useState<ProgramSummaryApi | null>(
+    null,
+  );
 
   useEffect(() => {
     if (dealerError && (dealerError.toLowerCase().includes('token expired') || dealerError.toLowerCase().includes('unauthorized'))) {
@@ -93,6 +106,41 @@ export const SOADealerList: React.FC = () => {
     };
   }, [dispatch, selectedProgramIds]);
 
+  useEffect(() => {
+    if (!SHOW_SOA_VENDOR_LIST_PROGRAM_HEADER || !programId) {
+      return;
+    }
+    let cancelled = false;
+    soaDetailsApi
+      .getProgramSummary(programId)
+      .then(summary => {
+        if (!cancelled) {
+          setProgramSummary(summary);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProgramSummary(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [programId]);
+
+  const headerAvailableLimit = useMemo(() => {
+    if (!programSummary) {
+      return null;
+    }
+    const limit = Number(programSummary.total_limit || 0);
+    const utilized = Number(programSummary.utilized_amount || 0);
+    const pipeline = Number(programSummary.pipeline_requests || 0);
+    if (!Number.isFinite(limit)) {
+      return null;
+    }
+    return limit - utilized - pipeline;
+  }, [programSummary]);
+
   const renderDealerItem = ({item, index}: {item: any; index: number}) => {
     const isStatusActive = item.status?.toLowerCase() === 'active';
 
@@ -116,7 +164,7 @@ export const SOADealerList: React.FC = () => {
               <Text style={styles.infoValue}>{item.counterPartyName}</Text>
             </View>
             <View style={styles.infoColumn}>
-              <Text style={styles.infoLabel}>OD Account</Text>
+              <Text style={styles.infoLabel}>Loan/OD Account</Text>
               <TouchableOpacity
                 disabled={!programId}
                 onPress={() =>
@@ -204,6 +252,23 @@ export const SOADealerList: React.FC = () => {
         </Text>
       </View>
 
+      {SHOW_SOA_VENDOR_LIST_PROGRAM_HEADER ? (
+        <View style={styles.programHeaderWrap}>
+          <SOAVendorListProgramHeader
+            programName={programName}
+            anchorName={programSummary?.entity_name || routePartyName}
+            bankName={routeBankName}
+            status={routeStatus}
+            programLimit={programSummary?.total_limit ?? routeProgramLimit}
+            availableLimit={headerAvailableLimit}
+            principalDpd={programSummary?.overdue_days}
+            totalDue={
+              programSummary?.total_outstanding ?? routeTotalOutstanding
+            }
+          />
+        </View>
+      ) : null}
+
       <View style={styles.content}>
         <View style={styles.dealersHeader}>
           <Text style={styles.dealersLabel}>{partyLabelPlural}</Text>
@@ -254,6 +319,11 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(16),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
+  },
+  programHeaderWrap: {
+    paddingHorizontal: scaleWidth(16),
+    backgroundColor: '#F8F9FA',
+    paddingBottom: scaleHeight(4),
   },
   content: {
     flex: 1,

@@ -132,6 +132,11 @@ export type HomeNavigatorType = {
     programId?: string;
     programIds?: string[];
     programName?: string;
+    bankName?: string;
+    partyName?: string;
+    status?: string;
+    totalSanctionedAmount?: string | number;
+    totalOutstanding?: string | number;
   };
   OcrInvoice: undefined;
   Profile: undefined;

@@ -1,4 +1,4 @@
-import {call, put, takeLatest} from 'redux-saga/effects';
+import {call, put, select, takeLatest} from 'redux-saga/effects';
 import {PayloadAction} from '@reduxjs/toolkit';
 import axiosInstance from '@services/api/api';
 import Endpoints from '@constants/ApiEndPoints';
@@ -9,23 +9,30 @@ import {
   fetchProgramListFailure,
 } from './soa.slice';
 import {FetchProgramListRequest} from './soa.types';
-
+import {selectOptionalProductId} from '@store/product/productContext.saga';
+import {selectActiveProductId} from '@store/product/product.selectors';
 import {decryptValue} from '@utils/decrypt';
 import {formatIndianNumber} from '@utils/Utils';
 
 function* fetchProgramListWorker(action: PayloadAction<FetchProgramListRequest>): Generator<any, void, any> {
   try {
-    const {programIds} = action.payload;
+    const productId: string | null =
+      action.payload.productId ??
+      (yield call(selectOptionalProductId)) ??
+      (yield select(selectActiveProductId));
+
     const url = `${API_URL}/${Endpoints.apiProgramList}`;
-    const response = yield call(axiosInstance.post as any, url, {
-      programIds,
-    }, {
+    const body: {productId?: string} = {};
+    if (productId) {
+      body.productId = productId;
+    }
+
+    const response = yield call(axiosInstance.post as any, url, body, {
       authRequired: true,
     });
 
     if (response.data?.statusCode === 200) {
       const rawData = response.data.data || [];
-      const total = response.data.totalCount || rawData.length;
 
       const mappedData = rawData.map((item: any) => {
         // Format createdAt to "02 Apr 2026" format
@@ -52,7 +59,7 @@ function* fetchProgramListWorker(action: PayloadAction<FetchProgramListRequest>)
 
       yield put(fetchProgramListSuccess({
         data: mappedData,
-        total,
+        total: mappedData.length,
       }));
     } else {
       yield put(fetchProgramListFailure(response.data?.message || 'Failed to fetch program list'));

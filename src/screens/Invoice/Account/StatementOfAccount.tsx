@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo} from 'react';
+import React, {useEffect} from 'react';
 import {
   View,
   Text,
@@ -22,47 +22,27 @@ import {
   resetSOAState,
 } from '@store/soa';
 import {
-  selectProgramSelection,
-  selectAllProgramIds,
-} from '@store/programSelection/programSelection.selector';
-import {
   selectActiveProductName,
-  selectActiveProductCode,
+  selectActiveProductId,
   selectEffectiveProductCode,
 } from '@store/product/product.selectors';
-import {getEffectiveProductCode} from '@store/product/product.resolver';
-import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 
 export const StatementOfAccount: React.FC = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
 
-  const programSelection = useSelector(selectProgramSelection);
-  const allProgramIds = useSelector(selectAllProgramIds);
   const activeProductName = useSelector(selectActiveProductName);
-  const activeProductCode = useSelector(selectActiveProductCode);
+  const activeProductId = useSelector(selectActiveProductId);
   const effectiveProductCode = useSelector(selectEffectiveProductCode);
-  const isVendorFinance = effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE;
-  const primaryPartyLabel = isVendorFinance ? 'Anchor' : 'Primary Party';
+  const primaryPartyLabel = 'Primary Party';
   const productBreadcrumbLabel =
-    activeProductName ||
-    PRODUCT_DISPLAY_NAMES[getEffectiveProductCode(activeProductCode)];
+    activeProductName || PRODUCT_DISPLAY_NAMES[effectiveProductCode];
 
   const programList = useSelector(programListSelector);
   const loading = useSelector(soaLoadingSelector);
   const totalPrograms = useSelector(totalProgramsSelector);
   const soaError = useSelector(soaErrorSelector);
-
-  // Determine which programIds to use
-  const selectedProgramIds = useMemo(() => {
-    if (programSelection.programScope === 'all' && allProgramIds) {
-      return allProgramIds;
-    }
-    if (programSelection.programId) {
-      return [programSelection.programId];
-    }
-    return allProgramIds || [];
-  }, [programSelection, allProgramIds]);
 
   useEffect(() => {
     if (soaError && (soaError.toLowerCase().includes('token expired') || soaError.toLowerCase().includes('unauthorized'))) {
@@ -81,15 +61,20 @@ export const StatementOfAccount: React.FC = () => {
     }
   }, [soaError]);
 
-  // Fetch program list when programIds change
   useEffect(() => {
-    if (selectedProgramIds.length > 0) {
-      dispatch(fetchProgramListRequest({programIds: selectedProgramIds, isInitialLoad: true}));
+    if (!activeProductId) {
+      return;
     }
+    dispatch(
+      fetchProgramListRequest({
+        productId: activeProductId,
+        isInitialLoad: true,
+      }),
+    );
     return () => {
       dispatch(resetSOAState());
     };
-  }, [dispatch, selectedProgramIds]);
+  }, [dispatch, activeProductId]);
 
   const renderProgramItem = ({item, index}: {item: any; index: number}) => {
     const isStatusActive = item.status?.toLowerCase() === 'active';
@@ -109,6 +94,11 @@ export const StatementOfAccount: React.FC = () => {
                     programId: item.programId,
                     programIds: item.programId ? [item.programId] : [],
                     programName: item.programName,
+                    bankName: item.bankName,
+                    partyName: item.partyName,
+                    status: item.status,
+                    totalSanctionedAmount: item.totalSanctionedAmount,
+                    totalOutstanding: item.totalOutstanding,
                   })
                 }>
                 <Text style={[styles.infoValue, styles.linkText]}>{item.bankName || '-'}</Text>

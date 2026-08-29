@@ -61,10 +61,7 @@ export const CreditAccountDetails: React.FC = () => {
   const partyLabel = isVendorFinance ? 'Vendor Name' : 'Dealer Name';
   const emptyPartyLabel = isVendorFinance ? 'vendors' : 'dealers';
   const invoiceRefLabel = isVendorFinance ? 'Invoice Ref. No' : 'Invoice Number';
-  const financedAmountLabel = isVendorFinance ? 'Financed Amount' : 'Loan Amount';
   const disbursementDateLabel = 'Disbursement Date';
-  const closedDateLabel = isVendorFinance ? 'Disbursement Date' : 'Loan Date';
-  const maturityDateLabel = isVendorFinance ? 'Maturity Date' : 'Due Date';
   const sanctionedAmountLabel = isVendorFinance ? 'Sanctioned Amount' : 'Sanction Amount';
 
   const formatParticulars = (particulars?: string) => {
@@ -257,7 +254,7 @@ export const CreditAccountDetails: React.FC = () => {
             <Text style={styles.infoLabel}>{invoiceRefLabel}</Text>
             <Text style={styles.infoValue}>{item.invoice_no || 'N/A'}</Text>
           </View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>{financedAmountLabel}</Text><Text style={styles.infoValue}>{item.loan_amount || '-'}</Text></View>
+          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Loan Amount</Text><Text style={styles.infoValue}>{item.loan_amount || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>{disbursementDateLabel}</Text><Text style={styles.infoValue}>{item.loan_date || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Principal O/S Amo.</Text><Text style={styles.infoValue}>{item.principal_os || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Interest O/S Amo.</Text><Text style={styles.infoValue}>{item.interest_os || '-'}</Text></View>
@@ -267,7 +264,7 @@ export const CreditAccountDetails: React.FC = () => {
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Paid Interest</Text><Text style={styles.infoValue}>{item.paid_interest || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Paid Penal Interest</Text><Text style={styles.infoValue}>{item.paid_penal_interest || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Paid Other Charges</Text><Text style={styles.infoValue}>{item.paid_other_charges || '-'}</Text></View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>{maturityDateLabel}</Text><Text style={styles.infoValue}>{item.due_date || '-'}</Text></View>
+          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Due Date</Text><Text style={styles.infoValue}>{item.due_date || '-'}</Text></View>
           <View style={styles.infoColumn}>
              <Text style={styles.infoLabel}>Status</Text>
              <Text style={[styles.statusBadgeText, {color: Colors.primaryColor}]}>{item.status || '-'}</Text>
@@ -290,8 +287,8 @@ export const CreditAccountDetails: React.FC = () => {
             <Text style={styles.infoLabel}>{invoiceRefLabel}</Text>
             <Text style={styles.infoValue}>{item.invoice_no || 'N/A'}</Text>
           </View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>{financedAmountLabel}</Text><Text style={styles.infoValue}>{item.loan_amount || '-'}</Text></View>
-          <View style={styles.infoColumn}><Text style={styles.infoLabel}>{closedDateLabel}</Text><Text style={styles.infoValue}>{item.loan_date || '-'}</Text></View>
+          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Loan Amount</Text><Text style={styles.infoValue}>{item.loan_amount || '-'}</Text></View>
+          <View style={styles.infoColumn}><Text style={styles.infoLabel}>Loan Date</Text><Text style={styles.infoValue}>{item.loan_date || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Principal O/S Amo.</Text><Text style={styles.infoValue}>{item.principal_os || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Interest O/S Amo.</Text><Text style={styles.infoValue}>{item.interest_os || '-'}</Text></View>
           <View style={styles.infoColumn}><Text style={styles.infoLabel}>Penal Interest O/S</Text><Text style={styles.infoValue}>{item.penal_interest_os || '-'}</Text></View>
