@@ -33,6 +33,7 @@ import {
 } from './selector';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
 import {PRODUCT_CODES} from '@store/product/product.types';
+import {SOALoanDetailsCard} from '@screens/Invoice/Account/SOALoanDetailsCard';
 
 const TABS = [
   'OD Account Summary',
@@ -49,6 +50,7 @@ export const CreditAccountDetails: React.FC = () => {
   
   const [activeTab, setActiveTab] = useState(TABS[0]);
   const [searchText, setSearchText] = useState('');
+  const [loanCardExpanded, setLoanCardExpanded] = useState(false);
 
   // Extract params
   const id = (route.params as any)?.id;
@@ -58,6 +60,8 @@ export const CreditAccountDetails: React.FC = () => {
   const dealerName =
     (route.params as any)?.dealerName || (isVendorFinance ? 'Vendor' : 'Dealer');
   const programName = (route.params as any)?.anchor || 'Program';
+  const bankName = (route.params as any)?.bankName;
+  const accountStatus = (route.params as any)?.status;
   const partyLabel = isVendorFinance ? 'Vendor Name' : 'Dealer Name';
   const emptyPartyLabel = isVendorFinance ? 'vendors' : 'dealers';
   const invoiceRefLabel = isVendorFinance ? 'Invoice Ref. No' : 'Invoice Number';
@@ -108,6 +112,21 @@ export const CreditAccountDetails: React.FC = () => {
       dispatch(resetCreditAccountDetails());
     };
   }, [id, programId, dispatch]);
+
+  const availableLimit = useMemo(() => {
+    if (!summary) {
+      return null;
+    }
+    const limit = Number(summary.total_limit || 0);
+    if (!Number.isFinite(limit)) {
+      return null;
+    }
+    return (
+      limit -
+      Number(summary.utilized_amount || 0) -
+      Number(summary.pipeline_requests || 0)
+    );
+  }, [summary]);
 
   const filteredDealers = useMemo(() => {
     if (!searchText.trim()) return dealers;
@@ -410,51 +429,31 @@ export const CreditAccountDetails: React.FC = () => {
           </Text>
         </View>
 
-        {/* Top Summary Card - Program Summary */}
+        {/* Top Summary Card - Loan Details */}
         {summary && (
-          <View style={styles.headerSummaryGrid}>
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Credit Account No</Text>
-              <Text style={styles.summaryValue}>{summary.account_number || '-'}</Text>
-            </View>
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Anchor</Text>
-              <Text style={styles.summaryValue}>{summary.entity_name || programName || '-'}</Text>
-            </View>
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Sanctioned Limit</Text>
-              <Text style={styles.summaryValue}>₹ {formatIndianNumber(String(summary.total_limit || 0))}</Text>
-            </View>
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Utilized Amount</Text>
-              <Text style={styles.summaryValue}>₹ {formatIndianNumber(String(summary.utilized_amount || 0))}</Text>
-            </View>
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Available Limit</Text>
-              <Text style={styles.summaryValue}>
-                ₹ {formatIndianNumber(String(
-                  Number(summary.total_limit || 0) -
-                    Number(summary.utilized_amount || 0) -
-                    Number(summary.pipeline_requests || 0),
-                ))}
-              </Text>
-            </View>
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Total Outstanding</Text>
-              <Text style={styles.summaryValue}>₹ {formatIndianNumber(String(summary.total_outstanding || 0))}</Text>
-            </View>
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Overdue Days</Text>
-              <Text style={styles.summaryValue}>{summary.overdue_days ?? 0}</Text>
-            </View>
-          </View>
+          <SOALoanDetailsCard
+            anchorName={summary.entity_name || programName}
+            bankName={bankName}
+            status={accountStatus}
+            programLimit={summary.total_limit}
+            availableLimit={availableLimit}
+            totalDue={summary.total_outstanding}
+            expanded={loanCardExpanded}
+            onToggleExpanded={() => setLoanCardExpanded(prev => !prev)}
+          />
         )}
 
         {/* Tabs */}
         <View style={styles.tabContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
             {TABS.map(tab => (
-              <TouchableOpacity key={tab} style={styles.tabLink} onPress={() => setActiveTab(tab)}>
+              <TouchableOpacity
+                key={tab}
+                style={styles.tabLink}
+                onPress={() => {
+                  setActiveTab(tab);
+                  setLoanCardExpanded(false);
+                }}>
                 <Text style={[styles.tabLinkText, activeTab === tab && styles.activeTabLinkText]}>{tab}</Text>
                 {activeTab === tab && <View style={styles.activeTabIndicator} />}
               </TouchableOpacity>
@@ -566,38 +565,6 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: scaleHeight(40) },
   pageTitleBar: { paddingHorizontal: scaleWidth(16), paddingVertical: scaleHeight(12), backgroundColor: Colors.white },
   pageTitleText: { fontSize: scaleFont(13), fontFamily: Fonts.GilroySemiBold, color: Colors.darkblack },
-  headerSummaryGrid: { 
-    paddingHorizontal: scaleWidth(16), 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    gap: scaleWidth(12), 
-    marginTop: scaleHeight(12),
-    marginBottom: scaleHeight(12)
-  },
-  summaryCard: {
-    flexBasis: '47%',
-    backgroundColor: '#FFF5F5',
-    borderRadius: scaleWidth(12),
-    padding: scaleWidth(16),
-    borderWidth: 1,
-    borderColor: '#FFD9D9',
-    minWidth: 0,
-    marginBottom: scaleHeight(4),
-  },
-  summaryLabel: {
-    fontSize: scaleFont(13),
-    color: Colors.graybase,
-    fontFamily: Fonts.GilroyMedium,
-    marginBottom: scaleHeight(6),
-    flexWrap: 'wrap',
-  },
-  summaryValue: {
-    fontSize: scaleFont(16),
-    color: Colors.primaryColor,
-    fontFamily: Fonts.GilroySemiBold,
-    flexShrink: 1,
-    minWidth: 0,
-  },
   tabContainer: { backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
   tabScrollContent: { paddingHorizontal: scaleWidth(16) },
   tabLink: { paddingVertical: scaleHeight(14), marginRight: scaleWidth(24), position: 'relative' },

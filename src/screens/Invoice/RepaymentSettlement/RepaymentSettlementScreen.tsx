@@ -36,7 +36,7 @@ import {
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 import {FetchRepaymentListRequest} from '@store/repayment/repayment.types';
 import {decryptValue} from '@utils/decrypt';
-import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
+import {formatDateDash, formatStatus} from '../InvoiceList/components/InvoiceDetails/types';
 import {invoiceApi, RepaymentKpisResponse} from '@services/api/invoice.api';
 
 // Summary metrics for Repayment & Settlement will be dynamically built inside the component
@@ -271,7 +271,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
         item.interest_accrued ?? item.cumulative_interest,
       ),
       penalAmount: fmtMoney(item.penal_interest),
-      invoiceStatus: item.invoice_status || '-',
+      invoiceStatus: formatStatus(item.invoice_status || '') || '-',
     }));
 
     if (searchText.trim()) {

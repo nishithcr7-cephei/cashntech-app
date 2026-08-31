@@ -8,6 +8,7 @@ import {Tick} from '@assets/Icons';
 import type {InvoiceOverviewLatestItem} from '@store/invoiceOverview';
 import type {BulkInvoiceItem} from '@components/index';
 import {formatDateDDMmmYYYY} from '../utils/dashboardUtils';
+import {formatStatus} from '@utils/invoiceStatusDisplay';
 import type {ProductTabType} from '../types';
 
 interface LatestInvoicesListProps {
@@ -103,7 +104,7 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
                         row.invoice_status === 'PAID' && styles.statusGreenText,
                         row.invoice_status === 'SUBMITTED' && styles.statusOrangeText,
                       ]}>
-                        {row.invoice_status || 'N/A'}
+                        {formatStatus(row.invoice_status || '') || 'N/A'}
                       </Text>
                     </View>
                   </View>
@@ -145,15 +146,15 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
                     </View>
                     <View style={styles.infoColumn}>
                       <Text style={styles.infoLabel}>Invoice Status</Text>
-                      <Text style={[styles.infoValue, {color: Colors.green}]}>{row.invoice_status || '-'}</Text>
+                      <Text style={[styles.infoValue, {color: Colors.green}]}>{formatStatus(row.invoice_status || '') || '-'}</Text>
                     </View>
                     <View style={styles.infoColumn}>
                       <Text style={styles.infoLabel}>Approval Status</Text>
-                      <Text style={styles.infoValue}>{row.approval_status || '-'}</Text>
+                      <Text style={styles.infoValue}>{formatStatus(row.approval_status || '') || '-'}</Text>
                     </View>
                     <View style={styles.infoColumn}>
                       <Text style={styles.infoLabel}>Admin Status</Text>
-                      <Text style={styles.infoValue}>{row.admin_status || '-'}</Text>
+                      <Text style={styles.infoValue}>{formatStatus(row.admin_status || '') || '-'}</Text>
                     </View>
                   </View>
                   </>

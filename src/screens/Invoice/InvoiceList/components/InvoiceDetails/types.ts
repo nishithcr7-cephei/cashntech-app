@@ -3,6 +3,9 @@ import type {InvoiceApprovalLogApi} from '@services/api/invoice.api';
 import type {CheckerApprovalEntry} from '@components/CheckerApprovalModal/CheckerApprovalModal';
 import type {WorkflowStep} from '@components/InvoiceTrackingModal/InvoiceTrackingModal';
 import {decryptValue} from '@utils/decrypt';
+import {formatStatus} from '@utils/invoiceStatusDisplay';
+
+export {formatStatus};
 
 export const NA_AD = 'N/A/AD';
 
@@ -177,14 +180,6 @@ export function formatDateDash(isoDate: string): string {
   } catch {
     return isoDate;
   }
-}
-
-export function formatStatus(str: string): string {
-  if (!str) return '';
-  return str
-    .split('_')
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ');
 }
 
 function formatListAmount(value: number | string | null | undefined): string {

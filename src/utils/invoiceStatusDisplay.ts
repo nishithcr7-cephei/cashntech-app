@@ -1,9 +1,12 @@
 import {Colors} from '@constants/index';
 
-function formatStatus(str: string): string {
-  if (!str) return '';
+/** Title-case status labels: "Pending anchor maker" → "Pending Anchor Maker". */
+export function formatStatus(str: string): string {
+  if (!str || str === '-') return str || '';
   return str
-    .split('_')
+    .replace(/_/g, ' ')
+    .trim()
+    .split(/\s+/)
     .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ');
 }

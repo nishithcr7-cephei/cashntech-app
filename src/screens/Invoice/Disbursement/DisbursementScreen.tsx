@@ -245,8 +245,8 @@ function mapToDisbursementRow(item: any): DisbursementRow {
       }
       return formatStatus(rawStatus) || rawStatus || (hasDisbursementRecord ? 'Disbursed' : '');
     })(),
-    approvalStatus: item.approval_status ?? item.approvalStatus ?? '',
-    adminStatus: item.admin_status ?? item.adminStatus ?? '',
+    approvalStatus: formatStatus(item.approval_status ?? item.approvalStatus ?? ''),
+    adminStatus: formatStatus(item.admin_status ?? item.adminStatus ?? ''),
     finalTotal: finalTotal != null ? Number(finalTotal) : undefined,
     disbursedAmount: item.disbursed_amount ?? item.disbursedAmount ?? null,
     invoiceDateRaw: item.invoice_date ?? item.invoiceDate ?? null,
