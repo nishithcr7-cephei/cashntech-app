@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
   TextInput,
+  Keyboard,
 } from 'react-native';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -153,6 +154,9 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({
                     multiline
                     numberOfLines={3}
                     textAlignVertical="top"
+                    returnKeyType="done"
+                    blurOnSubmit
+                    onSubmitEditing={Keyboard.dismiss}
                   />
                 </View>
 

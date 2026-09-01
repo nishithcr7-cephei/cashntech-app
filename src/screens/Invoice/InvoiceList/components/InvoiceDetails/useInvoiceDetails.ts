@@ -1025,6 +1025,8 @@ export function useInvoiceDetails() {
         dealerName: item.dealerName || item.counterParty,
         amount: item.invoiceAmount,
         dueDate: item.dueDate,
+        invoiceDate: item.invoiceDate,
+        grnDate: item.grnDate,
         rawApprovalStatus: item.rawApprovalStatus,
       },
     ]);
@@ -1174,6 +1176,8 @@ export function useInvoiceDetails() {
         dealerName: row.dealerName || row.counterParty,
         amount: row.invoiceAmount,
         dueDate: row.dueDate,
+        invoiceDate: row.invoiceDate,
+        grnDate: row.grnDate,
         rawApprovalStatus: row.rawApprovalStatus,
       }));
       setSelectedInvoices(prev => [...prev, ...newItems]);
@@ -1347,6 +1351,7 @@ export function useInvoiceDetails() {
       action: string;
       remark: string;
       approvalRemark?: string;
+      grnDate?: string;
     }[];
   }) => {
     // Workflow bulk approve/reject → PATCH /invoice/bulk/status (web: approve permission is enough for maker reject).
@@ -1531,6 +1536,8 @@ export function useInvoiceDetails() {
           isDealerMaker,
           isAnchorChecker,
           isDealerChecker,
+          isAnchorAllAccess,
+          isDealerAllAccess,
           canApprove,
           canReject,
           roleLabel: storedUserRole,
@@ -1549,6 +1556,8 @@ export function useInvoiceDetails() {
     isAnchorChecker,
     isDealerMaker,
     isDealerChecker,
+    isAnchorAllAccess,
+    isDealerAllAccess,
     canImport,
     canEdit,
     canApprove,

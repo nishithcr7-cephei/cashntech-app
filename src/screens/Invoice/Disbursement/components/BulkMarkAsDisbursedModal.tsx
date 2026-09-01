@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Platform,
   Dimensions,
+  Keyboard,
 } from 'react-native';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -554,6 +555,9 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
                     placeholder="Remark"
                     multiline
                     placeholderTextColor={Colors.graybase}
+                    returnKeyType="done"
+                    blurOnSubmit
+                    onSubmitEditing={Keyboard.dismiss}
                   />
                 </View>
                 </>

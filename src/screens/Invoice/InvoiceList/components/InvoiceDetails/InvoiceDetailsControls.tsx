@@ -104,6 +104,16 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   const canVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_ADMIN_VERIFICATION);
   
   const hasFunctionalPermission = canApprove || canReject || canVerify;
+  const isVendorFinance =
+    effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE;
+  const showBulkSelectUi =
+    (isDealerChecker ||
+      isAnchorChecker ||
+      isCashnTechUser ||
+      isAnchorAllAccess ||
+      isDealerAllAccess ||
+      (isAnchorMaker && isVendorFinance)) &&
+    hasFunctionalPermission;
 
   // Composite Role-based visibility check for "Create Invoice"
   const showCreateButton = shouldShowCreateInvoice(user, canCreateInvoice);
@@ -153,7 +163,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
 
       <View style={styles.selectAllCreateRow}>
         <View style={styles.dmSelectAllWrapper}>
-          {(isDealerChecker || isAnchorChecker || isCashnTechUser || isAnchorAllAccess || isDealerAllAccess) && hasFunctionalPermission && (
+          {showBulkSelectUi && (
             <TouchableOpacity
               activeOpacity={0.8}
               style={[
@@ -172,7 +182,12 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
                 )}
               </View>
               <Text style={styles.dmSelectAllText}>Select all</Text>
-              {(isCashnTechUser || isAnchorChecker || isDealerChecker || isAnchorAllAccess || isDealerAllAccess) && (
+              {(isCashnTechUser ||
+                isAnchorChecker ||
+                isDealerChecker ||
+                isAnchorAllAccess ||
+                isDealerAllAccess ||
+                (isAnchorMaker && isVendorFinance)) && (
                 <View style={styles.bulkBadge}>
                   <Text style={styles.bulkBadgeText}>Bulk Actions</Text>
                 </View>
@@ -327,8 +342,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
       </View>
 
 
-      {(isDealerChecker || isAnchorChecker || isCashnTechUser || isAnchorAllAccess || isDealerAllAccess) && 
-        hasFunctionalPermission && 
+      {showBulkSelectUi &&
         selectedInvoiceIdsLength > 0 && (
         <TouchableOpacity
           style={styles.proceedButton}

@@ -372,6 +372,7 @@ function* bulkUpdateInvoiceSaga(
               ? Number(inv.approval_level)
               : 1,
           remark: inv.remark,
+          grn_date: inv.grnDate,
         })),
       });
     }

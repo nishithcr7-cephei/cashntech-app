@@ -50,7 +50,6 @@ export const CreditAccountDetails: React.FC = () => {
   
   const [activeTab, setActiveTab] = useState(TABS[0]);
   const [searchText, setSearchText] = useState('');
-  const [loanCardExpanded, setLoanCardExpanded] = useState(false);
 
   // Extract params
   const id = (route.params as any)?.id;
@@ -60,8 +59,6 @@ export const CreditAccountDetails: React.FC = () => {
   const dealerName =
     (route.params as any)?.dealerName || (isVendorFinance ? 'Vendor' : 'Dealer');
   const programName = (route.params as any)?.anchor || 'Program';
-  const bankName = (route.params as any)?.bankName;
-  const accountStatus = (route.params as any)?.status;
   const partyLabel = isVendorFinance ? 'Vendor Name' : 'Dealer Name';
   const emptyPartyLabel = isVendorFinance ? 'vendors' : 'dealers';
   const invoiceRefLabel = isVendorFinance ? 'Invoice Ref. No' : 'Invoice Number';
@@ -432,14 +429,15 @@ export const CreditAccountDetails: React.FC = () => {
         {/* Top Summary Card - Loan Details */}
         {summary && (
           <SOALoanDetailsCard
+            creditAccountNo={
+              summary.account_number || dealers[0]?.od_account_no
+            }
             anchorName={summary.entity_name || programName}
-            bankName={bankName}
-            status={accountStatus}
-            programLimit={summary.total_limit}
+            sanctionedLimit={summary.total_limit}
+            utilizedAmount={summary.utilized_amount}
             availableLimit={availableLimit}
-            totalDue={summary.total_outstanding}
-            expanded={loanCardExpanded}
-            onToggleExpanded={() => setLoanCardExpanded(prev => !prev)}
+            totalOutstanding={summary.total_outstanding}
+            overdueDays={summary.overdue_days}
           />
         )}
 
@@ -452,7 +450,6 @@ export const CreditAccountDetails: React.FC = () => {
                 style={styles.tabLink}
                 onPress={() => {
                   setActiveTab(tab);
-                  setLoanCardExpanded(false);
                 }}>
                 <Text style={[styles.tabLinkText, activeTab === tab && styles.activeTabLinkText]}>{tab}</Text>
                 {activeTab === tab && <View style={styles.activeTabIndicator} />}

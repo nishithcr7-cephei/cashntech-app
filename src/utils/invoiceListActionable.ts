@@ -273,7 +273,7 @@ type PendingApprovalDotContext = {
 
 /**
  * Same rules as invoice-list "Pending Invoice Approval" badge count.
- * Use for blue-dot on list cards so count and dots stay in sync.
+ * Count only invoices waiting on this user's turn (actionable / pending role).
  */
 export function isPendingInvoiceApprovalRow(
   row: ActionableRow,
@@ -287,16 +287,6 @@ export function isPendingInvoiceApprovalRow(
   const approvalStatus = (row.rawApprovalStatus || '').trim();
   const approvalS = approvalStatus.toLowerCase().replace(/_/g, ' ');
   const approvalSUpper = approvalStatus.toUpperCase().replace(/_/g, ' ');
-
-  // Maker: Created invoices already in approval flow
-  if (
-    (context.isAnchorMaker || context.isDealerMaker) &&
-    iStatusRaw === 'Created' &&
-    approvalStatus !== 'Pending Attachment' &&
-    approvalStatus !== 'Rejected'
-  ) {
-    return true;
-  }
 
   const isActionablePerm = !!(context.canApprove || context.canReject);
 
@@ -323,6 +313,7 @@ export function isPendingInvoiceApprovalRow(
   const roleLabel = (context.roleLabel || '').trim().toUpperCase();
   const isMyLevel =
     (!!myApprovalLevel && approvalStatus === myApprovalLevel) ||
+    (context.isAnchorMaker && approvalS.includes('pending anchor maker')) ||
     (context.isAnchorChecker && approvalS.includes('pending anchor checker')) ||
     (context.isDealerMaker && approvalS.includes('pending dealer maker')) ||
     (context.isDealerChecker && approvalS.includes('pending dealer checker')) ||

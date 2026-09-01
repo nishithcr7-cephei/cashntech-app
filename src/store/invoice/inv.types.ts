@@ -197,6 +197,8 @@ export type BulkUpdateInvoiceRequest = {
     remark: string;
     approval_level?: number;
     approvalRemark?: string;
+    /** VF Anchor Maker bulk approve — YYYY-MM-DD */
+    grnDate?: string;
   }[];
   programId?: string;
   filters?: InvoiceListFilters;

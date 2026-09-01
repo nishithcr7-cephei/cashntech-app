@@ -9,6 +9,7 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import moment from 'moment';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -825,6 +826,9 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                         multiline
                         numberOfLines={3}
                         textAlignVertical="top"
+                        returnKeyType="done"
+                        blurOnSubmit
+                        onSubmitEditing={Keyboard.dismiss}
                       />
                     </View>
                   </ScrollView>

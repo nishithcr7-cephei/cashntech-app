@@ -9,6 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
   Dimensions,
+  Keyboard,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
@@ -788,6 +789,9 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                         numberOfLines={3}
                         scrollEnabled={false}
                         textAlignVertical="top"
+                        returnKeyType="done"
+                        blurOnSubmit
+                        onSubmitEditing={Keyboard.dismiss}
                       />
                     </View>
                   </PersistentScrollView>

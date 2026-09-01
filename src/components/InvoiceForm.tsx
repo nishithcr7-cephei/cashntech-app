@@ -9,6 +9,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Linking,
+  Keyboard,
 } from 'react-native';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
@@ -927,7 +928,17 @@ export const InvoiceForm: React.FC<Props> = ({
           </View>
         </View>
         <L label="Remark (Optional)">
-          <TextInput style={styles.input} value={value.remark} onChangeText={set('remark')} placeholder="Value" multiline numberOfLines={3} />
+          <TextInput
+            style={styles.input}
+            value={value.remark}
+            onChangeText={set('remark')}
+            placeholder="Value"
+            multiline
+            numberOfLines={3}
+            returnKeyType="done"
+            blurOnSubmit
+            onSubmitEditing={Keyboard.dismiss}
+          />
         </L>
       </View>
 

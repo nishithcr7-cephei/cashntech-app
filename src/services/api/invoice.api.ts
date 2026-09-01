@@ -901,11 +901,26 @@ export const invoiceApi = {
       action: string;
       approval_level: number;
       remark: string;
+      grn_date?: string;
     }[];
   }): Promise<any> => {
     const response = await axiosInstance.patch(
       ApiEndPoints.apiBulkUpdateInvoiceStatus,
-      payload,
+      {
+        action: payload.action,
+        invoices: payload.invoices.map(inv => {
+          const item: Record<string, unknown> = {
+            invoiceId: inv.invoiceId,
+            action: inv.action,
+            approval_level: inv.approval_level,
+            remark: inv.remark,
+          };
+          if (inv.grn_date?.trim()) {
+            item.grn_date = inv.grn_date.trim();
+          }
+          return item;
+        }),
+      },
       {authRequired: true} as any,
     );
     return response.data;

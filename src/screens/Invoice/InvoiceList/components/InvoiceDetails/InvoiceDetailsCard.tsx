@@ -62,6 +62,7 @@ type Props = {
   index: number;
   transparency?: number;
   isSelectable?: boolean;
+  showBulkCheckbox?: boolean;
 };
 
 export const InvoiceDetailsCard: React.FC<Props> = ({
@@ -82,6 +83,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   index,
   transparency = 1,
   isSelectable = false,
+  showBulkCheckbox = false,
 }) => {
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canEdit = useHasPermission(PERMISSIONS.INVOICE_LIST_EDIT);
@@ -198,7 +200,10 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
           </View>
           <View style={styles.cardHeaderContainer}>
             {(isSelectable || isSelected) &&
-            (isDealerChecker || isAnchorChecker || isCashnTechUser) ? (
+            (isDealerChecker ||
+              isAnchorChecker ||
+              isCashnTechUser ||
+              showBulkCheckbox) ? (
               <TouchableOpacity
                 activeOpacity={0.8}
                 style={styles.dmCardHeaderRow}

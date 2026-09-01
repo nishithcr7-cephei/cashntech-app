@@ -18,6 +18,7 @@ type Props = {
   onAction: (action: 'Verify' | 'Reject' | 'On Hold' | 'Approve') => void;
   isAnchorChecker?: boolean;
   isDealerChecker?: boolean;
+  isVfAnchorMaker?: boolean;
 };
 
 const {height: SCREEN_HEIGHT} = Dimensions.get('window');
@@ -29,6 +30,7 @@ export const BulkActionSheet: React.FC<Props> = ({
   onAction,
   isAnchorChecker = false,
   isDealerChecker = false,
+  isVfAnchorMaker = false,
 }) => {
   if (!visible) return null;
 
@@ -51,7 +53,7 @@ export const BulkActionSheet: React.FC<Props> = ({
         <Text style={styles.subtitle}>Choose a bulk action to apply</Text>
 
         <View style={styles.optionsContainer}>
-          {(isAnchorChecker || isDealerChecker) ? (
+          {(isAnchorChecker || isDealerChecker || isVfAnchorMaker) ? (
             <>
               <TouchableOpacity
                 style={[styles.optionCard, styles.verifyCard]}

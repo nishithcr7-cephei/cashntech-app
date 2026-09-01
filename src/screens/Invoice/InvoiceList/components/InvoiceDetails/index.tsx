@@ -146,16 +146,33 @@ export const InvoiceDetails: React.FC = () => {
     isDealerAllAccess,
   } = useInvoiceDetails();
 
+  const isVendorFinance =
+    effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE;
+  const isVfAnchorMaker = isVendorFinance && isAnchorMaker;
+
   const [showBulkActionSheet, setShowBulkActionSheet] = React.useState(false);
 
-  // Automatically trigger action sheet when invoices are selected (CashnTech and Anchor Checker)
+  // Automatically trigger action sheet when invoices are selected
   const prevCount = React.useRef(selectedInvoiceIds.length);
   React.useEffect(() => {
-    if ((isCashnTechUser || isAnchorChecker || isDealerChecker) && selectedInvoiceIds.length > prevCount.current && selectedInvoiceIds.length > 0) {
+    if (
+      (isCashnTechUser ||
+        isAnchorChecker ||
+        isDealerChecker ||
+        isVfAnchorMaker) &&
+      selectedInvoiceIds.length > prevCount.current &&
+      selectedInvoiceIds.length > 0
+    ) {
       setShowBulkActionSheet(true);
     }
     prevCount.current = selectedInvoiceIds.length;
-  }, [selectedInvoiceIds.length, isCashnTechUser, isAnchorChecker, isDealerChecker]);
+  }, [
+    selectedInvoiceIds.length,
+    isCashnTechUser,
+    isAnchorChecker,
+    isDealerChecker,
+    isVfAnchorMaker,
+  ]);
 
   const registerMenuRef = (id: string, ref: View | null) => {
     menuButtonRefs.current[id] = ref;
@@ -274,12 +291,19 @@ export const InvoiceDetails: React.FC = () => {
                 isDealerAllAccess={isDealerAllAccess}
                 storedUserRole={storedUserRole}
                 transparency={invoiceListLoading ? 0.6 : 1}
-                isSelected={(isDealerChecker || isAnchorChecker || isCashnTechUser) && selectedInvoiceIds.includes(row.id)}
+                isSelected={
+                  (isDealerChecker ||
+                    isAnchorChecker ||
+                    isCashnTechUser ||
+                    isVfAnchorMaker) &&
+                  selectedInvoiceIds.includes(row.id)
+                }
                 onMenuToggle={handleMenuToggle}
                 onToggleSelection={toggleInvoiceSelection}
                 onInvoiceNoPress={handleInvoiceNoPress}
                 registerMenuRef={registerMenuRef}
                 isSelectable={isInvoiceSelectable(row)}
+                showBulkCheckbox={isVfAnchorMaker}
               />
             )}
             ListEmptyComponent={
@@ -475,6 +499,7 @@ export const InvoiceDetails: React.FC = () => {
         }}
         isAnchorChecker={isAnchorChecker}
         isDealerChecker={isDealerChecker}
+        isVfAnchorMaker={isVfAnchorMaker}
       />
 
       <BulkReviewModal
@@ -486,6 +511,7 @@ export const InvoiceDetails: React.FC = () => {
         }}
         selectedInvoices={selectedInvoices}
         action={bulkAction}
+        requireGrnDate={isVfAnchorMaker}
         onSubmit={handleBulkReviewSubmit}
         loading={bulkLoading}
       />

@@ -482,7 +482,7 @@ export const InvoiceDetailView: React.FC = () => {
         <AppBar
           title="Invoice Detail"
           navigation={navigation as any}
-          hideHamburger={isCheckerRole}
+          hideHamburger={true}
           renderLeftIcon={
             isCheckerRole ? (
               <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />
@@ -504,7 +504,7 @@ export const InvoiceDetailView: React.FC = () => {
         <AppBar
           title="Invoice Detail"
           navigation={navigation as any}
-          hideHamburger={isCheckerRole}
+          hideHamburger={true}
           renderLeftIcon={
             isCheckerRole ? (
               <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />
@@ -524,7 +524,7 @@ export const InvoiceDetailView: React.FC = () => {
       <AppBar
         title="Invoice Detail"
         navigation={navigation as any}
-        hideHamburger={isCheckerRole}
+        hideHamburger={true}
         renderLeftIcon={
           isCheckerRole ? (
             <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />

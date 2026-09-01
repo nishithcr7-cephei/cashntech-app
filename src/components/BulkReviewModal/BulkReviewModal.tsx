@@ -9,11 +9,21 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import moment from 'moment';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
+import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
+import {toYYYYMMDD} from '@services/api/invoice.api';
+import {
+  GRN_DATE_FORMATS,
+  getGrnDateValidationError,
+  getGrnPickerBounds,
+  parseGrnDisplay,
+} from '@utils/grnDate';
 
 export type BulkInvoiceItem = {
   id: string;
@@ -21,6 +31,9 @@ export type BulkInvoiceItem = {
   dealerName: string;
   amount: string;
   dueDate?: string;
+  invoiceDate?: string;
+  grnDate?: string;
+  tenorDays?: string | number;
   /** Used to derive workflow approval_level for checker bulk approve/reject */
   rawApprovalStatus?: string;
 };
@@ -30,6 +43,8 @@ type BulkReviewModalProps = {
   onClose: () => void;
   selectedInvoices: BulkInvoiceItem[];
   action: 'Verify' | 'Approve' | 'Reject' | 'On Hold';
+  /** VF Anchor Maker: per-invoice GRN Date (required on Approve). */
+  requireGrnDate?: boolean;
   onSubmit: (payload: {
     action: 'Verify' | 'Approve' | 'Reject' | 'On Hold';
     invoices: {
@@ -37,6 +52,7 @@ type BulkReviewModalProps = {
       action: string;
       remark: string;
       approvalRemark?: string;
+      grnDate?: string;
     }[];
   }) => void;
   loading?: boolean;
@@ -47,11 +63,15 @@ export const BulkReviewModal: React.FC<BulkReviewModalProps> = ({
   onClose,
   selectedInvoices,
   action,
+  requireGrnDate = false,
   onSubmit,
   loading = false,
 }) => {
   const insets = useSafeAreaInsets();
   const [individualRemarks, setIndividualRemarks] = useState<Record<string, string>>({});
+  const [individualGrnDates, setIndividualGrnDates] = useState<Record<string, string>>({});
+  const [grnErrors, setGrnErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
   const [activeInvoices, setActiveInvoices] = useState<Set<string>>(new Set());
   const [showConfirmUI, setShowConfirmUI] = useState(false);
 
@@ -59,6 +79,13 @@ export const BulkReviewModal: React.FC<BulkReviewModalProps> = ({
     if (visible) {
       setActiveInvoices(new Set(selectedInvoices.map(inv => inv.id)));
       setShowConfirmUI(false);
+      setFormError(null);
+      setGrnErrors({});
+      const nextGrn: Record<string, string> = {};
+      selectedInvoices.forEach(inv => {
+        nextGrn[inv.id] = parseGrnDisplay(inv.grnDate);
+      });
+      setIndividualGrnDates(nextGrn);
     }
   }, [visible, selectedInvoices]);
 
@@ -83,15 +110,58 @@ export const BulkReviewModal: React.FC<BulkReviewModalProps> = ({
     setIndividualRemarks(prev => ({...prev, [id]: text}));
   };
 
+  const validateBeforeConfirm = (): boolean => {
+    const invoicesToProcess = selectedInvoices.filter(inv =>
+      activeInvoices.has(inv.id),
+    );
+    const nextErrors: Record<string, string> = {};
+    let firstError: string | null = null;
+
+    for (const inv of invoicesToProcess) {
+      if (requireGrnDate && action === 'Approve') {
+        const grn = (individualGrnDates[inv.id] || '').trim();
+        if (!grn) {
+          nextErrors[inv.id] = 'GRN date is required';
+          firstError = firstError || `${inv.invoiceNo}: GRN date is required`;
+          continue;
+        }
+        const error = getGrnDateValidationError(
+          grn,
+          inv.invoiceDate,
+          inv.tenorDays,
+          inv.dueDate,
+        );
+        if (error) {
+          nextErrors[inv.id] = error;
+          firstError = firstError || `${inv.invoiceNo}: ${error}`;
+        }
+      }
+      if (requireGrnDate && action === 'Reject' && !(individualRemarks[inv.id] || '').trim()) {
+        firstError =
+          firstError || `${inv.invoiceNo}: Remark is required to reject`;
+      }
+    }
+
+    setGrnErrors(nextErrors);
+    setFormError(firstError);
+    return !firstError;
+  };
+
   const handleFinalSubmit = () => {
     const invoicesToProcess = selectedInvoices.filter(inv => activeInvoices.has(inv.id));
     const payloadInvoices = invoicesToProcess.map(inv => {
       const remark = individualRemarks[inv.id] || '';
+      const grnDisplay = (individualGrnDates[inv.id] || '').trim();
+      const grnApi =
+        requireGrnDate && grnDisplay
+          ? toYYYYMMDD(grnDisplay) || undefined
+          : undefined;
       return {
         invoiceId: inv.id,
         action: action,
         remark: (action === 'Reject' || action === 'On Hold') ? remark : '-',
         approvalRemark: (action === 'Verify' || action === 'Approve') ? remark : undefined,
+        grnDate: grnApi,
       };
     });
 
@@ -104,6 +174,9 @@ export const BulkReviewModal: React.FC<BulkReviewModalProps> = ({
 
   const handleClose = () => {
     setIndividualRemarks({});
+    setIndividualGrnDates({});
+    setGrnErrors({});
+    setFormError(null);
     setShowConfirmUI(false);
     onClose();
   };
@@ -162,24 +235,33 @@ export const BulkReviewModal: React.FC<BulkReviewModalProps> = ({
                 <View style={styles.invoiceList}>
                   {selectedInvoices.map((item) => {
                     const isActive = activeInvoices.has(item.id);
+                    const grnBounds = getGrnPickerBounds(
+                      item.invoiceDate,
+                      item.tenorDays,
+                      item.dueDate,
+                    );
+                    const grnValue = individualGrnDates[item.id] || '';
                     return (
-                      <TouchableOpacity 
-                        key={item.id} 
-                        activeOpacity={0.9}
-                        onPress={() => toggleInvoiceActive(item.id)}
+                      <View
+                        key={item.id}
                         style={[styles.invoiceCard, !isActive && styles.invoiceCardInactive]}
                       >
-                        <View style={styles.cardHeader}>
-                          <View style={styles.headerLeft}>
-                            <View style={[styles.checkbox, isActive && styles.checkboxActive]}>
-                              {isActive && <Text style={styles.checkboxTick}>✓</Text>}
+                        <TouchableOpacity
+                          activeOpacity={0.9}
+                          onPress={() => toggleInvoiceActive(item.id)}
+                          disabled={showConfirmUI}>
+                          <View style={styles.cardHeader}>
+                            <View style={styles.headerLeft}>
+                              <View style={[styles.checkbox, isActive && styles.checkboxActive]}>
+                                {isActive && <Text style={styles.checkboxTick}>✓</Text>}
+                              </View>
+                              <View style={styles.invoiceInfoPill}>
+                                <Text style={styles.invoiceNoText}>{item.invoiceNo}</Text>
+                              </View>
                             </View>
-                            <View style={styles.invoiceInfoPill}>
-                              <Text style={styles.invoiceNoText}>{item.invoiceNo}</Text>
-                            </View>
+                            <Text style={styles.amountText}>{item.amount}</Text>
                           </View>
-                          <Text style={styles.amountText}>{item.amount}</Text>
-                        </View>
+                        </TouchableOpacity>
 
                         <View style={styles.detailsGrid}>
                           <View style={styles.detailItem}>
@@ -187,15 +269,61 @@ export const BulkReviewModal: React.FC<BulkReviewModalProps> = ({
                             <Text style={styles.detailValue}>{item.dueDate || '-'}</Text>
                           </View>
                           <View style={styles.detailItem}>
-                            <Text style={styles.detailLabel}>Dealer</Text>
+                            <Text style={styles.detailLabel}>
+                              {requireGrnDate ? 'Vendor' : 'Dealer'}
+                            </Text>
                             <Text style={styles.detailValue} numberOfLines={1}>{item.dealerName}</Text>
                           </View>
                         </View>
 
+                        {requireGrnDate && isActive && (
+                          <View style={styles.grnDateContainer}>
+                            <DateNTimePicker
+                              label={action === 'Approve' ? 'GRN Date *' : 'GRN Date'}
+                              value={grnValue}
+                              onConfirm={date => {
+                                const next = moment(date).format('DD-MM-YYYY');
+                                setIndividualGrnDates(prev => ({...prev, [item.id]: next}));
+                                const error = getGrnDateValidationError(
+                                  next,
+                                  item.invoiceDate,
+                                  item.tenorDays,
+                                  item.dueDate,
+                                );
+                                setGrnErrors(prev => {
+                                  const copy = {...prev};
+                                  if (error) copy[item.id] = error;
+                                  else delete copy[item.id];
+                                  return copy;
+                                });
+                                setFormError(null);
+                              }}
+                              placeholder="DD-MM-YYYY"
+                              mode="date"
+                              datePickerProps={{
+                                date: grnValue
+                                  ? moment(grnValue, GRN_DATE_FORMATS, true).toDate()
+                                  : grnBounds.maximumDate,
+                                mode: 'date',
+                                minimumDate: grnBounds.minimumDate,
+                                maximumDate: grnBounds.maximumDate,
+                              }}
+                              containerStyle={styles.grnDatePicker}
+                            />
+                            {!!grnErrors[item.id] && (
+                              <Text style={styles.grnDateError}>{grnErrors[item.id]}</Text>
+                            )}
+                          </View>
+                        )}
+
                         <View style={styles.remarkContainer}>
                           <View style={styles.remarkHeader}>
                             <Text style={styles.remarkLabel}>Remark</Text>
-                            <Text style={styles.optionalLabel}>(Optional)</Text>
+                            <Text style={styles.optionalLabel}>
+                              {requireGrnDate && action === 'Reject'
+                                ? '(Required)'
+                                : '(Optional)'}
+                            </Text>
                           </View>
                           <TextInput
                             style={styles.individualInput}
@@ -206,13 +334,20 @@ export const BulkReviewModal: React.FC<BulkReviewModalProps> = ({
                             multiline
                             textAlignVertical="top"
                             editable={isActive}
+                            returnKeyType="done"
+                            blurOnSubmit
+                            onSubmitEditing={Keyboard.dismiss}
                           />
                         </View>
-                      </TouchableOpacity>
+                      </View>
                     );
                   })}
                 </View>
               </ScrollView>
+
+              {!!formError && (
+                <Text style={styles.formErrorText}>{formError}</Text>
+              )}
 
               <View style={styles.footer}>
                 <TouchableOpacity
@@ -227,7 +362,10 @@ export const BulkReviewModal: React.FC<BulkReviewModalProps> = ({
                     (action === 'Verify' || action === 'Approve') ? styles.verifyButton : action === 'Reject' ? styles.rejectButton : styles.holdButton,
                     (loading || activeInvoices.size === 0) && styles.disabledButton
                   ]}
-                  onPress={() => setShowConfirmUI(true)}
+                  onPress={() => {
+                    if (!validateBeforeConfirm()) return;
+                    setShowConfirmUI(true);
+                  }}
                   disabled={loading || activeInvoices.size === 0}>
                   {loading ? (
                     <ActivityIndicator color={Colors.white} size="small" />
@@ -490,5 +628,25 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  grnDateContainer: {
+    paddingLeft: scaleWidth(32),
+    marginBottom: scaleHeight(12),
+  },
+  grnDatePicker: {
+    marginBottom: 0,
+  },
+  grnDateError: {
+    marginTop: scaleHeight(4),
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: '#EF4444',
+  },
+  formErrorText: {
+    paddingHorizontal: scaleWidth(20),
+    paddingBottom: scaleHeight(8),
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: '#EF4444',
   },
 });
