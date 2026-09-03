@@ -7,13 +7,51 @@ import {
   fetchDealerListRequest,
   fetchDealerListSuccess,
   fetchDealerListFailure,
+  fetchProgramSummaryRequest,
+  fetchProgramSummarySuccess,
+  fetchProgramSummaryFailure,
 } from './dealer.slice';
-import {FetchDealerListRequest, DealerListItem} from './dealer.types';
+import {
+  FetchDealerListRequest,
+  FetchProgramSummaryRequest,
+  ProgramCounterPartySummary,
+  ProgramSummaryAmounts,
+} from './dealer.types';
 import {decryptValue} from '@utils/decrypt';
 import moment from 'moment';
 import {formatIndianNumber} from '@utils/Utils';
 
-function* fetchDealerListWorker(action: PayloadAction<FetchDealerListRequest>): Generator<any, void, any> {
+function formatSummaryDate(value: unknown): string {
+  if (!value) {
+    return '-';
+  }
+  const formatted = moment(value).format('DD-MM-YYYY');
+  return formatted === 'Invalid date' ? '-' : formatted;
+}
+
+function formatSummaryAmount(value: unknown): string {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) {
+    return '₹0.00';
+  }
+  return `₹${formatIndianNumber(String(num))}`;
+}
+
+function mapSummaryAmounts(raw: any): ProgramSummaryAmounts {
+  return {
+    principal: formatSummaryAmount(raw?.principal),
+    interest: formatSummaryAmount(raw?.interest),
+    penalInterest: formatSummaryAmount(raw?.penal_interest),
+    charges: formatSummaryAmount(raw?.charges),
+    total: formatSummaryAmount(
+      raw?.total_due ?? raw?.total_received ?? raw?.total,
+    ),
+  };
+}
+
+function* fetchDealerListWorker(
+  action: PayloadAction<FetchDealerListRequest>,
+): Generator<any, void, any> {
   try {
     const {programIds} = action.payload;
     const url = `${API_URL}/${Endpoints.apiProgramDealersList}`;
@@ -30,7 +68,7 @@ function* fetchDealerListWorker(action: PayloadAction<FetchDealerListRequest>): 
       const rawData = response.data.data || [];
       const total = response.data.totalCount || rawData.length;
 
-      const mappedData: DealerListItem[] = rawData.map((item: any) => {
+      const mappedData = rawData.map((item: any) => {
         const drawingPower = Number(item.drawing_power || 0);
         const utilizedAmount = Number(item.utilized_amount || 0);
         const availableLimit =
@@ -80,6 +118,69 @@ function* fetchDealerListWorker(action: PayloadAction<FetchDealerListRequest>): 
   }
 }
 
+function* fetchProgramSummaryWorker(
+  action: PayloadAction<FetchProgramSummaryRequest>,
+): Generator<any, void, any> {
+  try {
+    const {programIds} = action.payload;
+    const url = `${API_URL}/${Endpoints.apiProgramCounterPartySummary}`;
+    const response = yield call(
+      axiosInstance.post as any,
+      url,
+      {programIds},
+      {
+        authRequired: true,
+      },
+    );
+
+    if (response.data?.statusCode === 200) {
+      const raw = response.data.data || {};
+      const loanDetails = raw.loanDetails || {};
+      const due = raw.due || {};
+      const received = raw.received || {};
+
+      const roiPercent =
+        loanDetails.roi_percent != null && loanDetails.roi_percent !== ''
+          ? `${loanDetails.roi_percent}%`
+          : '-';
+
+      const summary: ProgramCounterPartySummary = {
+        loanDetails: {
+          anchorName: decryptValue(loanDetails.anchor_name || '') || '-',
+          bankName: loanDetails.bank_name || '-',
+          programApprovalDate: formatSummaryDate(loanDetails.program_approval_date),
+          programExpiryDate: formatSummaryDate(loanDetails.program_expiry_date),
+          status: loanDetails.status || '-',
+          programLimit: formatSummaryAmount(loanDetails.program_limit),
+          availableLimit: formatSummaryAmount(loanDetails.available_limit),
+          roiPercent,
+        },
+        due: {
+          ...mapSummaryAmounts(due),
+          total: formatSummaryAmount(due.total_due),
+        },
+        received: {
+          ...mapSummaryAmounts(received),
+          total: formatSummaryAmount(received.total_received),
+        },
+      };
+
+      yield put(fetchProgramSummarySuccess(summary));
+    } else {
+      yield put(
+        fetchProgramSummaryFailure(
+          response.data?.message || 'Failed to fetch program summary',
+        ),
+      );
+    }
+  } catch (error: any) {
+    yield put(
+      fetchProgramSummaryFailure(error?.message || 'Something went wrong'),
+    );
+  }
+}
+
 export function* dealerSaga() {
   yield takeLatest(fetchDealerListRequest.type, fetchDealerListWorker);
+  yield takeLatest(fetchProgramSummaryRequest.type, fetchProgramSummaryWorker);
 }

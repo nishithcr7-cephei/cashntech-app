@@ -18,9 +18,41 @@ export interface FetchDealerListRequest {
   isInitialLoad?: boolean;
 }
 
+export interface FetchProgramSummaryRequest {
+  programIds: string[];
+}
+
+export interface ProgramSummaryAmounts {
+  principal: string;
+  interest: string;
+  penalInterest: string;
+  charges: string;
+  total: string;
+}
+
+export interface ProgramSummaryLoanDetails {
+  anchorName: string;
+  bankName: string;
+  programApprovalDate: string;
+  programExpiryDate: string;
+  status: string;
+  programLimit: string;
+  availableLimit: string;
+  roiPercent: string;
+}
+
+export interface ProgramCounterPartySummary {
+  loanDetails: ProgramSummaryLoanDetails;
+  due: ProgramSummaryAmounts;
+  received: ProgramSummaryAmounts;
+}
+
 export interface DealerState {
   dealerList: DealerListItem[];
   loading: boolean;
   error: string | null;
   totalDealers: number;
+  programSummary: ProgramCounterPartySummary | null;
+  summaryLoading: boolean;
+  summaryError: string | null;
 }

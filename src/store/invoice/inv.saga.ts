@@ -295,6 +295,9 @@ function* updateInvoiceStatusSaga(
       'Failed to update invoice status';
     showActionToast('error', msg);
     yield put(updateInvoiceStatusFailure(msg));
+    if (action.payload.onFailure) {
+      yield call(action.payload.onFailure);
+    }
   }
 }
 
@@ -331,6 +334,9 @@ function* updateInvoiceVerificationSaga(
       'Failed to update invoice verification';
     showActionToast('error', msg);
     yield put(updateInvoiceVerificationFailure(msg));
+    if (action.payload.onFailure) {
+      yield call(action.payload.onFailure);
+    }
   }
 }
 

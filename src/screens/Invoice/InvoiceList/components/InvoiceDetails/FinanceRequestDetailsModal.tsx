@@ -19,6 +19,7 @@ import {
   AdvanceInterestFormulaModal,
   DisbursementRequestedFormulaModal,
   InvoiceAmountFormulaModal,
+  NetDisbursementFormulaModal,
 } from '@components/AdvanceInterestFormulaModal';
 import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
@@ -235,6 +236,8 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
     useState(false);
   const [showDisbursementRequestedFormula, setShowDisbursementRequestedFormula] =
     useState(false);
+  const [showNetDisbursementFormula, setShowNetDisbursementFormula] =
+    useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -244,6 +247,7 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
     setShowAdvanceInterestFormula(false);
     setShowInvoiceAmountFormula(false);
     setShowDisbursementRequestedFormula(false);
+    setShowNetDisbursementFormula(false);
   }, [visible, preview?.invoice_ref_no]);
 
   const display = useMemo(() => {
@@ -538,6 +542,9 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                         onAdvanceInterestInfoPress={() =>
                           setShowAdvanceInterestFormula(true)
                         }
+                        onNetDisbursementInfoPress={() =>
+                          setShowNetDisbursementFormula(true)
+                        }
                       />
 
                       <Text style={styles.sectionTitle}>Attachments</Text>
@@ -669,6 +676,11 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
       <DisbursementRequestedFormulaModal
         visible={showDisbursementRequestedFormula}
         onClose={() => setShowDisbursementRequestedFormula(false)}
+        amounts={display.formula}
+      />
+      <NetDisbursementFormulaModal
+        visible={showNetDisbursementFormula}
+        onClose={() => setShowNetDisbursementFormula(false)}
         amounts={display.formula}
       />
     </>

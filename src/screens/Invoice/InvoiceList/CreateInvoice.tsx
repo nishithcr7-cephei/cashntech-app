@@ -12,12 +12,13 @@ import {
 } from 'react-native';
 import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
-import {AppBar, Container} from '@components/index';
+import {AppBar, Container, BusyOverlay} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
 import {ensureCameraPermission} from '@services/permissions';
 import {runGSTInvoiceExtractionWithAI} from '@services/ocr';
+import type {GeminiRetryEvent} from '@services/geminiOcr';
 import {
   InvoiceForm,
   type PartyTaxOption,
@@ -26,20 +27,25 @@ import {
 import {InvoiceCamera} from '@components/InvoiceCamera';
 import {UploadModal} from '@components/index';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
-import type {GSTInvoiceJSON} from '@services/gstInvoiceExtractor';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {Camera, Upload, AI, LeftChevron} from '@assets/Icons';
 import Toast from 'react-native-toast-message';
 import {
   computeInvoiceLineAggregates,
   computeInvoiceNetTotal,
-  computeInvoiceTaxableBase,
-  computeTdsAmount,
   computeVendorFinanceAdvanceInterest,
   extractRoiPercent,
   isTdsPartyTaxName,
   round2,
 } from '@utils/invoiceTotals';
+import {
+  computeCreateInvoiceTotals,
+  computeInvoiceAmountForLimitCheck,
+  getOcrPartyLabels,
+  shouldWarnVfZeroAdvanceInterest,
+} from '@utils/invoiceCreateCalc';
+import {convertOcrLineItems} from '@utils/ocrLineItemMapper';
+import {normalizeOcrPatch} from '@utils/ocrPatchNormalizer';
 import {expectedNextApprovalAfterCreate} from '@utils/invoiceStatusDisplay';
 import {invoiceApi} from '@services/api/invoice.api';
 import {
@@ -100,31 +106,6 @@ const getInitialFields = (): InvoiceFields => ({
   tdsAmount: '0',
   upfrontInterest: '0',
 });
-
-const convertOcrLineItems = (
-  gstItems: GSTInvoiceJSON['line_items'],
-): InvoiceLineItem[] =>
-  gstItems.map(item => {
-    const hasTax = (item.tax_amount || 0) > 0
-      && (item.tax_percentage || 0) > 0;
-    return {
-      itemName: item.description || '',
-      quantity: item.quantity.toString(),
-      unit: item.unit || 'PCS',
-      pricePerQuantity: item.rate_per_unit.toString(),
-      total: item.taxable_amount.toString(),
-      taxType: hasTax ? (item.tax_type || 'GST') : '',
-      taxPercentage: hasTax
-        ? (item.tax_percentage ?? 0).toString() : '',
-      taxAmount: hasTax
-        ? (item.tax_amount ?? 0).toFixed(2) : '',
-      taxes: hasTax ? [{
-        taxType: item.tax_type || 'GST',
-        taxPercentage: (item.tax_percentage ?? 0).toString(),
-        taxAmount: (item.tax_amount ?? 0).toFixed(2),
-      }] : [{taxType: '', taxPercentage: '', taxAmount: ''}],
-    };
-  });
 
 interface ValidationErrors {
   invoiceNumber?: string;
@@ -245,6 +226,7 @@ export const CreateInvoice: React.FC = () => {
   const fieldsRef = useRef(fields);
   fieldsRef.current = fields;
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrStatusText, setOcrStatusText] = useState('Extracting invoice data...');
   const [isOcrPopulated, setIsOcrPopulated] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [isOcrUploadModalVisible, setIsOcrUploadModalVisible] = useState(false);
@@ -300,6 +282,16 @@ export const CreateInvoice: React.FC = () => {
     return Array.from(byAccount.values());
   }, [dealerInfo]);
 
+  const resolvedCreditAccountId = useMemo(
+    () =>
+      resolveCreditAccountIdFromOptions(
+        fields.creditTo,
+        creditToOptions,
+        fields.creditToAccountId,
+      ),
+    [fields.creditTo, fields.creditToAccountId, creditToOptions],
+  );
+
   // Keep creditToAccountId in sync once bank options load (encrypted/raw
   // mismatch used to leave UUID empty even when account number was shown).
   useEffect(() => {
@@ -318,11 +310,7 @@ export const CreateInvoice: React.FC = () => {
       return;
     }
 
-    const resolved = resolveCreditAccountIdFromOptions(
-      fields.creditTo,
-      creditToOptions,
-      fields.creditToAccountId,
-    );
+    const resolved = resolvedCreditAccountId;
     if (resolved && resolved !== fields.creditToAccountId) {
       setFields(prev => ({...prev, creditToAccountId: resolved}));
       // Clear stale field error once UUID is linked (same account already shown).
@@ -338,16 +326,12 @@ export const CreateInvoice: React.FC = () => {
     fields.creditTo,
     fields.creditToAccountId,
     mode,
+    resolvedCreditAccountId,
   ]);
 
   const isFormValid = useMemo(() => {
     const tenorDays = parseInt(String(fields.tenor ?? '').trim(), 10);
     const tenorOk = Number.isFinite(tenorDays) && tenorDays > 0;
-    const resolvedCreditAccountId = resolveCreditAccountIdFromOptions(
-      fields.creditTo,
-      creditToOptions,
-      fields.creditToAccountId,
-    );
     // Unified backend requires credit_to_account_id (UUID) on create for
     // DF + VF alike; edit mode pass-through only, no re-selection needed.
     const creditAccountOk =
@@ -364,7 +348,7 @@ export const CreateInvoice: React.FC = () => {
       fields.creditTo?.trim() &&
       creditAccountOk
     );
-  }, [fields, mode, productType, creditToOptions]);
+  }, [fields, mode, productType, resolvedCreditAccountId]);
 
   console.log('[CreateInvoice] Render, createInvoiceLoading:', createInvoiceLoading, 'isFormValid:', isFormValid);
   const [selectedParticipant, setSelectedParticipant] = useState<DealerInfoParticipant | null>(null);
@@ -410,8 +394,14 @@ export const CreateInvoice: React.FC = () => {
     threshold: number | null;
   } | null>(null);
   const [ytdInvoiceTotal, setYtdInvoiceTotal] = useState(0);
+  const ocrPartyLabels = useMemo(
+    () => getOcrPartyLabels(productType),
+    [productType],
+  );
   const isOcrPrerequisitesMet = useMemo(() => {
     const tenorDays = parseInt(String(fields.tenor ?? '').trim(), 10);
+    const creditAccountOk =
+      !requiresCreditToAccountId(productType) || !!resolvedCreditAccountId;
     return !!(
       fields.dealer?.trim() &&
       fields.dealerCode?.trim() &&
@@ -420,7 +410,8 @@ export const CreateInvoice: React.FC = () => {
       fields.invoiceDueDate?.trim() &&
       Number.isFinite(tenorDays) &&
       tenorDays > 0 &&
-      fields.creditTo?.trim()
+      fields.creditTo?.trim() &&
+      creditAccountOk
     );
   }, [
     fields.dealer,
@@ -430,18 +421,27 @@ export const CreateInvoice: React.FC = () => {
     fields.invoiceDueDate,
     fields.tenor,
     fields.creditTo,
+    productType,
+    resolvedCreditAccountId,
   ]);
 
   const showOcrPrerequisitesToast = useCallback(() => {
     const missing: string[] = [];
-    if (!fields.dealer?.trim()) missing.push('Dealer');
-    if (!fields.dealerCode?.trim()) missing.push('Code');
-    if (!fields.odAccountNumber?.trim()) missing.push('OD Account');
+    if (!fields.dealer?.trim()) missing.push(ocrPartyLabels.party);
+    if (!fields.dealerCode?.trim()) missing.push(ocrPartyLabels.code);
+    if (!fields.odAccountNumber?.trim()) missing.push(ocrPartyLabels.od);
     if (!fields.invoiceDate?.trim()) missing.push('Inv. Date');
     if (!fields.invoiceDueDate?.trim()) missing.push('Due Date');
     const tenorDays = parseInt(String(fields.tenor ?? '').trim(), 10);
     if (!Number.isFinite(tenorDays) || tenorDays <= 0) missing.push('Tenor');
-    if (!fields.creditTo?.trim()) missing.push('Credit To');
+    if (!fields.creditTo?.trim()) {
+      missing.push('Credit To');
+    } else if (
+      requiresCreditToAccountId(productType) &&
+      !resolvedCreditAccountId
+    ) {
+      missing.push('Valid Credit To account');
+    }
 
     Toast.show({
       type: 'info',
@@ -457,6 +457,9 @@ export const CreateInvoice: React.FC = () => {
     fields.invoiceDueDate,
     fields.tenor,
     fields.creditTo,
+    ocrPartyLabels,
+    productType,
+    resolvedCreditAccountId,
   ]);
 
   const isOcrTemporarilyDisabled = false;
@@ -566,41 +569,32 @@ export const CreateInvoice: React.FC = () => {
       'upfront';
 
   // Client-confirmed VF Upfront: TDS excludes GST; preserve existing base for other flows.
-  const invoiceTotals = useMemo(() => {
-    const {subTotal, discountTotal, taxTotal} = computeInvoiceLineAggregates(
+  const invoiceTotals = useMemo(
+    () =>
+      computeCreateInvoiceTotals({
+        items: fields.items,
+        fieldsTax: {
+          cgst: fields.cgst,
+          sgst: fields.sgst,
+          taxTotal: fields.taxTotal,
+        },
+        productType,
+        isVendorFinanceUpfront,
+        tdsRatePercent: tdsTaxConfig?.ratePercent,
+        tdsThreshold: tdsTaxConfig?.threshold,
+        ytdInvoiceTotal,
+      }),
+    [
       fields.items,
-      {
-        cgst: fields.cgst,
-        sgst: fields.sgst,
-        taxTotal: fields.taxTotal,
-      },
-    );
-    const base = isVendorFinanceUpfront
-      ? Math.max(0, round2(subTotal - discountTotal))
-      : computeInvoiceTaxableBase(subTotal, discountTotal, taxTotal);
-    const hasSelectedTax = (fields.items || []).some(item => {
-      if (String(item.taxType || '').trim()) return true;
-      return (item.taxes || []).some(tax => String(tax.taxType || '').trim());
-    });
-    const tds = hasSelectedTax
-      ? computeTdsAmount({
-          ratePercent: tdsTaxConfig?.ratePercent,
-          threshold: tdsTaxConfig?.threshold,
-          ytdInvoiceTotal,
-          currentBase: base,
-          requireThresholdExceeded: isVendorFinanceUpfront,
-        })
-      : 0;
-    return {subTotal, discountTotal, taxTotal, tds};
-  }, [
-    fields.items,
-    fields.cgst,
-    fields.sgst,
-    fields.taxTotal,
-    tdsTaxConfig,
-    ytdInvoiceTotal,
-    isVendorFinanceUpfront,
-  ]);
+      fields.cgst,
+      fields.sgst,
+      fields.taxTotal,
+      productType,
+      tdsTaxConfig,
+      ytdInvoiceTotal,
+      isVendorFinanceUpfront,
+    ],
+  );
 
   // VF Upfront AI = (Invoice Amount − TDS) × ROI% × (Tenor/365).
   const advanceInterestInfo = useMemo(
@@ -1441,11 +1435,25 @@ export const CreateInvoice: React.FC = () => {
     setIsOcrUploadModalVisible(true);
   };
 
+  const handleGeminiOcrRetry = useCallback((event: GeminiRetryEvent) => {
+    const {failedAttempt, nextAttempt, maxAttempts} = event;
+    setOcrStatusText(`Retrying attempt ${nextAttempt} of ${maxAttempts}...`);
+    Toast.show({
+      type: 'info',
+      text1: 'Gemini AI OCR',
+      text2: `Attempt ${failedAttempt} failed. Retrying (${nextAttempt}/${maxAttempts})...`,
+      visibilityTime: 3500,
+    });
+  }, []);
+
   const runOcrAndPatchForm = async (uriOrPath: string | null) => {
     if (!uriOrPath) return;
     try {
       setOcrLoading(true);
-      const {gstInvoice} = await runGSTInvoiceExtractionWithAI(uriOrPath);
+      setOcrStatusText('Extracting invoice data...');
+      const {gstInvoice} = await runGSTInvoiceExtractionWithAI(uriOrPath, {
+        onRetry: handleGeminiOcrRetry,
+      });
       const header = gstInvoice?.invoice_header;
       const summary = gstInvoice?.financial_summary;
       const gstLineItems = gstInvoice?.line_items ?? [];
@@ -1506,18 +1514,35 @@ export const CreateInvoice: React.FC = () => {
         taxTotal,
         grandTotal,
       }));
-      setFields(prev => ({
-        ...prev,
-        invoiceNumber: header?.invoice_number || prev.invoiceNumber,
-        associatedPO: header?.order_no || prev.associatedPO,
-        earlyPaymentDiscount:
-          header?.early_payment_discount || prev.earlyPaymentDiscount || '',
-        items: extractedItems.length > 0 ? extractedItems : prev.items,
-        cgst,
-        sgst,
-        taxTotal,
-        grandTotal,
-      }));
+      setFields(prev => {
+        const ocrPatch = normalizeOcrPatch(
+          {
+            invoiceNumber: header?.invoice_number || prev.invoiceNumber,
+            associatedPO: header?.order_no || prev.associatedPO,
+            earlyPaymentDiscount:
+              header?.early_payment_discount || prev.earlyPaymentDiscount || '',
+            items: extractedItems.length > 0 ? extractedItems : prev.items,
+            cgst,
+            sgst,
+            taxTotal,
+            grandTotal,
+          },
+          productType,
+        );
+        return {...prev, ...ocrPatch};
+      });
+
+      if (extractedItems.length === 0) {
+        setIsOcrPopulated(false);
+        Toast.show({
+          type: 'info',
+          text1: 'No line items found on invoice',
+          text2: 'Scan again or add items manually',
+          visibilityTime: 4000,
+        });
+        return;
+      }
+
       setIsOcrPopulated(true);
       Toast.show({
         type: 'success',
@@ -1527,9 +1552,17 @@ export const CreateInvoice: React.FC = () => {
         visibilityTime: 2500,
       });
     } catch (e: any) {
-      Alert.alert('OCR Error', e?.message ?? 'Failed to extract invoice data.');
+      Toast.show({
+        type: 'error',
+        text1: 'Gemini AI OCR failed',
+        text2:
+          e?.message ??
+          'Failed to extract invoice data. Please try again in a few seconds.',
+        visibilityTime: 7000,
+      });
     } finally {
       setOcrLoading(false);
+      setOcrStatusText('Extracting invoice data...');
     }
   };
 
@@ -1555,18 +1588,11 @@ export const CreateInvoice: React.FC = () => {
       // apmAvailableLimit is set at screen load from fresh getDealerInfo call.
       // If null → fetch failed (don't block, allow cautiously). If number → enforce.
       if (apmAvailableLimit !== null) {
-        const subTotalCalc = fields.items.reduce((s, i) => s + (parseFloat(i.total) || 0), 0);
-        const discCalc = fields.items.reduce((s, i) => s + (parseFloat(i.discountAmount || '0') || 0), 0);
-        const itemTaxCalc = fields.items.reduce((s, i) => {
-          if (i.taxes?.length) return s + i.taxes.reduce((ts, t) => ts + (parseFloat(t.taxAmount || '0') || 0), 0);
-          return s + (parseFloat(i.taxAmount || '0') || 0);
-        }, 0);
-        const ocrTaxTotal =
-          (parseFloat(fields.cgst || '0') || 0) +
-          (parseFloat(fields.sgst || '0') || 0) +
-          (parseFloat(fields.taxTotal || '0') || 0);
-        const taxCalc = itemTaxCalc > 0 ? itemTaxCalc : ocrTaxTotal;
-        const invoiceTotal = Math.max(0, subTotalCalc - discCalc + taxCalc);
+        const invoiceTotal = computeInvoiceAmountForLimitCheck(fields.items, {
+          cgst: fields.cgst,
+          sgst: fields.sgst,
+          taxTotal: fields.taxTotal,
+        });
 
         console.log('[EditMode] Limit check: invoiceTotal=', invoiceTotal, 'availableLimit=', apmAvailableLimit);
 
@@ -1581,15 +1607,11 @@ export const CreateInvoice: React.FC = () => {
       }
     } else {
       // Create mode: calculate from participant
-      const subTotalCalculated = fields.items.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0);
-      const discountTotalCalculated = fields.items.reduce((sum, item) => sum + (parseFloat(item.discountAmount || '0') || 0), 0);
-      const taxTotalCalculated = fields.items.reduce((sum, item) => {
-        if (item.taxes?.length) {
-          return sum + item.taxes.reduce((s, t) => s + (parseFloat(t.taxAmount || '0') || 0), 0);
-        }
-        return sum + (parseFloat(item.taxAmount || '0') || 0);
-      }, 0);
-      const invoiceTotal = Math.max(0, subTotalCalculated - discountTotalCalculated + taxTotalCalculated);
+      const invoiceTotal = computeInvoiceAmountForLimitCheck(fields.items, {
+        cgst: fields.cgst,
+        sgst: fields.sgst,
+        taxTotal: fields.taxTotal,
+      });
 
       let participant = selectedParticipant;
       if (!participant && dealerInfo?.participants?.length && fields.dealer) {
@@ -1656,6 +1678,36 @@ export const CreateInvoice: React.FC = () => {
       }
     }
 
+    if (
+      mode !== 'edit' &&
+      shouldWarnVfZeroAdvanceInterest({
+        isVendorFinanceUpfront,
+        chargeApplies: advanceInterestInfo.chargeApplies,
+        advanceInterest: aiCalc,
+        roiPercent: extractRoiPercent(selectedParticipant?.interest_parameters),
+        tenorDays: fields.tenor,
+        subTotal: subTotalCalc,
+        discountTotal: discCalc,
+        taxTotal: taxCalc,
+        tdsAmount: tdsCalc,
+      })
+    ) {
+      const shouldContinue = await new Promise<boolean>(resolve => {
+        Alert.alert(
+          'Advance Interest is ₹0.00',
+          'VF Upfront: verify Tenor and program ROI before creating this invoice.',
+          [
+            {text: 'Review', style: 'cancel', onPress: () => resolve(false)},
+            {text: 'Continue', onPress: () => resolve(true)},
+          ],
+          {cancelable: false},
+        );
+      });
+      if (!shouldContinue) {
+        return;
+      }
+    }
+
     const createdBy = userId != null ? String(userId) : '';
 
     // In Edit Mode: dispatch update directly.
@@ -1713,11 +1765,7 @@ export const CreateInvoice: React.FC = () => {
       // Golden rule: credit_to_account_id is required on create for DF + VF
       // alike on the unified backend. Resolve UUID from selected account
       // number when dropdown showed a value but accountId wasn't synced.
-      const resolvedCreditToAccountId = resolveCreditAccountIdFromOptions(
-        fields.creditTo,
-        creditToOptions,
-        fields.creditToAccountId,
-      );
+      const resolvedCreditToAccountId = resolvedCreditAccountId;
       if (requiresCreditToAccountId(productType) && !resolvedCreditToAccountId) {
         Toast.show({
           type: 'error',
@@ -2236,7 +2284,9 @@ export const CreateInvoice: React.FC = () => {
             <View style={styles.ocrSection}>
               <Text style={styles.ocrTitle}>Scan invoice for OCR</Text>
               <Text style={styles.ocrSubtitle}>
-                Capture or upload invoice image to auto-fill form fields.
+                {productType === 'vendor_finance'
+                  ? 'Capture or upload invoice image. Tenor is required for Advance Interest.'
+                  : 'Capture or upload invoice image to auto-fill form fields.'}
               </Text>
 
               <View style={styles.ocrButtons}>
@@ -2269,7 +2319,7 @@ export const CreateInvoice: React.FC = () => {
               {ocrLoading && (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color={Colors.primaryColor} />
-                  <Text style={styles.loadingText}>Extracting invoice data...</Text>
+                  <Text style={styles.loadingText}>{ocrStatusText}</Text>
                 </View>
               )}
             </View>
@@ -2360,6 +2410,16 @@ export const CreateInvoice: React.FC = () => {
             setIsProofUploadModalVisible(false);
           }
         }}
+      />
+      <BusyOverlay
+        visible={!!createInvoiceLoading}
+        message={
+          mode === 'edit'
+            ? 'Updating invoice…'
+            : mode === 'recreate'
+              ? 'Recreating invoice…'
+              : 'Creating invoice…'
+        }
       />
     </Container>
   );

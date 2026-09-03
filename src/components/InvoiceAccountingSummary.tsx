@@ -22,6 +22,7 @@ export type InvoiceAccountingSummaryProps = {
   onInvoiceAmountInfoPress?: () => void;
   onDisbursementRequestedInfoPress?: () => void;
   onAdvanceInterestInfoPress?: () => void;
+  onNetDisbursementInfoPress?: () => void;
   /** Prefix before the formatted amount, e.g. `₹`. */
   amountPrefix?: string;
   /** Suffix after the formatted amount, e.g. `/-`. */
@@ -100,6 +101,7 @@ export const InvoiceAccountingSummary: React.FC<
   onInvoiceAmountInfoPress,
   onDisbursementRequestedInfoPress,
   onAdvanceInterestInfoPress,
+  onNetDisbursementInfoPress,
   amountPrefix = '',
   amountSuffix = '',
 }) => {
@@ -178,6 +180,11 @@ export const InvoiceAccountingSummary: React.FC<
         label={SUMMARY.netDisbursementAmount}
         value={money(netDisbursementAmount)}
         kind="net"
+        trailing={
+          onNetDisbursementInfoPress ? (
+            <AdvanceInterestInfoButton onPress={onNetDisbursementInfoPress} />
+          ) : null
+        }
       />
     </View>
   );

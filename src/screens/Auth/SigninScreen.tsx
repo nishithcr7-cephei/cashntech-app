@@ -128,10 +128,6 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
     navigation.navigate(AuthScreens.PasswordScreen, {screenMode: 'forgotPass'});
   };
 
-  const onPressSignup = () => {
-    navigation.navigate(AuthScreens.SignupScreen);
-  };
-
   return (
     <Container>
       <KeyboardAwareScrollView>
@@ -193,11 +189,9 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
           />
           <View style={styles.accountContainer}>
             <Text style={styles.accountText}>{Strings.noAccountText}</Text>
-            <TouchableOpacity onPress={onPressSignup}>
-              <Text style={[styles.accountText, styles.accountLinkText]}>
-                {Strings.signupLinkText}
-              </Text>
-            </TouchableOpacity>
+            <Text style={[styles.accountText, styles.accountLinkDisabled]}>
+              {Strings.signupLinkText}
+            </Text>
           </View>
         </View>
       </KeyboardAwareScrollView>
@@ -245,12 +239,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   accountText: {
-    color: '#202325',
+    color: Colors.gray300,
     fontFamily: Fonts.GilroySemiBold,
     fontSize: scaleFont(16),
   },
-  accountLinkText: {
-    color: Colors.primaryColor,
+  accountLinkDisabled: {
+    color: Colors.gray300,
     textDecorationLine: 'underline',
   },
   countryCodeContainer: {

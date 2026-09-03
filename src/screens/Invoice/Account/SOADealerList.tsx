@@ -16,6 +16,7 @@ import {LeftChevron} from '@assets/Icons';
 import Toast from 'react-native-toast-message';
 import {
   fetchDealerListRequest,
+  fetchProgramSummaryRequest,
   resetDealerState,
 } from '@store/soa/dealer/dealer.slice';
 import {
@@ -23,7 +24,14 @@ import {
   dealerLoadingSelector,
   totalDealersSelector,
   dealerErrorSelector,
+  programSummarySelector,
+  programSummaryLoadingSelector,
+  programSummaryErrorSelector,
 } from '@store/soa/dealer/dealer.selector';
+import {
+  SHOW_SOA_VENDOR_LIST_PROGRAM_HEADER,
+  SOAVendorListProgramHeader,
+} from './SOAVendorListProgramHeader';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
@@ -62,6 +70,9 @@ export const SOADealerList: React.FC = () => {
   const loading = useSelector(dealerLoadingSelector);
   const totalDealers = useSelector(totalDealersSelector);
   const dealerError = useSelector(dealerErrorSelector);
+  const programSummary = useSelector(programSummarySelector);
+  const summaryLoading = useSelector(programSummaryLoadingSelector);
+  const summaryError = useSelector(programSummaryErrorSelector);
 
   useEffect(() => {
     if (dealerError && (dealerError.toLowerCase().includes('token expired') || dealerError.toLowerCase().includes('unauthorized'))) {
@@ -80,6 +91,27 @@ export const SOADealerList: React.FC = () => {
     }
   }, [dealerError]);
 
+  useEffect(() => {
+    if (
+      summaryError &&
+      (summaryError.toLowerCase().includes('token expired') ||
+        summaryError.toLowerCase().includes('unauthorized'))
+    ) {
+      Toast.show({
+        type: 'error',
+        text1: 'Session Expired',
+        text2: 'Your token has expired. Please log in again.',
+        visibilityTime: 4000,
+      });
+    } else if (summaryError) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: summaryError,
+      });
+    }
+  }, [summaryError]);
+
   // Fetch dealer list when selected program changes
   useEffect(() => {
     if (selectedProgramIds.length > 0) {
@@ -89,6 +121,13 @@ export const SOADealerList: React.FC = () => {
           isInitialLoad: true,
         }),
       );
+      if (SHOW_SOA_VENDOR_LIST_PROGRAM_HEADER) {
+        dispatch(
+          fetchProgramSummaryRequest({
+            programIds: selectedProgramIds,
+          }),
+        );
+      }
     }
     return () => {
       dispatch(resetDealerState());
@@ -209,6 +248,33 @@ export const SOADealerList: React.FC = () => {
       </View>
 
       <View style={styles.content}>
+        {SHOW_SOA_VENDOR_LIST_PROGRAM_HEADER &&
+        selectedProgramIds.length > 0 &&
+        (summaryLoading || programSummary) ? (
+          <SOAVendorListProgramHeader
+            programName={programName}
+            anchorName={programSummary?.loanDetails.anchorName ?? null}
+            bankName={
+              programSummary?.loanDetails.bankName ?? routeBankName ?? null
+            }
+            status={programSummary?.loanDetails.status ?? routeStatus ?? null}
+            programApprovalDate={
+              programSummary?.loanDetails.programApprovalDate ?? null
+            }
+            programExpiryDate={
+              programSummary?.loanDetails.programExpiryDate ?? null
+            }
+            programLimit={programSummary?.loanDetails.programLimit ?? null}
+            availableLimit={
+              programSummary?.loanDetails.availableLimit ?? null
+            }
+            roiPercent={programSummary?.loanDetails.roiPercent ?? null}
+            due={programSummary?.due ?? null}
+            received={programSummary?.received ?? null}
+            loading={summaryLoading}
+          />
+        ) : null}
+
         <View style={styles.dealersHeader}>
           <Text style={styles.dealersLabel}>{partyLabelPlural}</Text>
           <View style={styles.badge}>

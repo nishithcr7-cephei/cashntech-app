@@ -11,13 +11,19 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {useSelector} from 'react-redux';
 import {selectDealerInfo} from '@store/invoice/inv.selector';
 import {AppBar, Container, InvoiceStatusBadges} from '@components/index';
-import {AdvanceInterestFormulaModal} from '@components/AdvanceInterestFormulaModal';
+import {
+  AdvanceInterestFormulaModal,
+  DisbursementRequestedFormulaModal,
+  InvoiceAmountFormulaModal,
+  NetDisbursementFormulaModal,
+} from '@components/AdvanceInterestFormulaModal';
 import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 import {decryptValue} from '@utils/decrypt';
+import {computeCreateInvoiceSummaryFromFields} from '@utils/invoiceCreateCalc';
 import type {AdvanceInterestBreakdown} from '@utils/invoiceTotals';
 import type {InvoiceFields} from '@type/Invoice';
 
@@ -109,45 +115,27 @@ const mapPreviewFieldsToInvoiceData = (
     },
   );
 
-  const subTotalBeforeDiscountTax = normalizedItems.reduce(
-    (sum, it) => sum + (Number(it.lineTotal) || 0),
-    0,
-  );
-  const itemDiscountTotal = normalizedItems.reduce(
-    (sum, it) => sum + (Number(it.discountAmount) || 0),
-    0,
-  );
-  const itemTaxTotal = normalizedItems.reduce(
-    (sum, it) => sum + (Number(it.taxAmount) || 0),
-    0,
-  );
+  const summary = computeCreateInvoiceSummaryFromFields({
+    items: fields.items || [],
+    fieldsTax: {
+      cgst: fields.cgst,
+      sgst: fields.sgst,
+      taxTotal: fields.taxTotal,
+    },
+    tdsAmount: fields.tdsAmount,
+    upfrontInterest: fields.upfrontInterest,
+  });
 
-  const formDiscountValue = Number(fields.discountValue) || 0;
-  const discountAmount =
-    itemDiscountTotal ||
-    (fields.discountType === 'percentage'
-      ? (subTotalBeforeDiscountTax * formDiscountValue) / 100
-      : formDiscountValue);
-
-  const formTaxTotal = (Number(fields.cgst) || 0) + (Number(fields.sgst) || 0);
-  const taxAmount = itemTaxTotal || formTaxTotal;
-
-  const subTotal = subTotalBeforeDiscountTax;
-  const tdsAmount = Number(fields.tdsAmount) || 0;
-  const advanceInterest = Number(fields.upfrontInterest) || 0;
-  // grandTotal from create already includes AI deduct (web Create parity).
-  const total =
-    Number(fields.grandTotal) ||
-    subTotalBeforeDiscountTax - discountAmount + taxAmount - tdsAmount - advanceInterest;
+  const subTotal = summary.subTotal;
+  const discountAmount = summary.discountTotal;
+  const taxAmount = summary.taxTotal;
+  const tdsAmount = summary.tdsAmount;
+  const advanceInterest = summary.advanceInterest;
+  const total = summary.netTotal;
 
   const discountPercent =
-    subTotalBeforeDiscountTax > 0
-      ? (discountAmount / subTotalBeforeDiscountTax) * 100
-      : 0;
-  const taxPercent =
-    subTotalBeforeDiscountTax > 0
-      ? (taxAmount / subTotalBeforeDiscountTax) * 100
-      : 0;
+    subTotal > 0 ? (discountAmount / subTotal) * 100 : 0;
+  const taxPercent = subTotal > 0 ? (taxAmount / subTotal) * 100 : 0;
 
   const fallbackCounterParty =
     decryptValue(fields.dealer ?? '') || fields.dealer || '';
@@ -244,6 +232,12 @@ export const InvoiceUploadPreview: React.FC = () => {
   const roiPercent = Number(route?.params?.roiPercent) || 0;
   const [showAdvanceInterestFormula, setShowAdvanceInterestFormula] =
     useState(false);
+  const [showInvoiceAmountFormula, setShowInvoiceAmountFormula] =
+    useState(false);
+  const [showDisbursementRequestedFormula, setShowDisbursementRequestedFormula] =
+    useState(false);
+  const [showNetDisbursementFormula, setShowNetDisbursementFormula] =
+    useState(false);
 
   const fallbackAnchorName =
     previewAnchorName ||
@@ -278,9 +272,8 @@ export const InvoiceUploadPreview: React.FC = () => {
   }, [invoiceData.earlyPaymentDiscount]);
 
   const showAdvanceInterestRow =
-    advanceInterestBreakdown?.chargeApplies ||
-    invoiceData.advanceInterest > 0 ||
-    isVendorFinance;
+    advanceInterestBreakdown?.chargeApplies === true ||
+    invoiceData.advanceInterest > 0;
 
   const closePreview = () => {
     (navigation as any).navigate('CreateInvoice', {
@@ -463,8 +456,15 @@ export const InvoiceUploadPreview: React.FC = () => {
             }
             netDisbursementAmount={invoiceData.total}
             showAdvanceInterest={showAdvanceInterestRow}
+            onInvoiceAmountInfoPress={() => setShowInvoiceAmountFormula(true)}
+            onDisbursementRequestedInfoPress={() =>
+              setShowDisbursementRequestedFormula(true)
+            }
             onAdvanceInterestInfoPress={() =>
               setShowAdvanceInterestFormula(true)
+            }
+            onNetDisbursementInfoPress={() =>
+              setShowNetDisbursementFormula(true)
             }
             amountSuffix="/-"
           />
@@ -529,6 +529,38 @@ export const InvoiceUploadPreview: React.FC = () => {
             invoiceData.advanceInterest,
           roiPercent,
           tenorDays: invoiceData.tenor,
+        }}
+      />
+      <InvoiceAmountFormulaModal
+        visible={showInvoiceAmountFormula}
+        onClose={() => setShowInvoiceAmountFormula(false)}
+        amounts={{
+          basicAmount: invoiceData.subTotal,
+          discount: invoiceData.discount.amount,
+          gstAmount: invoiceData.tax.amount,
+        }}
+      />
+      <DisbursementRequestedFormulaModal
+        visible={showDisbursementRequestedFormula}
+        onClose={() => setShowDisbursementRequestedFormula(false)}
+        amounts={{
+          basicAmount: invoiceData.subTotal,
+          discount: invoiceData.discount.amount,
+          gstAmount: invoiceData.tax.amount,
+          tdsAmount: invoiceData.tdsAmount,
+        }}
+      />
+      <NetDisbursementFormulaModal
+        visible={showNetDisbursementFormula}
+        onClose={() => setShowNetDisbursementFormula(false)}
+        amounts={{
+          basicAmount: invoiceData.subTotal,
+          discount: invoiceData.discount.amount,
+          gstAmount: invoiceData.tax.amount,
+          tdsAmount: invoiceData.tdsAmount,
+          advanceInterest:
+            advanceInterestBreakdown?.advanceInterest ??
+            invoiceData.advanceInterest,
         }}
       />
     </Container>

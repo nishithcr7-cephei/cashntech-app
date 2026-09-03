@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {formatIndianNumber} from '@utils/Utils';
+import {ProgramSummaryAmounts} from '@store/soa/dealer/dealer.types';
 
 const EXPANDED_MAX_HEIGHT = Math.round(Dimensions.get('window').height * 0.36);
 
@@ -24,10 +26,14 @@ export type SOAVendorListProgramHeaderProps = {
   anchorName?: string | null;
   bankName?: string | null;
   status?: string | null;
-  programLimit?: string | number | null;
-  availableLimit?: string | number | null;
-  principalDpd?: string | number | null;
-  totalDue?: string | number | null;
+  programApprovalDate?: string | null;
+  programExpiryDate?: string | null;
+  programLimit?: string | null;
+  availableLimit?: string | null;
+  roiPercent?: string | null;
+  due?: ProgramSummaryAmounts | null;
+  received?: ProgramSummaryAmounts | null;
+  loading?: boolean;
 };
 
 const DASH = '-';
@@ -99,14 +105,28 @@ export const SOAVendorListProgramHeader: React.FC<
   anchorName,
   bankName,
   status,
+  programApprovalDate,
+  programExpiryDate,
   programLimit,
   availableLimit,
-  principalDpd,
-  totalDue,
+  roiPercent,
+  due,
+  received,
+  loading = false,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const statusText = displayText(status);
   const isActive = statusText.toLowerCase() === 'active';
+  const totalDue = due?.total ?? null;
+
+  if (loading) {
+    return (
+      <View style={[styles.card, styles.loadingCard]}>
+        <ActivityIndicator size="small" color={Colors.primaryColor} />
+        <Text style={styles.loadingText}>Loading loan details...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.card}>
@@ -114,13 +134,15 @@ export const SOAVendorListProgramHeader: React.FC<
         <Text style={styles.sectionTitle}>LOAN DETAILS</Text>
       </View>
       <DetailRow label="Program Name" value={displayText(programName)} />
+      <DetailRow label="Anchor" value={displayText(anchorName)} />
       <DetailRow label="Bank" value={displayText(bankName)} />
       <View style={styles.detailRow}>
         <Text style={styles.detailLabel}>Account Status</Text>
         <Text
           style={[
             styles.detailValue,
-            statusText !== DASH && (isActive ? styles.statusActive : styles.statusInactive),
+            statusText !== DASH &&
+              (isActive ? styles.statusActive : styles.statusInactive),
           ]}>
           {statusText}
         </Text>
@@ -132,29 +154,43 @@ export const SOAVendorListProgramHeader: React.FC<
           style={styles.expandedScroll}
           nestedScrollEnabled
           showsVerticalScrollIndicator>
-          <DetailRow label="Anchor" value={displayText(anchorName)} />
-          <DetailRow label="Program Approval Date" value={DASH} />
-          <DetailRow label="Program Expiry Date" value={DASH} />
-          <DetailRow label="Program Limit" value={displayAmount(programLimit)} />
-          <DetailRow label="Available Limit" value={displayAmount(availableLimit)} />
-          <DetailRow label="ROI%" value={DASH} />
           <DetailRow
-            label="Principal DPD(max)"
-            value={
-              principalDpd == null || principalDpd === ''
-                ? DASH
-                : String(principalDpd)
-            }
+            label="Program Approval Date"
+            value={displayText(programApprovalDate)}
           />
-          <DetailRow label="Interest DPD(max)" value={DASH} />
+          <DetailRow
+            label="Program Expiry Date"
+            value={displayText(programExpiryDate)}
+          />
+          <DetailRow
+            label="Program Limit"
+            value={displayAmount(programLimit)}
+          />
+          <DetailRow
+            label="Available Limit"
+            value={displayAmount(availableLimit)}
+          />
+          <DetailRow label="ROI%" value={displayText(roiPercent)} />
 
           <View style={styles.breakdownRow}>
             <View style={[styles.breakdownCol, styles.dueCol]}>
               <Text style={[styles.breakdownTitle, styles.dueTitle]}>DUE</Text>
-              <AmountRow label="Principal" value={DASH} />
-              <AmountRow label="Interest" value={DASH} />
-              <AmountRow label="Penal Interest" value={DASH} />
-              <AmountRow label="Charges" value={DASH} />
+              <AmountRow
+                label="Principal"
+                value={displayAmount(due?.principal)}
+              />
+              <AmountRow
+                label="Interest"
+                value={displayAmount(due?.interest)}
+              />
+              <AmountRow
+                label="Penal Interest"
+                value={displayAmount(due?.penalInterest)}
+              />
+              <AmountRow
+                label="Charges"
+                value={displayAmount(due?.charges)}
+              />
               <AmountRow
                 label="Total Due"
                 value={displayAmount(totalDue)}
@@ -165,11 +201,27 @@ export const SOAVendorListProgramHeader: React.FC<
               <Text style={[styles.breakdownTitle, styles.receivedTitle]}>
                 RECEIVED
               </Text>
-              <AmountRow label="Principal" value={DASH} />
-              <AmountRow label="Interest" value={DASH} />
-              <AmountRow label="Penal Interest" value={DASH} />
-              <AmountRow label="Charges" value={DASH} />
-              <AmountRow label="Total Received" value={DASH} emphasize />
+              <AmountRow
+                label="Principal"
+                value={displayAmount(received?.principal)}
+              />
+              <AmountRow
+                label="Interest"
+                value={displayAmount(received?.interest)}
+              />
+              <AmountRow
+                label="Penal Interest"
+                value={displayAmount(received?.penalInterest)}
+              />
+              <AmountRow
+                label="Charges"
+                value={displayAmount(received?.charges)}
+              />
+              <AmountRow
+                label="Total Received"
+                value={displayAmount(received?.total)}
+                emphasize
+              />
             </View>
           </View>
         </ScrollView>
@@ -195,6 +247,16 @@ const styles = StyleSheet.create({
     marginTop: scaleHeight(8),
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E6E6E6',
+  },
+  loadingCard: {
+    alignItems: 'center',
+    paddingVertical: scaleHeight(20),
+    gap: scaleHeight(8),
+  },
+  loadingText: {
+    fontSize: scaleFont(12),
+    color: Colors.graybase,
+    fontFamily: Fonts.GilroyMedium,
   },
   titleRow: {
     flexDirection: 'row',

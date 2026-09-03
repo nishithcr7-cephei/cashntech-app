@@ -16,6 +16,7 @@ import {
   InvoiceAttachmentsModal,
   ProgramBreadcrumb,
   BulkReviewModal,
+  BusyOverlay,
 } from '@components/index';
 import {BulkActionSheet} from './BulkActionSheet';
 import {Colors} from '@constants/index';
@@ -140,6 +141,8 @@ export const InvoiceDetails: React.FC = () => {
     handleBulkAction,
     bulkLoading,
     setBulkLoading,
+    actionBusy,
+    actionBusyMessage,
     setSelectedInvoiceIds,
     isInvoiceSelectable,
     isAnchorAllAccess,
@@ -410,7 +413,11 @@ export const InvoiceDetails: React.FC = () => {
           anchorCheckerInvoiceDetails ?? selectedInvoiceDetails
         }
         detailsLoading={anchorCheckerDetailsLoading}
+        autoCloseOnAction={false}
         onClose={() => {
+          if (actionBusy) {
+            return;
+          }
           setShowApproveRejectModal(false);
           setSelectedInvoiceId(null);
           setSelectedInvoiceNo(null);
@@ -514,6 +521,19 @@ export const InvoiceDetails: React.FC = () => {
         requireGrnDate={isVfAnchorMaker}
         onSubmit={handleBulkReviewSubmit}
         loading={bulkLoading}
+      />
+
+      <BusyOverlay
+        visible={actionBusy || bulkLoading || financeRequestSubmitting}
+        message={
+          actionBusy
+            ? actionBusyMessage
+            : bulkLoading
+              ? 'Updating invoices…'
+              : financeRequestSubmitting
+                ? 'Submitting finance request…'
+                : 'Please wait…'
+        }
       />
     </Container>
   );

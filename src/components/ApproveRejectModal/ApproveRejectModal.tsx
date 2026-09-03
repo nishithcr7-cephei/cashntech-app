@@ -27,6 +27,7 @@ import {
   AdvanceInterestFormulaModal,
   DisbursementRequestedFormulaModal,
   InvoiceAmountFormulaModal,
+  NetDisbursementFormulaModal,
 } from '@components/AdvanceInterestFormulaModal';
 import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
@@ -117,6 +118,8 @@ type ApproveRejectModalProps = {
   onReject?: (invoiceId: string, remarks?: string, grnDate?: string) => void;
   /** CashnTech admin verification — On Hold */
   onHold?: (invoiceId: string, remarks?: string) => void;
+  /** When false, parent closes the modal after the API finishes. */
+  autoCloseOnAction?: boolean;
 };
 
 const GRN_DATE_FORMATS = ['DD-MM-YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'] as const;
@@ -250,6 +253,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   onApprove,
   onReject,
   onHold,
+  autoCloseOnAction = true,
 }) => {
   const insets = useSafeAreaInsets();
   const [remarks, setRemarks] = useState('');
@@ -266,6 +270,8 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
   const [showInvoiceAmountFormula, setShowInvoiceAmountFormula] =
     useState(false);
   const [showDisbursementRequestedFormula, setShowDisbursementRequestedFormula] =
+    useState(false);
+  const [showNetDisbursementFormula, setShowNetDisbursementFormula] =
     useState(false);
 
   const effectiveCode = getEffectiveProductCode(productCode);
@@ -376,7 +382,9 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
     if (invoiceId && onApprove) {
       onApprove(invoiceId, remarks.trim() || undefined, resolveGrnForApi());
     }
-    handleClose();
+    if (autoCloseOnAction) {
+      handleClose();
+    }
   };
 
   const handleReject = () => {
@@ -395,7 +403,9 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
     if (invoiceId && onReject) {
       onReject(invoiceId, remarks.trim() || undefined, grn);
     }
-    handleClose();
+    if (autoCloseOnAction) {
+      handleClose();
+    }
   };
 
   const handleCashnTechSubmit = () => {
@@ -413,7 +423,9 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
     } else if (selectedStatus === 'Hold') {
       onHold?.(invoiceId, remark);
     }
-    handleClose();
+    if (autoCloseOnAction) {
+      handleClose();
+    }
   };
 
   const openAttachment = (fullUrl: string) => {
@@ -630,6 +642,9 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                       }
                       onAdvanceInterestInfoPress={() =>
                         setShowAdvanceInterestFormula(true)
+                      }
+                      onNetDisbursementInfoPress={() =>
+                        setShowNetDisbursementFormula(true)
                       }
                     />
 
@@ -877,6 +892,17 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
         discount: details.discountAmount ?? 0,
         gstAmount: details.taxAmount ?? 0,
         tdsAmount: details.tdsAmount ?? 0,
+      }}
+    />
+    <NetDisbursementFormulaModal
+      visible={showNetDisbursementFormula}
+      onClose={() => setShowNetDisbursementFormula(false)}
+      amounts={{
+        basicAmount: details.subTotalAmount ?? 0,
+        discount: details.discountAmount ?? 0,
+        gstAmount: details.taxAmount ?? 0,
+        tdsAmount: details.tdsAmount ?? 0,
+        advanceInterest: details.advanceInterest ?? 0,
       }}
     />
     </>

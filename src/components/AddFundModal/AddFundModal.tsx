@@ -12,6 +12,7 @@ import {
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker} from '@components/index';
+import {BusyOverlay} from '@components/BusyOverlay/BusyOverlay';
 
 type AddFundModalProps = {
   visible: boolean;
@@ -37,26 +38,38 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({
   const [creditAmount, setCreditAmount] = useState('');
   const [particulars, setParticulars] = useState('');
   const [remark, setRemark] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!creditTo.trim() || !creditDate || !creditAmount.trim()) {
-      // TODO: Show validation error
       return;
     }
 
     if (onSubmit) {
-      onSubmit({
-        creditTo: creditTo.trim(),
-        creditDate,
-        creditAmount: creditAmount.trim(),
-        particulars: particulars.trim(),
-        remark: remark.trim(),
-      });
+      setSubmitting(true);
+      try {
+        await Promise.resolve(
+          onSubmit({
+            creditTo: creditTo.trim(),
+            creditDate,
+            creditAmount: creditAmount.trim(),
+            particulars: particulars.trim(),
+            remark: remark.trim(),
+          }),
+        );
+        handleClose();
+      } finally {
+        setSubmitting(false);
+      }
+      return;
     }
     handleClose();
   };
 
   const handleClose = () => {
+    if (submitting) {
+      return;
+    }
     setCreditTo('');
     setCreditDate('');
     setCreditAmount('');
@@ -164,13 +177,15 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({
                 <View style={styles.buttonContainer}>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.cancelButton]}
-                    onPress={handleClose}>
+                    onPress={handleClose}
+                    disabled={submitting}>
                     <Text style={styles.cancelButtonText}>Cancel</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[styles.actionButton, styles.submitButton]}
-                    onPress={handleSubmit}>
+                    onPress={handleSubmit}
+                    disabled={submitting}>
                     <Text style={styles.submitButtonText}>Submit</Text>
                   </TouchableOpacity>
                 </View>
@@ -179,6 +194,7 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({
           </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>
+      <BusyOverlay visible={submitting} message="Submitting…" />
     </Modal>
   );
 };

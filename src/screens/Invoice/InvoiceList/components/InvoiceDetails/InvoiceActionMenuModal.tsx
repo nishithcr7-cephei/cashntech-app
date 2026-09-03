@@ -193,7 +193,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
 
   const showCashnTechVerification = canShowCashnTechInvoiceVerification(
     actionRow,
-    canVerify,
+    canVerify || canApprove || canReject,
   );
 
   const showFinanceRequest = canShowFinanceRequest(
@@ -419,7 +419,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
-              {/* Invoice Verification — actionable && invoice_verification (not admin_status string) */}
+              {/* Invoice Verification — admin turn (actionable / pending verification) */}
               {showCashnTechVerification && (
                 <TouchableOpacity
                   disabled={permissionsLoading}

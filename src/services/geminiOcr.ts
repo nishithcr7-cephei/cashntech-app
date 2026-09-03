@@ -75,6 +75,121 @@ export interface GeminiExtractionResult {
   confidence: 'high' | 'medium' | 'low';
 }
 
+export type GeminiRetryEvent = {
+  failedAttempt: number;
+  nextAttempt: number;
+  maxAttempts: number;
+};
+
+export type GeminiExtractionOptions = {
+  onRetry?: (event: GeminiRetryEvent) => void;
+};
+
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
+const RETRYABLE_STATUSES = new Set([429, 500, 503]);
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function toUserFriendlyGeminiError(
+  status: number,
+  apiMessage?: string,
+): Error {
+  if (status === 503 || status === 429) {
+    return new Error(
+      'OCR service is busy right now. Please wait a few seconds and try again.',
+    );
+  }
+  if (status === 401 || status === 403) {
+    return new Error('OCR service is not available. Please contact support.');
+  }
+  if (status >= 500) {
+    return new Error(
+      'OCR service is temporarily unavailable. Please try again later.',
+    );
+  }
+  return new Error(
+    apiMessage?.trim() ||
+      'Could not read the invoice. Please try again with a clearer image.',
+  );
+}
+
+function notifyRetry(
+  onRetry: GeminiExtractionOptions['onRetry'],
+  attempt: number,
+): void {
+  onRetry?.({
+    failedAttempt: attempt + 1,
+    nextAttempt: attempt + 2,
+    maxAttempts: MAX_RETRIES,
+  });
+}
+
+async function callGeminiApi(
+  payload: object,
+  options?: GeminiExtractionOptions,
+): Promise<any> {
+  const {onRetry} = options ?? {};
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    let response: Response;
+    try {
+      response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (networkError: any) {
+      if (__DEV__) {
+        console.warn(
+          `Gemini API network error (attempt ${attempt + 1}/${MAX_RETRIES}):`,
+          networkError,
+        );
+      }
+      if (attempt < MAX_RETRIES - 1) {
+        notifyRetry(onRetry, attempt);
+        await sleep(RETRY_DELAY_MS * (attempt + 1));
+        continue;
+      }
+      throw new Error(
+        'Network error while reading the invoice. Please check your connection and try again.',
+      );
+    }
+
+    if (response.ok) {
+      return response.json();
+    }
+
+    const errorBody = await response.json().catch(() => ({}));
+    const status = response.status;
+    const apiMessage = errorBody?.error?.message as string | undefined;
+
+    if (__DEV__) {
+      console.warn(
+        `Gemini API error (attempt ${attempt + 1}/${MAX_RETRIES}):`,
+        status,
+        apiMessage ?? errorBody,
+      );
+    }
+
+    if (RETRYABLE_STATUSES.has(status) && attempt < MAX_RETRIES - 1) {
+      notifyRetry(onRetry, attempt);
+      await sleep(RETRY_DELAY_MS * (attempt + 1));
+      continue;
+    }
+
+    throw toUserFriendlyGeminiError(status, apiMessage);
+  }
+
+  throw new Error(
+    'OCR service is busy right now. Please wait a few seconds and try again.',
+  );
+}
+
 /**
  * Convert image file to base64 for Gemini API
  */
@@ -85,8 +200,10 @@ async function imageToBase64(filePath: string): Promise<string> {
     const base64 = await RNFS.readFile(cleanPath, 'base64');
     return base64;
   } catch (error: any) {
-    console.error('Error reading image file:', error);
-    throw new Error(`Failed to read image: ${error.message}`);
+    if (__DEV__) {
+      console.warn('Error reading image file:', error);
+    }
+    throw new Error('Could not read the invoice image. Please try again.');
   }
 }
 
@@ -95,7 +212,8 @@ async function imageToBase64(filePath: string): Promise<string> {
  * High accuracy AI-powered extraction
  */
 export async function extractWithGemini(
-  filePath: string
+  filePath: string,
+  options?: GeminiExtractionOptions,
 ): Promise<GeminiExtractionResult> {
   try {
     // Convert image to base64
@@ -125,30 +243,14 @@ export async function extractWithGemini(
       },
     };
 
-    // Call Gemini API
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.json();
-      console.error('Gemini API Error:', errorBody);
-      throw new Error(
-        `API call failed with status ${response.status}: ${
-          errorBody.error?.message || 'Unknown error'
-        }`
-      );
-    }
-
-    const result = await response.json();
+    // Call Gemini API with automatic retry for transient failures
+    const result = await callGeminiApi(payload, options);
     const jsonString = result.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!jsonString) {
-      throw new Error('Received empty response from Gemini API');
+      throw new Error(
+        'Could not extract data from the invoice. Please try again with a clearer image.',
+      );
     }
 
     // Clean and parse JSON
@@ -165,7 +267,17 @@ export async function extractWithGemini(
         .trim();
     }
 
-    const gstInvoice: GSTInvoiceJSON = JSON.parse(cleanJsonString);
+    let gstInvoice: GSTInvoiceJSON;
+    try {
+      gstInvoice = JSON.parse(cleanJsonString);
+    } catch (parseError) {
+      if (__DEV__) {
+        console.warn('Gemini JSON parse error:', parseError, cleanJsonString);
+      }
+      throw new Error(
+        'Could not understand the invoice data. Please try again with a clearer image.',
+      );
+    }
 
     // Generate a simple raw text representation for display
     const rawText = generateRawTextFromJSON(gstInvoice);
@@ -179,8 +291,13 @@ export async function extractWithGemini(
       confidence,
     };
   } catch (error: any) {
-    console.error('Gemini extraction error:', error);
-    throw new Error(`Gemini extraction failed: ${error.message}`);
+    if (__DEV__) {
+      console.warn('Gemini extraction error:', error);
+    }
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Could not read the invoice. Please try again.');
   }
 }
 

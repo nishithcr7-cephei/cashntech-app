@@ -1,11 +1,20 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
-import {DealerState, DealerListItem, FetchDealerListRequest} from './dealer.types';
+import {
+  DealerState,
+  DealerListItem,
+  FetchDealerListRequest,
+  FetchProgramSummaryRequest,
+  ProgramCounterPartySummary,
+} from './dealer.types';
 
 const initialState: DealerState = {
   dealerList: [],
   loading: false,
   error: null,
   totalDealers: 0,
+  programSummary: null,
+  summaryLoading: false,
+  summaryError: null,
 };
 
 const dealerSlice = createSlice({
@@ -21,7 +30,7 @@ const dealerSlice = createSlice({
     },
     fetchDealerListSuccess: (
       state,
-      action: PayloadAction<{data: DealerListItem[]; total: number}>
+      action: PayloadAction<{data: DealerListItem[]; total: number}>,
     ) => {
       state.loading = false;
       const {data, total} = action.payload;
@@ -32,7 +41,25 @@ const dealerSlice = createSlice({
       state.loading = false;
       state.error = action.payload;
     },
-    resetDealerState: (state) => {
+    fetchProgramSummaryRequest: (
+      state,
+      _action: PayloadAction<FetchProgramSummaryRequest>,
+    ) => {
+      state.summaryLoading = true;
+      state.summaryError = null;
+    },
+    fetchProgramSummarySuccess: (
+      state,
+      action: PayloadAction<ProgramCounterPartySummary>,
+    ) => {
+      state.summaryLoading = false;
+      state.programSummary = action.payload;
+    },
+    fetchProgramSummaryFailure: (state, action: PayloadAction<string>) => {
+      state.summaryLoading = false;
+      state.summaryError = action.payload;
+    },
+    resetDealerState: () => {
       return initialState;
     },
   },
@@ -42,6 +69,9 @@ export const {
   fetchDealerListRequest,
   fetchDealerListSuccess,
   fetchDealerListFailure,
+  fetchProgramSummaryRequest,
+  fetchProgramSummarySuccess,
+  fetchProgramSummaryFailure,
   resetDealerState,
 } = dealerSlice.actions;
 

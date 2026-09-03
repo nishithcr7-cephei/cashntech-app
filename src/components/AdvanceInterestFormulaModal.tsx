@@ -30,6 +30,8 @@ import {
 
   computeInvoiceTaxableBase,
 
+  computeInvoiceNetTotal,
+
   formatIndianCurrency,
 
   round2,
@@ -317,6 +319,7 @@ export type InvoiceSummaryFormulaAmounts = {
   discount: number;
   gstAmount: number;
   tdsAmount?: number;
+  advanceInterest?: number;
 };
 
 type SummaryFormulaModalProps = {
@@ -417,6 +420,40 @@ export const DisbursementRequestedFormulaModal: React.FC<{
         `DRA = Invoice Amount ${MINUS} TDS`,
         `    = ${fmtMoney(invoiceAmount)} ${MINUS} ${fmtMoney(amounts.tdsAmount ?? 0)}`,
         `    = ${fmtMoney(requestedAmount)}`,
+      ]}
+    />
+  );
+};
+
+export const NetDisbursementFormulaModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  amounts: InvoiceSummaryFormulaAmounts;
+}> = ({visible, onClose, amounts}) => {
+  const requestedAmount = computeInvoiceSubTotalAfterTds(
+    amounts.basicAmount,
+    amounts.discount,
+    amounts.gstAmount,
+    amounts.tdsAmount ?? 0,
+  );
+  const advanceInterest = amounts.advanceInterest ?? 0;
+  const netAmount = computeInvoiceNetTotal(
+    amounts.basicAmount,
+    amounts.discount,
+    amounts.gstAmount,
+    amounts.tdsAmount ?? 0,
+    advanceInterest,
+  );
+
+  return (
+    <SummaryFormulaModal
+      visible={visible}
+      onClose={onClose}
+      title="Net Disbursement Amount"
+      lines={[
+        `NDA = Disbursement Requested Amount ${MINUS} Advance Interest`,
+        `    = ${fmtMoney(requestedAmount)} ${MINUS} ${fmtMoney(advanceInterest)}`,
+        `    = ${fmtMoney(netAmount)}`,
       ]}
     />
   );

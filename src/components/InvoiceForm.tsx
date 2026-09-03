@@ -13,7 +13,12 @@ import {
 } from 'react-native';
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
-import {AdvanceInterestFormulaModal} from '@components/AdvanceInterestFormulaModal';
+import {
+  AdvanceInterestFormulaModal,
+  DisbursementRequestedFormulaModal,
+  InvoiceAmountFormulaModal,
+  NetDisbursementFormulaModal,
+} from '@components/AdvanceInterestFormulaModal';
 import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -205,6 +210,12 @@ export const InvoiceForm: React.FC<Props> = ({
   const [showSGSTTooltip, setShowSGSTTooltip] = useState(false);
   const [showPaymentDateTooltip, setShowPaymentDateTooltip] = useState(false);
   const [showAdvanceInterestFormula, setShowAdvanceInterestFormula] =
+    useState(false);
+  const [showInvoiceAmountFormula, setShowInvoiceAmountFormula] =
+    useState(false);
+  const [showDisbursementRequestedFormula, setShowDisbursementRequestedFormula] =
+    useState(false);
+  const [showNetDisbursementFormula, setShowNetDisbursementFormula] =
     useState(false);
 
   // Role-based entity type: use entityType prop if provided, otherwise derive from productType or user role
@@ -1208,8 +1219,17 @@ export const InvoiceForm: React.FC<Props> = ({
                 advanceInterest={aiAmount}
                 netDisbursementAmount={total}
                 showAdvanceInterest={showAdvanceInterest}
+                onInvoiceAmountInfoPress={() =>
+                  setShowInvoiceAmountFormula(true)
+                }
+                onDisbursementRequestedInfoPress={() =>
+                  setShowDisbursementRequestedFormula(true)
+                }
                 onAdvanceInterestInfoPress={() =>
                   setShowAdvanceInterestFormula(true)
+                }
+                onNetDisbursementInfoPress={() =>
+                  setShowNetDisbursementFormula(true)
                 }
                 amountPrefix="₹"
               />
@@ -1221,6 +1241,21 @@ export const InvoiceForm: React.FC<Props> = ({
       <AdvanceInterestFormulaModal
         visible={showAdvanceInterestFormula}
         onClose={() => setShowAdvanceInterestFormula(false)}
+        amounts={advanceInterestFormulaAmounts}
+      />
+      <InvoiceAmountFormulaModal
+        visible={showInvoiceAmountFormula}
+        onClose={() => setShowInvoiceAmountFormula(false)}
+        amounts={advanceInterestFormulaAmounts}
+      />
+      <DisbursementRequestedFormulaModal
+        visible={showDisbursementRequestedFormula}
+        onClose={() => setShowDisbursementRequestedFormula(false)}
+        amounts={advanceInterestFormulaAmounts}
+      />
+      <NetDisbursementFormulaModal
+        visible={showNetDisbursementFormula}
+        onClose={() => setShowNetDisbursementFormula(false)}
         amounts={advanceInterestFormulaAmounts}
       />
 

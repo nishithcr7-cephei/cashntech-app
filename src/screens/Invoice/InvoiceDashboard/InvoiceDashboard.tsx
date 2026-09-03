@@ -10,6 +10,7 @@ import {
   Container,
   ScopeSelectorCard,
   BulkReviewModal,
+  BusyOverlay,
 } from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleWidth, scaleHeight, scaleFont} from '@utils/Scale';
@@ -242,6 +243,10 @@ export const InvoiceDashboard: React.FC = () => {
         action={bulkAction}
         onSubmit={onBulkSubmit}
         loading={bulkLoading}
+      />
+      <BusyOverlay
+        visible={bulkLoading}
+        message="Updating invoices…"
       />
     </Container>
   );

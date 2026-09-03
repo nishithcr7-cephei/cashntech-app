@@ -168,6 +168,7 @@ export type UpdateInvoiceStatusRequest = {
   programId?: string;
   filters?: InvoiceListFilters;
   onSuccess?: () => void;
+  onFailure?: () => void;
 };
 
 /** CashnTech admin verification (PATCH /invoice/admin/:invoiceId) */
@@ -178,6 +179,7 @@ export type UpdateInvoiceVerificationRequest = {
   programId?: string;
   filters?: InvoiceListFilters;
   onSuccess?: () => void;
+  onFailure?: () => void;
 };
 export type UpdateInvoicePayload = {
   invoiceId: string;

@@ -29,14 +29,6 @@ function isFinanceRequestStep(row: ActionableRow): boolean {
   return normalizeStepActionType(actionType) === 'finance request';
 }
 
-function isAdminVerifyStep(row: ActionableRow): boolean {
-  const actionType = row.currentStepActionType;
-  if (actionType?.trim()) {
-    return normalizeStepActionType(actionType) === 'verify';
-  }
-  return true;
-}
-
 export type InvoiceEditRow = ActionableRow & {
   currentStepSequenceNo?: number | null;
 };
@@ -102,20 +94,16 @@ export function canShowWorkflowApproveReject(
 }
 
 /**
- * CashnTech / bank: Invoice Verification menu — actionable && invoice_verification.
- * Fallback to Pending Verification only when actionable is absent from the API.
+ * CashnTech / bank: Invoice Verification menu — same turn as pending-count
+ * (`actionable`). Do not require step === verify: admin 3-dots must still offer
+ * Approve/Reject while the invoice is on their turn. Fallback to Pending
+ * Verification only when actionable is absent from the API.
  */
 export function canShowCashnTechInvoiceVerification(
   row: ActionableRow,
   canVerify: boolean,
 ): boolean {
-  if (!canVerify) {
-    return false;
-  }
-  if (typeof row.actionable === 'boolean') {
-    return row.actionable && isAdminVerifyStep(row);
-  }
-  return isPendingVerificationStatus(row.rawAdminStatus);
+  return isCashnTechPendingRow(row, canVerify);
 }
 
 /**

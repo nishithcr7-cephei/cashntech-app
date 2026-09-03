@@ -22,6 +22,7 @@ import {
   Container,
   FilterModal,
   ProgramBreadcrumb,
+  BusyOverlay,
 } from '@components/index';
 import {getApiErrorMessage} from '@utils/apiErrorMessage';
 import {MarkAsDisbursedModal} from './components/MarkAsDisbursedModal';
@@ -322,6 +323,7 @@ export const DisbursementScreen: React.FC = () => {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showBulkEmailModal, setShowBulkEmailModal] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
   const bulkDisbursementLoading = useSelector(selectBulkDisbursementLoading);
   const menuButtonRefs = useRef<Record<string, any>>({});
   const fetchRequestId = useRef(0);
@@ -1390,6 +1392,7 @@ export const DisbursementScreen: React.FC = () => {
         productCode={getEffectiveProductCode(activeProductCode)}
         onSubmit={async data => {
           if (!selectedDisbursementId) return;
+          setActionBusy(true);
           try {
             const amount = parseFloat(
               (data.disbursedAmount || '0').replace(/[,\s₹]/g, ''),
@@ -1442,6 +1445,8 @@ export const DisbursementScreen: React.FC = () => {
               text1: getApiErrorMessage(err, 'Failed to mark as disbursed'),
               visibilityTime: 4000,
             });
+          } finally {
+            setActionBusy(false);
           }
         }}
       />
@@ -1493,6 +1498,14 @@ export const DisbursementScreen: React.FC = () => {
             };
           })}
         onSubmit={handleBulkSubmit}
+      />
+      <BusyOverlay
+        visible={actionBusy || bulkLoading || bulkDisbursementLoading}
+        message={
+          actionBusy
+            ? 'Updating disbursement…'
+            : 'Updating invoices…'
+        }
       />
     </Container>
   );

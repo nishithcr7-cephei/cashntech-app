@@ -33,6 +33,8 @@ const Strings = {
   sendResetLinkButtonText: 'Send Reset Link',
   createPasswordButtonText: 'Create Password',
   updatePasswordButtonText: 'Update Password',
+  noAccountText: "Don't have an account? ",
+  signupLinkText: 'Sign up',
 };
 
 export const PasswordScreen = ({
@@ -213,6 +215,12 @@ export const PasswordScreen = ({
               onPress={onPressSendResetLink}
               showLoader={isLoading}
             />
+            <View style={styles.accountContainer}>
+              <Text style={styles.accountText}>{Strings.noAccountText}</Text>
+              <Text style={[styles.accountText, styles.accountLinkDisabled]}>
+                {Strings.signupLinkText}
+              </Text>
+            </View>
           </>
         ) : (
           <>
@@ -356,4 +364,19 @@ const styles = StyleSheet.create({
     color: 'red',
   },
   buttonStyle: {marginHorizontal: scaleWidth(43), marginTop: scaleHeight(68)},
+  accountContainer: {
+    marginTop: scaleHeight(64),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountText: {
+    color: Colors.gray300,
+    fontFamily: Fonts.GilroySemiBold,
+    fontSize: scaleFont(16),
+  },
+  accountLinkDisabled: {
+    color: Colors.gray300,
+    textDecorationLine: 'underline',
+  },
 });

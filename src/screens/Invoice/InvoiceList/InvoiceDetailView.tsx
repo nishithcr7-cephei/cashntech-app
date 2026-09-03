@@ -19,6 +19,7 @@ import {
   AdvanceInterestFormulaModal,
   DisbursementRequestedFormulaModal,
   InvoiceAmountFormulaModal,
+  NetDisbursementFormulaModal,
 } from '@components/AdvanceInterestFormulaModal';
 import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {Colors, Fonts} from '@constants/index';
@@ -213,6 +214,8 @@ export const InvoiceDetailView: React.FC = () => {
   const [showInvoiceAmountFormula, setShowInvoiceAmountFormula] =
     useState(false);
   const [showDisbursementRequestedFormula, setShowDisbursementRequestedFormula] =
+    useState(false);
+  const [showNetDisbursementFormula, setShowNetDisbursementFormula] =
     useState(false);
 
   const rawInvoiceId = route?.params?.invoiceId || '';
@@ -747,6 +750,9 @@ export const InvoiceDetailView: React.FC = () => {
             onAdvanceInterestInfoPress={() =>
               setShowAdvanceInterestFormula(true)
             }
+            onNetDisbursementInfoPress={() =>
+              setShowNetDisbursementFormula(true)
+            }
           />
 
           <Text style={styles.sectionTitle}>
@@ -835,6 +841,17 @@ export const InvoiceDetailView: React.FC = () => {
           discount: invoiceData.discount.amount,
           gstAmount: invoiceData.tax.amount,
           tdsAmount: invoiceData.tdsAmount,
+        }}
+      />
+      <NetDisbursementFormulaModal
+        visible={showNetDisbursementFormula}
+        onClose={() => setShowNetDisbursementFormula(false)}
+        amounts={{
+          basicAmount: invoiceData.subTotal,
+          discount: invoiceData.discount.amount,
+          gstAmount: invoiceData.tax.amount,
+          tdsAmount: invoiceData.tdsAmount,
+          advanceInterest: invoiceData.advanceInterest,
         }}
       />
     </Container>

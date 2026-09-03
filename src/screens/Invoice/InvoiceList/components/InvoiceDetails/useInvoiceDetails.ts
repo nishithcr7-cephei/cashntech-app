@@ -222,6 +222,8 @@ export function useInvoiceDetails() {
   const [financeRequestLoading, setFinanceRequestLoading] = useState(false);
   const [financeRequestSubmitting, setFinanceRequestSubmitting] = useState(false);
   const [financeRequestInvoiceId, setFinanceRequestInvoiceId] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionBusyMessage, setActionBusyMessage] = useState('Please wait…');
 
   const programIdFromParams = routeParams?.programId;
   const concreteProgramId = programSelection?.programId ?? programIdFromParams;
@@ -748,6 +750,8 @@ export function useInvoiceDetails() {
               style: 'destructive',
               onPress: async () => {
                 try {
+                  setActionBusyMessage('Deleting invoice…');
+                  setActionBusy(true);
                   const res = await invoiceApi.deleteInvoice(invoiceId);
                   if (res?.statusCode === 200 || res?.status === 200) {
                     Toast.show({
@@ -769,6 +773,8 @@ export function useInvoiceDetails() {
                     text1: 'Error',
                     text2: (e as Error)?.message || 'An error occurred during deletion',
                   });
+                } finally {
+                  setActionBusy(false);
                 }
               },
             },
@@ -1184,6 +1190,13 @@ export function useInvoiceDetails() {
     }
   };
 
+  const closeApproveRejectUi = () => {
+    setShowApproveRejectModal(false);
+    setSelectedInvoiceId(null);
+    setSelectedInvoiceNo(null);
+    setAnchorCheckerInvoiceDetails(null);
+  };
+
   const onApproveRejectApprove = (
     invoiceId: string,
     remarks?: string,
@@ -1197,6 +1210,8 @@ export function useInvoiceDetails() {
       });
       return;
     }
+    setActionBusyMessage('Approving invoice…');
+    setActionBusy(true);
     dispatch(
       updateInvoiceStatusRequest({
         invoiceId,
@@ -1206,12 +1221,13 @@ export function useInvoiceDetails() {
         grnDate,
         programId,
         filters: apiFilters,
+        onSuccess: () => {
+          closeApproveRejectUi();
+          setActionBusy(false);
+        },
+        onFailure: () => setActionBusy(false),
       }),
     );
-    setShowApproveRejectModal(false);
-    setSelectedInvoiceId(null);
-    setSelectedInvoiceNo(null);
-    setAnchorCheckerInvoiceDetails(null);
   };
 
   const onApproveRejectReject = (
@@ -1228,6 +1244,8 @@ export function useInvoiceDetails() {
       });
       return;
     }
+    setActionBusyMessage('Rejecting invoice…');
+    setActionBusy(true);
     dispatch(
       updateInvoiceStatusRequest({
         invoiceId,
@@ -1237,12 +1255,13 @@ export function useInvoiceDetails() {
         grnDate,
         programId,
         filters: apiFilters,
+        onSuccess: () => {
+          closeApproveRejectUi();
+          setActionBusy(false);
+        },
+        onFailure: () => setActionBusy(false),
       }),
     );
-    setShowApproveRejectModal(false);
-    setSelectedInvoiceId(null);
-    setSelectedInvoiceNo(null);
-    setAnchorCheckerInvoiceDetails(null);
   };
 
   const onVerifyApprove = (invoiceId: string, remarks?: string) => {
@@ -1255,6 +1274,8 @@ export function useInvoiceDetails() {
       return;
     }
     const invNo = selectedInvoiceNo;
+    setActionBusyMessage('Verifying invoice…');
+    setActionBusy(true);
     dispatch(
       updateInvoiceVerificationRequest({
         invoiceId,
@@ -1262,20 +1283,20 @@ export function useInvoiceDetails() {
         remark: remarks,
         programId,
         filters: apiFilters,
-        onSuccess: () =>
+        onSuccess: () => {
+          closeApproveRejectUi();
+          setActionBusy(false);
           (navigation as any).navigate('InvoiceDetailView', {
             invoiceId,
             invoiceNo: invNo || invoiceId,
             programId,
             fromInvoiceDashboard,
             returnRoute: 'InvoiceDetails',
-          }),
+          });
+        },
+        onFailure: () => setActionBusy(false),
       }),
     );
-    setShowApproveRejectModal(false);
-    setSelectedInvoiceId(null);
-    setSelectedInvoiceNo(null);
-    setAnchorCheckerInvoiceDetails(null);
   };
 
   const onVerifyReject = (invoiceId: string, remarks?: string) => {
@@ -1287,6 +1308,8 @@ export function useInvoiceDetails() {
       });
       return;
     }
+    setActionBusyMessage('Rejecting invoice…');
+    setActionBusy(true);
     dispatch(
       updateInvoiceVerificationRequest({
         invoiceId,
@@ -1294,12 +1317,13 @@ export function useInvoiceDetails() {
         remark: remarks,
         programId,
         filters: apiFilters,
+        onSuccess: () => {
+          closeApproveRejectUi();
+          setActionBusy(false);
+        },
+        onFailure: () => setActionBusy(false),
       }),
     );
-    setShowApproveRejectModal(false);
-    setSelectedInvoiceId(null);
-    setSelectedInvoiceNo(null);
-    setAnchorCheckerInvoiceDetails(null);
   };
 
   const onVerifyHold = (invoiceId: string, remarks?: string) => {
@@ -1311,6 +1335,8 @@ export function useInvoiceDetails() {
       });
       return;
     }
+    setActionBusyMessage('Updating invoice…');
+    setActionBusy(true);
     dispatch(
       updateInvoiceVerificationRequest({
         invoiceId,
@@ -1318,12 +1344,13 @@ export function useInvoiceDetails() {
         remark: remarks,
         programId,
         filters: apiFilters,
+        onSuccess: () => {
+          closeApproveRejectUi();
+          setActionBusy(false);
+        },
+        onFailure: () => setActionBusy(false),
       }),
     );
-    setShowApproveRejectModal(false);
-    setSelectedInvoiceId(null);
-    setSelectedInvoiceNo(null);
-    setAnchorCheckerInvoiceDetails(null);
   };
 
   const [bulkAction, setBulkAction] = useState<'Verify' | 'Reject' | 'On Hold' | 'Approve'>('Verify');
@@ -1428,6 +1455,7 @@ export function useInvoiceDetails() {
     (anchor: { x: number; y: number; width: number; height: number } | null) => {
       const screen = Dimensions.get('window');
       const menuWidth = scaleWidth(210);
+      const estimatedMenuHeight = scaleHeight(220);
       const horizontalPadding = scaleWidth(12);
       const topPadding = scaleHeight(8);
       if (!anchor) {
@@ -1442,7 +1470,12 @@ export function useInvoiceDetails() {
         horizontalPadding,
         Math.min(desiredLeft, screen.width - menuWidth - horizontalPadding),
       );
-      const top = Math.max(topPadding, anchor.y + anchor.height + scaleHeight(6));
+      const below = anchor.y + anchor.height + scaleHeight(6);
+      const maxTop = Math.max(
+        topPadding,
+        screen.height - estimatedMenuHeight - topPadding,
+      );
+      const top = Math.min(Math.max(topPadding, below), maxTop);
       return { position: 'absolute' as const, top, left };
     },
     [],
@@ -1685,6 +1718,8 @@ export function useInvoiceDetails() {
     handleBulkAction,
     bulkLoading,
     setBulkLoading,
+    actionBusy,
+    actionBusyMessage,
     isAnchorAllAccess,
     isDealerAllAccess,
     isInvoiceSelectable,

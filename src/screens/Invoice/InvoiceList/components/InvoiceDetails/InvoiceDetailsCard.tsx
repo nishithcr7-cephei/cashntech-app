@@ -96,9 +96,16 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   const canPrint = useHasPermission(PERMISSIONS.INVOICE_LIST_PRINT);
   const canVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_ADMIN_VERIFICATION);
 
-  const hasAnyActionPermission = 
-    canEdit || canDelete || canApprove || canReject || 
-    canViewHistory || canAttachment || canRecreate || canPrint;
+  const hasAnyActionPermission =
+    canEdit ||
+    canDelete ||
+    canApprove ||
+    canReject ||
+    canVerify ||
+    canViewHistory ||
+    canAttachment ||
+    canRecreate ||
+    canPrint;
 
   const invoiceStatusLower = (row.invoiceStatus || '').toLowerCase();
   const approvalStatusLower = (row.approvalStatus || '').toLowerCase();

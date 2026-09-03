@@ -2,7 +2,7 @@ import type {OcrResult} from '../types/Invoice';
 import {intelligentParseInvoice} from '@utils/intelligentParser';
 import type {OCRBlock} from '../utils/mlFeatureExtractor';
 import {extractGSTInvoiceJSON, type GSTInvoiceJSON} from './gstInvoiceExtractor';
-import { extractWithGemini } from './geminiOcr';
+import { extractWithGemini, type GeminiExtractionOptions } from './geminiOcr';
 
 /**
  * Enhanced ML-powered OCR: Uses ML Kit + ML-based parsing + Intelligent local parsing
@@ -135,10 +135,11 @@ export async function runGSTInvoiceExtraction(filePath: string): Promise<{rawTex
  * @returns Extracted invoice data
  */
 export async function runGSTInvoiceExtractionWithAI(
-  filePath: string
+  filePath: string,
+  options?: GeminiExtractionOptions,
 ): Promise<{rawText: string; gstInvoice: GSTInvoiceJSON}> {
   console.log('🔮 Using Gemini AI extraction...');
-  const geminiResult = await extractWithGemini(filePath);
+  const geminiResult = await extractWithGemini(filePath, options);
   console.log('✅ Gemini extraction successful!', geminiResult.confidence);
   
   return {
