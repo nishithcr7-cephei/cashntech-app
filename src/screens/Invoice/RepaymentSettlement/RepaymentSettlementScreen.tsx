@@ -501,6 +501,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
                       </>
                     ) : (
                       <>
+                        {/* DF web parity: Loan Ref → Invoice No → Bank → Product → Program → Parties → Invoice Date → GRN Date → Due Date → Disbursement Date → Invoice Amount → Disbursed Amount → O/S Principal → Advance Interest Paid → O/S Interest Accrued → O/S Penal → O/S Total → Invoice Status */}
                         <View style={styles.infoColumn}>
                           <Text style={styles.infoLabel}>Loan Ref No.</Text>
                           <Text style={styles.infoValue}>{row.loanRefNo}</Text>
@@ -536,12 +537,26 @@ export const RepaymentSettlementScreen: React.FC = () => {
                           <Text style={styles.infoValue}>{row.counterParty}</Text>
                         </View>
                         <View style={styles.infoColumn}>
-                          <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
-                          <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
-                        </View>
-                        <View style={styles.infoColumn}>
                           <Text style={styles.infoLabel}>Invoice Date</Text>
                           <Text style={styles.infoValue}>{row.invoiceDate}</Text>
+                        </View>
+                        <View style={styles.infoColumn}>
+                          <Text style={styles.infoLabel}>GRN Date</Text>
+                          <Text style={styles.infoValue}>{row.grnDate || '-'}</Text>
+                        </View>
+                        <View style={styles.infoColumn}>
+                          <Text style={styles.infoLabel}>Due Date</Text>
+                          <Text style={styles.infoValue}>{row.dueDate}</Text>
+                        </View>
+                        <View style={styles.infoColumn}>
+                          <Text style={styles.infoLabel}>Disbursement Date</Text>
+                          <Text style={styles.infoValue}>
+                            {row.disbursementDate || '-'}
+                          </Text>
+                        </View>
+                        <View style={styles.infoColumn}>
+                          <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
+                          <Text style={styles.infoValue}>{row.invoiceAmount}</Text>
                         </View>
                         <View style={styles.infoColumn}>
                           <Text style={styles.infoLabel}>
@@ -553,23 +568,37 @@ export const RepaymentSettlementScreen: React.FC = () => {
                         </View>
                         <View style={styles.infoColumn}>
                           <Text style={styles.infoLabel}>
-                            Total Outstanding Amount (₹)
-                          </Text>
-                          <Text style={styles.infoValue}>
-                            {row.totalOutstandingAmount}
-                          </Text>
-                        </View>
-                        <View style={styles.infoColumn}>
-                          <Text style={styles.infoLabel}>
-                            Outstanding Principle (₹)
+                            O/S Principal Amount (₹)
                           </Text>
                           <Text style={styles.infoValue}>
                             {row.outstandingPrinciple}
                           </Text>
                         </View>
                         <View style={styles.infoColumn}>
-                          <Text style={styles.infoLabel}>Due Date</Text>
-                          <Text style={styles.infoValue}>{row.dueDate}</Text>
+                          <Text style={styles.infoLabel}>
+                            Advance Interest Paid (₹)
+                          </Text>
+                          <Text style={styles.infoValue}>
+                            {row.advanceInterestPaid}
+                          </Text>
+                        </View>
+                        <View style={styles.infoColumn}>
+                          <Text style={styles.infoLabel}>
+                            O/S Interest Accrued Amount (₹)
+                          </Text>
+                          <Text style={styles.infoValue}>
+                            {row.interestAccrued}
+                          </Text>
+                        </View>
+                        <View style={styles.infoColumn}>
+                          <Text style={styles.infoLabel}>O/S Penal Amount (₹)</Text>
+                          <Text style={styles.infoValue}>{row.penalAmount}</Text>
+                        </View>
+                        <View style={styles.infoColumn}>
+                          <Text style={styles.infoLabel}>O/S Total Amount (₹)</Text>
+                          <Text style={styles.infoValue}>
+                            {row.totalOutstandingAmount}
+                          </Text>
                         </View>
                         <View style={styles.infoColumn}>
                           <Text style={styles.infoLabel}>Invoice Status</Text>

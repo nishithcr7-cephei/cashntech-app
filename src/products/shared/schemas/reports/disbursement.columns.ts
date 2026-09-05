@@ -21,6 +21,7 @@ export const DISBURSEMENT_REPORT_SCHEMA: ReportSchema = {
     'invoiceDate',
     'disbursementDate',
     'maturityDate',
+    'usanceDays',
     'invoiceValue',
     'disbursementAmount',
     'roi',
@@ -49,6 +50,7 @@ export const DISBURSEMENT_REPORT_SCHEMA: ReportSchema = {
     'invoiceDate',
     'disbursementDate',
     'maturityDate',
+    'usanceDays',
     'invoiceValue',
     'loanValue',
     'disbursementAmount',
@@ -87,6 +89,7 @@ export const DISBURSEMENT_REPORT_SCHEMA: ReportSchema = {
     invoiceDate: {key: 'invoiceDate', ...c('Invoice Date')},
     disbursementDate: {key: 'disbursementDate', ...c('Disbursement Date')},
     maturityDate: {key: 'maturityDate', ...c('Maturity Date')},
+    usanceDays: {key: 'usanceDays', ...c('Usance Days')},
     invoiceValue: {key: 'invoiceValue', ...c('Invoice Value')},
     loanValue: {key: 'loanValue', ...c('Loan Value')},
     disbursementAmount: {

@@ -60,6 +60,13 @@ export function allLoansFieldAccessor(
       return {value: formatText(item.dueDate)};
     case 'tenor':
       return {value: formatText(item.tenor)};
+    case 'usanceDays':
+      return {
+        value:
+          item.usanceDays != null && Number.isFinite(item.usanceDays)
+            ? String(Math.round(item.usanceDays))
+            : '-',
+      };
     case 'roi':
       return {value: formatText(item.roi)};
     case 'repaidAmount':

@@ -28,6 +28,8 @@ export type AllLoansReportApiRow = {
   disbursementDate?: string;
   dueDate?: string;
   tenor?: number;
+  usance_days?: number;
+  usanceDays?: number;
   roi?: string;
   repaidamount?: number;
   repaidAmount?: number;
@@ -74,6 +76,7 @@ export type AllLoanReportItem = {
   disbursementDate: string;
   dueDate: string;
   tenor: number;
+  usanceDays: number | null;
   roi: string;
   repaidAmount: number;
   principalOutstanding: number;
@@ -119,6 +122,10 @@ export type DisbursementReportApiRow = {
   invoiceDate?: string;
   disbursementDate?: string;
   maturityDate?: string;
+  usance_days?: number;
+  usanceDays?: number;
+  tenor?: number;
+  tenure?: number;
   invoiceValue?: number;
   loanValue?: number;
   disbursementAmount?: number;
@@ -152,6 +159,7 @@ export type DisbursementReportItem = {
   invoiceDate: string;
   disbursementDate: string;
   maturityDate: string;
+  usanceDays: number | null;
   invoiceValue: number;
   loanValue: number;
   disbursementAmount: number;

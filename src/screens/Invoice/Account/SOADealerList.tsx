@@ -36,6 +36,10 @@ import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
 import {PRODUCT_CODES} from '@store/product/product.types';
+import {formatIndianNumber} from '@utils/Utils';
+
+const formatTotalInr = (n: number) =>
+  `₹${formatIndianNumber(String(Number.isFinite(n) ? n : 0))}`;
 
 export const SOADealerList: React.FC = () => {
   const navigation = useNavigation();
@@ -73,6 +77,30 @@ export const SOADealerList: React.FC = () => {
   const programSummary = useSelector(programSummarySelector);
   const summaryLoading = useSelector(programSummaryLoadingSelector);
   const summaryError = useSelector(programSummaryErrorSelector);
+
+  const columnTotals = useMemo(() => {
+    return dealerList.reduce(
+      (acc, row) => {
+        acc.sanctionLimit += Number(row.sanctionLimitRaw) || 0;
+        acc.utilizedAmount += Number(row.utilizedAmountRaw) || 0;
+        acc.pipelineRequests += Number(row.pipelineRequestsRaw) || 0;
+        acc.excessCredit += Number(row.excessCreditRaw) || 0;
+        acc.availableLimit += Number(row.availableLimitRaw) || 0;
+        acc.totalOsAmount += Number(row.totalOsAmountRaw) || 0;
+        acc.totalAmountPaid += Number(row.totalAmountPaidRaw) || 0;
+        return acc;
+      },
+      {
+        sanctionLimit: 0,
+        utilizedAmount: 0,
+        pipelineRequests: 0,
+        excessCredit: 0,
+        availableLimit: 0,
+        totalOsAmount: 0,
+        totalAmountPaid: 0,
+      },
+    );
+  }, [dealerList]);
 
   useEffect(() => {
     if (dealerError && (dealerError.toLowerCase().includes('token expired') || dealerError.toLowerCase().includes('unauthorized'))) {
@@ -203,6 +231,18 @@ export const SOADealerList: React.FC = () => {
               <Text style={styles.infoValue}>{item.availableLimit}</Text>
             </View>
             <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Total O/S Amount</Text>
+              <Text style={styles.infoValue}>
+                {item.totalOsAmount || '₹0.00'}
+              </Text>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Total Amount Paid</Text>
+              <Text style={styles.infoValue}>
+                {item.totalAmountPaid || '₹0.00'}
+              </Text>
+            </View>
+            <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>Overdue Days</Text>
               <Text style={styles.infoValue}>{item.overdueDays}</Text>
             </View>
@@ -222,14 +262,57 @@ export const SOADealerList: React.FC = () => {
     );
   };
 
-  const renderFooter = () => {
-    if (!loading) return null;
-    return (
-      <View style={styles.loaderFooter}>
-        <ActivityIndicator size="small" color={Colors.primaryColor} />
+  const renderTotalsFooter = () => (
+    <View style={styles.cardWrapper}>
+      <View style={[styles.listCard, styles.totalsCard]}>
+        <Text style={styles.totalsTitle}>Total</Text>
+        <View style={styles.infoGrid}>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Sanction Limit</Text>
+            <Text style={styles.totalsValue}>
+              {formatTotalInr(columnTotals.sanctionLimit)}
+            </Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Utilized Amount (₹)</Text>
+            <Text style={styles.totalsValue}>
+              {formatTotalInr(columnTotals.utilizedAmount)}
+            </Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Pipeline Requests</Text>
+            <Text style={styles.totalsValue}>
+              {formatTotalInr(columnTotals.pipelineRequests)}
+            </Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Excess Credit</Text>
+            <Text style={styles.totalsValue}>
+              {formatTotalInr(columnTotals.excessCredit)}
+            </Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Available Limit</Text>
+            <Text style={styles.totalsValue}>
+              {formatTotalInr(columnTotals.availableLimit)}
+            </Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Total O/S Amount</Text>
+            <Text style={styles.totalsValue}>
+              {formatTotalInr(columnTotals.totalOsAmount)}
+            </Text>
+          </View>
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>Total Amount Paid</Text>
+            <Text style={styles.totalsValue}>
+              {formatTotalInr(columnTotals.totalAmountPaid)}
+            </Text>
+          </View>
+        </View>
       </View>
-    );
-  };
+    </View>
+  );
 
   return (
     <Container>
@@ -305,6 +388,7 @@ export const SOADealerList: React.FC = () => {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
             scrollEnabled={true}
+            ListFooterComponent={renderTotalsFooter}
           />
         )}
       </View>
@@ -411,6 +495,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 10,
     elevation: 8,
+  },
+  totalsCard: {
+    backgroundColor: '#FFF8F8',
+    borderColor: '#FFD9D9',
+  },
+  totalsTitle: {
+    fontSize: scaleFont(15),
+    fontFamily: Fonts.GilroyBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(10),
+  },
+  totalsValue: {
+    fontSize: scaleFont(13),
+    color: Colors.darkblack,
+    fontFamily: Fonts.GilroyBold,
   },
   cardHeaderRow: {
     flexDirection: 'row',

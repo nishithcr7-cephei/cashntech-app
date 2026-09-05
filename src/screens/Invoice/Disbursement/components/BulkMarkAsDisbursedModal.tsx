@@ -19,6 +19,11 @@ import Toast from 'react-native-toast-message';
 import {invoiceApi} from '@services/api/invoice.api';
 import {decryptValue} from '@utils/decrypt';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
+import {
+  computeDisbursementPreviewAmounts,
+  isVfUpfrontChargeType,
+  resolveDisbursementUsanceDaysDisplay,
+} from '@utils/invoiceTotals';
 
 const WINDOW_HEIGHT = Dimensions.get('window').height;
 const SHEET_HEIGHT = WINDOW_HEIGHT * 0.96;
@@ -32,8 +37,28 @@ type BulkMarkAsDisbursedModalProps = {
     invoiceNo: string;
     amount: number;
     invoiceDateRaw?: string | null;
+    productName?: string;
   }[];
-  onSubmit: (data: any[]) => void | Promise<void>;
+  onSubmit: (data: BulkDisbursementSubmitRow[]) => void | Promise<void>;
+};
+
+export type BulkDisbursementSubmitRow = {
+  id: string;
+  invoiceNo: string;
+  amount: number;
+  debitFrom: string;
+  creditTo: string;
+  status: string;
+  disbursedAmount: string;
+  date: string;
+  utrNo: string;
+  transactionNo: string;
+  remark: string;
+  holdCategory: string;
+  expectedReleaseDate: string;
+  invoiceDateRaw?: string | null;
+  usanceDays?: number;
+  upfrontInterest?: number;
 };
 
 /** Invoice calendar day + 1 through today (no future dates). */
@@ -108,22 +133,52 @@ const holdCategoryOptions = [
   {label: 'Other', value: 'Other'},
 ];
 
-type InvoiceRowData = {
-  id: string;
-  invoiceNo: string;
-  amount: number;
-  debitFrom: string;
-  creditTo: string;
-  status: string;
-  disbursedAmount: string;
-  date: string;
-  utrNo: string;
-  transactionNo: string;
-  remark: string;
-  holdCategory: string;
-  expectedReleaseDate: string;
-  invoiceDateRaw?: string | null;
+type InvoiceRowData = BulkDisbursementSubmitRow & {
+  invoicePreview?: Record<string, unknown> | null;
+  isVendorFinance?: boolean;
+  isVfUpfront?: boolean;
 };
+
+function isVendorFinanceProduct(productName?: string): boolean {
+  return String(productName || '').toLowerCase().includes('vendor');
+}
+
+function buildInvoicePreview(invoiceData: Record<string, unknown>, bankData: Record<string, unknown>) {
+  const apm = (invoiceData.anchorParticipantMapping ?? {}) as Record<string, unknown>;
+  const program = (invoiceData.program ?? {}) as Record<string, unknown>;
+  const productConfig = (program.productConfig ?? {}) as Record<string, unknown>;
+  const interestParams = (apm.interest_parameters ?? {}) as Record<string, unknown>;
+  return {
+    ...invoiceData,
+    eligibility_percent:
+      apm.eligibility ?? (program as {eligibility?: unknown}).eligibility ?? null,
+    interest_charge_type: productConfig.interest_charge_type ?? null,
+    interest_rate_percent:
+      invoiceData.total_roi_percent ?? interestParams.total_roi_percent ?? null,
+    transaction_interest_rate:
+      bankData.interest_rate ?? bankData.interestRate ?? null,
+  };
+}
+
+function applyDisbursementCalc(
+  row: InvoiceRowData,
+  disbursementDate: string,
+): Pick<InvoiceRowData, 'disbursedAmount' | 'usanceDays' | 'upfrontInterest'> {
+  if (row.status !== 'Disbursed' || !disbursementDate.trim()) {
+    return {disbursedAmount: '', usanceDays: undefined, upfrontInterest: undefined};
+  }
+  const amounts = computeDisbursementPreviewAmounts(row.invoicePreview, {
+    disbursementDate,
+    isVendorFinance: row.isVendorFinance,
+    isVfUpfront: row.isVfUpfront,
+  });
+  return {
+    disbursedAmount:
+      amounts.disbursedAmount > 0 ? formatAmount(amounts.disbursedAmount) : '',
+    usanceDays: amounts.usanceDays,
+    upfrontInterest: amounts.advanceInterest,
+  };
+}
 
 const formatAmount = (amount: number) =>
   amount.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -147,7 +202,7 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
 
     setCheckedIds(new Set(selectedInvoices.map(inv => inv.id)));
 
-    const initRows = selectedInvoices.map(inv => ({
+    const initRows: InvoiceRowData[] = selectedInvoices.map(inv => ({
       id: inv.id,
       invoiceNo: inv.invoiceNo,
       amount: inv.amount,
@@ -162,6 +217,9 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
       remark: '',
       holdCategory: '',
       expectedReleaseDate: '',
+      isVendorFinance: isVendorFinanceProduct(inv.productName),
+      isVfUpfront: false,
+      invoicePreview: null,
     }));
     setRows(initRows);
     setAccountsLoading(true);
@@ -169,41 +227,83 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
     Promise.all(
       selectedInvoices.map(async inv => {
         try {
-          const data = await invoiceApi.getBankAccountsForDisbursement(inv.id);
-          const d = data?.data ?? data;
+          const [bankRes, invoiceRes] = await Promise.all([
+            invoiceApi.getBankAccountsForDisbursement(inv.id),
+            invoiceApi.getInvoiceDetails(inv.id),
+          ]);
+          const bankPayload = bankRes?.data ?? bankRes ?? {};
+          const invoiceData = (invoiceRes ?? {}) as Record<string, unknown>;
+          const d = bankPayload as Record<string, unknown>;
 
           let debitFrom = '';
           let creditTo = '';
 
           const apm = d?.anchorParticipantMapping ?? d?.anchor_participant_mapping;
-          const apmObj = Array.isArray(apm) ? apm[0] : apm;
+          const apmObj = (Array.isArray(apm) ? apm[0] : apm) as Record<string, unknown> | undefined;
           const odAccount = apmObj?.od_account_no ?? apmObj?.odAccountNo ?? '';
-          const entityName = apmObj?.party?.entity_name ?? apmObj?.Party?.entityName ?? '';
+          const party = apmObj?.party as Record<string, unknown> | undefined;
+          const entityName = party?.entity_name ?? apmObj?.Party?.entityName ?? '';
           if (odAccount) {
-            const decryptedOd = decryptValue(odAccount);
+            const decryptedOd = decryptValue(String(odAccount));
             debitFrom = entityName ? `${decryptedOd} (${entityName})` : decryptedOd;
           }
 
-          const program = d?.program ?? d?.Program;
-          const programBankDetails = program?.bank_details ?? [];
+          const program = (d?.program ?? d?.Program) as Record<string, unknown> | undefined;
+          const programBankDetails = (program?.bank_details ?? []) as Array<Record<string, unknown>>;
           const programAcc =
-            Array.isArray(programBankDetails) && programBankDetails.length > 0
+            programBankDetails.length > 0
               ? programBankDetails[0]?.account_number ?? programBankDetails[0]?.accountNumber ?? ''
               : '';
           if (programAcc) {
-            creditTo = decryptValue(programAcc);
+            creditTo = decryptValue(String(programAcc));
           }
 
-          return {id: inv.id, debitFrom: debitFrom || '-', creditTo: creditTo || '-'};
+          const preview = buildInvoicePreview(invoiceData, d);
+          const programConfig = (invoiceData.program as {productConfig?: {interest_charge_type?: string}} | undefined)
+            ?.productConfig;
+          const isVendorFinance =
+            inv.productName != null
+              ? isVendorFinanceProduct(inv.productName)
+              : isVendorFinanceProduct(
+                  String((programConfig as {product?: {name?: string}} | undefined)?.product?.name ?? ''),
+                );
+          const isVfUpfront =
+            isVendorFinance &&
+            isVfUpfrontChargeType(programConfig?.interest_charge_type ?? preview.interest_charge_type as string);
+
+          return {
+            id: inv.id,
+            debitFrom: debitFrom || '-',
+            creditTo: creditTo || '-',
+            invoicePreview: preview,
+            isVendorFinance,
+            isVfUpfront,
+          };
         } catch {
-          return {id: inv.id, debitFrom: 'N/A', creditTo: 'N/A'};
+          return {
+            id: inv.id,
+            debitFrom: 'N/A',
+            creditTo: 'N/A',
+            invoicePreview: null,
+            isVendorFinance: isVendorFinanceProduct(inv.productName),
+            isVfUpfront: false,
+          };
         }
       }),
     ).then(results => {
       setRows(prev =>
         prev.map(r => {
           const match = results.find(res => res.id === r.id);
-          return match ? {...r, debitFrom: match.debitFrom, creditTo: match.creditTo} : r;
+          return match
+            ? {
+                ...r,
+                debitFrom: match.debitFrom,
+                creditTo: match.creditTo,
+                invoicePreview: match.invoicePreview,
+                isVendorFinance: match.isVendorFinance,
+                isVfUpfront: match.isVfUpfront,
+              }
+            : r;
         }),
       );
       setAccountsLoading(false);
@@ -214,17 +314,23 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
     setRows(prev =>
       prev.map(r => {
         if (r.id !== id) return r;
-        const next = {...r, [field]: value};
+        let next: InvoiceRowData = {...r, [field]: value} as InvoiceRowData;
         if (field === 'status') {
           if (value !== 'Disbursed') {
             next.utrNo = '';
             next.transactionNo = '';
             next.date = '';
+            next.disbursedAmount = '';
+            next.usanceDays = undefined;
+            next.upfrontInterest = undefined;
           }
           if (value !== 'Hold') {
             next.holdCategory = '';
             next.expectedReleaseDate = '';
           }
+        }
+        if (field === 'date' && next.status === 'Disbursed') {
+          next = {...next, ...applyDisbursementCalc(next, value)};
         }
         return next;
       }),
@@ -314,7 +420,11 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
       }
     }
 
-    await onSubmit(rowsToSubmit);
+    await onSubmit(
+      rowsToSubmit.map(
+        ({invoicePreview: _p, isVendorFinance: _vf, isVfUpfront: _vu, ...rest}) => rest,
+      ),
+    );
   };
 
   const handleClose = () => {
@@ -432,6 +542,17 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
 
                 {row.status === 'Disbursed' && (
                   <>
+                    {row.isVfUpfront && row.date ? (
+                      renderReadOnlyField(
+                        'Usance Days',
+                        resolveDisbursementUsanceDaysDisplay(
+                          row.usanceDays ?? null,
+                          String(row.invoicePreview?.invoice_due_date ?? row.invoicePreview?.due_date ?? ''),
+                          row.date,
+                          row.invoicePreview?.tenor ?? row.invoicePreview?.tenor_days ?? null,
+                        ),
+                      )
+                    ) : null}
                     <View style={styles.fieldBlock}>
                       <Text style={styles.fieldLabel}>
                         Disbursed Amount <Text style={styles.required}>*</Text>

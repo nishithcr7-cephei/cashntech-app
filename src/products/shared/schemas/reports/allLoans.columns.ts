@@ -22,6 +22,7 @@ export const ALL_LOANS_REPORT_SCHEMA: ReportSchema = {
     'disbursementDate',
     'dueDate',
     'tenor',
+    'usanceDays',
     'roi',
     'repaidAmount',
     'principalOutstanding',
@@ -53,6 +54,7 @@ export const ALL_LOANS_REPORT_SCHEMA: ReportSchema = {
     'disbursementDate',
     'dueDate',
     'tenor',
+    'usanceDays',
     'roi',
     'repaidAmount',
     'principalOutstanding',
@@ -89,6 +91,10 @@ export const ALL_LOANS_REPORT_SCHEMA: ReportSchema = {
     disbursementDate: {key: 'disbursementDate', ...c('Disbursement Date')},
     dueDate: {key: 'dueDate', ...c('Due Date')},
     tenor: {key: 'tenor', ...c('Tenor', 'Tenor (Days)')},
+    usanceDays: {
+      key: 'usanceDays',
+      ...c('Usance Days', 'Loan Tenor (Days)'),
+    },
     roi: {key: 'roi', ...c('Roi', 'Interest Rate')},
     repaidAmount: {key: 'repaidAmount', ...c('Repaid Amount')},
     principalOutstanding: {

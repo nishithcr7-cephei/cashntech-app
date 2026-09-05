@@ -1,9 +1,18 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {CreditAccountDetailsState} from './types';
-import {ProgramSummaryApi, DealerListItemApi, TransactionDetailsApi, OpenInvoiceApi, ClosedInvoiceApi, RepaymentApi} from '@services/api/soa_details.api';
+import {
+  ProgramSummaryApi,
+  DealerListItemApi,
+  TransactionDetailsApi,
+  OpenInvoiceApi,
+  ClosedInvoiceApi,
+  RepaymentApi,
+} from '@services/api/soa_details.api';
+import type {ProgramCounterPartySummary} from '@store/soa/dealer/dealer.types';
 
 const initialState: CreditAccountDetailsState = {
   programSummary: null,
+  accountLoanSummary: null,
   dealerList: [],
   transactionList: [],
   openInvoiceList: [],
@@ -30,8 +39,9 @@ const creditAccountDetailsSlice = createSlice({
     fetchCreditAccountDetailsSuccess: (
       state,
       action: PayloadAction<{
-        summary: ProgramSummaryApi; 
-        dealers: DealerListItemApi[]; 
+        summary: ProgramSummaryApi;
+        accountLoanSummary: ProgramCounterPartySummary | null;
+        dealers: DealerListItemApi[];
         transactions: TransactionDetailsApi[];
         openInvoices: OpenInvoiceApi[];
         closedInvoices: ClosedInvoiceApi[];
@@ -42,6 +52,7 @@ const creditAccountDetailsSlice = createSlice({
       }>,
     ) => {
       state.programSummary = action.payload.summary;
+      state.accountLoanSummary = action.payload.accountLoanSummary;
       state.dealerList = action.payload.dealers;
       state.transactionList = action.payload.transactions;
       state.openInvoiceList = action.payload.openInvoices;
@@ -58,6 +69,7 @@ const creditAccountDetailsSlice = createSlice({
     },
     resetCreditAccountDetails: (state) => {
       state.programSummary = null;
+      state.accountLoanSummary = null;
       state.dealerList = [];
       state.transactionList = [];
       state.openInvoiceList = [];

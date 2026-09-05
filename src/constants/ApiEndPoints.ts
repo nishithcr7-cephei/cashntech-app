@@ -196,6 +196,8 @@ const Endpoints = {
   apiProgramList: 'transactions/program/list',
   apiProgramDealersList: 'transactions/program/dealers',
   apiProgramCounterPartySummary: 'transactions/program/counter-party-summary',
+  apiCounterPartyAccountSummary: (participantId: string) =>
+    `transactions/counter-party/${participantId}/summary`,
   apiProgramDealers: (programId: string) => `transactions/program/dealers/${programId}`,
   apiProgramSummary: (id: string) => `transactions/program-summary/${id}`,
   apiProgramDealersDetails: (id: string) => `transactions/dealers/${id}`,

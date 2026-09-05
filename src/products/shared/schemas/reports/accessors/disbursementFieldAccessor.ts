@@ -54,6 +54,13 @@ export function disbursementFieldAccessor(
       return {value: formatText(item.disbursementDate)};
     case 'maturityDate':
       return {value: formatText(item.maturityDate)};
+    case 'usanceDays':
+      return {
+        value:
+          item.usanceDays != null && Number.isFinite(item.usanceDays)
+            ? String(Math.round(item.usanceDays))
+            : '-',
+      };
     case 'invoiceValue':
       return {value: formatAmount(item.invoiceValue)};
     case 'loanValue':

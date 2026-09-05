@@ -20,6 +20,7 @@ import {Search, Filter, LeftChevron} from '@assets/Icons';
 import {fetchCreditAccountDetailsRequest, resetCreditAccountDetails} from './slice';
 import {
   selectProgramSummary,
+  selectAccountLoanSummary,
   selectDealerListDetails,
   selectCreditAccountDetailsLoading,
   selectCreditAccountDetailsError,
@@ -33,7 +34,7 @@ import {
 } from './selector';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
 import {PRODUCT_CODES} from '@store/product/product.types';
-import {SOALoanDetailsCard} from '@screens/Invoice/Account/SOALoanDetailsCard';
+import {SOAVendorListProgramHeader} from '@screens/Invoice/Account/SOAVendorListProgramHeader';
 
 const TABS = [
   'OD Account Summary',
@@ -75,6 +76,7 @@ export const CreditAccountDetails: React.FC = () => {
 
   // Redux state
   const summary = useSelector(selectProgramSummary);
+  const accountLoanSummary = useSelector(selectAccountLoanSummary);
   const dealers = useSelector(selectDealerListDetails) || [];
   const loading = useSelector(selectCreditAccountDetailsLoading);
   const error = useSelector(selectCreditAccountDetailsError);
@@ -109,21 +111,6 @@ export const CreditAccountDetails: React.FC = () => {
       dispatch(resetCreditAccountDetails());
     };
   }, [id, programId, dispatch]);
-
-  const availableLimit = useMemo(() => {
-    if (!summary) {
-      return null;
-    }
-    const limit = Number(summary.total_limit || 0);
-    if (!Number.isFinite(limit)) {
-      return null;
-    }
-    return (
-      limit -
-      Number(summary.utilized_amount || 0) -
-      Number(summary.pipeline_requests || 0)
-    );
-  }, [summary]);
 
   const filteredDealers = useMemo(() => {
     if (!searchText.trim()) return dealers;
@@ -426,19 +413,42 @@ export const CreditAccountDetails: React.FC = () => {
           </Text>
         </View>
 
-        {/* Top Summary Card - Loan Details */}
-        {summary && (
-          <SOALoanDetailsCard
-            creditAccountNo={
-              summary.account_number || dealers[0]?.od_account_no
-            }
-            anchorName={summary.entity_name || programName}
-            sanctionedLimit={summary.total_limit}
-            utilizedAmount={summary.utilized_amount}
-            availableLimit={availableLimit}
-            totalOutstanding={summary.total_outstanding}
-            overdueDays={summary.overdue_days}
-          />
+        {/* Top Summary Card - Loan Details (web parity: DUE / RECEIVED) — DF + VF */}
+        {(loading || accountLoanSummary) && (
+          <View style={styles.loanDetailsWrap}>
+            <SOAVendorListProgramHeader
+              programName={
+                accountLoanSummary?.loanDetails.programName ?? programName
+              }
+              anchorName={accountLoanSummary?.loanDetails.anchorName ?? null}
+              bankName={
+                accountLoanSummary?.loanDetails.bankName ??
+                (route.params as any)?.bankName ??
+                null
+              }
+              status={
+                accountLoanSummary?.loanDetails.status ??
+                (route.params as any)?.status ??
+                null
+              }
+              programApprovalDate={
+                accountLoanSummary?.loanDetails.programApprovalDate ?? null
+              }
+              programExpiryDate={
+                accountLoanSummary?.loanDetails.programExpiryDate ?? null
+              }
+              programLimit={
+                accountLoanSummary?.loanDetails.programLimit ?? null
+              }
+              availableLimit={
+                accountLoanSummary?.loanDetails.availableLimit ?? null
+              }
+              roiPercent={accountLoanSummary?.loanDetails.roiPercent ?? null}
+              due={accountLoanSummary?.due ?? null}
+              received={accountLoanSummary?.received ?? null}
+              loading={loading && !accountLoanSummary}
+            />
+          </View>
         )}
 
         {/* Tabs */}
@@ -562,6 +572,10 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: scaleHeight(40) },
   pageTitleBar: { paddingHorizontal: scaleWidth(16), paddingVertical: scaleHeight(12), backgroundColor: Colors.white },
   pageTitleText: { fontSize: scaleFont(13), fontFamily: Fonts.GilroySemiBold, color: Colors.darkblack },
+  loanDetailsWrap: {
+    paddingHorizontal: scaleWidth(16),
+    marginBottom: scaleHeight(4),
+  },
   tabContainer: { backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
   tabScrollContent: { paddingHorizontal: scaleWidth(16) },
   tabLink: { paddingVertical: scaleHeight(14), marginRight: scaleWidth(24), position: 'relative' },

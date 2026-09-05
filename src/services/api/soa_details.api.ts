@@ -1,6 +1,9 @@
 import axiosInstance from './api';
 import ApiEndPoints from '@constants/ApiEndPoints';
 import {decryptValue} from '@utils/decrypt';
+import moment from 'moment';
+import {formatIndianNumber} from '@utils/Utils';
+import type {ProgramCounterPartySummary} from '@store/soa/dealer/dealer.types';
 
 export interface ProgramSummaryApi {
   account_number: string;
@@ -97,7 +100,78 @@ export interface RepaymentApi {
 const asRelativeEndpoint = (path: string) =>
   path.startsWith('/') ? path : `/${path}`;
 
+function formatSummaryDate(value: unknown): string {
+  if (!value) {
+    return '-';
+  }
+  const formatted = moment(value).format('DD-MM-YYYY');
+  return formatted === 'Invalid date' ? '-' : formatted;
+}
+
+function formatSummaryAmount(value: unknown): string {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) {
+    return '₹0.00';
+  }
+  return `₹${formatIndianNumber(String(num))}`;
+}
+
+function mapAccountSummaryAmounts(raw: any, totalKey: 'total_due' | 'total_received') {
+  return {
+    principal: formatSummaryAmount(raw?.principal),
+    interest: formatSummaryAmount(raw?.interest),
+    penalInterest: formatSummaryAmount(raw?.penal_interest),
+    charges: formatSummaryAmount(raw?.charges),
+    total: formatSummaryAmount(raw?.[totalKey] ?? raw?.total),
+  };
+}
+
 export const soaDetailsApi = {
+  /**
+   * Account-level LOAN DETAILS (DUE / RECEIVED) — existing backend endpoint.
+   * POST /transactions/counter-party/:participantId/summary
+   */
+  getCounterPartyAccountSummary: async (
+    participantId: string,
+  ): Promise<ProgramCounterPartySummary | null> => {
+    const url = asRelativeEndpoint(
+      ApiEndPoints.apiCounterPartyAccountSummary(participantId),
+    );
+    const response = await axiosInstance.post(url, {}, {
+      authRequired: true,
+    } as any);
+    const data = response?.data;
+    if (data?.statusCode !== 200 && data?.statusCode !== 201) {
+      return null;
+    }
+    const raw = data?.data || {};
+    const loanDetails = raw.loanDetails || {};
+    const due = raw.due || {};
+    const received = raw.received || {};
+    const roiPercent =
+      loanDetails.roi_percent != null && loanDetails.roi_percent !== ''
+        ? `${loanDetails.roi_percent}%`
+        : '-';
+
+    return {
+      loanDetails: {
+        programName: loanDetails.program_name || '-',
+        anchorName: decryptValue(loanDetails.anchor_name || '') || '-',
+        bankName: loanDetails.bank_name || '-',
+        programApprovalDate: formatSummaryDate(
+          loanDetails.program_approval_date,
+        ),
+        programExpiryDate: formatSummaryDate(loanDetails.program_expiry_date),
+        status: loanDetails.status || '-',
+        programLimit: formatSummaryAmount(loanDetails.program_limit),
+        availableLimit: formatSummaryAmount(loanDetails.available_limit),
+        roiPercent,
+      },
+      due: mapAccountSummaryAmounts(due, 'total_due'),
+      received: mapAccountSummaryAmounts(received, 'total_received'),
+    };
+  },
+
   getProgramSummary: async (id: string): Promise<ProgramSummaryApi | null> => {
     const url = asRelativeEndpoint(ApiEndPoints.apiProgramSummary(id));
     // eslint-disable-next-line no-console

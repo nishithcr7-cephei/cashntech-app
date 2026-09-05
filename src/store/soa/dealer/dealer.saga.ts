@@ -75,6 +75,11 @@ function* fetchDealerListWorker(
           item.available_limit != null
             ? Number(item.available_limit)
             : drawingPower - utilizedAmount;
+        const sanctionLimitRaw = Number(item.sanctioned_limit || 0) || 0;
+        const pipelineRequestsRaw = Number(item.pipeline_requests || 0) || 0;
+        const excessCreditRaw = Number(item.excess_credit || 0) || 0;
+        const totalOsAmountRaw = Number(item.total_os_amount || 0) || 0;
+        const totalAmountPaidRaw = Number(item.total_amount_paid || 0) || 0;
 
         return {
           id: item.id || item.programDealerId,
@@ -83,20 +88,23 @@ function* fetchDealerListWorker(
           odExpiryDate: item.od_expiry_date
             ? moment(item.od_expiry_date).format('DD-MM-YYYY')
             : '-',
-          sanctionLimit: item.sanctioned_limit
-            ? `₹${formatIndianNumber(item.sanctioned_limit)}`
-            : '₹0.00',
+          sanctionLimit: `₹${formatIndianNumber(String(sanctionLimitRaw))}`,
           drawingPower: `₹${formatIndianNumber(String(drawingPower))}`,
           utilizedAmount: `₹${formatIndianNumber(String(utilizedAmount))}`,
-          pipelineRequests: item.pipeline_requests
-            ? `₹${formatIndianNumber(item.pipeline_requests)}`
-            : '₹0.00',
-          excessCredit: item.excess_credit
-            ? `₹${formatIndianNumber(item.excess_credit)}`
-            : '₹0.00',
+          pipelineRequests: `₹${formatIndianNumber(String(pipelineRequestsRaw))}`,
+          excessCredit: `₹${formatIndianNumber(String(excessCreditRaw))}`,
           availableLimit: `₹${formatIndianNumber(String(availableLimit))}`,
+          totalOsAmount: `₹${formatIndianNumber(String(totalOsAmountRaw))}`,
+          totalAmountPaid: `₹${formatIndianNumber(String(totalAmountPaidRaw))}`,
           overdueDays: String(item.overdue_days ?? 0),
           status: item.status || 'N/A',
+          sanctionLimitRaw,
+          utilizedAmountRaw: utilizedAmount,
+          pipelineRequestsRaw,
+          excessCreditRaw,
+          availableLimitRaw: availableLimit,
+          totalOsAmountRaw,
+          totalAmountPaidRaw,
         };
       });
 

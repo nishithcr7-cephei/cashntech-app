@@ -2,6 +2,8 @@ import {RootState} from '@store/app/store';
 
 export const selectCreditAccountDetailsState = (state: RootState) => state.creditAccountDetails;
 export const selectProgramSummary = (state: RootState) => state.creditAccountDetails.programSummary;
+export const selectAccountLoanSummary = (state: RootState) =>
+  state.creditAccountDetails.accountLoanSummary;
 export const selectDealerListDetails = (state: RootState) => state.creditAccountDetails.dealerList;
 export const selectCreditAccountDetailsLoading = (state: RootState) => state.creditAccountDetails.loading;
 export const selectCreditAccountDetailsError = (state: RootState) => state.creditAccountDetails.error;

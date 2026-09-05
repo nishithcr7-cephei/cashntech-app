@@ -227,7 +227,7 @@ export type InvoiceRow = {
   invoiceDate: string;
   requestDate: string;
   dueDate: string;
-  /** VF list column — empty string when not set */
+  /** List column — empty string when not set */
   grnDate: string;
   invoiceStatus: string;
   approvalStatus: string;

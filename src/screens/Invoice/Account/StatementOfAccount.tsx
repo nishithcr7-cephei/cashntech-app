@@ -117,13 +117,25 @@ export const StatementOfAccount: React.FC = () => {
               <Text style={styles.infoValue}>{item.partyName || '-'}</Text>
             </View>
             <View style={styles.infoColumn}>
-              <Text style={styles.infoLabel}>Total Sanctioned Amount (₹)</Text>
+              <Text style={styles.infoLabel}>Total Sanction Limit (₹)</Text>
               <Text style={[styles.infoValue, {color: Colors.primaryColor, fontFamily: Fonts.GilroyBold}]}>
                  {item.totalSanctionedAmount || '₹0.00'}
               </Text>
             </View>
             <View style={styles.infoColumn}>
-              <Text style={styles.infoLabel}>Total Outstanding</Text>
+              <Text style={styles.infoLabel}>Total Utilized Amount (₹)</Text>
+              <Text style={styles.infoValue}>
+                {item.utilizedAmount || '₹0.00'}
+              </Text>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Total Available Limit (₹)</Text>
+              <Text style={styles.infoValue}>
+                {item.totalAvailableLimit || '₹0.00'}
+              </Text>
+            </View>
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Total Outstanding (₹)</Text>
               <Text
                 style={[
                   styles.infoValue,
@@ -131,10 +143,7 @@ export const StatementOfAccount: React.FC = () => {
                 ]}
                 numberOfLines={1}
                 adjustsFontSizeToFit>
-                {`₹ ${Number(item.totalOutstanding || 0).toLocaleString('en-IN', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}`}
+                {item.totalOutstanding || '₹0.00'}
               </Text>
             </View>
             <View style={styles.infoColumn}>

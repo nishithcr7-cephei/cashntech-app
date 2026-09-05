@@ -374,12 +374,10 @@ export const InterestAccrualsScreen: React.FC = () => {
             <Text style={styles.infoLabel}>Invoice Date</Text>
             <Text style={styles.infoValue}>{row.invoiceDate}</Text>
           </View>
-          {isVendorFinance ? (
-            <View style={styles.infoColumn}>
-              <Text style={styles.infoLabel}>GRN Date</Text>
-              <Text style={styles.infoValue}>{row.grnDate}</Text>
-            </View>
-          ) : null}
+          <View style={styles.infoColumn}>
+            <Text style={styles.infoLabel}>GRN Date</Text>
+            <Text style={styles.infoValue}>{row.grnDate || '-'}</Text>
+          </View>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Due Date</Text>
             <Text style={styles.infoValue}>{row.dueDate}</Text>

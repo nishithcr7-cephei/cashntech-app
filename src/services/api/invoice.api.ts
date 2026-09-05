@@ -313,6 +313,7 @@ export type MarkAsDisbursedPayload = {
   expected_release_date?: string;
   final_total?: number;
   upfront_interest?: number;
+  usance_days?: number;
 };
 
 /** API response shape for invoice approval log (GET /invoice/logs/:invoiceId) */
@@ -1051,6 +1052,8 @@ export const invoiceApi = {
       hold_category?: string;
       expected_release_date?: string;
       rejection_reason?: string;
+      upfront_interest?: number;
+      usance_days?: number;
     }[];
   }): Promise<any> => {
     const response = await axiosInstance.post(

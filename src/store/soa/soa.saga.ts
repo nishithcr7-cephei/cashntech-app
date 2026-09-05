@@ -48,11 +48,24 @@ function* fetchProgramListWorker(action: PayloadAction<FetchProgramListRequest>)
           }
         }
 
+        const sanctionRaw = Number(item.totalSanctionedAmount ?? 0) || 0;
+        const utilizedRaw = Number(item.utilizedAmount ?? 0) || 0;
+        const outstandingRaw = Number(
+          item.totalOutstanding ?? item.totaloutstanding ?? 0,
+        ) || 0;
+        // Web SOA: Available = Sanction − Utilized (not Outstanding)
+        const availableRaw = Math.max(0, sanctionRaw - utilizedRaw);
+
+        const formatInr = (n: number) =>
+          `₹${formatIndianNumber(String(n))}`;
+
         return {
           ...item,
           partyName: decryptValue(item.partyName || ''),
-          totalSanctionedAmount: item.totalSanctionedAmount ? `₹${formatIndianNumber(item.totalSanctionedAmount)}` : '₹0.00',
-          totaloutstanding: item.totaloutstanding ? `₹${formatIndianNumber(item.totaloutstanding)}` : '₹0.00',
+          totalSanctionedAmount: formatInr(sanctionRaw),
+          utilizedAmount: formatInr(utilizedRaw),
+          totalAvailableLimit: formatInr(availableRaw),
+          totalOutstanding: formatInr(outstandingRaw),
           createdAt: formattedDate,
         };
       });

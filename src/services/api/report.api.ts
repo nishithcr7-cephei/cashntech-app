@@ -33,6 +33,7 @@ import type {
   DpdReportRequestPayload,
 } from '@store/report/report.types';
 import {formatReportDisplayDate} from '@utils/reportDateFormat';
+import {resolveUsanceDaysForReportRow} from '@utils/usanceDays';
 
 function readNumber(
   ...values: Array<number | string | undefined | null>
@@ -63,6 +64,14 @@ export function normalizeAllLoanReportItem(
   index: number,
 ): AllLoanReportItem {
   const r = raw as AllLoansReportApiRow & Record<string, unknown>;
+  const dueRaw = readString(r.dueDate);
+  const disbRaw = readString(r.disbursementDate);
+  const usanceDays = resolveUsanceDaysForReportRow({
+    usanceDaysFromApi: r.usance_days ?? r.usanceDays,
+    dueDate: dueRaw === '-' ? null : dueRaw,
+    disbursementDate: disbRaw === '-' ? null : disbRaw,
+    tenor: r.tenor,
+  });
   return {
     srNo: readNumber(r.srNo, index + 1),
     lmsId: readString(r.lmsId),
@@ -79,6 +88,7 @@ export function normalizeAllLoanReportItem(
     disbursementDate: formatReportDisplayDate(readString(r.disbursementDate)),
     dueDate: formatReportDisplayDate(readString(r.dueDate)),
     tenor: readNumber(r.tenor),
+    usanceDays,
     roi: readString(r.roi, '0%'),
     repaidAmount: readNumber(r.repaidamount, r.repaidAmount),
     principalOutstanding: readNumber(
@@ -146,6 +156,14 @@ export function normalizeDisbursementReportItem(
   raw: unknown,
 ): DisbursementReportItem {
   const r = raw as DisbursementReportApiRow & Record<string, unknown>;
+  const dueRaw = readString(r.maturityDate, r.dueDate);
+  const disbRaw = readString(r.disbursementDate);
+  const usanceDays = resolveUsanceDaysForReportRow({
+    usanceDaysFromApi: r.usance_days ?? r.usanceDays,
+    dueDate: dueRaw === '-' ? null : dueRaw,
+    disbursementDate: disbRaw === '-' ? null : disbRaw,
+    tenor: r.tenor ?? r.tenure,
+  });
   return {
     anchorName: readString(r.anchorName),
     anchorPan: readString(r.anchorPan),
@@ -162,6 +180,7 @@ export function normalizeDisbursementReportItem(
     invoiceDate: formatReportDisplayDate(readString(r.invoiceDate)),
     disbursementDate: formatReportDisplayDate(readString(r.disbursementDate)),
     maturityDate: formatReportDisplayDate(readString(r.maturityDate)),
+    usanceDays,
     invoiceValue: readNumber(r.invoiceValue),
     loanValue: readNumber(r.loanValue),
     disbursementAmount: readNumber(r.disbursementAmount),

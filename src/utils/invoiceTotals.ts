@@ -4,9 +4,15 @@
  * Invoice Amount = Basic − Discount + Tax
  * Disbursement Requested Amount = Invoice Amount − TDS
  * Advance Interest (VF + Upfront) on Requested Amount:
- *   (Invoice Amount − TDS) × (ROI% ÷ 100) × (Tenor ÷ 365)
+ *   (Invoice Amount − TDS) × (ROI% ÷ 100) × (Usance Days ÷ 365)
+ *   Usance Days = Invoice Due Date − Disbursement Date
  * Net Disbursement = Requested Amount − Advance Interest
  */
+
+import {
+  computeUsanceDays,
+  resolveUsanceDaysForDisplay,
+} from '@utils/usanceDays';
 
 export function round2(n: number): number {
   if (!Number.isFinite(n)) return 0;
@@ -186,7 +192,7 @@ export type AdvanceInterestBreakdown = {
 
 /**
  * VF + Upfront Advance Interest on Disbursement Requested Amount:
- *   AI = (Invoice Amount − TDS) × ROI% × (Tenor ÷ 365)
+ *   AI = (Invoice Amount − TDS) × ROI% × (Usance Days ÷ 365)
  *   Invoice Amount = Basic − Discount + Tax
  */
 export function computeVendorFinanceAdvanceInterest(input: {
@@ -198,6 +204,8 @@ export function computeVendorFinanceAdvanceInterest(input: {
   taxTotal?: number | string | null;
   tdsAmount?: number | string | null;
   roiPercent?: number | string | null;
+  /** Prefer usance (due − disb); tenorDays used when usance not supplied (e.g. create flow). */
+  usanceDays?: number | string | null;
   tenorDays?: number | string | null;
 }): AdvanceInterestBreakdown {
   const chargeType = String(input.interestChargeType || '')
@@ -216,16 +224,22 @@ export function computeVendorFinanceAdvanceInterest(input: {
     round2(subTotal - discountTotal + taxTotal - tdsAmount),
   );
   const roiPercent = Number(input.roiPercent) || 0;
-  const tenorDays = Number(input.tenorDays) || 0;
+  const usanceFromInput = Number(input.usanceDays);
+  const interestDays =
+    Number.isFinite(usanceFromInput) && usanceFromInput > 0
+      ? usanceFromInput
+      : Number(input.tenorDays) || 0;
 
-  if (aiBase <= 0 || roiPercent <= 0 || tenorDays <= 0) {
+  if (aiBase <= 0 || roiPercent <= 0 || interestDays <= 0) {
     return {chargeApplies: true, applicable: true, advanceInterest: 0};
   }
 
   return {
     chargeApplies: true,
     applicable: true,
-    advanceInterest: round2(aiBase * (roiPercent / 100) * (tenorDays / 365)),
+    advanceInterest: round2(
+      aiBase * (roiPercent / 100) * (interestDays / 365),
+    ),
   };
 }
 
@@ -283,6 +297,8 @@ type InvoiceAmountPreview = {
   transaction_interest_rate?: number | string | null;
   tenor_days?: number | string | null;
   tenor?: number | string | null;
+  invoice_due_date?: string | null;
+  due_date?: string | null;
   program?: {eligibility?: number | string | null} | null;
   anchorParticipantMapping?:
     | {interest_parameters?: unknown; [key: string]: unknown}
@@ -293,6 +309,13 @@ export type VfDisbursementModalAmounts = {
   grossTaxable: number;
   advanceInterest: number;
   netInvoiceAmount: number;
+  usanceDays: number;
+};
+
+export type VfDisbursementModalOptions = {
+  disbursementDate?: string | null;
+  /** When set, skips due − disb derivation. */
+  usanceDays?: number | null;
 };
 
 /**
@@ -349,11 +372,13 @@ export function isVfUpfrontChargeType(
  */
 export function resolveVfDisbursementModalAmounts(
   details: InvoiceAmountPreview | null | undefined,
+  options?: VfDisbursementModalOptions,
 ): VfDisbursementModalAmounts {
   const empty: VfDisbursementModalAmounts = {
     grossTaxable: 0,
     advanceInterest: 0,
     netInvoiceAmount: 0,
+    usanceDays: 0,
   };
   if (!details) return empty;
 
@@ -374,34 +399,40 @@ export function resolveVfDisbursementModalAmounts(
       extractRoiPercent(details.anchorParticipantMapping?.interest_parameters),
   );
 
-  const tenorDays = Number(details.tenor ?? details.tenor_days ?? 0);
+  const dueRaw = details.invoice_due_date ?? details.due_date ?? null;
+  const usanceDays =
+    options?.usanceDays ??
+    computeUsanceDays({
+      dueDate: dueRaw,
+      disbursementDate: options?.disbursementDate,
+    }) ??
+    0;
 
   // Interest base excludes tax and is taken before any advance interest deduction.
   const aiBase = round2((sub - disc) * (eligibility / 100));
   const advanceInterest =
-    aiBase > 0 && roi > 0 && tenorDays > 0
-      ? round2(aiBase * (roi / 100) * (tenorDays / 365))
+    aiBase > 0 && roi > 0 && usanceDays > 0
+      ? round2(aiBase * (roi / 100) * (usanceDays / 365))
       : 0;
 
   const netInvoiceAmount = round2(Math.max(0, grossTaxable - advanceInterest));
 
-  return {grossTaxable, advanceInterest, netInvoiceAmount};
+  return {grossTaxable, advanceInterest, netInvoiceAmount, usanceDays};
 }
 
-/** Web disbursement usance display: API value, else tenor. */
+/** Disbursement usance display: API → due − disb → optional tenor fallback. */
 export function resolveDisbursementUsanceDaysDisplay(
   usanceDays?: number | string | null,
+  dueDate?: string | null,
+  disbursementDate?: string | null,
   tenor?: number | string | null,
 ): string {
-  const fromApi = Number(usanceDays);
-  if (Number.isFinite(fromApi) && usanceDays != null && usanceDays !== '') {
-    return String(Math.round(fromApi));
-  }
-  const tenorNum = Number(tenor);
-  if (Number.isFinite(tenorNum) && tenorNum > 0) {
-    return String(Math.round(tenorNum));
-  }
-  return '-';
+  return resolveUsanceDaysForDisplay({
+    usanceDaysFromApi: usanceDays,
+    dueDate,
+    disbursementDate,
+    tenor,
+  });
 }
 
 /** Finance preview: prefer stored AI, else VF Upfront formula, else eligible − net. */
@@ -481,6 +512,79 @@ export function resolveInvoiceRoiPercent(source: {
     return direct;
   }
   return extractRoiPercent(source.anchorParticipantMapping?.interest_parameters);
+}
+
+export type DisbursementPreviewAmounts = {
+  usanceDays: number;
+  advanceInterest: number;
+  disbursedAmount: number;
+  netInvoiceAmount: number;
+};
+
+/** Single/bulk disbursement: usance from due − disb, amounts from VF Upfront rules. */
+export function computeDisbursementPreviewAmounts(
+  preview: InvoiceAmountPreview | null | undefined,
+  options?: {
+    disbursementDate?: string | null;
+    isVendorFinance?: boolean;
+    isVfUpfront?: boolean;
+  },
+): DisbursementPreviewAmounts {
+  const empty: DisbursementPreviewAmounts = {
+    usanceDays: 0,
+    advanceInterest: 0,
+    disbursedAmount: 0,
+    netInvoiceAmount: 0,
+  };
+  if (!preview) {
+    return empty;
+  }
+
+  const chargeType = preview.interest_charge_type;
+  const isVfUpfront =
+    options?.isVfUpfront ??
+    (options?.isVendorFinance === true && isVfUpfrontChargeType(chargeType));
+
+  const dueRaw = preview.invoice_due_date ?? preview.due_date ?? null;
+  const usanceFromDue =
+    computeUsanceDays({
+      dueDate: dueRaw,
+      disbursementDate: options?.disbursementDate,
+    }) ?? 0;
+
+  if (isVfUpfront) {
+    const vf = resolveVfDisbursementModalAmounts(preview, {
+      disbursementDate: options?.disbursementDate,
+      usanceDays: usanceFromDue,
+    });
+    const netInvoice = Number(preview.final_total) || 0;
+    const roi = resolveInvoiceRoiPercent(preview);
+    const computed = computeDisbursedAmountLikeWeb({
+      netInvoice,
+      eligibilityPercent:
+        preview.eligibility_percent ?? preview.program?.eligibility ?? 100,
+      roiPercent: roi,
+      usanceDays: vf.usanceDays,
+      tdsAmount: preview.tds_amount ?? 0,
+      applyUpfrontInterest: true,
+    });
+    return {
+      usanceDays: vf.usanceDays,
+      advanceInterest: computed.advanceInterest,
+      disbursedAmount: computed.disbursedAmount,
+      netInvoiceAmount: vf.netInvoiceAmount,
+    };
+  }
+
+  const netInvoice = resolveNetInvoiceAmountFromPreview(preview, {
+    isVendorFinance: options?.isVendorFinance,
+  });
+  return {
+    usanceDays: usanceFromDue,
+    advanceInterest: 0,
+    disbursedAmount: netInvoice,
+    netInvoiceAmount: netInvoice,
+  };
 }
 
 export function extractRoiPercent(interestParameters: unknown): number {

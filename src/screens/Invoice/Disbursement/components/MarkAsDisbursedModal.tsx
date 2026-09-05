@@ -35,6 +35,7 @@ import {
   resolveNetInvoiceAmountFromPreview,
   resolveVfDisbursementModalAmounts,
 } from '@utils/invoiceTotals';
+import {computeUsanceDays} from '@utils/usanceDays';
 
 type MarkAsDisbursedModalProps = {
   visible: boolean;
@@ -57,6 +58,7 @@ type MarkAsDisbursedModalProps = {
     expectedReleaseDate?: string;
     finalTotal?: number;
     upfrontInterest?: number;
+    usanceDays?: number;
   }) => void | Promise<void>;
 };
 
@@ -99,47 +101,6 @@ function formatDateDDMMYYYY(value?: string | null): string {
   } catch {
     return String(value);
   }
-}
-
-function parseFlexibleDate(value?: string | null): moment.Moment | null {
-  if (!value?.trim()) return null;
-  const strict = moment(value.trim(), DATE_FORMATS, true);
-  if (strict.isValid()) return strict.startOf('day');
-  const loose = moment(value.trim());
-  return loose.isValid() ? loose.startOf('day') : null;
-}
-
-/** Usance Days — prefer API value; else Due − Disbursement / tenor − (Disb − GRN). */
-function resolveUsanceDays(params: {
-  usanceDays?: number | string | null;
-  preferredDisbursementDate?: string | null;
-  dueDate?: string | null;
-  grnDate?: string | null;
-  invoiceDate?: string | null;
-  tenor?: number | string | null;
-}): string {
-  const fromApi = Number(params.usanceDays);
-  if (Number.isFinite(fromApi) && params.usanceDays != null && params.usanceDays !== '') {
-    return String(Math.round(fromApi));
-  }
-
-  const disb = parseFlexibleDate(params.preferredDisbursementDate ?? null);
-  if (!disb) return '-';
-
-  const due = parseFlexibleDate(params.dueDate ?? null);
-  if (due) {
-    return String(due.diff(disb, 'days'));
-  }
-
-  const tenor = Number(params.tenor);
-  if (!Number.isFinite(tenor)) return '-';
-
-  const base =
-    parseFlexibleDate(params.grnDate ?? null) ||
-    parseFlexibleDate(params.invoiceDate ?? null);
-  if (!base) return '-';
-
-  return String(tenor - disb.diff(base, 'days'));
 }
 
 function resolveProductCode(
@@ -330,14 +291,12 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       return;
     }
 
-    const tenor = Number(preview.tenor ?? preview.tenor_days ?? 0);
-    const disb = parseFlexibleDate(date);
-    const grn = parseFlexibleDate(
-      preview.grn_date ? formatDateDDMMYYYY(preview.grn_date) : null,
-    );
-    const diffDays =
-      disb && grn ? disb.diff(grn, 'days') : 0;
-    const usanceDays = Math.max(0, tenor - diffDays);
+    const dueRaw = preview.invoice_due_date ?? preview.due_date ?? null;
+    const usanceDays =
+      computeUsanceDays({
+        dueDate: dueRaw,
+        disbursementDate: date,
+      }) ?? 0;
     const roi = resolveInvoiceRoiPercent(preview);
     const computed = computeDisbursedAmountLikeWeb({
       netInvoice,
@@ -361,8 +320,10 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
 
   const vfAmounts = useMemo(() => {
     if (!isVfUpfront || !preview) return null;
-    return resolveVfDisbursementModalAmounts(preview);
-  }, [isVfUpfront, preview]);
+    const disbursementDate =
+      disbursementAction === 'Disbursed' && date ? date : todayDisplay;
+    return resolveVfDisbursementModalAmounts(preview, {disbursementDate});
+  }, [isVfUpfront, preview, date, disbursementAction, todayDisplay]);
 
   const invoiceAmountCap = useMemo(() => {
     if (!preview) return 0;
@@ -398,6 +359,12 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     const dueDateRaw = p.invoice_due_date ?? p.due_date ?? null;
     const grnDateRaw = p.grn_date ?? null;
     const tenorRaw = p.tenor ?? p.tenor_days ?? null;
+    const disbursementDateForUsance =
+      disbursementAction === 'Disbursed' && date
+        ? date
+        : preferredDisbursementDateRaw
+          ? formatDateDDMMYYYY(preferredDisbursementDateRaw)
+          : todayDisplay;
     const eligibilityRaw =
       p.eligibility_percent ?? apm.eligibility ?? p.program?.eligibility ?? null;
 
@@ -437,23 +404,12 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
           ? `${formatPercent(eligibilityRaw)}%`
           : '-',
       advanceInterest: advanceInterestDisplay,
-      usanceDays: isVfUpfront
-        ? resolveDisbursementUsanceDaysDisplay(
-            p.usance_days ?? p.usanceDays ?? null,
-            tenorRaw,
-          )
-        : resolveUsanceDays({
-            usanceDays: p.usance_days ?? p.usanceDays ?? null,
-            preferredDisbursementDate: preferredDisbursementDateRaw
-              ? formatDateDDMMYYYY(preferredDisbursementDateRaw)
-              : null,
-            dueDate: dueDateRaw ? formatDateDDMMYYYY(dueDateRaw) : null,
-            grnDate: grnDateRaw ? formatDateDDMMYYYY(grnDateRaw) : null,
-            invoiceDate: p.invoice_date
-              ? formatDateDDMMYYYY(p.invoice_date)
-              : null,
-            tenor: tenorRaw,
-          }),
+      usanceDays: resolveDisbursementUsanceDaysDisplay(
+        p.usance_days ?? p.usanceDays ?? null,
+        dueDateRaw,
+        disbursementDateForUsance,
+        tenorRaw,
+      ),
       netInvoiceAmount: formatAmount(
         netInvoiceValue > 0
           ? netInvoiceValue
@@ -464,7 +420,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       ),
       status: dash(p.invoice_status ?? p.status),
     };
-  }, [preview, isVendorFinance, isVfUpfront, debitFrom]);
+  }, [preview, isVendorFinance, isVfUpfront, debitFrom, vfAmounts, date, disbursementAction, todayDisplay]);
 
   const handleClose = () => {
     setDisbursementAction('');
@@ -543,6 +499,15 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       }),
     };
 
+    const dueRaw = preview?.invoice_due_date ?? preview?.due_date ?? null;
+    const disbForUsance =
+      disbursementAction === 'Disbursed' ? todayDisplay : '';
+    const computedUsance =
+      computeUsanceDays({
+        dueDate: dueRaw,
+        disbursementDate: disbForUsance,
+      }) ?? undefined;
+
     if (onSubmit) {
       await onSubmit({
         debitFrom,
@@ -559,6 +524,8 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
             ? submitAmounts.netInvoiceAmount
             : undefined,
         upfrontInterest: submitAmounts.advanceInterest,
+        usanceDays:
+          disbursementAction === 'Disbursed' ? computedUsance : undefined,
       });
     }
     handleClose();

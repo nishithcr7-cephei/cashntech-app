@@ -6,7 +6,11 @@ export type ProgramRecord = {
   programName: string;
   partyName: string;
   totalSanctionedAmount: string;
-  totaloutstanding: string;
+  /** API `utilizedAmount` — formatted for list display */
+  utilizedAmount: string;
+  /** Client: Sanction − Utilized (no backend change) */
+  totalAvailableLimit: string;
+  totalOutstanding: string;
   createdAt?: string; // Formatted date (e.g., "02 Apr 2026")
 };
 

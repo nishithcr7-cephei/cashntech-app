@@ -9,8 +9,20 @@ export interface DealerListItem {
   pipelineRequests: string;
   excessCredit: string;
   availableLimit: string;
+  /** API `total_os_amount` */
+  totalOsAmount: string;
+  /** API `total_amount_paid` */
+  totalAmountPaid: string;
   overdueDays: string;
   status: string;
+  /** Raw numbers for Total row (client sum; no backend change) */
+  sanctionLimitRaw: number;
+  utilizedAmountRaw: number;
+  pipelineRequestsRaw: number;
+  excessCreditRaw: number;
+  availableLimitRaw: number;
+  totalOsAmountRaw: number;
+  totalAmountPaidRaw: number;
 }
 
 export interface FetchDealerListRequest {
@@ -31,6 +43,7 @@ export interface ProgramSummaryAmounts {
 }
 
 export interface ProgramSummaryLoanDetails {
+  programName?: string;
   anchorName: string;
   bankName: string;
   programApprovalDate: string;

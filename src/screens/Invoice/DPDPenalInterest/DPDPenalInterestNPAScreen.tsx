@@ -525,6 +525,7 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
                     </>
                   ) : (
                     <>
+                      {/* DF web parity: Loan Ref → Invoice No → Bank → Product → Program → Parties → Invoice Date → GRN Date → Due Date → Disbursement Date → Invoice Amount → Disbursed Amount → DPD Days → O/S Principal → O/S Interest Accrued → O/S Penal → O/S Total → NPA Status */}
                       <View style={styles.infoColumn}>
                         <Text style={styles.infoLabel}>Loan Ref No.</Text>
                         <Text style={styles.infoValue}>
@@ -543,9 +544,33 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
                         </TouchableOpacity>
                       </View>
                       <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Bank Name</Text>
+                        <Text style={styles.infoValue}>
+                          {row.bankName ?? row.bank_name ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Product Name</Text>
+                        <Text style={styles.infoValue}>
+                          {row.productName ?? row.name ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
                         <Text style={styles.infoLabel}>Program Name</Text>
                         <Text style={styles.infoValue}>
                           {row.program_name ?? '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>{primaryPartyLabel}</Text>
+                        <Text style={styles.infoValue}>
+                          {decryptValue(row.partyName ?? '') || '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>{counterPartyLabel}</Text>
+                        <Text style={styles.infoValue}>
+                          {decryptValue(row.counterPartyName ?? '') || '-'}
                         </Text>
                       </View>
                       <View style={styles.infoColumn}>
@@ -555,31 +580,33 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
                         </Text>
                       </View>
                       <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>GRN Date</Text>
+                        <Text style={styles.infoValue}>
+                          {formatDate(row.grn_date)}
+                        </Text>
+                      </View>
+                      <View style={styles.infoColumn}>
                         <Text style={styles.infoLabel}>Due Date</Text>
                         <Text style={styles.infoValue}>
                           {formatDate(row.invoice_due_date)}
                         </Text>
                       </View>
                       <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>
-                          Disbursement Amount (₹)
-                        </Text>
+                        <Text style={styles.infoLabel}>Disbursement Date</Text>
                         <Text style={styles.infoValue}>
-                          {row.disbursed_amount ?? '-'}
+                          {formatDate(row.disbursement_date)}
                         </Text>
                       </View>
                       <View style={styles.infoColumn}>
-                        <Text style={styles.infoLabel}>
-                          Invoice Accrued Amount (₹)
-                        </Text>
+                        <Text style={styles.infoLabel}>Invoice Amount (₹)</Text>
                         <Text style={styles.infoValue}>
-                          {row.interest_accrued ?? '-'}
+                          {formatMoney(row.final_total)}
                         </Text>
                       </View>
                       <View style={styles.infoColumn}>
                         <Text style={styles.infoLabel}>Disbursed Amount</Text>
                         <Text style={styles.infoValue}>
-                          {row.disbursed_amount ?? '-'}
+                          {formatMoney(row.disbursed_amount)}
                         </Text>
                       </View>
                       <View style={styles.infoColumn}>
@@ -593,7 +620,7 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
                           O/S Principal Amount (₹)
                         </Text>
                         <Text style={styles.infoValue}>
-                          {row.outstanding_principal ?? '-'}
+                          {formatMoney(row.outstanding_principal)}
                         </Text>
                       </View>
                       <View style={styles.infoColumn}>
@@ -601,19 +628,19 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
                           O/S Interest Accrued Amount (₹)
                         </Text>
                         <Text style={styles.infoValue}>
-                          {row.interest_accrued ?? '-'}
+                          {formatMoney(row.interest_accrued)}
                         </Text>
                       </View>
                       <View style={styles.infoColumn}>
                         <Text style={styles.infoLabel}>O/S Penal Amount (₹)</Text>
                         <Text style={styles.infoValue}>
-                          {row.penal_interest ?? '-'}
+                          {formatMoney(row.penal_interest)}
                         </Text>
                       </View>
                       <View style={styles.infoColumn}>
                         <Text style={styles.infoLabel}>O/S Total Amount (₹)</Text>
                         <Text style={styles.infoValue}>
-                          {row.total_outstanding ?? '-'}
+                          {formatMoney(row.total_outstanding)}
                         </Text>
                       </View>
                       <View style={styles.infoColumn}>

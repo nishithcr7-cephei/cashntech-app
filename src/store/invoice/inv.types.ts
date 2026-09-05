@@ -227,6 +227,8 @@ export type BulkDisbursementRequest = {
     expected_release_date?: string;
     remark?: string;
     rejection_reason?: string;
+    upfront_interest?: number;
+    usance_days?: number;
   }[];
   onSuccess?: (message?: string) => void | Promise<void>;
 };

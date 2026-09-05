@@ -131,10 +131,6 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
   const showDraftOrangeDot = statusLower === 'draft';
   const showActionRequiredRedDot = statusLower === 'rejected';
 
-  const isVendorFinance = (row.productName || '')
-    .toLowerCase()
-    .includes('vendor finance');
-
   const renderInvoiceNo = () =>
     onInvoiceNoPress ? (
       <TouchableOpacity
@@ -148,26 +144,20 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
       <Text style={styles.infoValue}>{row.invoiceNo || '-'}</Text>
     );
 
-  const renderVfExtraFields = () =>
-    isVendorFinance ? (
-      <>
-        <View style={styles.infoColumn}>
-          <Text style={styles.infoLabel}>GRN Date</Text>
-          <Text style={styles.infoValue}>{row.grnDate || '-'}</Text>
-        </View>
-        {row.disbursementRequestedAmount &&
-        row.disbursementRequestedAmount !== '-' ? (
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>
-              Disbursement Requested Amount (₹)
-            </Text>
-            <Text style={styles.infoValue}>
-              {row.disbursementRequestedAmount}
-            </Text>
-          </View>
-        ) : null}
-      </>
-    ) : null;
+  const renderListExtraFields = () => (
+    <>
+      <View style={styles.infoColumn}>
+        <Text style={styles.infoLabel}>GRN Date</Text>
+        <Text style={styles.infoValue}>{row.grnDate || '-'}</Text>
+      </View>
+      <View style={styles.infoColumn}>
+        <Text style={styles.infoLabel}>Disbursement Requested Amount (₹)</Text>
+        <Text style={styles.infoValue}>
+          {row.disbursementRequestedAmount || '-'}
+        </Text>
+      </View>
+    </>
+  );
 
   return (
     <View style={[styles.cardWrapper, {opacity: transparency}]}>
@@ -267,7 +257,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
                 <Text style={styles.infoLabel}>Invoice Date</Text>
                 <Text style={styles.infoValue}>{row.invoiceDate || '-'}</Text>
               </View>
-              {renderVfExtraFields()}
+              {renderListExtraFields()}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Due Date</Text>
                 <Text style={styles.infoValue}>{row.dueDate || '-'}</Text>
@@ -334,7 +324,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
                 <Text style={styles.infoLabel}>Invoice Date</Text>
                 <Text style={styles.infoValue}>{row.invoiceDate || '-'}</Text>
               </View>
-              {renderVfExtraFields()}
+              {renderListExtraFields()}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Due Date</Text>
                 <Text style={styles.infoValue}>{row.dueDate || '-'}</Text>
@@ -401,7 +391,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
                 <Text style={styles.infoLabel}>Invoice Date</Text>
                 <Text style={styles.infoValue}>{row.invoiceDate || '-'}</Text>
               </View>
-              {renderVfExtraFields()}
+              {renderListExtraFields()}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Due Date</Text>
                 <Text style={styles.infoValue}>{row.dueDate || '-'}</Text>
@@ -468,7 +458,7 @@ export const InvoiceDetailsCard: React.FC<Props> = ({
                 <Text style={styles.infoLabel}>Invoice Date</Text>
                 <Text style={styles.infoValue}>{row.invoiceDate || '-'}</Text>
               </View>
-              {renderVfExtraFields()}
+              {renderListExtraFields()}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Upload Date</Text>
                 <Text style={styles.infoValue}>{row.requestDate || '-'}</Text>

@@ -34,6 +34,7 @@ import {decryptValue} from '@utils/decrypt';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
 import {mapInvoiceAttachmentsWithUrls, openInvoiceAttachment} from '@utils/invoiceAttachments';
 import {
+  resolveDisbursementUsanceDaysDisplay,
   resolveInvoiceRoiPercent,
   resolveNetDisbursementAmountFromInvoice,
 } from '@utils/invoiceTotals';
@@ -406,10 +407,15 @@ export const InvoiceDetailView: React.FC = () => {
           grnDate: formatApiInvoiceDate(data?.grn_date) || '',
           disbursementDate:
             formatApiInvoiceDate(data?.disbursement_date) || '',
-          usanceDays:
-            data?.usance_days != null && data?.usance_days !== ''
-              ? String(Math.round(Number(data.usance_days)) || data.usance_days)
-              : '',
+          usanceDays: (() => {
+            const resolved = resolveDisbursementUsanceDaysDisplay(
+              data?.usance_days ?? null,
+              data?.invoice_due_date ?? null,
+              data?.disbursement_date ?? null,
+              data?.tenor ?? null,
+            );
+            return resolved === '-' ? '' : resolved;
+          })(),
           creditTo,
           workflowMethod:
             apm?.program?.method || data?.program?.method || data?.workflow_method || '',

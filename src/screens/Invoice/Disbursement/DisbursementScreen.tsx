@@ -26,7 +26,7 @@ import {
 } from '@components/index';
 import {getApiErrorMessage} from '@utils/apiErrorMessage';
 import {MarkAsDisbursedModal} from './components/MarkAsDisbursedModal';
-import {BulkMarkAsDisbursedModal} from './components/BulkMarkAsDisbursedModal';
+import {BulkMarkAsDisbursedModal, type BulkDisbursementSubmitRow} from './components/BulkMarkAsDisbursedModal';
 import {BulkInvoiceEmailModal} from './components/BulkInvoiceEmailModal';
 import {DisbursementBulkActionSheet} from './components/DisbursementBulkActionSheet';
 import {Colors, Fonts} from '@constants/index';
@@ -779,7 +779,7 @@ export const DisbursementScreen: React.FC = () => {
     return ddMmYyyy || new Date().toISOString().slice(0, 10);
   };
 
-  const handleBulkSubmit = (invoicesData: any[]) => {
+  const handleBulkSubmit = (invoicesData: BulkDisbursementSubmitRow[]) => {
     const invoicesPayload = invoicesData.map(data => {
       const amtStr = data.disbursedAmount?.toString().replace(/[,\s₹/-]/g, '') || '0';
       const amt = parseFloat(amtStr) || 0;
@@ -802,6 +802,14 @@ export const DisbursementScreen: React.FC = () => {
         expected_release_date: isHold ? toApiDate(data.expectedReleaseDate) : undefined,
         rejection_reason:
           normalizeInvoiceStatus(status) === 'reject' ? data.remark || undefined : undefined,
+        upfront_interest:
+          isDisbursed && data.upfrontInterest != null && Number.isFinite(data.upfrontInterest)
+            ? data.upfrontInterest
+            : undefined,
+        usance_days:
+          isDisbursed && data.usanceDays != null && Number.isFinite(data.usanceDays)
+            ? data.usanceDays
+            : undefined,
       };
     });
 
@@ -910,15 +918,14 @@ export const DisbursementScreen: React.FC = () => {
     </View>
   );
 
-  const renderGrnDateField = (row: DisbursementRow) =>
-    isVendorFinance ? (
-      <View style={styles.infoColumn}>
-        <Text style={styles.infoLabel}>GRN Date</Text>
-        <Text style={styles.infoValue}>
-          {!row.grnDate || row.grnDate === 'dd-mm-yyyy' ? '-' : row.grnDate}
-        </Text>
-      </View>
-    ) : null;
+  const renderGrnDateField = (row: DisbursementRow) => (
+    <View style={styles.infoColumn}>
+      <Text style={styles.infoLabel}>GRN Date</Text>
+      <Text style={styles.infoValue}>
+        {!row.grnDate || row.grnDate === 'dd-mm-yyyy' ? '-' : row.grnDate}
+      </Text>
+    </View>
+  );
 
   const renderAmountStatusAndUtr = (row: DisbursementRow) => (
     <>
@@ -1017,7 +1024,7 @@ export const DisbursementScreen: React.FC = () => {
           <View style={styles.infoGrid}>
           {isAnchorMaker ? (
             <>
-              {/* Anchor Maker Order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Date → GRN Date (VF) → Due Date → Disbursement Date → Invoice Amount (₹) → Disbursement Amount (₹) → UTR No. → Invoice Status */}
+              {/* Anchor Maker Order: Invoice No → Bank Name → Product Name → Program Name → Counter Party → Invoice Date → GRN Date → Due Date → Disbursement Date → Invoice Amount (₹) → Disbursement Amount (₹) → UTR No. → Invoice Status */}
               {renderInvoiceNoField(row)}
               <View style={styles.infoColumn}>
                 <Text style={styles.infoLabel}>Bank Name</Text>
@@ -1430,6 +1437,12 @@ export const DisbursementScreen: React.FC = () => {
               expected_release_date: isHold ? holdReleaseDate : undefined,
               final_total: isDisbursed ? (data.finalTotal ?? 0) : undefined,
               upfront_interest: isDisbursed ? (data.upfrontInterest ?? 0) : undefined,
+              usance_days:
+                isDisbursed &&
+                data.usanceDays != null &&
+                Number.isFinite(data.usanceDays)
+                  ? data.usanceDays
+                  : undefined,
             });
             Toast.show({
               type: 'success',
@@ -1495,6 +1508,7 @@ export const DisbursementScreen: React.FC = () => {
               invoiceNo: row?.invoiceNo || id,
               amount: amt,
               invoiceDateRaw: row?.invoiceDateRaw ?? null,
+              productName: row?.productName,
             };
           })}
         onSubmit={handleBulkSubmit}
