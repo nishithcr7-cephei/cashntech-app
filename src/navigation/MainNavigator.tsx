@@ -4,6 +4,7 @@ import {HomeNavigator} from './HomeNavigator';
 import {useAuth} from '@hooks/index';
 import {AuthNavigator} from './AuthNavigator';
 import {API_URL} from '@config/config';
+import {navigationRef} from './navigationRef';
 
 export const MainNavigator = () => {
   const {isInitialized, isLoggedIn} = useAuth();
@@ -21,7 +22,7 @@ export const MainNavigator = () => {
   };
 
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       {isInitialized ? (
         isLoggedIn ? <HomeNavigator /> : <AuthNavigator />
       ) : (

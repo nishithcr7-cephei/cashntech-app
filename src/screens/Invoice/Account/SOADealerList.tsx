@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo} from 'react';
+import React, {useEffect, useMemo, useCallback} from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,7 @@ import {
   SHOW_SOA_VENDOR_LIST_PROGRAM_HEADER,
   SOAVendorListProgramHeader,
 } from './SOAVendorListProgramHeader';
+import SOAVendorsCombinedSummary from './SOAVendorsCombinedSummary';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
@@ -262,75 +263,9 @@ export const SOADealerList: React.FC = () => {
     );
   };
 
-  const renderTotalsFooter = () => (
-    <View style={styles.cardWrapper}>
-      <View style={[styles.listCard, styles.totalsCard]}>
-        <Text style={styles.totalsTitle}>Total</Text>
-        <View style={styles.infoGrid}>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Sanction Limit</Text>
-            <Text style={styles.totalsValue}>
-              {formatTotalInr(columnTotals.sanctionLimit)}
-            </Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Utilized Amount (₹)</Text>
-            <Text style={styles.totalsValue}>
-              {formatTotalInr(columnTotals.utilizedAmount)}
-            </Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Pipeline Requests</Text>
-            <Text style={styles.totalsValue}>
-              {formatTotalInr(columnTotals.pipelineRequests)}
-            </Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Excess Credit</Text>
-            <Text style={styles.totalsValue}>
-              {formatTotalInr(columnTotals.excessCredit)}
-            </Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Available Limit</Text>
-            <Text style={styles.totalsValue}>
-              {formatTotalInr(columnTotals.availableLimit)}
-            </Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Total O/S Amount</Text>
-            <Text style={styles.totalsValue}>
-              {formatTotalInr(columnTotals.totalOsAmount)}
-            </Text>
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.infoLabel}>Total Amount Paid</Text>
-            <Text style={styles.totalsValue}>
-              {formatTotalInr(columnTotals.totalAmountPaid)}
-            </Text>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-
-  return (
-    <Container>
-      <AppBar 
-        title="Transactions > Statement of Account (SOA)" 
-        navigation={navigation as any} 
-        hideHamburger={true}
-        renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
-        onPressLeftIcon={() => (navigation as any).navigate('StatementOfAccount')}
-      />
-      
-      <View style={styles.pageTitleBar}>
-        <Text style={styles.pageTitleText}>
-          {partyLabel} list of {programName}
-        </Text>
-      </View>
-
-      <View style={styles.content}>
+  const renderListHeader = useCallback(
+    () => (
+      <View>
         {SHOW_SOA_VENDOR_LIST_PROGRAM_HEADER &&
         selectedProgramIds.length > 0 &&
         (summaryLoading || programSummary) ? (
@@ -365,6 +300,43 @@ export const SOADealerList: React.FC = () => {
           </View>
         </View>
 
+        <SOAVendorsCombinedSummary
+          partyLabelPlural={partyLabelPlural}
+          totals={columnTotals}
+          formatInr={formatTotalInr}
+        />
+      </View>
+    ),
+    [
+      columnTotals,
+      partyLabelPlural,
+      programName,
+      programSummary,
+      routeBankName,
+      routeStatus,
+      selectedProgramIds.length,
+      summaryLoading,
+      totalDealers,
+    ],
+  );
+
+  return (
+    <Container>
+      <AppBar 
+        title="Transactions > Statement of Account (SOA)" 
+        navigation={navigation as any} 
+        hideHamburger={true}
+        renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
+        onPressLeftIcon={() => (navigation as any).navigate('StatementOfAccount')}
+      />
+      
+      <View style={styles.pageTitleBar}>
+        <Text style={styles.pageTitleText}>
+          {partyLabel} list of {programName}
+        </Text>
+      </View>
+
+      <View style={styles.content}>
         {loading && (
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color={Colors.primaryColor} />
@@ -382,13 +354,13 @@ export const SOADealerList: React.FC = () => {
 
         {!loading && dealerList.length > 0 && (
           <FlatList
+            style={styles.list}
             data={dealerList}
             renderItem={renderDealerItem}
             keyExtractor={(item, index) => `${item.id}-${index}`}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
-            scrollEnabled={true}
-            ListFooterComponent={renderTotalsFooter}
+            ListHeaderComponent={renderListHeader}
           />
         )}
       </View>
@@ -413,11 +385,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: scaleWidth(16),
   },
+  list: {
+    flex: 1,
+  },
   dealersHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: scaleHeight(12),
-    marginBottom: scaleHeight(12),
+    marginBottom: scaleHeight(8),
     gap: scaleWidth(8),
   },
   dealersLabel: {
@@ -495,21 +470,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 10,
     elevation: 8,
-  },
-  totalsCard: {
-    backgroundColor: '#FFF8F8',
-    borderColor: '#FFD9D9',
-  },
-  totalsTitle: {
-    fontSize: scaleFont(15),
-    fontFamily: Fonts.GilroyBold,
-    color: Colors.darkblack,
-    marginBottom: scaleHeight(10),
-  },
-  totalsValue: {
-    fontSize: scaleFont(13),
-    color: Colors.darkblack,
-    fontFamily: Fonts.GilroyBold,
   },
   cardHeaderRow: {
     flexDirection: 'row',

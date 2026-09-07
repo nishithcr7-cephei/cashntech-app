@@ -148,6 +148,7 @@ const invoiceSlice = createSlice({
       state.bulkDisbursementSuccess = false;
       state.invoiceListError = action.payload;
     },
+    resetInvoiceWorkspace: () => initialInvoiceState,
   },
 });
 
@@ -180,6 +181,7 @@ export const {
   bulkDisbursementRequest,
   bulkDisbursementSuccess,
   bulkDisbursementFailure,
+  resetInvoiceWorkspace,
 } = invoiceSlice.actions;
 
 export default invoiceSlice.reducer;

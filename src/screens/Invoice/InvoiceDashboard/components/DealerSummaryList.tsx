@@ -7,6 +7,7 @@ import type {InvoiceOverviewSummaryItem} from '@store/invoiceOverview';
 
 interface DealerSummaryListProps {
   loading: boolean;
+  error?: string | null;
   data: InvoiceOverviewSummaryItem[];
   onDealerPress: (dealerId: string, dealerNo: string) => void;
   isCashnTechUser?: boolean;
@@ -32,6 +33,7 @@ const displayText = (value: string | number | null | undefined): string => {
 
 export const DealerSummaryList: React.FC<DealerSummaryListProps> = ({
   loading,
+  error,
   data,
   onDealerPress,
   isCashnTechUser = false,
@@ -59,6 +61,22 @@ export const DealerSummaryList: React.FC<DealerSummaryListProps> = ({
           },
         ]}>
         <ActivityIndicator size="large" color={Colors.primaryColor} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View
+        style={[
+          styles.verticalList,
+          {
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingVertical: scaleHeight(40),
+          },
+        ]}>
+        <Text style={styles.noDataText}>{error}</Text>
       </View>
     );
   }

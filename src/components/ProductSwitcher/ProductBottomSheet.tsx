@@ -8,7 +8,7 @@ import {
   Pressable,
   FlatList,
 } from 'react-native';
-import {useDispatch, useSelector} from 'react-redux';
+import {useSelector} from 'react-redux';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {RightCheckmark} from '@assets/Icons';
@@ -16,9 +16,8 @@ import {
   selectActiveProductCode,
   selectAvailableProducts,
 } from '@store/product/product.selectors';
-import {setActiveProduct} from '@store/product/product.slice';
 import {ResolvedProduct} from '@store/product/product.types';
-import {setProgramScope} from '@store/programSelection/programSelection.slice';
+import {useSwitchProductWorkspace} from '@hooks/useSwitchProductWorkspace';
 import {ProductIcon} from './ProductIcon';
 
 type ProductBottomSheetProps = {
@@ -30,14 +29,13 @@ export const ProductBottomSheet: React.FC<ProductBottomSheetProps> = ({
   visible,
   onClose,
 }) => {
-  const dispatch = useDispatch();
   const availableProducts = useSelector(selectAvailableProducts);
   const activeProductCode = useSelector(selectActiveProductCode);
+  const {switchProductWorkspace} = useSwitchProductWorkspace();
 
   const handleSelect = (product: ResolvedProduct) => {
     if (product.code !== activeProductCode) {
-      dispatch(setActiveProduct(product));
-      dispatch(setProgramScope('all'));
+      switchProductWorkspace(product);
     }
     onClose();
   };

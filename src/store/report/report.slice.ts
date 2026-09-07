@@ -255,6 +255,7 @@ const reportSlice = createSlice({
       state.utilizationError = action.payload;
       state.utilizationReportData = [];
     },
+    resetReportState: () => initialReportState,
   },
 });
 
@@ -289,6 +290,7 @@ export const {
   fetchUtilizationReportRequest,
   fetchUtilizationReportSuccess,
   fetchUtilizationReportFailure,
+  resetReportState,
 } = reportSlice.actions;
 
 export default reportSlice.reducer;

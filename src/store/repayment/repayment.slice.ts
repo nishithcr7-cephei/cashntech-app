@@ -18,6 +18,7 @@ const repaymentSlice = createSlice({
       state.loading = false;
       state.error = action.payload;
     },
+    resetRepaymentState: () => initialRepaymentState,
   },
 });
 
@@ -25,6 +26,7 @@ export const {
   fetchRepaymentListRequest,
   fetchRepaymentListSuccess,
   fetchRepaymentListFailure,
+  resetRepaymentState,
 } = repaymentSlice.actions;
 
 export default repaymentSlice.reducer;

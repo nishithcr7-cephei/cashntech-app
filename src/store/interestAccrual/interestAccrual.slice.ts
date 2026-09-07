@@ -31,6 +31,7 @@ const interestAccrualSlice = createSlice({
       state.loading = false;
       state.error = action.payload;
     },
+    resetInterestAccrualState: () => initialInterestAccrualState,
   },
 });
 
@@ -41,6 +42,7 @@ export const {
   fetchInterestAccrualListRequest,
   fetchInterestAccrualListSuccess,
   fetchInterestAccrualListFailure,
+  resetInterestAccrualState,
 } = interestAccrualSlice.actions;
 
 export default interestAccrualSlice.reducer;

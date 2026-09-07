@@ -35,13 +35,12 @@ import {
   selectActiveProductCode,
   selectAvailableProducts,
 } from '@store/product/product.selectors';
-import {setActiveProduct} from '@store/product/product.slice';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES, ResolvedProduct} from '@store/product/product.types';
-import {setProgramScope} from '@store/programSelection/programSelection.slice';
 import {ProductIcon} from '@components/ProductSwitcher/ProductIcon';
 import {ProductBottomSheet} from '@components/ProductSwitcher/ProductBottomSheet';
 import {useProductSwitcherSheet} from '@hooks/useProductSwitcherSheet';
+import {useSwitchProductWorkspace} from '@hooks/useSwitchProductWorkspace';
 import {DrawerTreeMenu, DrawerMenuNode} from './DrawerTreeMenu';
 
 const REPORT_MENU_ITEMS = [
@@ -151,6 +150,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
     hasMultipleProducts,
     activeProduct,
   } = useProductSwitcherSheet();
+  const {switchProductWorkspace} = useSwitchProductWorkspace();
   // PR1 store already defaults DF-only users to a single resolved product;
   // this fallback only guards the brief window before scope/product hydration.
   const productBranches: ResolvedProduct[] =
@@ -166,11 +166,6 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
 
   const toggleExpandedKey = (key: string) => {
     setExpandedKeys(prev => ({...prev, [key]: !prev[key]}));
-  };
-
-  const switchActiveProduct = (product: ResolvedProduct) => {
-    dispatch(setActiveProduct(product));
-    dispatch(setProgramScope('all'));
   };
 
   // Get role-based header colors (default to anchor_maker if no role)
@@ -449,10 +444,10 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
     if (node.disabled || !node.route) {
       return;
     }
-    // Tapping a menu item under a non-active product branch switches the
-    // active product first, then navigation + tree re-sync via useEffect.
     if (node.productContext && node.productContext.code !== activeProductCode) {
-      switchActiveProduct(node.productContext);
+      navigation.closeDrawer();
+      switchProductWorkspace(node.productContext);
+      return;
     }
     navigation.closeDrawer();
     navigation.navigate(node.route as never);

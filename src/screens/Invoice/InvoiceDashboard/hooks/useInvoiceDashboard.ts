@@ -19,6 +19,7 @@ import {
   fetchLatestInvoicesRequest,
   selectInvoiceOverviewSummary,
   selectInvoiceOverviewSummaryLoading,
+  selectInvoiceOverviewSummaryError,
   selectInvoiceOverviewLatest,
   selectInvoiceOverviewLatestLoading,
   fetchInvoiceKpisRequest,
@@ -32,7 +33,7 @@ import {invoiceApi} from '@services/api/invoice.api';
 import {getBestWorkflowApprovalLevelFromScope, getInvoiceApprovalLevelForId} from '@utils/getInvoiceApprovalLevel';
 import {selectActiveProductCode, selectActiveProductName, selectActiveProductId} from '@store/product/product.selectors';
 import {PRODUCT_DISPLAY_NAMES, PRODUCT_CODES} from '@store/product/product.types';
-import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {getEffectiveProductCode, resolveWorkspaceProductId} from '@store/product/product.resolver';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
 import type {Bank} from '@constants/programSelection';
 import type {ProductTabType} from '../types';
@@ -55,6 +56,7 @@ export const useInvoiceDashboard = () => {
   const activeProductId = useSelector(selectActiveProductId);
   const summaryData = useSelector(selectInvoiceOverviewSummary);
   const summaryLoading = useSelector(selectInvoiceOverviewSummaryLoading);
+  const summaryError = useSelector(selectInvoiceOverviewSummaryError);
   const latestData = useSelector(selectInvoiceOverviewLatest);
   const latestLoading = useSelector(selectInvoiceOverviewLatestLoading);
   const kpis = useSelector(selectInvoiceOverviewKpis);
@@ -120,23 +122,10 @@ export const useInvoiceDashboard = () => {
 
   const canShowApproveReject = canApprove || canReject;
 
-  const overviewProductId = useMemo(() => {
-    if (
-      programSelection?.programScope === 'selected' &&
-      programSelection?.productId
-    ) {
-      return programSelection.productId;
-    }
-    if (effectiveCode === PRODUCT_CODES.VENDOR_FINANCE && activeProductId) {
-      return activeProductId;
-    }
-    return null;
-  }, [
-    programSelection?.programScope,
-    programSelection?.productId,
-    effectiveCode,
-    activeProductId,
-  ]);
+  const overviewProductId = useMemo(
+    () => resolveWorkspaceProductId(programSelection, activeProductId),
+    [programSelection, activeProductId],
+  );
 
   const productBreadcrumbLabel = useMemo(() => {
     if (activeProductName) {return activeProductName;}
@@ -201,6 +190,17 @@ export const useInvoiceDashboard = () => {
     dispatch(fetchLatestInvoicesRequest({programIds, productId: overviewProductId}));
     dispatch(fetchInvoiceKpisRequest({programIds, productId: overviewProductId}));
   }, [dispatch, programIds, scopeData, programSelection?.programScope, productTab, overviewProductId]);
+
+  useEffect(() => {
+    if (!summaryError) {
+      return;
+    }
+    Toast.show({
+      type: 'error',
+      text1: 'Invoice summary',
+      text2: summaryError,
+    });
+  }, [summaryError]);
 
   const handleBulkAction = useCallback((action: 'Verify' | 'Approve' | 'Reject' | 'On Hold') => {
     setBulkAction(action);
@@ -290,6 +290,7 @@ export const useInvoiceDashboard = () => {
     userRole,
     summaryData,
     summaryLoading,
+    summaryError,
     latestData,
     latestLoading,
     kpis,

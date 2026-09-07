@@ -18,6 +18,7 @@ const dpdSlice = createSlice({
       state.loading = false;
       state.error = action.payload;
     },
+    resetDPDState: () => initialDPDState,
   },
 });
 
@@ -25,6 +26,7 @@ export const {
   fetchDPDListRequest,
   fetchDPDListSuccess,
   fetchDPDListFailure,
+  resetDPDState,
 } = dpdSlice.actions;
 
 export default dpdSlice.reducer;

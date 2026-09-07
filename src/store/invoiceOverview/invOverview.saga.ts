@@ -3,6 +3,7 @@ import {PayloadAction} from '@reduxjs/toolkit';
 import {
   fetchInvoiceSummaryRequest,
   fetchInvoiceSummarySuccess,
+  fetchInvoiceSummaryFailure,
   fetchLatestInvoicesRequest,
   fetchLatestInvoicesSuccess,
   fetchLatestInvoicesFailure,
@@ -38,10 +39,13 @@ function* fetchInvoiceSummarySaga(
       fetchInvoiceSummarySuccess(data as InvoiceOverviewSummaryItem[]),
     );
   } catch (error: any) {
-    // Summary API may not be available on all environments — fail silently
-    // eslint-disable-next-line no-console
-    console.warn('[fetchInvoiceSummarySaga] Summary API unavailable:', error?.message);
-    yield put(fetchInvoiceSummarySuccess([] as InvoiceOverviewSummaryItem[]));
+    const msg =
+      error?.message?.includes('fetch') || error?.code === 'ECONNABORTED'
+        ? 'Network error. Check connection.'
+        : error?.response?.data?.message ||
+          error?.message ||
+          'Failed to fetch invoice summary';
+    yield put(fetchInvoiceSummaryFailure(msg));
   }
 }
 

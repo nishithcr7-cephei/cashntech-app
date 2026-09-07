@@ -184,6 +184,31 @@ export function getEffectiveProductCode(
 }
 
 /**
+ * productId for list/KPI/summary APIs.
+ * Prefer a specifically selected program product; otherwise the active product
+ * (DF, VF, and future PID/SID). Backend summary/latest require productId.
+ */
+export function resolveWorkspaceProductId(
+  programSelection?: {
+    programScope?: string | null;
+    productId?: string | null;
+  } | null,
+  activeProductId?: string | null,
+): string | null {
+  if (
+    programSelection?.programScope === 'selected' &&
+    typeof programSelection.productId === 'string' &&
+    programSelection.productId.trim()
+  ) {
+    return programSelection.productId.trim();
+  }
+  if (typeof activeProductId === 'string' && activeProductId.trim()) {
+    return activeProductId.trim();
+  }
+  return null;
+}
+
+/**
  * One entry per ProductCode for selection UI (DF / VF), DF first then VF.
  * Prefer the first occurrence's backend id/name.
  */

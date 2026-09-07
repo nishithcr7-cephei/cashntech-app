@@ -31,7 +31,7 @@ import {
   selectEffectiveProductCode,
   selectIsVendorFinanceActive,
 } from '@store/product/product.selectors';
-import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {getEffectiveProductCode, resolveWorkspaceProductId} from '@store/product/product.resolver';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 
 type InterestAccrualInvoiceRow = {
@@ -114,24 +114,11 @@ export const InterestAccrualsScreen: React.FC = () => {
   const programIdsKey = JSON.stringify(programIds ?? []);
   const kpiProgramIdsKey = JSON.stringify(kpiProgramIds);
 
-  /** PR5/PR7 pattern: optional productId for VF list/KPI filters; omitted for DF default. */
-  const overviewProductId = useMemo(() => {
-    if (
-      programSelection?.programScope === 'selected' &&
-      programSelection?.productId
-    ) {
-      return programSelection.productId;
-    }
-    if (effectiveCode === PRODUCT_CODES.VENDOR_FINANCE && activeProductId) {
-      return activeProductId;
-    }
-    return null;
-  }, [
-    programSelection?.programScope,
-    programSelection?.productId,
-    effectiveCode,
-    activeProductId,
-  ]);
+  /** productId for list/KPI filters — active product (DF/VF) or selected program. */
+  const overviewProductId = useMemo(
+    () => resolveWorkspaceProductId(programSelection, activeProductId),
+    [programSelection, activeProductId],
+  );
 
   const [apiKpis, setApiKpis] = useState<InterestAccrualKpisResponse | null>(null);
   const [interestList, setInterestList] = useState<any[]>([]);

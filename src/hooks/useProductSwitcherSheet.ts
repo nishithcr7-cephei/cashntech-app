@@ -7,7 +7,7 @@ import {
 
 /**
  * Shared visibility + product context for ProductBottomSheet (home chip + drawer chip).
- * Selection itself stays inside ProductBottomSheet (setActiveProduct + setProgramScope).
+ * Selection itself stays in ProductBottomSheet via useSwitchProductWorkspace.
  */
 export const useProductSwitcherSheet = () => {
   const [sheetVisible, setSheetVisible] = useState(false);

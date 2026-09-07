@@ -29,6 +29,7 @@ export {
   fetchUtilizationReportRequest,
   fetchUtilizationReportSuccess,
   fetchUtilizationReportFailure,
+  resetReportState,
 } from './report.slice';
 export {default as reportReducer} from './report.slice';
 export * from './report.types';

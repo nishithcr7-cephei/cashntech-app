@@ -34,6 +34,7 @@ import {
   selectIsVendorFinanceActive,
 } from '@store/product/product.selectors';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {resolveWorkspaceProductId} from '@store/product/product.resolver';
 import {FetchRepaymentListRequest} from '@store/repayment/repayment.types';
 import {decryptValue} from '@utils/decrypt';
 import {formatDateDash, formatStatus} from '../InvoiceList/components/InvoiceDetails/types';
@@ -81,24 +82,11 @@ export const RepaymentSettlementScreen: React.FC = () => {
   const repaymentData = useSelector(repaymentSelectors.selectRepaymentList);
   const loading = useSelector(repaymentSelectors.selectRepaymentLoading);
 
-  /** PR5/PR7 pattern: optional productId for VF list/KPI filters; omitted for DF default. */
-  const overviewProductId = useMemo(() => {
-    if (
-      programSelection?.programScope === 'selected' &&
-      programSelection?.productId
-    ) {
-      return programSelection.productId;
-    }
-    if (effectiveCode === PRODUCT_CODES.VENDOR_FINANCE && activeProductId) {
-      return activeProductId;
-    }
-    return null;
-  }, [
-    programSelection?.programScope,
-    programSelection?.productId,
-    effectiveCode,
-    activeProductId,
-  ]);
+  /** productId for list/KPI filters — active product (DF/VF) or selected program. */
+  const overviewProductId = useMemo(
+    () => resolveWorkspaceProductId(programSelection, activeProductId),
+    [programSelection, activeProductId],
+  );
 
   const productBreadcrumbLabel = useMemo(() => {
     if (activeProductName) {

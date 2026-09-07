@@ -26,6 +26,7 @@ const invoiceOverviewSlice = createSlice({
       state.summaryError = null;
     },
     fetchInvoiceSummaryFailure: (state, action: PayloadAction<string>) => {
+      state.summary = [];
       state.summaryLoading = false;
       state.summaryError = action.payload;
     },
@@ -89,6 +90,7 @@ const invoiceOverviewSlice = createSlice({
       };
       state.kpisLoading = false;
     },
+    resetInvoiceOverview: () => initialInvoiceOverviewState,
   },
 });
 
@@ -102,6 +104,7 @@ export const {
   fetchInvoiceKpisRequest,
   fetchInvoiceKpisSuccess,
   fetchInvoiceKpisFailure,
+  resetInvoiceOverview,
 } = invoiceOverviewSlice.actions;
 
 export default invoiceOverviewSlice.reducer;

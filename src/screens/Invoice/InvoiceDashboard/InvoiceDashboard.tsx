@@ -28,6 +28,7 @@ export const InvoiceDashboard: React.FC = () => {
     navigation,
     summaryData,
     summaryLoading,
+    summaryError,
     latestData,
     latestLoading,
     kpis,
@@ -151,6 +152,7 @@ export const InvoiceDashboard: React.FC = () => {
               </View>
               <DealerSummaryList
                 loading={summaryLoading}
+                error={summaryError}
                 data={summaryData}
                 isCashnTechUser={isCashnTechUser}
                 isAnchorMaker={isAnchorMaker}
