@@ -17,8 +17,9 @@ import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import Toast from 'react-native-toast-message';
 import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
-import {useSelector} from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
+import {navigateToCreateInvoice} from '@store/ui';
 import {shouldShowCreateInvoice} from '@utils/permissionHelpers';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
 import {PRODUCT_CODES} from '@store/product/product.types';
@@ -88,6 +89,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   onRefresh,
   listRefreshing = false,
 }) => {
+  const dispatch = useDispatch();
   const [showSearchHelp, setShowSearchHelp] = React.useState(false);
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const effectiveProductCode = useSelector(selectEffectiveProductCode);
@@ -128,7 +130,8 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
     }
     const handler =
       onCreateInvoicePress ??
-      (() => navigation.navigate('CreateInvoice' as never, {freshCreate: true} as never));
+      (() =>
+        navigateToCreateInvoice(dispatch, navigation, {freshCreate: true}));
     handler();
   };
 

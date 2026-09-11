@@ -1,7 +1,9 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -14,22 +16,27 @@ type BusyOverlayProps = {
   message?: string;
 };
 
+const SCREEN = Dimensions.get('screen');
+
 export const BusyOverlay: React.FC<BusyOverlayProps> = ({
   visible,
   message = 'Please wait…',
 }) => {
-  if (!visible) {
-    return null;
-  }
-
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
       statusBarTranslucent
+      presentationStyle="overFullScreen"
+      hardwareAccelerated={Platform.OS === 'android'}
       onRequestClose={() => undefined}>
-      <View style={styles.backdrop} pointerEvents="auto">
+      <View
+        style={[
+          styles.root,
+          {width: SCREEN.width, height: SCREEN.height},
+        ]}
+        pointerEvents={visible ? 'auto' : 'none'}>
         <View style={styles.card}>
           <ActivityIndicator size="large" color={Colors.primaryColor} />
           <Text style={styles.message}>{message}</Text>
@@ -40,11 +47,10 @@ export const BusyOverlay: React.FC<BusyOverlayProps> = ({
 };
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
+  root: {
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: scaleWidth(24),
   },
   card: {

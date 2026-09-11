@@ -45,9 +45,9 @@ import type {
 import {
   selectActiveProductCode,
   selectActiveProductId,
-  selectIsVendorFinanceActive,
 } from '@store/product/product.selectors';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
+import {resolveWorkspaceProductId} from '@store/product/product.resolver';
 import {getUserCapability} from '@store/user/user.selector';
 import type {InvoiceListFilters} from './inv.types';
 import type {InvoicePartyInfoRouteOptions} from '@utils/invoicePartyInfoRoute';
@@ -79,29 +79,12 @@ function* selectPartyInfoRouteOptions(): Generator<
 }
 
 /**
- * Optional productId for list/KPI bodies.
- * VF: active product or selected program product.
- * DF: omitted when no product context (preserves legacy requests).
+ * productId for list/KPI bodies: selected program product, else active product.
  */
 function* selectOptionalProductId(): Generator<any, string | null, any> {
   const programSelection = yield select(selectProgramSelection);
-  if (
-    programSelection?.programScope === 'selected' &&
-    typeof programSelection?.productId === 'string' &&
-    programSelection.productId.trim()
-  ) {
-    return programSelection.productId.trim();
-  }
-
-  const isVf = yield select(selectIsVendorFinanceActive);
-  if (!isVf) {
-    return null;
-  }
   const productId = yield select(selectActiveProductId);
-  if (typeof productId === 'string' && productId.trim()) {
-    return productId.trim();
-  }
-  return null;
+  return resolveWorkspaceProductId(programSelection, productId);
 }
 
 function* fetchDealerInfoSaga(action: PayloadAction<string>): Generator {
@@ -234,8 +217,10 @@ function* fetchInvoiceListSaga(
 ): Generator {
   try {
     const {programId, filters} = action.payload;
-    // Optional productId — included only when set (VF/CWF); DF omits and stays unchanged
     const productId: string | null = yield call(selectOptionalProductId);
+    if (!String(programId || '').trim() && !productId) {
+      return;
+    }
     const data = yield call(
       invoiceApi.getInvoiceList,
       programId,

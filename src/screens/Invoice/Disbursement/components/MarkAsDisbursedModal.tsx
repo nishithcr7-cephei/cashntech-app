@@ -17,7 +17,12 @@ import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker} from '@components/index';
-import {invoiceApi} from '@services/api/invoice.api';
+import {
+  invoiceApi,
+  type DueDateImpactFigure,
+  type DueDateImpactPreviewResponse,
+} from '@services/api/invoice.api';
+import {DueDateImpactModal} from './DueDateImpactModal';
 import Toast from 'react-native-toast-message';
 import {decryptValue} from '@utils/decrypt';
 import {
@@ -59,6 +64,8 @@ type MarkAsDisbursedModalProps = {
     finalTotal?: number;
     upfrontInterest?: number;
     usanceDays?: number;
+    /** YYYY-MM-DD when bank due-date override is confirmed */
+    invoiceDueDate?: string;
   }) => void | Promise<void>;
 };
 
@@ -101,6 +108,27 @@ function formatDateDDMMYYYY(value?: string | null): string {
   } catch {
     return String(value);
   }
+}
+
+function toApiDateFromDisplay(ddMmYyyy: string): string {
+  const m = moment(ddMmYyyy.trim(), DATE_FORMATS, true);
+  if (m.isValid()) return m.format('YYYY-MM-DD');
+  const parts = ddMmYyyy.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return ddMmYyyy;
+}
+
+function parseAmountNumber(raw?: string | null): number {
+  const n = Number(String(raw ?? '').replace(/[,\s₹]/g, '').trim());
+  return Number.isFinite(n) ? n : 0;
+}
+
+function displayDueDateFromPreview(p: any): string {
+  const raw = p?.invoice_due_date ?? p?.due_date ?? null;
+  const formatted = formatDateDDMMYYYY(raw);
+  return formatted === '-' ? '' : formatted;
 }
 
 function resolveProductCode(
@@ -163,6 +191,16 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   const [debitFrom, setDebitFrom] = useState('');
   const [creditTo, setCreditTo] = useState('');
 
+  const [computedDueDate, setComputedDueDate] = useState('');
+  const [dueDateOverride, setDueDateOverride] = useState<string | null>(null);
+  const [confirmedImpact, setConfirmedImpact] =
+    useState<DueDateImpactFigure | null>(null);
+  const [impactModalVisible, setImpactModalVisible] = useState(false);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [impactData, setImpactData] =
+    useState<DueDateImpactPreviewResponse | null>(null);
+  const [pendingOverrideDate, setPendingOverrideDate] = useState('');
+
   useEffect(() => {
     if (!visible) return;
     setDisbursementAction('');
@@ -177,6 +215,13 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     setPreview(null);
     setDebitFrom('');
     setCreditTo('');
+    setComputedDueDate('');
+    setDueDateOverride(null);
+    setConfirmedImpact(null);
+    setImpactModalVisible(false);
+    setImpactLoading(false);
+    setImpactData(null);
+    setPendingOverrideDate('');
   }, [visible, invoiceId]);
 
   useEffect(() => {
@@ -214,6 +259,12 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
             null,
         };
         setPreview(data);
+
+        const initialDueRaw = invoiceData.invoice_due_date ?? invoiceData.due_date ?? null;
+        const initialDueDisplay = formatDateDDMMYYYY(initialDueRaw);
+        if (initialDueDisplay !== '-') {
+          setComputedDueDate(initialDueDisplay);
+        }
 
         const odRaw = apm.od_account_no ?? '';
         const odDisplay = decryptValue(String(odRaw)) || String(odRaw);
@@ -281,8 +332,101 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   const isVfUpfront =
     isVendorFinance && isVfUpfrontChargeType(preview?.interest_charge_type);
 
+  const canModifyDueDate = preview?.can_modify_due_date === true;
+  const effectiveDueDateDisplay =
+    dueDateOverride ?? (computedDueDate || displayDueDateFromPreview(preview));
+  const hasDueDateException =
+    !!dueDateOverride &&
+    !!computedDueDate &&
+    dueDateOverride !== computedDueDate;
+
+  const minOverrideDate = useMemo(() => {
+    const disb = moment(date || todayDisplay, DATE_FORMATS, true);
+    if (disb.isValid()) {
+      return disb.clone().add(1, 'day').startOf('day').toDate();
+    }
+    return moment().add(1, 'day').startOf('day').toDate();
+  }, [date, todayDisplay]);
+
+  const fetchDueDateImpact = async (pickedDisplay: string) => {
+    if (!invoiceId || !pickedDisplay) return;
+    setImpactLoading(true);
+    setImpactModalVisible(true);
+    setPendingOverrideDate(pickedDisplay);
+    setImpactData(null);
+    try {
+      const disbursementApiDate = toApiDateFromDisplay(date || todayDisplay);
+      const amountNum = parseAmountNumber(disbursedAmount);
+      const response = await invoiceApi.previewDueDateImpact(invoiceId, {
+        invoice_due_date: toApiDateFromDisplay(pickedDisplay),
+        disbursement_date: disbursementApiDate,
+        ...(amountNum > 0 ? {disbursed_amount: amountNum} : {}),
+      });
+      if (response?.allowed === false) {
+        Toast.show({
+          type: 'error',
+          text1: response.reason || 'Due date override is not available',
+        });
+        setImpactModalVisible(false);
+        return;
+      }
+      setImpactData(response);
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1:
+          err?.response?.data?.message ||
+          err?.message ||
+          'Failed to preview due date impact',
+      });
+      setImpactModalVisible(false);
+    } finally {
+      setImpactLoading(false);
+    }
+  };
+
+  const handleDueDateOverrideConfirm = (picked: Date) => {
+    const pickedDisplay = moment(picked).format('DD-MM-YYYY');
+    const baseline = computedDueDate || displayDueDateFromPreview(preview);
+    if (baseline && pickedDisplay === baseline) {
+      setDueDateOverride(null);
+      setConfirmedImpact(null);
+      return;
+    }
+    void fetchDueDateImpact(pickedDisplay);
+  };
+
+  const handleKeepCurrentDueDate = () => {
+    setImpactModalVisible(false);
+    setImpactData(null);
+    setPendingOverrideDate('');
+  };
+
+  const handleConfirmNewDueDate = () => {
+    if (!pendingOverrideDate || impactData?.is_holiday) return;
+    setDueDateOverride(pendingOverrideDate);
+    setConfirmedImpact(impactData?.proposed ?? null);
+    if (impactData?.proposed?.net_disbursement_amount != null) {
+      setDisbursedAmount(
+        formatAmount(impactData.proposed.net_disbursement_amount),
+      );
+      setAmountError(null);
+    }
+    setImpactModalVisible(false);
+    setImpactData(null);
+  };
+
+  const handleResetDueDateOverride = () => {
+    setDueDateOverride(null);
+    setConfirmedImpact(null);
+    setPendingOverrideDate('');
+  };
+
   useEffect(() => {
     if (disbursementAction !== 'Disbursed' || !preview || !date) {
+      return;
+    }
+    if (confirmedImpact?.net_disbursement_amount != null) {
       return;
     }
 
@@ -291,10 +435,14 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       return;
     }
 
-    const dueRaw = preview.invoice_due_date ?? preview.due_date ?? null;
+    const dueForCalc =
+      effectiveDueDateDisplay ||
+      preview.invoice_due_date ||
+      preview.due_date ||
+      null;
     const usanceDays =
       computeUsanceDays({
-        dueDate: dueRaw,
+        dueDate: dueForCalc,
         disbursementDate: date,
       }) ?? 0;
     const roi = resolveInvoiceRoiPercent(preview);
@@ -316,7 +464,14 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
 
     setDisbursedAmount(formatAmount(computed.disbursedAmount));
     setAmountError(null);
-  }, [disbursementAction, preview, date, isVfUpfront]);
+  }, [
+    disbursementAction,
+    preview,
+    date,
+    isVfUpfront,
+    effectiveDueDateDisplay,
+    confirmedImpact,
+  ]);
 
   const vfAmounts = useMemo(() => {
     if (!isVfUpfront || !preview) return null;
@@ -356,7 +511,12 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       : '-';
 
     const preferredDisbursementDateRaw = p.preferred_disbursement_date ?? null;
-    const dueDateRaw = p.invoice_due_date ?? p.due_date ?? null;
+    const dueDateRaw =
+      dueDateOverride ??
+      computedDueDate ??
+      p.invoice_due_date ??
+      p.due_date ??
+      null;
     const grnDateRaw = p.grn_date ?? null;
     const tenorRaw = p.tenor ?? p.tenor_days ?? null;
     const disbursementDateForUsance =
@@ -368,9 +528,12 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     const eligibilityRaw =
       p.eligibility_percent ?? apm.eligibility ?? p.program?.eligibility ?? null;
 
-    const advanceInterestValue = vfAmounts
-      ? vfAmounts.advanceInterest
-      : resolveAdvanceInterestFromPreview(p, {isVendorFinance: isVf});
+    const advanceInterestValue =
+      confirmedImpact?.upfront_interest != null
+        ? Number(confirmedImpact.upfront_interest)
+        : vfAmounts
+          ? vfAmounts.advanceInterest
+          : resolveAdvanceInterestFromPreview(p, {isVendorFinance: isVf});
     const advanceInterestDisplay =
       Number.isFinite(advanceInterestValue) && advanceInterestValue > 0
         ? formatAmount(advanceInterestValue)
@@ -404,12 +567,15 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
           ? `${formatPercent(eligibilityRaw)}%`
           : '-',
       advanceInterest: advanceInterestDisplay,
-      usanceDays: resolveDisbursementUsanceDaysDisplay(
-        p.usance_days ?? p.usanceDays ?? null,
-        dueDateRaw,
-        disbursementDateForUsance,
-        tenorRaw,
-      ),
+      usanceDays:
+        confirmedImpact?.usance_days != null
+          ? String(confirmedImpact.usance_days)
+          : resolveDisbursementUsanceDaysDisplay(
+              p.usance_days ?? p.usanceDays ?? null,
+              dueDateRaw,
+              disbursementDateForUsance,
+              tenorRaw,
+            ),
       netInvoiceAmount: formatAmount(
         netInvoiceValue > 0
           ? netInvoiceValue
@@ -420,7 +586,19 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       ),
       status: dash(p.invoice_status ?? p.status),
     };
-  }, [preview, isVendorFinance, isVfUpfront, debitFrom, vfAmounts, date, disbursementAction, todayDisplay]);
+  }, [
+    preview,
+    isVendorFinance,
+    isVfUpfront,
+    debitFrom,
+    vfAmounts,
+    date,
+    disbursementAction,
+    todayDisplay,
+    dueDateOverride,
+    computedDueDate,
+    confirmedImpact,
+  ]);
 
   const handleClose = () => {
     setDisbursementAction('');
@@ -499,14 +677,25 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       }),
     };
 
-    const dueRaw = preview?.invoice_due_date ?? preview?.due_date ?? null;
+    const dueRaw =
+      effectiveDueDateDisplay ||
+      preview?.invoice_due_date ||
+      preview?.due_date ||
+      null;
     const disbForUsance =
       disbursementAction === 'Disbursed' ? todayDisplay : '';
     const computedUsance =
+      confirmedImpact?.usance_days ??
       computeUsanceDays({
         dueDate: dueRaw,
         disbursementDate: disbForUsance,
-      }) ?? undefined;
+      }) ??
+      undefined;
+
+    const submitUpfrontInterest =
+      confirmedImpact?.upfront_interest != null
+        ? Number(confirmedImpact.upfront_interest)
+        : submitAmounts.advanceInterest;
 
     if (onSubmit) {
       await onSubmit({
@@ -523,9 +712,13 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
           submitAmounts.netInvoiceAmount > 0
             ? submitAmounts.netInvoiceAmount
             : undefined,
-        upfrontInterest: submitAmounts.advanceInterest,
+        upfrontInterest: submitUpfrontInterest,
         usanceDays:
           disbursementAction === 'Disbursed' ? computedUsance : undefined,
+        invoiceDueDate:
+          disbursementAction === 'Disbursed' && hasDueDateException
+            ? toApiDateFromDisplay(dueDateOverride!)
+            : undefined,
       });
     }
     handleClose();
@@ -756,6 +949,50 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                               containerStyle={styles.datePickerContainer}
                             />
                           </View>
+                          {canModifyDueDate && (
+                            <View style={styles.inputRow}>
+                              <View style={styles.overrideHeaderRow}>
+                                <Text style={styles.inputLabel}>
+                                  Due Date Override (bank exception)
+                                </Text>
+                                {hasDueDateException && (
+                                  <TouchableOpacity
+                                    onPress={handleResetDueDateOverride}
+                                    hitSlop={{
+                                      top: 8,
+                                      bottom: 8,
+                                      left: 8,
+                                      right: 8,
+                                    }}>
+                                    <Text style={styles.resetLink}>
+                                      Reset to computed date
+                                    </Text>
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                              <DateNTimePicker
+                                label=""
+                                mode="date"
+                                value={
+                                  effectiveDueDateDisplay ||
+                                  computedDueDate ||
+                                  todayDisplay
+                                }
+                                datePickerProps={{
+                                  minimumDate: minOverrideDate,
+                                }}
+                                onConfirm={handleDueDateOverrideConfirm}
+                                placeholder="DD-MM-YYYY"
+                                containerStyle={styles.datePickerContainer}
+                              />
+                              {hasDueDateException && (
+                                <Text style={styles.overrideWarning}>
+                                  Bank exception applied — differs from the
+                                  program-computed date.
+                                </Text>
+                              )}
+                            </View>
+                          )}
                           <View style={styles.inputRow}>
                             <Text style={styles.inputLabel}>UTR No *</Text>
                             <TextInput
@@ -829,6 +1066,15 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
           </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>
+
+      <DueDateImpactModal
+        visible={impactModalVisible}
+        loading={impactLoading}
+        data={impactData}
+        onKeepCurrent={handleKeepCurrentDueDate}
+        onConfirm={handleConfirmNewDueDate}
+        onClose={handleKeepCurrentDueDate}
+      />
     </Modal>
   );
 };
@@ -993,6 +1239,24 @@ const styles = StyleSheet.create({
   datePickerContainer: {
     marginBottom: 0,
     marginTop: 0,
+  },
+  overrideHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: scaleWidth(8),
+  },
+  resetLink: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroySemiBold,
+    color: '#1565C0',
+  },
+  overrideWarning: {
+    marginTop: scaleHeight(6),
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyMedium,
+    color: '#C2410C',
+    lineHeight: scaleFont(15),
   },
   actionFieldContainer: {
     marginTop: scaleHeight(4),

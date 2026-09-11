@@ -1430,6 +1430,7 @@ export const DisbursementScreen: React.FC = () => {
                 Number.isFinite(data.usanceDays)
                   ? data.usanceDays
                   : undefined,
+              invoice_due_date: isDisbursed ? data.invoiceDueDate : undefined,
             });
             Toast.show({
               type: 'success',

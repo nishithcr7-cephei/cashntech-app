@@ -14,6 +14,7 @@ import {reportReducer} from '@store/report';
 import soaReducer from '@store/soa/soa.slice';
 import soaDealerReducer from '@store/soa/dealer/dealer.slice';
 import {creditAccountDetailsReducer} from '@store/soa/creditAccountDetails/slice';
+import {uiReducer} from '@store/ui';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -30,6 +31,7 @@ const rootReducer = combineReducers({
   soa: soaReducer,
   soaDealer: soaDealerReducer,
   creditAccountDetails: creditAccountDetailsReducer,
+  ui: uiReducer,
   ...registerwebReducer,
 });
 

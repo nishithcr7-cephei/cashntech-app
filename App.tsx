@@ -1,11 +1,16 @@
 import React, {useEffect} from 'react';
-import {Provider} from 'react-redux';
+import {Provider, useSelector} from 'react-redux';
 import {MainNavigator} from '@navigation/MainNavigator';
 import {store} from '@store/app/store';
 import '@services/localStorage';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import Toast, {ErrorToast, InfoToast, ToastConfig} from 'react-native-toast-message';
 import {initializeML} from '@utils/mlInitialization';
+import {BusyOverlay} from '@components/index';
+import {
+  selectLeavingCreateInvoice,
+  selectOpeningCreateInvoice,
+} from '@store/ui';
 
 const toastConfig: ToastConfig = {
   error: props => (
@@ -38,6 +43,28 @@ const toastConfig: ToastConfig = {
   ),
 };
 
+function AppShell() {
+  const leavingCreateInvoice = useSelector(selectLeavingCreateInvoice);
+  const openingCreateInvoice = useSelector(selectOpeningCreateInvoice);
+  const showCreateInvoiceTransition =
+    leavingCreateInvoice || openingCreateInvoice;
+
+  return (
+    <>
+      <MainNavigator />
+      <Toast topOffset={80} config={toastConfig} />
+      <BusyOverlay
+        visible={showCreateInvoiceTransition}
+        message={
+          leavingCreateInvoice
+            ? 'Going back to invoices…'
+            : 'Opening create invoice…'
+        }
+      />
+    </>
+  );
+}
+
 function App() {
   // Initialize ML capabilities (TensorFlow.js) in background
   useEffect(() => {
@@ -50,8 +77,7 @@ function App() {
   return (
     <SafeAreaProvider>
       <Provider store={store}>
-        <MainNavigator />
-        <Toast topOffset={80} config={toastConfig} />
+        <AppShell />
       </Provider>
     </SafeAreaProvider>
   );

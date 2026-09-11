@@ -1,9 +1,13 @@
 <resources>
 
     <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <item name="android:textColor">#191D23</item>
+        <item name="android:textColorPrimary">#191D23</item>
+        <item name="android:textColorHint">#9E9E9E</item>
+        <item name="android:textColorSecondary">#191D23</item>
+        <item name="android:forceDarkAllowed">false</item>
     </style>
 
 </resources>

@@ -55,9 +55,12 @@ export const Input = forwardRef<TextInput, InputProps>((props, ref) => {
         )}
         <TextInput
           ref={ref}
+          underlineColorAndroid="transparent"
+          selectionColor={Colors.darkGray}
+          cursorColor={Colors.darkGray}
           {...rest}
           style={[styles.inputStyle, style]}
-          placeholderTextColor={Colors.gray300}
+          placeholderTextColor={props.placeholderTextColor ?? Colors.gray300}
         />
         {renderRightIcon && (
           <TouchableOpacity

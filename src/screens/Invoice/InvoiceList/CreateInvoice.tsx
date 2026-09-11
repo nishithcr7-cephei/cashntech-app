@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Modal,
   BackHandler,
+  InteractionManager,
 } from 'react-native';
 import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
@@ -62,9 +63,13 @@ import {
   selectCreateInvoiceError,
 } from '@store/invoice/inv.selector';
 import {
-  setProgramScope,
   toggleProgramSelection,
 } from '@store/programSelection/programSelection.slice';
+import {
+  setLeavingCreateInvoice,
+  setOpeningCreateInvoice,
+  selectLeavingCreateInvoice,
+} from '@store/ui';
 import {userSelector} from '@store/user';
 import {PERMISSIONS} from '@constants/permissions';
 import {AppRole, ROLE_LABELS} from '@constants/roles';
@@ -226,6 +231,7 @@ export const CreateInvoice: React.FC = () => {
   const fieldsRef = useRef(fields);
   fieldsRef.current = fields;
   const [ocrLoading, setOcrLoading] = useState(false);
+  const isLeavingCreate = useSelector(selectLeavingCreateInvoice);
   const [ocrStatusText, setOcrStatusText] = useState('Extracting invoice data...');
   const [isOcrPopulated, setIsOcrPopulated] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -356,8 +362,9 @@ export const CreateInvoice: React.FC = () => {
   selectedParticipantRef.current = selectedParticipant;
   const [selectedAttachment, setSelectedAttachment] = useState<DocumentPickerResponse | null>(null);
   const disabled = useMemo(
-    () => createInvoiceLoading || ocrLoading || permissionsLoading,
-    [createInvoiceLoading, ocrLoading, permissionsLoading],
+    () =>
+      createInvoiceLoading || ocrLoading || permissionsLoading || isLeavingCreate,
+    [createInvoiceLoading, ocrLoading, permissionsLoading, isLeavingCreate],
   );
   const previewFieldsFromRoute: InvoiceFields | undefined = route?.params?.previewFields;
   const previewAttachmentFromRoute: DocumentPickerResponse | undefined = route?.params?.previewAttachment;
@@ -1939,10 +1946,7 @@ export const CreateInvoice: React.FC = () => {
           text: 'Yes',
           style: 'destructive',
           onPress: () => {
-            allowLeaveRef.current = true;
-            resetCreateInvoiceForm();
-            resetScreenData();
-            goToInvoiceList(true);
+            beginLeaveToInvoiceList(() => goToInvoiceList(true));
           },
         },
       ]
@@ -1982,6 +1986,35 @@ export const CreateInvoice: React.FC = () => {
   // After user confirms Leave/Cancel — skip second beforeRemove prompt
   // (setState may not have flushed before navigate).
   const allowLeaveRef = useRef(false);
+
+  const beginLeaveToInvoiceList = useCallback((onLeave: () => void) => {
+    if (isLeavingCreate) {
+      return;
+    }
+    allowLeaveRef.current = true;
+    dispatch(setLeavingCreateInvoice(true));
+    requestAnimationFrame(() => {
+      InteractionManager.runAfterInteractions(() => {
+        onLeave();
+      });
+    });
+  }, [dispatch, isLeavingCreate]);
+
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(setLeavingCreateInvoice(false));
+      return () => {
+        dispatch(setLeavingCreateInvoice(false));
+        dispatch(setOpeningCreateInvoice(false));
+      };
+    }, [dispatch]),
+  );
+
+  useEffect(() => {
+    if (!permissionsLoading) {
+      dispatch(setOpeningCreateInvoice(false));
+    }
+  }, [permissionsLoading, dispatch]);
 
   // True when user has typed/selected anything worth protecting.
   const isCreateFormDirty = useMemo(() => {
@@ -2025,12 +2058,7 @@ export const CreateInvoice: React.FC = () => {
       }
 
       const clearAndLeave = () => {
-        allowLeaveRef.current = true;
-        resetCreateInvoiceForm();
-        resetScreenData();
-        dispatch(setProgramScope('all'));
-        clearCreateInvoiceRouteParams();
-        onLeave();
+        beginLeaveToInvoiceList(onLeave);
       };
 
       if (!isCreateFormDirty) {
@@ -2051,14 +2079,7 @@ export const CreateInvoice: React.FC = () => {
         ],
       );
     },
-    [
-      ocrLoading,
-      isCreateFormDirty,
-      resetCreateInvoiceForm,
-      resetScreenData,
-      dispatch,
-      clearCreateInvoiceRouteParams,
-    ],
+    [ocrLoading, isCreateFormDirty, beginLeaveToInvoiceList],
   );
 
   // Flush only when leaving Create Invoice for a non-preview route.
@@ -2085,7 +2106,6 @@ export const CreateInvoice: React.FC = () => {
           allowLeaveRef.current = false;
           resetCreateInvoiceForm();
           resetScreenData();
-          dispatch(setProgramScope('all'));
           clearCreateInvoiceRouteParams();
           return;
         }
@@ -2093,7 +2113,6 @@ export const CreateInvoice: React.FC = () => {
         if (!isCreateFormDirty) {
           resetCreateInvoiceForm();
           resetScreenData();
-          dispatch(setProgramScope('all'));
           clearCreateInvoiceRouteParams();
           return;
         }
@@ -2109,12 +2128,9 @@ export const CreateInvoice: React.FC = () => {
               text: 'Leave & Clear',
               style: 'destructive',
               onPress: () => {
-                allowLeaveRef.current = true;
-                resetCreateInvoiceForm();
-                resetScreenData();
-                dispatch(setProgramScope('all'));
-                clearCreateInvoiceRouteParams();
-                navigation.dispatch(e.data.action);
+                beginLeaveToInvoiceList(() =>
+                  navigation.dispatch(e.data.action),
+                );
               },
             },
           ],
@@ -2126,9 +2142,9 @@ export const CreateInvoice: React.FC = () => {
   }, [
     navigation,
     isCreateFormDirty,
+    beginLeaveToInvoiceList,
     resetCreateInvoiceForm,
     resetScreenData,
-    dispatch,
     clearCreateInvoiceRouteParams,
   ]);
 
@@ -2243,6 +2259,7 @@ export const CreateInvoice: React.FC = () => {
   }
 
   return (
+    <>
     <Container>
       <AppBar 
         title={mode === 'edit' ? "Edit Invoice" : mode === 'recreate' ? "Recreate Invoice" : "Create Invoice"} 
@@ -2411,17 +2428,18 @@ export const CreateInvoice: React.FC = () => {
           }
         }}
       />
-      <BusyOverlay
-        visible={!!createInvoiceLoading}
-        message={
-          mode === 'edit'
-            ? 'Updating invoice…'
-            : mode === 'recreate'
-              ? 'Recreating invoice…'
-              : 'Creating invoice…'
-        }
-      />
     </Container>
+    <BusyOverlay
+      visible={!!createInvoiceLoading}
+      message={
+        mode === 'edit'
+          ? 'Updating invoice…'
+          : mode === 'recreate'
+            ? 'Recreating invoice…'
+            : 'Creating invoice…'
+      }
+    />
+    </>
   );
 };
 

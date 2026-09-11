@@ -173,6 +173,8 @@ const Endpoints = {
   apiMailToBank: (invoiceId: string) => `/invoice/mail-to-bank/${invoiceId}`,
   apiTransactionAccount: (invoiceId: string) => `/invoice/transaction-account/${invoiceId}`,
   apiDisbursement: (invoiceId: string) => `/invoice/disbursement/${invoiceId}`,
+  apiDueDateImpact: (invoiceId: string) =>
+    `/invoice/disbursement/due-date-impact/${invoiceId}`,
   apiInvoiceDailyInterest: (invoiceId: string) => `/invoice/daily-interest/${invoiceId}`,
   apiUpdateInvoice: (invoiceId: string) => `/invoice/${invoiceId}`,
   apiInvoiceById: (invoiceId: string) => `/invoice/${invoiceId}`,

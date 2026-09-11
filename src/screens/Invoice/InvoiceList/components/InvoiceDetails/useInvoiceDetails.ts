@@ -14,6 +14,11 @@ import {
 } from '@store/invoice/inv.slice';
 import { fetchPermissionsRequest } from '@store/permissions';
 import {
+  navigateToCreateInvoice,
+  setLeavingCreateInvoice,
+  setOpeningCreateInvoice,
+} from '@store/ui';
+import {
   setProgramSelection,
   toggleProgramSelection,
   fetchUserScopeRequest,
@@ -62,6 +67,7 @@ import type {InvoiceListFilters} from '@store/invoice/inv.types';
 import {
   selectActiveProductName,
   selectActiveProductCode,
+  selectActiveProductId,
 } from '@store/product/product.selectors';
 import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
@@ -81,6 +87,7 @@ export function useInvoiceDetails() {
   const userInfoFull = useSelector(userSelector.getUserInfo);
   const userDepartment = (userInfoFull as any)?.department || '';
   const activeProductName = useSelector(selectActiveProductName);
+  const activeProductId = useSelector(selectActiveProductId);
   const activeProductCode = useSelector(selectActiveProductCode);
   const productBreadcrumbLabel =
     activeProductName ||
@@ -297,29 +304,37 @@ export function useInvoiceDetails() {
   })();
 
   const hasAnyProgramContext = isAllProgramScope || !!concreteProgramId;
+  const listProductId = String(
+    programSelection?.productId || activeProductId || '',
+  ).trim();
+  const canFetchInvoiceList =
+    hasAnyProgramContext &&
+    (!!String(programId || '').trim() || !!listProductId);
 
   const refreshInvoiceList = useCallback(() => {
-    if (!hasAnyProgramContext) return;
+    if (!canFetchInvoiceList) return;
     setVisibleCount(30);
     dispatch(fetchInvoiceListRequest({ programId, filters: apiFilters }));
-  }, [hasAnyProgramContext, programId, apiFilters, dispatch]);
+  }, [canFetchInvoiceList, programId, apiFilters, dispatch]);
 
   useEffect(() => {
-    if (!hasAnyProgramContext) return;
+    if (!canFetchInvoiceList) return;
     dispatch(fetchInvoiceListRequest({ programId, filters: apiFilters }));
-  }, [hasAnyProgramContext, programId, apiFilters, dispatch]);
+  }, [canFetchInvoiceList, programId, apiFilters, dispatch]);
 
   useFocusEffect(
     useCallback(() => {
-      if (!hasAnyProgramContext || routeParams?.refreshList !== true) return;
+      if (!canFetchInvoiceList || routeParams?.refreshList !== true) return;
       dispatch(fetchInvoiceListRequest({ programId, filters: apiFilters }));
       (navigation as any).setParams({ refreshList: false });
-    }, [hasAnyProgramContext, programId, apiFilters, dispatch, navigation, routeParams?.refreshList]),
+    }, [canFetchInvoiceList, programId, apiFilters, dispatch, navigation, routeParams?.refreshList]),
   );
 
   // Auto-refresh permissions and reset search on screen focus
   useFocusEffect(
     useCallback(() => {
+      dispatch(setLeavingCreateInvoice(false));
+      dispatch(setOpeningCreateInvoice(false));
       dispatch(fetchPermissionsRequest());
       // setSearchText(''); // REMOVED: Search should persist when returning from detail view
     }, [dispatch]),
@@ -700,7 +715,7 @@ export function useInvoiceDetails() {
         });
         break;
       case 'edit':
-        (navigation as any).navigate('CreateInvoice', {
+        navigateToCreateInvoice(dispatch, navigation as any, {
           invoiceId,
           invoiceNo,
           mode: 'edit',
@@ -720,7 +735,7 @@ export function useInvoiceDetails() {
         setShowCheckerApprovalModal(true);
         break;
       case 'recreateInvoice':
-        (navigation as any).navigate('CreateInvoice', {
+        navigateToCreateInvoice(dispatch, navigation as any, {
           invoiceId,
           invoiceNo,
           mode: 'recreate',
@@ -1525,8 +1540,8 @@ export function useInvoiceDetails() {
       return;
     }
 
-    (navigation as any).navigate('CreateInvoice', {freshCreate: true});
-  }, [navigation, canCreate, isCreateInvoiceEnabled, createInvoiceDisabledReason]);
+    navigateToCreateInvoice(dispatch, navigation as any, {freshCreate: true});
+  }, [dispatch, navigation, canCreate, isCreateInvoiceEnabled, createInvoiceDisabledReason]);
 
   const userPartyType = isCashnTechUser ? 'cashntech' : (isAnchorMaker || isAnchorChecker) ? 'anchor' : 'dealer';
 

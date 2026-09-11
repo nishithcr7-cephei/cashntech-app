@@ -64,6 +64,13 @@ function normalizeUnitInput(value: string): string {
   return value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 3);
 }
 
+const TEXT_INPUT_DEFAULTS = {
+  placeholderTextColor: '#999999',
+  underlineColorAndroid: 'transparent' as const,
+  selectionColor: Colors.darkGray,
+  cursorColor: Colors.darkGray,
+};
+
 const emptyFields: InvoiceFields = {
   dealer: '',
   dealerCode: '',
@@ -737,7 +744,7 @@ export const InvoiceForm: React.FC<Props> = ({
               <Text style={styles.readOnlyText}>{value.invoiceNumber}</Text>
             </View>
           ) : (
-            <TextInput 
+            <TextInput {...TEXT_INPUT_DEFAULTS} 
               style={[styles.input, errors.invoiceNumber && styles.inputError]} 
               value={value.invoiceNumber} 
               onChangeText={set('invoiceNumber')} 
@@ -750,7 +757,7 @@ export const InvoiceForm: React.FC<Props> = ({
           <View style={styles.halfWidth}>
             <View style={styles.fieldInRow}>
               <L label="PO.Ref. No(Optional)">
-                <TextInput
+                <TextInput {...TEXT_INPUT_DEFAULTS}
                   style={styles.input}
                   value={value.associatedPO}
                   onChangeText={set('associatedPO')}
@@ -894,7 +901,7 @@ export const InvoiceForm: React.FC<Props> = ({
               </View>
             </TouchableOpacity>
           </View>
-          <TextInput style={styles.input} value={value.earlyPaymentDiscount} onChangeText={set('earlyPaymentDiscount')} placeholder="Value" keyboardType="decimal-pad" />
+          <TextInput {...TEXT_INPUT_DEFAULTS} style={styles.input} value={value.earlyPaymentDiscount} onChangeText={set('earlyPaymentDiscount')} placeholder="Value" keyboardType="decimal-pad" />
         </View>
         <View style={styles.row}>
           <View style={styles.halfWidth}>
@@ -939,7 +946,7 @@ export const InvoiceForm: React.FC<Props> = ({
           </View>
         </View>
         <L label="Remark (Optional)">
-          <TextInput
+          <TextInput {...TEXT_INPUT_DEFAULTS}
             style={styles.input}
             value={value.remark}
             onChangeText={set('remark')}
@@ -988,7 +995,7 @@ export const InvoiceForm: React.FC<Props> = ({
               )}
             </View>
             <L label="Item Name *">
-              <TextInput 
+              <TextInput {...TEXT_INPUT_DEFAULTS} 
                 style={[styles.input, errors.items && errors.items.includes(`Item ${index + 1}`) && errors.items.includes('Item Name') && styles.inputError]} 
                 value={item.itemName} 
                 onChangeText={(text) => updateItem(index, 'itemName', text)} 
@@ -996,7 +1003,7 @@ export const InvoiceForm: React.FC<Props> = ({
               />
             </L>
             <L label="Description (Optional)">
-              <TextInput 
+              <TextInput {...TEXT_INPUT_DEFAULTS} 
                 style={styles.input} 
                 value={item.description || ''} 
                 onChangeText={(text) => updateItem(index, 'description', text)} 
@@ -1006,7 +1013,7 @@ export const InvoiceForm: React.FC<Props> = ({
             <View style={styles.row}>
               <View style={styles.thirdWidth}>
                 <L label="Quantity *">
-                  <TextInput 
+                  <TextInput {...TEXT_INPUT_DEFAULTS} 
                     style={[styles.input, errors.items && errors.items.includes(`Item ${index + 1}`) && errors.items.includes('Quantity') && styles.inputError]} 
                     value={formatIndianAmountInput(item.quantity)} 
                     onChangeText={(text) => updateItem(index, 'quantity', text)} 
@@ -1017,7 +1024,7 @@ export const InvoiceForm: React.FC<Props> = ({
               </View>
               <View style={styles.thirdWidth}>
                 <L label="Unit *">
-                  <TextInput
+                  <TextInput {...TEXT_INPUT_DEFAULTS}
                     style={[styles.input, errors.items && errors.items.includes(`Item ${index + 1}`) && errors.items.includes('Unit') && styles.inputError]}
                     value={item.unit}
                     onChangeText={(text) => updateItem(index, 'unit', text)}
@@ -1027,7 +1034,7 @@ export const InvoiceForm: React.FC<Props> = ({
               </View>
               <View style={styles.thirdWidth}>
                 <L label="Price *">
-                  <TextInput 
+                  <TextInput {...TEXT_INPUT_DEFAULTS} 
                     style={[styles.input, errors.items && errors.items.includes(`Item ${index + 1}`) && errors.items.includes('Price') && styles.inputError]} 
                     value={formatIndianAmountInput(item.pricePerQuantity)} 
                     onChangeText={(text) => updateItem(index, 'pricePerQuantity', text)} 
@@ -1041,7 +1048,7 @@ export const InvoiceForm: React.FC<Props> = ({
               <Text style={styles.errorText}>{errors.items}</Text>
             )}
             <L label="Total">
-              <TextInput style={[styles.input, styles.autoCalculated]} value={item.total ? formatIndianAmountInput(item.total) : ''} editable={false} placeholder="Auto Calculated" />
+              <TextInput {...TEXT_INPUT_DEFAULTS} style={[styles.input, styles.autoCalculated]} value={item.total ? formatIndianAmountInput(item.total) : ''} editable={false} placeholder="Auto Calculated" />
             </L>
             
             {/* Item-level Discount */}
@@ -1073,7 +1080,7 @@ export const InvoiceForm: React.FC<Props> = ({
                 </View>
                 {item.discountType && (
                   <View style={styles.itemDiscountTaxInputsVertical}>
-                    <TextInput
+                    <TextInput {...TEXT_INPUT_DEFAULTS}
                       style={[styles.itemDiscountTaxInputVertical, isOcrMode && styles.ocrDisabledInput]}
                       value={formatIndianAmountInput(item.discountValue || '')}
                       onChangeText={(text) => updateItem(index, 'discountValue', text)}
@@ -1081,7 +1088,7 @@ export const InvoiceForm: React.FC<Props> = ({
                       keyboardType="decimal-pad"
                       editable={!isOcrMode}
                     />
-                    <TextInput
+                    <TextInput {...TEXT_INPUT_DEFAULTS}
                       style={[styles.itemDiscountTaxInputVertical, styles.autoCalculated]}
                       value={formatIndianAmountInput(item.discountAmount || '0.00')}
                       editable={false}
@@ -1121,7 +1128,7 @@ export const InvoiceForm: React.FC<Props> = ({
                       <View style={styles.itemDiscountTaxInputsVertical}>
                         <View style={styles.taxPercentInputRow}>
                           {isPartyConfiguredTax(tax.taxType) ? (
-                            <TextInput
+                            <TextInput {...TEXT_INPUT_DEFAULTS}
                               style={[
                                 styles.itemDiscountTaxInputVertical,
                                 styles.autoCalculated,
@@ -1131,7 +1138,7 @@ export const InvoiceForm: React.FC<Props> = ({
                               placeholder="Value"
                             />
                           ) : (
-                            <TextInput
+                            <TextInput {...TEXT_INPUT_DEFAULTS}
                               style={[
                                 styles.itemDiscountTaxInputVertical,
                                 isOcrMode && styles.ocrDisabledInput,
@@ -1147,7 +1154,7 @@ export const InvoiceForm: React.FC<Props> = ({
                           )}
                           <Text style={styles.taxPercentSuffix}>%</Text>
                         </View>
-                        <TextInput
+                        <TextInput {...TEXT_INPUT_DEFAULTS}
                           style={[styles.itemDiscountTaxInputVertical, styles.autoCalculated]}
                           value={formatIndianAmountInput(tax.taxAmount || '0.00')}
                           editable={false}
@@ -1779,6 +1786,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     fontSize: 13,
     height: 42, // Fixed height to match currencyDisplay
+    color: Colors.darkGray,
   },
   inputError: {
     borderColor: '#dc3545',
@@ -1923,6 +1931,7 @@ const styles = StyleSheet.create({
     minWidth: 60,
     maxWidth: 100,
     flexShrink: 1,
+    color: Colors.darkGray,
   },
   itemDiscountTaxContainer: {
     marginTop: 12,
@@ -1968,6 +1977,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     fontSize: 12,
     height: 38,
+    color: Colors.darkGray,
   },
   taxPercentInputRow: {
     flex: 1,

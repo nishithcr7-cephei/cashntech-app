@@ -215,6 +215,7 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     program,
     product,
     anchorParticipantMapping,
+    anchorParticipantMappingId: anchorParticipantMapping,
     party,
     tenor: parseTenorDays(fields.tenor),
     sub_total: Ue(subtotal),
@@ -314,6 +315,45 @@ export type MarkAsDisbursedPayload = {
   final_total?: number;
   upfront_interest?: number;
   usance_days?: number;
+  /** Bank-exception due date override at disbursement (YYYY-MM-DD). */
+  invoice_due_date?: string;
+};
+
+export type DueDateImpactFigure = {
+  invoice_due_date?: string;
+  usance_days?: number;
+  upfront_interest?: number;
+  net_disbursement_amount?: number;
+  total_outstanding?: number;
+  effective_due_date?: string;
+  grace_period_days?: number;
+  is_vendor_finance_upfront?: boolean;
+};
+
+export type DueDateImpactPreviewResponse = {
+  allowed: boolean;
+  reason?: string;
+  is_holiday?: boolean;
+  invoice_ref_no?: string;
+  loan_ref_no?: string;
+  tenor?: number;
+  disbursement_date?: string;
+  disbursed_amount?: number;
+  current?: DueDateImpactFigure | null;
+  proposed?: DueDateImpactFigure;
+  deltas?: {
+    days?: number | null;
+    upfront_interest?: number | null;
+    net_disbursement_amount?: number | null;
+    total_outstanding?: number | null;
+  };
+  impacts?: string[];
+};
+
+export type DueDateImpactPreviewPayload = {
+  invoice_due_date: string;
+  disbursement_date?: string;
+  disbursed_amount?: number;
 };
 
 /** API response shape for invoice approval log (GET /invoice/logs/:invoiceId) */
@@ -1037,6 +1077,20 @@ export const invoiceApi = {
       {authRequired: true} as any,
     );
     return response.data;
+  },
+
+  /** Read-only preview for due-date override at disbursement (no mutation). */
+  previewDueDateImpact: async (
+    invoiceId: string,
+    payload: DueDateImpactPreviewPayload,
+  ): Promise<DueDateImpactPreviewResponse> => {
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiDueDateImpact(invoiceId),
+      payload,
+      {authRequired: true, skipResponseTransform: true} as any,
+    );
+    const body = response?.data;
+    return (body?.data ?? body) as DueDateImpactPreviewResponse;
   },
 
   /** Mark multiple invoices as disbursed (BulkInvoiceDisbursementDto) */
