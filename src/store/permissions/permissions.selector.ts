@@ -1,5 +1,7 @@
 import {createSelector} from '@reduxjs/toolkit';
 import {RootState} from '@store/app/store';
+import {evaluatePermissionKey} from '@utils/effectivePermissions';
+import {resolveWorkspaceProductId} from '@store/product/product.resolver';
 
 const selectPermissionsState = (state: RootState) => state.permissions;
 
@@ -18,31 +20,49 @@ export const selectPermissionsError = createSelector(
   p => p.error,
 );
 
-export const selectHasPermission = (requiredPermission: string) =>
-  createSelector(selectPermissionsState, p => {
-    if (!p || !p.permissions || !Array.isArray(p.permissions)) return false;
+const selectWorkspaceProductId = (state: RootState): string | null => {
+  const programSelection = state.programSelection;
+  const productId = state.product?.activeProduct?.id ?? null;
+  return resolveWorkspaceProductId(programSelection, productId);
+};
 
-    // 1. Exact match first (fast path)
-    if (p.permissions.includes(requiredPermission)) return true;
-
-    // 2. Robust Partial Match for functional actions
-    const parts = (requiredPermission || '').split('.');
-    const actionIndex = parts.indexOf('action');
-
-    if (actionIndex !== -1 && actionIndex > 0) {
-      const functionalPart = parts.slice(actionIndex - 1).join('.');
-      return p.permissions.some(perm => perm && typeof perm === 'string' && perm.includes(functionalPart));
-    }
-
-    return false;
-  });
+/**
+ * Check a permission key against the nested effective-permissions object.
+ * When productId is omitted, the workspace product (program → active) is used.
+ */
+export const selectHasPermission = (
+  requiredPermission: string,
+  productId?: string | null,
+) =>
+  createSelector(
+    selectPermissionsState,
+    selectWorkspaceProductId,
+    (p, workspaceProductId) =>
+      evaluatePermissionKey(
+        p.permissions,
+        requiredPermission,
+        productId === undefined ? workspaceProductId : productId,
+      ),
+  );
 
 export const selectCanSendMailToBank = createSelector(
   selectPermissionsState,
-  p => p.canSendMailToBank,
+  selectWorkspaceProductId,
+  (p, productId) =>
+    evaluatePermissionKey(
+      p.permissions,
+      'disbursement.send_mail_to_bank',
+      productId,
+    ) || p.canSendMailToBank,
 );
 
 export const selectCanMarkAsDisbursed = createSelector(
   selectPermissionsState,
-  p => p.canMarkAsDisbursed,
+  selectWorkspaceProductId,
+  (p, productId) =>
+    evaluatePermissionKey(
+      p.permissions,
+      'disbursement.mark_as_disbursed',
+      productId,
+    ) || p.canMarkAsDisbursed,
 );

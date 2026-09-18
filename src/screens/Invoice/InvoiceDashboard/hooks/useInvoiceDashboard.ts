@@ -32,12 +32,12 @@ import {PERMISSIONS} from '@constants/permissions';
 import {invoiceApi} from '@services/api/invoice.api';
 import {getBestWorkflowApprovalLevelFromScope, getInvoiceApprovalLevelForId} from '@utils/getInvoiceApprovalLevel';
 import {selectActiveProductCode, selectActiveProductName, selectActiveProductId} from '@store/product/product.selectors';
-import {PRODUCT_DISPLAY_NAMES, PRODUCT_CODES} from '@store/product/product.types';
+import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 import {getEffectiveProductCode, resolveWorkspaceProductId} from '@store/product/product.resolver';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
 import type {Bank} from '@constants/programSelection';
 import type {ProductTabType} from '../types';
-import {getProgramIdsForTab} from '../utils/dashboardUtils';
+import {getProgramIdsForTab, productTabFromCode} from '../utils/dashboardUtils';
 import type {BulkInvoiceItem} from '@components/index';
 
 export const useInvoiceDashboard = () => {
@@ -81,21 +81,15 @@ export const useInvoiceDashboard = () => {
 
   const [activeTab, setActiveTab] = useState<'dealers' | 'unpaid'>('dealers');
   const effectiveCode = getEffectiveProductCode(activeProductCode);
-  const [productTab, setProductTab] = useState<ProductTabType>(
-    effectiveCode === PRODUCT_CODES.VENDOR_FINANCE ? 'vendor_finance' : 'dealer_finance',
+  const [productTab, setProductTab] = useState<ProductTabType>(() =>
+    productTabFromCode(effectiveCode),
   );
 
   // Keep productTab in sync when the active product changes via the in-app
-  // switcher (drawer toggle / header chip / product branch tap). Without this,
-  // productTab only reflects the product at mount time and the dashboard would
-  // keep filtering/fetching data for the previous product after a switch.
+  // switcher. Without this, productTab only reflects the product at mount.
   useEffect(() => {
     setProductTab(prev =>
-      prev === 'all_product' || prev === 'pid'
-        ? prev
-        : effectiveCode === PRODUCT_CODES.VENDOR_FINANCE
-        ? 'vendor_finance'
-        : 'dealer_finance',
+      prev === 'all_product' ? prev : productTabFromCode(effectiveCode),
     );
   }, [effectiveCode]);
   const [showCheckerApprovalModal, setShowCheckerApprovalModal] = useState(false);
@@ -140,15 +134,10 @@ export const useInvoiceDashboard = () => {
       return [programSelection.programId];
     }
 
-    // "All Program" / default: always active-product-scoped — never DF+VF combined.
-    const activeProductTab: ProductTabType =
-      effectiveCode === PRODUCT_CODES.VENDOR_FINANCE
-        ? 'vendor_finance'
-        : 'dealer_finance';
+    // "All Program" / default: always active-product-scoped — never DF+VF+PID mixed.
+    const activeProductTab = productTabFromCode(effectiveCode);
     const tabForFetch =
-      productTab === 'all_product' || productTab === 'pid'
-        ? activeProductTab
-        : productTab;
+      productTab === 'all_product' ? activeProductTab : productTab;
 
     if (
       programSelection?.programScope === 'all' &&
@@ -183,6 +172,11 @@ export const useInvoiceDashboard = () => {
       programSelection?.programScope === 'selected' &&
       programIds.length === 0
     ) {
+      return;
+    }
+    // Same guard as invoice list: KPI/summary/latest need productId
+    // (HTTP 400 without it). Skip until workspace product is resolved.
+    if (!overviewProductId && programIds.length === 0) {
       return;
     }
 

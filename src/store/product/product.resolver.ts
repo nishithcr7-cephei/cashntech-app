@@ -9,6 +9,10 @@ import {
 
 const DF_NAME_HINTS = ['dealer finance', 'dealer_finance'];
 const VF_NAME_HINTS = ['vendor finance', 'vendor_finance'];
+const PID_NAME_HINTS = [
+  'purchase invoice discounting',
+  'purchase_invoice_discounting',
+];
 
 function normalizeToken(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -16,7 +20,7 @@ function normalizeToken(value: string | null | undefined): string {
 
 /**
  * Resolve a mobile ProductCode from an explicit backend product_code / slug.
- * Returns null when the value is missing or unrecognized (do not invent VF).
+ * Returns null when the value is missing or unrecognized (do not invent VF/PID).
  */
 export function resolveProductCodeFromProductCode(
   productCode: string | null | undefined,
@@ -35,6 +39,14 @@ export function resolveProductCodeFromProductCode(
   }
 
   if (
+    token === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING ||
+    token === 'pid' ||
+    token === 'purchase_invoice_discounting'
+  ) {
+    return PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING;
+  }
+
+  if (
     token === PRODUCT_CODES.VENDOR_FINANCE ||
     token === 'vf' ||
     token === 'vendor'
@@ -47,7 +59,8 @@ export function resolveProductCodeFromProductCode(
 
 /**
  * Infer ProductCode from backend `product.name` values
- * (e.g. "Dealer Finance" / "Vendor Finance") when product_code is absent.
+ * (e.g. "Dealer Finance" / "Vendor Finance" / "Purchase Invoice Discounting")
+ * when product_code is absent.
  */
 export function resolveProductCodeFromName(
   name: string | null | undefined,
@@ -57,6 +70,10 @@ export function resolveProductCodeFromName(
     return null;
   }
 
+  // PID before VF — names must not be confused with generic "vendor".
+  if (PID_NAME_HINTS.some(hint => token.includes(hint))) {
+    return PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING;
+  }
   if (VF_NAME_HINTS.some(hint => token.includes(hint))) {
     return PRODUCT_CODES.VENDOR_FINANCE;
   }
@@ -70,7 +87,7 @@ export function resolveProductCodeFromName(
 
 /**
  * Prefer product_code when present; otherwise name-based inference.
- * Pure and safe for unit tests — never defaults to DF/VF when unknown.
+ * Pure and safe for unit tests — never defaults to DF/VF/PID when unknown.
  */
 export function resolveProductCode(input: ProductLike): ProductCode | null {
   const fromCode = resolveProductCodeFromProductCode(
@@ -84,7 +101,7 @@ export function resolveProductCode(input: ProductLike): ProductCode | null {
 
 /**
  * Build a ResolvedProduct from a backend-like product object.
- * Returns null when code cannot be resolved (unknown product stays out of VF/DF branching).
+ * Returns null when code cannot be resolved (unknown product stays out of branching).
  */
 export function resolveProduct(input: ProductLike): ResolvedProduct | null {
   const code = resolveProductCode(input);
@@ -106,7 +123,7 @@ export function resolveProduct(input: ProductLike): ResolvedProduct | null {
 
 /**
  * Deduplicate and resolve a list of backend-like products (e.g. from /user/scope).
- * Unknown products are skipped — they must not activate VF UI accidentally.
+ * Unknown products are skipped — they must not activate VF/PID UI accidentally.
  */
 export function resolveAvailableProducts(
   products: ProductLike[] | null | undefined,
@@ -173,9 +190,28 @@ export function isVendorFinance(code: ProductCode | null | undefined): boolean {
   return code === PRODUCT_CODES.VENDOR_FINANCE;
 }
 
+export function isPid(code: ProductCode | null | undefined): boolean {
+  return code === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING;
+}
+
+/** PID (+ future SID) — standalone program/vendor mapping products. */
+export function isStandaloneProduct(
+  code: ProductCode | null | undefined,
+): boolean {
+  return isPid(code);
+}
+
+/** VF + PID party labels are Vendor (not Dealer). */
+export function usesVendorPartyLabels(
+  code: ProductCode | null | undefined,
+): boolean {
+  return isVendorFinance(code) || isPid(code);
+}
+
 /**
  * Effective code for callers that need a non-null value.
  * Absent context defaults to DF so existing behavior is preserved.
+ * When a code is set (including PID), it is returned as-is — never rewrite PID→DF.
  */
 export function getEffectiveProductCode(
   code: ProductCode | null | undefined,
@@ -186,7 +222,7 @@ export function getEffectiveProductCode(
 /**
  * productId for list/KPI/summary APIs.
  * Prefer a specifically selected program product; otherwise the active product
- * (DF, VF, and future PID/SID). Backend summary/latest require productId.
+ * (DF, VF, PID). Backend summary/latest require productId.
  */
 export function resolveWorkspaceProductId(
   programSelection?: {
@@ -209,7 +245,7 @@ export function resolveWorkspaceProductId(
 }
 
 /**
- * One entry per ProductCode for selection UI (DF / VF), DF first then VF.
+ * One entry per ProductCode for selection UI — DF → VF → PID.
  * Prefer the first occurrence's backend id/name.
  */
 export function uniqueProductsByCode(
@@ -225,6 +261,7 @@ export function uniqueProductsByCode(
   const ordered: ProductCode[] = [
     PRODUCT_CODES.DEALER_FINANCE,
     PRODUCT_CODES.VENDOR_FINANCE,
+    PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING,
   ];
   const result: ResolvedProduct[] = [];
   for (const code of ordered) {

@@ -17,6 +17,7 @@ import {Colors, Fonts} from '@constants/index';
 import fontWeight from '@constants/FontWeight';
 import {fetchUserScopeRequest} from '@store/programSelection/programSelection.slice';
 import {selectScopeData, selectScopeLoading} from '@store/programSelection/programSelection.selector';
+import {selectActiveProductCode} from '@store/product/product.selectors';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {
   EMPTY_REPORT_API_FILTER,
@@ -60,9 +61,10 @@ export const ReportFilterModal: React.FC<ReportFilterModalProps> = ({
   const dispatch = useDispatch();
   const scopeData = useSelector(selectScopeData);
   const scopeLoading = useSelector(selectScopeLoading);
+  const activeProductCode = useSelector(selectActiveProductCode);
   const programOptions = useMemo(
-    () => getReportProgramOptions(scopeData),
-    [scopeData],
+    () => getReportProgramOptions(scopeData, activeProductCode),
+    [scopeData, activeProductCode],
   );
 
   const [activeCategory, setActiveCategory] = useState<FilterCategory>('range');

@@ -61,8 +61,12 @@ import {
   selectActiveProductCode,
   selectEffectiveProductCode,
 } from '@store/product/product.selectors';
-import {getEffectiveProductCode, resolveWorkspaceProductId} from '@store/product/product.resolver';
-import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {
+  getEffectiveProductCode,
+  resolveWorkspaceProductId,
+  usesVendorPartyLabels,
+} from '@store/product/product.resolver';
+import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 
 const STATUS_COLORS = {
   PENDING: { bg: '#FFF4E5', text: '#FF8C00' },
@@ -189,6 +193,7 @@ function mapToDisbursementRow(item: any): DisbursementRow {
       item.counterPartyName ??
         item.anchorParticipantMapping?.party?.entity_name ??
         item.counter_party_name ??
+        item.programVendorDetails?.vendor_name ??
         '',
     ) || '-';
   const bankId =
@@ -348,8 +353,11 @@ export const DisbursementScreen: React.FC = () => {
 
   const activeProductId = useSelector(selectActiveProductId);
   const effectiveCode = useSelector(selectEffectiveProductCode);
-  const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
-  const disbursementListTitle = isVendorFinance
+  const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
+  const counterPartyColumnLabel = vendorPartyLabels
+    ? 'Vendor Name'
+    : 'Counter Party';
+  const disbursementListTitle = vendorPartyLabels
     ? 'Vendor Wise Invoice Details'
     : isCashnTechUser
       ? 'Invoice'
@@ -372,6 +380,10 @@ export const DisbursementScreen: React.FC = () => {
       let apiFilters: Parameters<typeof invoiceApi.getVerifiedList>[1] = undefined;
       // Note: Removed local row-based ID lookup to prevent cumulative filtering bugs.
       // IDs should be managed via state or direct program selection when possible.
+      if (!overviewProductId && !(programIds && programIds.length)) {
+        setDisbursementRows([]);
+        return;
+      }
       if (Object.keys(filters).length > 0) {
         const byInvoiceStatus = filters['Invoice Status']?.length ? filters['Invoice Status'] : undefined;
         if (byInvoiceStatus) {
@@ -1026,7 +1038,7 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoValue}>{row.programName}</Text>
               </View>
               <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Counter Party</Text>
+                <Text style={styles.infoLabel}>{counterPartyColumnLabel}</Text>
                 <Text style={styles.infoValue}>{row.counterParty}</Text>
               </View>
               <View style={styles.infoColumn}>
@@ -1060,7 +1072,7 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoValue}>{row.programName}</Text>
               </View>
               <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Counter Party</Text>
+                <Text style={styles.infoLabel}>{counterPartyColumnLabel}</Text>
                 <Text style={styles.infoValue}>{row.counterParty}</Text>
               </View>
               <View style={styles.infoColumn}>
@@ -1102,7 +1114,7 @@ export const DisbursementScreen: React.FC = () => {
                 <Text style={styles.infoValue}>{row.primaryParty}</Text>
               </View>
               <View style={styles.infoColumn}>
-                <Text style={styles.infoLabel}>Counter Party</Text>
+                <Text style={styles.infoLabel}>{counterPartyColumnLabel}</Text>
                 <Text style={styles.infoValue}>{row.counterParty}</Text>
               </View>
               <View style={styles.infoColumn}>

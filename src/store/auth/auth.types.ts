@@ -99,19 +99,49 @@ export interface ILmsUser {
   }> | null;
 }
 
+/** Session after OTP / complete-consent (mobile gets refreshToken in body). */
 export interface ILmsVerifyOtpData {
   token: string;
+  refreshToken?: string;
   user: ILmsUser;
 }
+
+/** SCF pending-consent branch from verify-otp (no session token yet). */
+export interface IPendingConsentData {
+  pendingConsent: true;
+  continuationToken: string;
+  pendingAgreementTypes: string[];
+}
+
+export type SigninOtpVerifySuccess =
+  | {status: 'authenticated'; user: ILmsUser}
+  | {
+      status: 'pendingConsent';
+      mobile_number: string;
+      continuationToken: string;
+      pendingAgreementTypes: string[];
+    };
 
 export interface ISigninOtpVerifySuccessResponse {
   statusCode: number;
   message: string;
-  data: ILmsVerifyOtpData;
+  data: ILmsVerifyOtpData | IPendingConsentData;
 }
 
 export type SigninOtpVerifyPayloadWithCallback = PayloadWithCallback<
   ISigninOtpVerifyPayload,
+  [SigninOtpVerifySuccess],
+  [string]
+>;
+
+export interface ICompleteConsentPayload {
+  mobile_number: string;
+  continuationToken: string;
+  acceptedAgreementTypes: string[];
+}
+
+export type CompleteConsentPayloadWithCallback = PayloadWithCallback<
+  ICompleteConsentPayload,
   [ILmsUser],
   [string]
 >;

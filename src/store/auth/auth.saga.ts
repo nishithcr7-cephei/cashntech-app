@@ -11,6 +11,9 @@ import {
   IOtpVerifyErrorResponse,
   ICreatePasswordApiResponse,
   ISigninOtpVerifySuccessResponse,
+  ILmsUser,
+  ILmsVerifyOtpData,
+  IPendingConsentData,
   SignupPayloadWithCallback,
   OtpVerifyPayloadWithCallback,
   CreatePasswordPayloadWithCallback,
@@ -20,6 +23,7 @@ import {
   ISigninErrorResponse,
   SigninPayloadWithCallback,
   SigninOtpVerifyPayloadWithCallback,
+  CompleteConsentPayloadWithCallback,
   BootstrapProductContextPayloadWithCallback,
   ProductBootstrapResult,
 } from './auth.types';
@@ -33,6 +37,7 @@ import {
   resetPassword,
   signinRequest,
   signinOtpVerifyRequest,
+  completeConsentRequest,
   bootstrapProductContextRequest,
 } from './auth.slice';
 import {setStorage} from '@services/localStorage';
@@ -58,6 +63,37 @@ import {
 } from '@store/product/product.slice';
 import {selectActiveProduct} from '@store/product/product.selectors';
 import type {ResolvedProduct} from '@store/product/product.types';
+
+function isPendingConsentData(
+  data: ILmsVerifyOtpData | IPendingConsentData | undefined,
+): data is IPendingConsentData {
+  return !!data && (data as IPendingConsentData).pendingConsent === true;
+}
+
+function* persistAuthenticatedSession(session: ILmsVerifyOtpData): unknown {
+  const {token: tokenVal, refreshToken, user: userData} = session;
+  setStorage(StorageKeys.TOKEN, tokenVal);
+  if (refreshToken) {
+    setStorage(StorageKeys.REFRESH_TOKEN, refreshToken);
+  }
+  setStorage(StorageKeys.USER_INFO, JSON.stringify(userData));
+  const capability = userData
+    ? deriveCapabilityFromUser({
+        ...userData,
+        product_roles: userData.product_roles ?? null,
+      })
+    : null;
+  const appRole = capability ? toLegacyAppRole(capability) : null;
+  yield put(
+    userActions.setUserInfo({
+      ...userData,
+      appRole,
+      capability,
+      product_roles: userData?.product_roles ?? null,
+    }),
+  );
+  return userData as ILmsUser;
+}
 
 function* handleSignup(
   action: PayloadAction<SignupPayloadWithCallback>,
@@ -109,25 +145,54 @@ function* handleSignInOtpVerify(
   > = yield call(AuthApis.apiSigninOtpVerify, action.payload.payload);
   yield put(setGlobalLoader(false));
   if (!error) {
-    const {token: tokenVal, user: userData} = data.data || {};
-    setStorage(StorageKeys.TOKEN, tokenVal);
-    setStorage(StorageKeys.USER_INFO, JSON.stringify(userData));
-    // Role normalization (PR3): capability + legacy appRole; setUserInfo re-derives
-    // from permission_group / product_roles for a single source of truth.
-    const capability = userData
-      ? deriveCapabilityFromUser({
-          ...userData,
-          product_roles: userData.product_roles ?? null,
-        })
-      : null;
-    const appRole = capability ? toLegacyAppRole(capability) : null;
-    yield put(
-      userActions.setUserInfo({
-        ...userData,
-        appRole,
-        capability,
-        product_roles: userData?.product_roles ?? null,
-      }),
+    const payloadData = data.data;
+    if (isPendingConsentData(payloadData)) {
+      action.payload.callbackSuccess?.({
+        status: 'pendingConsent',
+        mobile_number: action.payload.payload.mobile_number,
+        continuationToken: payloadData.continuationToken,
+        pendingAgreementTypes: payloadData.pendingAgreementTypes ?? [],
+      });
+      return;
+    }
+    if (!payloadData?.token || !payloadData?.user) {
+      action.payload.callbackError?.('Invalid OTP response');
+      return;
+    }
+    const userData: ILmsUser = yield call(
+      persistAuthenticatedSession,
+      payloadData,
+    );
+    action.payload.callbackSuccess?.({
+      status: 'authenticated',
+      user: userData,
+    });
+  } else {
+    const errorMessage = error.response?.data?.message ?? 'Something went wrong';
+    action.payload.callbackError?.(errorMessage);
+  }
+}
+
+function* handleCompleteConsent(
+  action: PayloadAction<CompleteConsentPayloadWithCallback>,
+): unknown {
+  const {
+    data,
+    error,
+  }: Result<
+    ISigninOtpVerifySuccessResponse,
+    AxiosError<IOtpVerifyErrorResponse>
+  > = yield call(AuthApis.apiCompleteConsent, action.payload.payload);
+  yield put(setGlobalLoader(false));
+  if (!error) {
+    const payloadData = data.data;
+    if (isPendingConsentData(payloadData) || !payloadData?.token || !payloadData?.user) {
+      action.payload.callbackError?.('Consent completion did not return a session');
+      return;
+    }
+    const userData: ILmsUser = yield call(
+      persistAuthenticatedSession,
+      payloadData as ILmsVerifyOtpData,
     );
     action.payload.callbackSuccess?.(userData);
   } else {
@@ -299,6 +364,7 @@ export default function* authSaga() {
   yield takeLatest(signupRequest.type, handleSignup);
   yield takeLatest(otpVerifyRequest.type, handleOtpVerify);
   yield takeLatest(signinOtpVerifyRequest.type, handleSignInOtpVerify);
+  yield takeLatest(completeConsentRequest.type, handleCompleteConsent);
   yield takeLatest(createNewPassword.type, handleCreateNewPassword);
   yield takeLatest(sendResetLinkRequest.type, handleSendResetLink);
   yield takeLatest(resetPassword.type, handleResetPassword);

@@ -255,6 +255,7 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
   const counterParty =
     decryptValue(
       item.counter_party_name ??
+        item.programVendorDetails?.vendor_name ??
         item.anchorParticipantMapping?.party?.entity_name ??
         '',
     ) || '-';

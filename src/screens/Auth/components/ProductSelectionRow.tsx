@@ -29,7 +29,10 @@ const renderProductIcon = (code: string) => {
     );
   }
 
-  if (code === PRODUCT_CODES.VENDOR_FINANCE) {
+  if (
+    code === PRODUCT_CODES.VENDOR_FINANCE ||
+    code === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING
+  ) {
     return (
       <ProductIcon
         code={code}

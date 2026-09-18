@@ -1,5 +1,6 @@
 // Auth exports
 export * from './Auth/OTPInputScreen';
+export * from './Auth/ConsentScreen';
 export * from './Auth/PasswordScreen';
 export * from './Auth/SigninScreen';
 export * from './Auth/SignupScreen';

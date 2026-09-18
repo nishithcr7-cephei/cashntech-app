@@ -30,7 +30,7 @@ import {
   PRODUCT_DISPLAY_NAMES,
   type ProductCode,
 } from '@store/product/product.types';
-import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {getEffectiveProductCode, usesVendorPartyLabels} from '@store/product/product.resolver';
 import {
   computeDisbursedAmountLikeWeb,
   isVfUpfrontChargeType,
@@ -138,6 +138,9 @@ function resolveProductCode(
   const fromProp = getEffectiveProductCode(productCode ?? null);
   if (productCode) return fromProp;
   const name = (previewProductName || '').toLowerCase();
+  if (name.includes('purchase invoice discounting')) {
+    return PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING;
+  }
   if (name.includes('vendor')) return PRODUCT_CODES.VENDOR_FINANCE;
   if (name.includes('dealer')) return PRODUCT_CODES.DEALER_FINANCE;
   return fromProp;
@@ -329,6 +332,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   const modalSubtitle = `${invoiceLabel} · ${productDisplayName}`;
 
   const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
+  const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
   const isVfUpfront =
     isVendorFinance && isVfUpfrontChargeType(preview?.interest_charge_type);
 
@@ -489,19 +493,35 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   const display = useMemo(() => {
     const p = preview ?? {};
     const apm = p.anchorParticipantMapping ?? {};
+    const pvd = p.programVendorDetails ?? {};
     const isVf = isVendorFinance;
+    const programLoan =
+      p.program?.basic_parameters?.loan_account_no ??
+      p.counter_party_od_account ??
+      '';
 
-    const vendorRaw =
-      p.vendor_name ?? apm.party?.entity_name ?? '';
+    const vendorRaw = vendorPartyLabels
+      ? p.vendor_name ?? pvd.vendor_name ?? p.counter_party_name ?? apm.party?.entity_name ?? ''
+      : p.vendor_name ?? apm.party?.entity_name ?? '';
     const anchorRaw =
       p.anchor_name ?? p.program?.party?.entity_name ?? p.party?.entity_name ?? '';
-    const odRaw = apm.od_account_no ?? debitFrom ?? '';
-    const vendorCodeRaw = apm.company_code_given_by_party ?? '';
+    const odRaw = vendorPartyLabels && !isVf
+      ? programLoan || apm.od_account_no || debitFrom || ''
+      : apm.od_account_no ?? debitFrom ?? '';
+    const vendorCodeRaw = vendorPartyLabels && !isVf
+      ? pvd.vendor_code ?? p.counter_party_code ?? apm.company_code_given_by_party ?? ''
+      : apm.company_code_given_by_party ?? '';
 
     const creditAcc =
-      p.credit_to_bank_account?.accountNumber ?? p.credit_to ?? '';
+      p.credit_to_bank_account?.accountNumber ??
+      p.creditToBankAccount?.accountNumber ??
+      p.credit_to ??
+      '';
     const creditName =
-      p.credit_to_bank_account?.nameAsPerBank ?? vendorRaw ?? '';
+      p.credit_to_bank_account?.nameAsPerBank ??
+      p.creditToBankAccount?.nameAsPerBank ??
+      vendorRaw ??
+      '';
     const decryptedAcc = creditAcc ? decryptValue(String(creditAcc)) : '';
     const accLabel = decryptedAcc || String(creditAcc);
     const creditDisplay = accLabel
@@ -546,7 +566,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       isVf,
       anchor: dash(decryptValue(anchorRaw) || anchorRaw),
       vendor: dash(decryptValue(vendorRaw) || vendorRaw),
-      dealerLabel: isVf ? 'Vendor' : 'Dealer',
+      dealerLabel: vendorPartyLabels ? 'Vendor' : 'Dealer',
       loanOdAccount: dash(decryptValue(String(odRaw)) || odRaw),
       vendorCode: dash(decryptValue(String(vendorCodeRaw)) || vendorCodeRaw),
       creditToAccount: creditDisplay,
@@ -589,6 +609,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   }, [
     preview,
     isVendorFinance,
+    vendorPartyLabels,
     isVfUpfront,
     debitFrom,
     vfAmounts,
@@ -753,16 +774,16 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                   <View
                     style={[
                       styles.productBadge,
-                      effectiveCode === PRODUCT_CODES.VENDOR_FINANCE
-                        ? styles.productBadgeVf
-                        : styles.productBadgeDf,
+                      effectiveCode === PRODUCT_CODES.DEALER_FINANCE
+                        ? styles.productBadgeDf
+                        : styles.productBadgeVf,
                     ]}>
                     <Text
                       style={[
                         styles.productBadgeText,
-                        effectiveCode === PRODUCT_CODES.VENDOR_FINANCE
-                          ? styles.productBadgeTextVf
-                          : styles.productBadgeTextDf,
+                        effectiveCode === PRODUCT_CODES.DEALER_FINANCE
+                          ? styles.productBadgeTextDf
+                          : styles.productBadgeTextVf,
                       ]}>
                       {productDisplayName}
                     </Text>

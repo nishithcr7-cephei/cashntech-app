@@ -199,6 +199,9 @@ export function normalizeDealerInfoResponse(
 
   const participants: DealerInfoParticipant[] = rows.map((row, index) => {
     const r = row as Record<string, unknown>;
+    const rowBanks = parseBankAccounts(
+      pick(r, 'bankAccounts', 'bank_accounts'),
+    );
     collectBankDetails(r, bankMap);
 
     const pipelineRaw = pick(r, 'pipeline_requests', 'pipelineRequests');
@@ -209,7 +212,10 @@ export function normalizeDealerInfoResponse(
       company_code_given_by_party: String(
         pick(r, 'company_code_given_by_party', 'companyCodeGivenByParty') ?? '',
       ),
-      od_account_no: String(pick(r, 'od_account_no', 'odAccountNo') ?? ''),
+      od_account_no: String(
+        pick(r, 'od_account_no', 'odAccountNo', 'loanAccountNo', 'loan_account_no') ??
+          '',
+      ),
       default_payment_terms_days: pick(
         r,
         'default_payment_terms_days',
@@ -237,6 +243,7 @@ export function normalizeDealerInfoResponse(
         'interest_parameters',
         'interestparameters',
       ),
+      bank_details: rowBanks.length > 0 ? rowBanks : undefined,
     };
   });
 

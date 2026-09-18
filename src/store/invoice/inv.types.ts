@@ -1,3 +1,12 @@
+export type PartyBankDetail = {
+  /**
+   * Bank account row id (party-info `bankAccounts.id`).
+   * Pass as `credit_to_account_id` on create (PR6).
+   */
+  id: string;
+  account_number: string;
+};
+
 export type DealerInfoParticipant = {
   id: string;
   company_code: string;
@@ -13,15 +22,11 @@ export type DealerInfoParticipant = {
   eligibility?: number | string;
   /** VF: interest_parameters JSON (ROI / slabs). */
   interest_parameters?: unknown;
-};
-
-export type PartyBankDetail = {
   /**
-   * Bank account row id (party-info `bankAccounts.id`).
-   * Pass as `credit_to_account_id` on create (PR6).
+   * Per-row bank accounts from party-info (PID vendor banks, VF counterparty banks).
+   * Prefer these for Credit To when a participant is selected.
    */
-  id: string;
-  account_number: string;
+  bank_details?: PartyBankDetail[];
 };
 
 export type DealerInfoBasicParameters = {
@@ -110,6 +115,13 @@ export type InvoiceListItemApi = {
   };
   party?: { entity_name?: string };
   anchorParticipantMapping?: { party?: { entity_name?: string } };
+  /** PID/SID list/detail — vendor on the invoice */
+  programVendorDetails?: {
+    id?: string;
+    vendor_name?: string;
+    vendor_code?: string;
+    name_as_per_bank?: string;
+  } | null;
   approvalLogs?: Array<{id: string}>;
   attachment?: unknown;
   attachments?: unknown;

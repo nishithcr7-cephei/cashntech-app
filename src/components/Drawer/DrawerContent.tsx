@@ -35,7 +35,10 @@ import {
   selectActiveProductCode,
   selectAvailableProducts,
 } from '@store/product/product.selectors';
-import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {
+  getEffectiveProductCode,
+  uniqueProductsByCode,
+} from '@store/product/product.resolver';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES, ResolvedProduct} from '@store/product/product.types';
 import {ProductIcon} from '@components/ProductSwitcher/ProductIcon';
 import {ProductBottomSheet} from '@components/ProductSwitcher/ProductBottomSheet';
@@ -153,9 +156,10 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const {switchProductWorkspace} = useSwitchProductWorkspace();
   // PR1 store already defaults DF-only users to a single resolved product;
   // this fallback only guards the brief window before scope/product hydration.
+  // uniqueProductsByCode keeps drawer branch order DF → VF → PID.
   const productBranches: ResolvedProduct[] =
     availableProducts.length > 0
-      ? availableProducts
+      ? uniqueProductsByCode(availableProducts)
       : [
           {
             id: '',

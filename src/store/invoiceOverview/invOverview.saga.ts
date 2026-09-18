@@ -29,6 +29,9 @@ function* fetchInvoiceSummarySaga(
 ) {
   try {
     const {programIds, productId} = action.payload;
+    if (!String(productId || '').trim() && !(programIds && programIds.length)) {
+      return;
+    }
     const response: any = yield call(
       invoiceApi.getInvoiceSummary,
       programIds,
@@ -54,6 +57,9 @@ function* fetchLatestInvoicesSaga(
 ) {
   try {
     const {programIds, productId} = action.payload;
+    if (!String(productId || '').trim() && !(programIds && programIds.length)) {
+      return;
+    }
     const response: any = yield call(
       invoiceApi.getLatestInvoices,
       programIds,
@@ -75,6 +81,9 @@ function* fetchInvoiceKpisSaga(
 ) {
   try {
     const {programIds, productId} = action.payload;
+    if (!String(productId || '').trim() && !(programIds && programIds.length)) {
+      return;
+    }
     const kpis = yield call(
       invoiceApi.getInvoiceKpis,
       programIds,

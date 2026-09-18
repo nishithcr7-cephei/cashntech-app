@@ -25,7 +25,7 @@ export type ReportColumnOverride = {
   key: string;
   label?: string;
   exportHeader?: string;
-  /** When true, column is omitted for VF until backend data is confirmed. */
+  /** When true, column is omitted for VF and PID until backend data is confirmed. */
   hideForVf?: boolean;
 };
 

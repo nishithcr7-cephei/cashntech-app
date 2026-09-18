@@ -70,8 +70,8 @@ export function mapUserScopeToBanks(data: UserScopeApiItem[]): Bank[] {
 }
 
 /**
- * Resolve unique DF/VF products from /user/scope for product bootstrap (PR2).
- * Name-based when product_code is absent.
+ * Resolve unique DF/VF/PID products from /user/scope for product bootstrap.
+ * Name-based when product_code is absent. Order: DF → VF → PID.
  */
 export function extractResolvedProductsFromScope(
   data: UserScopeApiItem[] | null | undefined,

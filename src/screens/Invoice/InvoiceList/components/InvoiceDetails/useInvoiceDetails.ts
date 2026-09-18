@@ -38,6 +38,7 @@ import { userSelector } from '@store/user';
 import { AppRole, ROLE_LABELS } from '@constants/roles';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
 import {PRODUCT_CODES} from '@store/product/product.types';
+import {usesVendorPartyLabels} from '@store/product/product.resolver';
 import { mapApiToRow, formatDateDash, mapApprovalLogToTimelineStep, formatStatus } from './types';
 import { InvoiceListItemApi } from '@store/invoice/inv.types';
 import { invoiceApi } from '@services/api/invoice.api';
@@ -139,7 +140,7 @@ export function useInvoiceDetails() {
   const dealerListTitle =
     isCashnTechUser
       ? 'Invoice'
-      : effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE
+      : usesVendorPartyLabels(effectiveProductCode)
         ? 'Vendor Wise Invoice Details'
       : isDealerMaker || isDealerChecker
         ? 'Anchor Wise Invoice Details'

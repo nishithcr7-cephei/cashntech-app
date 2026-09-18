@@ -1,10 +1,11 @@
 import axiosInstance from './api';
 import ApiEndPoints from '@constants/ApiEndPoints';
+import type {EffectivePermissions} from '@store/permissions/permissions.types';
 
 export type UserPermissionsApiResponse = {
   statusCode?: number;
   message?: string;
-  data?: { permissions: string[] };
+  data?: {permissions: EffectivePermissions};
   timestamp?: string;
 };
 

@@ -16,6 +16,7 @@ import {useDispatch, useSelector} from 'react-redux';
 import {selectAvailableProducts} from '@store/product/product.selectors';
 import {setActiveProduct} from '@store/product/product.slice';
 import type {ResolvedProduct} from '@store/product/product.types';
+import {uniqueProductsByCode} from '@store/product/product.resolver';
 import {ProductSelectionRow} from './components/ProductSelectionRow';
 
 type ProductSelectionScreenProps = NativeStackScreenProps<
@@ -31,7 +32,7 @@ export const ProductSelectionScreen = ({
   const [selected, setSelected] = useState<ResolvedProduct | null>(null);
 
   const products = useMemo(
-    () => availableProducts ?? [],
+    () => uniqueProductsByCode(availableProducts ?? []),
     [availableProducts],
   );
 

@@ -7,7 +7,7 @@ import {scaleHeight, scaleWidth} from '@utils/Scale';
 import {Tick} from '@assets/Icons';
 import type {InvoiceOverviewLatestItem} from '@store/invoiceOverview';
 import type {BulkInvoiceItem} from '@components/index';
-import {formatDateDDMmmYYYY} from '../utils/dashboardUtils';
+import {formatDateDDMmmYYYY, partyNameLabelForTab} from '../utils/dashboardUtils';
 import {formatStatus} from '@utils/invoiceStatusDisplay';
 import type {ProductTabType} from '../types';
 
@@ -41,7 +41,7 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
 }) => {
   const showCashnTechLayout = isCashnTechUser || isAnchorMaker || isAnchorChecker || isDealerMaker || isDealerChecker;
   const partyLabel =
-    productTab === 'vendor_finance' ? 'Vendor Name' : 'Dealer Name';
+    partyNameLabelForTab(productTab);
 
   if (loading) {
     return (

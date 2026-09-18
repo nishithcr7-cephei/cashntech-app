@@ -6,6 +6,7 @@ import {
 } from './permissions.slice';
 import {userPermissionsApi} from '@services/api/userPermissions.api';
 import {userSelector} from '@store/user';
+import {isEffectivePermissions} from './permissions.types';
 
 function* fetchPermissionsSaga() {
   try {
@@ -13,7 +14,7 @@ function* fetchPermissionsSaga() {
     const groupId = yield select(userSelector.getPrimaryPermissionGroupId);
 
     if (groupId == null) {
-      yield put(fetchPermissionsSuccess([]));
+      yield put(fetchPermissionsSuccess(null));
       return;
     }
 
@@ -22,9 +23,13 @@ function* fetchPermissionsSaga() {
       isClient,
       groupId,
     );
-    const permissions = response?.data?.permissions ?? [];
+    const permissions = response?.data?.permissions;
 
-    yield put(fetchPermissionsSuccess(Array.isArray(permissions) ? permissions : []));
+    yield put(
+      fetchPermissionsSuccess(
+        isEffectivePermissions(permissions) ? permissions : null,
+      ),
+    );
   } catch (error: any) {
     const msg =
       error?.message?.includes('fetch') || error?.code === 'ECONNABORTED'

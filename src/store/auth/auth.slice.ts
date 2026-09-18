@@ -8,6 +8,7 @@ import {
   ResetLinkPayloadWithCallback,
   SigninPayloadWithCallback,
   SigninOtpVerifyPayloadWithCallback,
+  CompleteConsentPayloadWithCallback,
   BootstrapProductContextPayloadWithCallback,
 } from './auth.types';
 
@@ -51,6 +52,12 @@ const authSlice = createSlice({
     signinOtpVerifyRequest: (
       state,
       _action: PayloadAction<SigninOtpVerifyPayloadWithCallback>,
+    ) => {
+      state.globalLoader = true;
+    },
+    completeConsentRequest: (
+      state,
+      _action: PayloadAction<CompleteConsentPayloadWithCallback>,
     ) => {
       state.globalLoader = true;
     },
@@ -108,6 +115,7 @@ export const {
   signupRequest,
   otpVerifyRequest,
   signinOtpVerifyRequest,
+  completeConsentRequest,
   createNewPassword,
   sendResetLinkRequest,
   resetPassword,

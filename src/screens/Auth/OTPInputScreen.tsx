@@ -11,7 +11,7 @@ import Toast from 'react-native-toast-message';
 import {useDispatch, useSelector} from 'react-redux';
 import {signinOtpVerifyRequest} from '@store/auth/auth.slice';
 import {authSelector} from '@store/auth';
-import type {ILmsUser} from '@store/auth/auth.types';
+import type {SigninOtpVerifySuccess} from '@store/auth/auth.types';
 import {userActions} from '@store/user';
 import {clearProductContext} from '@store/product/product.slice';
 import {APP_VERSION_DISPLAY} from '@constants/AppMeta';
@@ -133,7 +133,16 @@ export const OTPInputScreen = ({
       dispatch(
         signinOtpVerifyRequest({
           payload: { mobile_number: mobileNumber, otp },
-          callbackSuccess: (user: ILmsUser) => {
+          callbackSuccess: (result: SigninOtpVerifySuccess) => {
+            if (result.status === 'pendingConsent') {
+              navigation.replace(AuthScreens.ConsentScreen, {
+                mobile_number: result.mobile_number,
+                continuationToken: result.continuationToken,
+                pendingAgreementTypes: result.pendingAgreementTypes,
+              });
+              return;
+            }
+            const user = result.user;
             Toast.show({
               type: 'success',
               text1: 'OTP verified successfully',

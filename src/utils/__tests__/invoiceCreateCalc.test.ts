@@ -238,6 +238,14 @@ describe('invoiceCreateCalc — 4-flow regression (Sprint 0)', () => {
       });
     });
 
+    it('PID OCR party labels use Vendor', () => {
+      expect(getOcrPartyLabels('purchase_invoice_discounting')).toEqual({
+        party: 'Vendor',
+        code: 'Vendor Code',
+        od: 'Vendor OD Account',
+      });
+    });
+
     it('DF OCR party labels unchanged', () => {
       expect(getOcrPartyLabels('dealer_finance')).toEqual({
         party: 'Dealer',

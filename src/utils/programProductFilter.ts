@@ -48,11 +48,19 @@ export function doesProductMatchActiveProduct(
     return scopeCode === PRODUCT_CODES.VENDOR_FINANCE;
   }
 
-  // Dealer Finance (default): DF-resolved products, or legacy DF-named rows
+  if (activeCode === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING) {
+    return scopeCode === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING;
+  }
+
+  // Dealer Finance (default): DF-resolved products, or legacy DF-named rows.
+  // Explicitly exclude VF/PID so they never leak into the DF workspace.
   if (scopeCode === PRODUCT_CODES.DEALER_FINANCE) {
     return true;
   }
-  if (scopeCode === PRODUCT_CODES.VENDOR_FINANCE) {
+  if (
+    scopeCode === PRODUCT_CODES.VENDOR_FINANCE ||
+    scopeCode === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING
+  ) {
     return false;
   }
   if (program) {

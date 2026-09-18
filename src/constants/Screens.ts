@@ -7,6 +7,7 @@ enum AuthScreens {
   ContactUs = 'ContactUs',
   SignupScreen = 'SignupScreen',
   OTPInputScreen = 'OTPInputScreen',
+  ConsentScreen = 'ConsentScreen',
   SigninScreen = 'SigninScreen',
   PasswordScreen = 'PasswordScreen',
   TermsOfService = 'TermsOfService',

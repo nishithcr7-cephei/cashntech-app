@@ -46,15 +46,19 @@ export const getProgramIdsForTab = (
         const isDFProgram =
           program.name.toLowerCase().includes('df') ||
           program.name.toLowerCase().includes('dealer finance');
+        const isPidProduct =
+          scopeCode === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING ||
+          product.name.toLowerCase().includes('purchase invoice discounting');
         // all_product intentionally does not dump every program — treat as DF
-        // default so DF+VF never mix via this helper alone.
+        // default so DF+VF+PID never mix via this helper alone.
         const includeInAll =
           tab === 'all_product' && (isDFProduct || isDFProgram);
         const includeInDF =
           tab === 'dealer_finance' && (isDFProduct || isDFProgram);
         const includeInVF =
           tab === 'vendor_finance' && isVFProduct;
-        if (includeInAll || includeInDF || includeInVF) {
+        const includeInPid = tab === 'pid' && isPidProduct;
+        if (includeInAll || includeInDF || includeInVF || includeInPid) {
           ids.push(program.id);
         }
       });
@@ -62,6 +66,24 @@ export const getProgramIdsForTab = (
   });
   return Array.from(new Set(ids));
 };
+
+export function productTabFromCode(
+  code: string | null | undefined,
+): ProductTabType {
+  if (code === PRODUCT_CODES.VENDOR_FINANCE) {
+    return 'vendor_finance';
+  }
+  if (code === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING) {
+    return 'pid';
+  }
+  return 'dealer_finance';
+}
+
+export function partyNameLabelForTab(tab: ProductTabType): string {
+  return tab === 'vendor_finance' || tab === 'pid'
+    ? 'Vendor Name'
+    : 'Dealer Name';
+}
 
 /**
  * Calculate and format metrics for the dashboard cards
@@ -120,7 +142,7 @@ export const getCardMetrics = (
   const penalOverdueVal = formatCurrency(finalPenalOverdue);
 
   const activeRatioLabel =
-    productTab === 'vendor_finance'
+    productTab === 'vendor_finance' || productTab === 'pid'
       ? 'Active Vendor Ratio(%)'
       : 'Active Dealer Ratio(%)';
 

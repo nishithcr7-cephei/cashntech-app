@@ -114,7 +114,7 @@ type Props = {
   loading?: boolean;
   errors?: ValidationErrors;
   isFormValid?: boolean;
-  productType?: 'dealer_finance' | 'vendor_finance';
+  productType?: 'dealer_finance' | 'vendor_finance' | 'purchase_invoice_discounting';
   entityType?: 'dealer' | 'anchor'; // Role-based: 'dealer' for Anchor Maker/Checker, 'anchor' for Dealer Maker
   dealerOptions?: DropdownOption[];
   creditToOptions?: CreditToOption[];
@@ -229,14 +229,42 @@ export const InvoiceForm: React.FC<Props> = ({
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isDealerMaker = userRole === 'dealer_maker';
   const effectiveEntityType = entityType ?? (isDealerMaker ? 'anchor' : 'dealer');
-  const isDealerFinance = productType !== 'vendor_finance';
-  
-  // Determine labels based on entityType (role-based)
-  const entityLabel = effectiveEntityType === 'anchor' ? 'Anchor' : 'Dealer';
-  const entityCodeLabel = effectiveEntityType === 'anchor' ? 'Anchor Code' : 'Dealer Code';
-  const entityNameLabel = effectiveEntityType === 'anchor' ? 'Anchor Name' : 'Dealer Name';
-  const entityODLabel = effectiveEntityType === 'anchor' ? 'Anchor OD Account' : 'Dealer OD Account';
-  const entityInvoiceLabel = effectiveEntityType === 'anchor' ? 'Anchor Invoice' : 'Dealer Invoice';
+  const isVendorFinance = productType === 'vendor_finance';
+  const isPid = productType === 'purchase_invoice_discounting';
+  const isDealerFinance = !isVendorFinance && !isPid;
+  const useVendorPartyLabels = isVendorFinance || isPid;
+
+  // Determine labels based on entityType (role-based) + product (PID/VF → Vendor)
+  const entityLabel =
+    effectiveEntityType === 'anchor'
+      ? 'Anchor'
+      : useVendorPartyLabels
+        ? 'Vendor'
+        : 'Dealer';
+  const entityCodeLabel =
+    effectiveEntityType === 'anchor'
+      ? 'Anchor Code'
+      : useVendorPartyLabels
+        ? 'Vendor Code'
+        : 'Dealer Code';
+  const entityNameLabel =
+    effectiveEntityType === 'anchor'
+      ? 'Anchor Name'
+      : useVendorPartyLabels
+        ? 'Vendor Name'
+        : 'Dealer Name';
+  const entityODLabel =
+    effectiveEntityType === 'anchor'
+      ? 'Anchor OD Account'
+      : useVendorPartyLabels
+        ? 'Vendor OD Account'
+        : 'Dealer OD Account';
+  const entityInvoiceLabel =
+    effectiveEntityType === 'anchor'
+      ? 'Anchor Invoice'
+      : useVendorPartyLabels
+        ? 'Vendor Invoice'
+        : 'Dealer Invoice';
 
   const TENURE_DAYS = defaultPaymentTermsDays;
   const isHistoricalInvoiceMode = mode === 'edit' || mode === 'recreate';
@@ -1604,9 +1632,9 @@ export const InvoiceForm: React.FC<Props> = ({
                   (!value.invoiceNumber?.trim()
                     ? 'Invoice / Unique Ref. No is required'
                     : !value.dealer?.trim()
-                    ? 'Dealer Name is required'
+                    ? `${entityNameLabel} is required`
                     : !value.dealerCode?.trim()
-                    ? 'Dealer Code is required'
+                    ? `${entityCodeLabel} is required`
                     : !value.invoiceDate?.trim()
                     ? 'Invoice Date is required'
                     : mode !== 'edit' &&

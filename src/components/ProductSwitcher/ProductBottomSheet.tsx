@@ -17,6 +17,7 @@ import {
   selectAvailableProducts,
 } from '@store/product/product.selectors';
 import {ResolvedProduct} from '@store/product/product.types';
+import {uniqueProductsByCode} from '@store/product/product.resolver';
 import {useSwitchProductWorkspace} from '@hooks/useSwitchProductWorkspace';
 import {ProductIcon} from './ProductIcon';
 
@@ -32,6 +33,7 @@ export const ProductBottomSheet: React.FC<ProductBottomSheetProps> = ({
   const availableProducts = useSelector(selectAvailableProducts);
   const activeProductCode = useSelector(selectActiveProductCode);
   const {switchProductWorkspace} = useSwitchProductWorkspace();
+  const products = uniqueProductsByCode(availableProducts);
 
   const handleSelect = (product: ResolvedProduct) => {
     if (product.code !== activeProductCode) {
@@ -75,7 +77,7 @@ export const ProductBottomSheet: React.FC<ProductBottomSheetProps> = ({
           <Text style={styles.title}>Switch Product</Text>
 
           <FlatList
-            data={availableProducts}
+            data={products}
             keyExtractor={item => item.code}
             renderItem={renderRow}
             showsVerticalScrollIndicator={false}

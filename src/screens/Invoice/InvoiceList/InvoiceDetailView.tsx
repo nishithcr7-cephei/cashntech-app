@@ -98,6 +98,7 @@ type InvoiceDetailData = {
   advanceInterest: number;
   showAdvanceInterest: boolean;
   isVendorFinance: boolean;
+  isPid: boolean;
   roiPercent: number;
   total: number;
   attachments: AttachmentItem[];
@@ -133,6 +134,7 @@ const defaultInvoiceData: InvoiceDetailData = {
   advanceInterest: 0,
   showAdvanceInterest: false,
   isVendorFinance: false,
+  isPid: false,
   roiPercent: 0,
   total: 0,
   attachments: [],
@@ -304,11 +306,13 @@ export const InvoiceDetailView: React.FC = () => {
       .then((data: any) => {
         if (cancelled) return;
         const apm = data?.anchorParticipantMapping;
+        const pvd = data?.programVendorDetails;
         const party = data?.party;
         const program = data?.program;
         const bankDetails = program?.bank_details;
         const rawCreditAccount =
           data?.creditToBankAccount?.accountNumber ||
+          data?.creditToBankAccount?.account_number ||
           (Array.isArray(bankDetails)
             ? bankDetails[0]?.account_number
             : bankDetails?.account_number) ||
@@ -318,9 +322,38 @@ export const InvoiceDetailView: React.FC = () => {
           ? decryptValue(String(rawCreditAccount)) || String(rawCreditAccount)
           : '';
 
-        const dealerName = decryptValue(apm?.party?.entity_name ?? '') || '';
-        const dealerCode = apm?.company_code_given_by_party ?? '';
-        const odAccountNumber = decryptValue(apm?.od_account_no ?? '') || '';
+        const productName = String(
+          data?.product?.name ||
+            data?.program?.productConfig?.product?.name ||
+            listRowForInvoice?.product?.name ||
+            listRowForInvoice?.product_name ||
+            '',
+        );
+        const isPidInvoice =
+          !!pvd?.id ||
+          /purchase\s*invoice\s*discounting/i.test(productName);
+
+        const dealerName = isPidInvoice
+          ? decryptValue(pvd?.vendor_name ?? '') ||
+            pvd?.vendor_name ||
+            decryptValue(data?.counter_party_name ?? '') ||
+            data?.counter_party_name ||
+            ''
+          : decryptValue(apm?.party?.entity_name ?? '') || '';
+        const dealerCode = isPidInvoice
+          ? pvd?.vendor_code || data?.counter_party_code || ''
+          : apm?.company_code_given_by_party ?? '';
+        const programLoanAccount = String(
+          program?.basic_parameters?.loan_account_no ||
+            (typeof program?.basic_parameters === 'object'
+              ? (program.basic_parameters as any)?.loan_account_no
+              : '') ||
+            data?.counter_party_od_account ||
+            '',
+        );
+        const odAccountNumber = isPidInvoice
+          ? decryptValue(programLoanAccount) || programLoanAccount || ''
+          : decryptValue(apm?.od_account_no ?? '') || '';
         const anchorName =
           program?.program_name ||
           decryptValue(party?.entity_name ?? '') ||
@@ -337,13 +370,6 @@ export const InvoiceDetailView: React.FC = () => {
         const netDisbursementAmount = resolveNetDisbursementAmountFromInvoice(data);
         const tdsAmount = Number(data?.tds_amount) || 0;
         const advanceInterest = Number(data?.upfront_interest) || 0;
-        const productName = String(
-          data?.product?.name ||
-            data?.program?.productConfig?.product?.name ||
-            listRowForInvoice?.product?.name ||
-            listRowForInvoice?.product_name ||
-            '',
-        );
         const isVendorFinanceInvoice = /vendor\s*finance/i.test(productName);
         const showAdvanceInterest =
           isVendorFinanceInvoice || advanceInterest > 0;
@@ -433,6 +459,7 @@ export const InvoiceDetailView: React.FC = () => {
           advanceInterest,
           showAdvanceInterest,
           isVendorFinance: isVendorFinanceInvoice,
+          isPid: isPidInvoice,
           roiPercent: resolveInvoiceRoiPercent(data),
           total: netDisbursementAmount || finalTotal,
           attachments,
@@ -478,10 +505,11 @@ export const InvoiceDetailView: React.FC = () => {
 
   const headerTitle = invoiceData.invoiceRefNo || invoiceNo || invoiceId || 'N/A';
   const subtitle = invoiceData.anchorName || invoiceData.dealerName || '';
-  /** VF active product or invoice product name — web Vendor Invoice preview parity. */
+  /** VF / PID party labels are Vendor. AI row stays VF-only via isVendorFinance. */
   const isVendorFinance =
     isVendorFinanceActive || invoiceData.isVendorFinance;
-  const productInvoiceLabel = isVendorFinance
+  const useVendorPartyLabels = isVendorFinance || invoiceData.isPid;
+  const productInvoiceLabel = useVendorPartyLabels
     ? 'Vendor Invoice'
     : 'Dealer Invoice';
 
@@ -631,17 +659,17 @@ export const InvoiceDetailView: React.FC = () => {
               value={displayOrDash(invoiceData.anchorName)}
             />
             <DetailRow
-              label={isVendorFinance ? 'Vendor Name' : 'Dealer Name'}
+              label={useVendorPartyLabels ? 'Vendor Name' : 'Dealer Name'}
               value={displayOrDash(invoiceData.dealerName)}
             />
             <DetailRow
               label={
-                isVendorFinance ? 'Loan OD Account Number' : 'OD Account'
+                useVendorPartyLabels ? 'Loan OD Account Number' : 'OD Account'
               }
               value={displayOrDash(invoiceData.odAccountNumber)}
             />
             <DetailRow
-              label={isVendorFinance ? 'Vendor Code' : 'Dealer Code'}
+              label={useVendorPartyLabels ? 'Vendor Code' : 'Dealer Code'}
               value={displayOrDash(invoiceData.dealerCode)}
             />
             <DetailRow

@@ -248,6 +248,22 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
             debitFrom = entityName ? `${decryptedOd} (${entityName})` : decryptedOd;
           }
 
+          const pvd = (invoiceData.programVendorDetails ??
+            invoiceData.program_vendor_details) as
+            | {vendor_name?: string; vendor_code?: string}
+            | undefined;
+          const invoiceProgram = invoiceData.program as
+            | {basic_parameters?: {loan_account_no?: string}}
+            | undefined;
+          const programLoan = invoiceProgram?.basic_parameters?.loan_account_no;
+          if (!debitFrom && programLoan) {
+            const decryptedOd = decryptValue(String(programLoan)) || String(programLoan);
+            const vendorName = pvd?.vendor_name
+              ? decryptValue(String(pvd.vendor_name)) || String(pvd.vendor_name)
+              : '';
+            debitFrom = vendorName ? `${decryptedOd} (${vendorName})` : decryptedOd;
+          }
+
           const program = (d?.program ?? d?.Program) as Record<string, unknown> | undefined;
           const programBankDetails = (program?.bank_details ?? []) as Array<Record<string, unknown>>;
           const programAcc =
@@ -256,6 +272,16 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
               : '';
           if (programAcc) {
             creditTo = decryptValue(String(programAcc));
+          }
+          if (!creditTo) {
+            const creditAcc = (invoiceData.creditToBankAccount ??
+              invoiceData.credit_to_bank_account) as
+              | {accountNumber?: string; account_number?: string}
+              | undefined;
+            const accNo = creditAcc?.accountNumber ?? creditAcc?.account_number ?? '';
+            if (accNo) {
+              creditTo = decryptValue(String(accNo)) || String(accNo);
+            }
           }
 
           const preview = buildInvoicePreview(invoiceData, d);

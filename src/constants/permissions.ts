@@ -1,66 +1,73 @@
 /**
- * Permission strings from /user/permissions API.
- * Use with useHasPermission(PERMISSIONS.INVOICE_LIST_EXPORT) etc.
+ * Permission keys for the nested GET /user/permissions payload.
+ *
+ * Encoding (see `evaluatePermissionKey`):
+ *   - `resource.action`  e.g. invoice_list.create_invoice
+ *   - `module:<key>`     e.g. module:lms
+ *   - `any:<resource>`   any action on that resource
+ *   - `anyReport:view`   any report resource view grant
+ *
+ * Use with useHasPermission(PERMISSIONS.INVOICE_LIST_CREATE) etc.
+ * Product scope (DF/VF) is applied inside the hook via workspace productId.
  */
 export const PERMISSIONS = {
-  LMS: 'lms',
-  DASHBOARD_MANAGEMENT: 'lms.dashboard_management',
-  MASTER_DATA_MANAGEMENT: 'lms.master_data_management',
-  SCF_MASTER: 'lms.master_data_management.supply_chain_finance',
-  LMS_ID_CREATION: 'lms.master_data_management.supply_chain_finance.lms_id_creation',
-  LMS_ID_CREATION_ADD: 'lms.master_data_management.supply_chain_finance.lms_id_creation.action.add_new_id',
-  LMS_ID_CREATION_FILTER: 'lms.master_data_management.supply_chain_finance.lms_id_creation.action.filter',
-  BANK_ID_LIST: 'lms.master_data_management.supply_chain_finance.bank_id_list',
-  PRIMARY_COUNTER_PARTY: 'lms.master_data_management.supply_chain_finance.primary_party_and_counter_party',
-  TRANSACTIONS: 'lms.transactions',
-  TRANSACTIONS_OVERVIEW: 'lms.transactions.overview',
-  INVOICE_LIST: 'lms.transactions.invoice_list',
-  INVOICE_LIST_EXPORT: 'lms.transactions.invoice_list.action.export',
-  INVOICE_LIST_APPROVAL_HISTORY: 'lms.transactions.invoice_list.action.approval_history',
-  INVOICE_LIST_IMPORT: 'lms.transactions.invoice_list.action.import',
-  INVOICE_LIST_EDIT: 'lms.transactions.invoice_list.action.edit',
-  INVOICE_LIST_RECREATE: 'lms.transactions.invoice_list.action.recreate_invoice',
-  INVOICE_LIST_ATTACHMENT: 'lms.transactions.invoice_list.action.attachment',
-  INVOICE_LIST_PRINT: 'lms.transactions.invoice_list.action.print',
-  INVOICE_LIST_DELETE: 'lms.transactions.invoice_list.action.delete',
-  INVOICE_LIST_APPROVE: 'lms.transactions.invoice_list.action.approve',
-  INVOICE_LIST_REJECT: 'lms.transactions.invoice_list.action.reject',
-  INVOICE_LIST_FILTER: 'lms.transactions.invoice_list.action.filter',
-  INVOICE_LIST_CREATE: 'lms.transactions.invoice_list.action.create_invoice',
-  DF_CREATE_INVOICE:
-    'lms.products.dealer_finance.transactions.invoice_list.action.create_invoice',
-  VF_CREATE_INVOICE:
-    'lms.products.vendor_finance.vf_transactions.vf_invoice_list.action.create_invoice',
-  INVOICE_LIST_ADMIN_VERIFICATION: 'lms.transactions.invoice_list.action.invoice_verification',
-  INVOICE_LIST_FINANCE_REQUEST: 'lms.transactions.invoice_list.action.finance_request',
-  /** DF product-scoped upload/verify (list actions). */
-  INVOICE_LIST_UPLOAD_VERIFY:
-    'lms.products.dealer_finance.transactions.invoice_list.action.upload_verify',
-  /** VF product-scoped upload/verify (list actions). */
-  VF_INVOICE_LIST_UPLOAD_VERIFY:
-    'lms.products.vendor_finance.vf_transactions.vf_invoice_list.action.upload_verify',
-  CREATE_INVOICE: 'lms.products.dealer_finance.transactions.invoice_list.action.create_invoice',
-  INTEREST_ACCRUALS: 'lms.transactions.interest_accruals',
-  INTEREST_ACCRUALS_VIEW_DAILY: 'lms.transactions.interest_accruals.action.view_daily_interest',
-  DISBURSEMENT: 'lms.transactions.disbursement',
-  DISBURSEMENT_MARK_AS_DISBURSED: 'lms.transactions.disbursement.action.mark_as_disbursed',
-  DISBURSEMENT_SEND_MAIL: 'lms.transactions.disbursement.action.send_mail_to_bank',
-  DISBURSEMENT_DELETE: 'lms.transactions.disbursement.action.delete',
-  DISBURSEMENT_EXPORT: 'lms.transactions.disbursement.action.export',
-  DISBURSEMENT_FILTER: 'lms.transactions.disbursement.action.filter',
-  REPAYMENT_SETTLEMENT: 'lms.transactions.repayment_settlement',
-  DPD_PENAL_NPA: 'lms.transactions.dpd',
-  SOA: 'lms.transactions.soa',
-  REPORTING_ANALYSIS: 'lms.reporting_analysis',
-  REPORT_ALL_LOANS: 'lms.reporting_analysis.all_loans_report',
-  REPORT_DISBURSEMENT: 'lms.reporting_analysis.disbursement_report',
-  REPORT_DPD: 'lms.reporting_analysis.dpd_report',
-  REPORT_DAILY_ACCRUAL: 'lms.reporting_analysis.daily_accrual_report',
-  REPORT_MONTHLY_INTEREST: 'lms.reporting_analysis.monthly_interest_report',
-  REPORT_REPAYMENT: 'lms.reporting_analysis.repayment_report',
-  REPORT_INVOICE_OUTSTANDING: 'lms.reporting_analysis.invoice_outstanding_report',
-  REPORT_LOAN_STATUS: 'lms.reporting_analysis.loan_status_report',
-  REPORT_ALL_PRODUCT_OUTSTANDING:
-    'lms.reporting_analysis.all_product_outstanding_report',
-  REPORT_UTILIZATION: 'lms.reporting_analysis.utilization_report',
+  LMS: 'module:lms',
+  DASHBOARD_MANAGEMENT: 'any:dashboard_management',
+  MASTER_DATA_MANAGEMENT: 'module:lms',
+  SCF_MASTER: 'any:supply_chain_finance',
+  LMS_ID_CREATION: 'any:lms_id_creation',
+  LMS_ID_CREATION_ADD: 'lms_id_creation.add_new_id',
+  LMS_ID_CREATION_FILTER: 'lms_id_creation.filter',
+  BANK_ID_LIST: 'any:bank_id_list',
+  PRIMARY_COUNTER_PARTY: 'any:primary_party_and_counter_party',
+  TRANSACTIONS: 'module:lms',
+  TRANSACTIONS_OVERVIEW: 'overview.view',
+  INVOICE_LIST: 'invoice_list.view',
+  INVOICE_LIST_EXPORT: 'invoice_list.export',
+  INVOICE_LIST_APPROVAL_HISTORY: 'invoice_list.approval_history',
+  INVOICE_LIST_IMPORT: 'invoice_list.import',
+  INVOICE_LIST_EDIT: 'invoice_list.edit',
+  INVOICE_LIST_RECREATE: 'invoice_list.recreate_invoice',
+  INVOICE_LIST_ATTACHMENT: 'invoice_list.attachment',
+  INVOICE_LIST_PRINT: 'invoice_list.print',
+  INVOICE_LIST_DELETE: 'invoice_list.delete',
+  /** Backend seed uses a single approve_reject action for both. */
+  INVOICE_LIST_APPROVE: 'invoice_list.approve_reject',
+  INVOICE_LIST_REJECT: 'invoice_list.approve_reject',
+  INVOICE_LIST_FILTER: 'invoice_list.filter',
+  INVOICE_LIST_CREATE: 'invoice_list.create_invoice',
+  /** Same resource/action — product UUID on the grant scopes DF vs VF. */
+  DF_CREATE_INVOICE: 'invoice_list.create_invoice',
+  VF_CREATE_INVOICE: 'invoice_list.create_invoice',
+  INVOICE_LIST_ADMIN_VERIFICATION: 'invoice_list.invoice_verification',
+  INVOICE_LIST_FINANCE_REQUEST: 'invoice_list.finance_request',
+  INVOICE_LIST_UPLOAD_VERIFY: 'invoice_list.upload_verify',
+  VF_INVOICE_LIST_UPLOAD_VERIFY: 'invoice_list.upload_verify',
+  CREATE_INVOICE: 'invoice_list.create_invoice',
+  INTEREST_ACCRUALS: 'interest_accruals.view',
+  INTEREST_ACCRUALS_VIEW_DAILY: 'interest_accruals.view_daily_interest',
+  DISBURSEMENT: 'disbursement.view',
+  DISBURSEMENT_MARK_AS_DISBURSED: 'disbursement.mark_as_disbursed',
+  DISBURSEMENT_SEND_MAIL: 'disbursement.send_mail_to_bank',
+  /** Not in current backend catalog — stays false until seeded. */
+  DISBURSEMENT_DELETE: 'disbursement.delete',
+  DISBURSEMENT_EXPORT: 'disbursement.export',
+  DISBURSEMENT_FILTER: 'disbursement.filter',
+  REPAYMENT_SETTLEMENT: 'repayment_settlement.view',
+  DPD_PENAL_NPA: 'dpd.view',
+  SOA: 'soa.view',
+  REPORTING_ANALYSIS: 'anyReport:view',
+  REPORT_ALL_LOANS: 'all_loans_report.view',
+  REPORT_DISBURSEMENT: 'disbursement_report.view',
+  REPORT_DPD: 'dpd_report.view',
+  REPORT_DAILY_ACCRUAL: 'daily_accrual_report.view',
+  REPORT_MONTHLY_INTEREST: 'monthly_interest_report.view',
+  REPORT_REPAYMENT: 'repayment_report.view',
+  REPORT_INVOICE_OUTSTANDING: 'invoice_outstanding_report.view',
+  REPORT_LOAN_STATUS: 'loan_status_report.view',
+  REPORT_ALL_PRODUCT_OUTSTANDING: 'all_product_outstanding_report.view',
+  REPORT_UTILIZATION: 'utilization_report.view',
 } as const;
+
+export type PermissionConstant =
+  (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

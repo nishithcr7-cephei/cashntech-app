@@ -213,18 +213,21 @@ export const InvoiceUploadPreview: React.FC = () => {
     | string
     | undefined;
   const productType =
-    (route?.params?.productType as 'dealer_finance' | 'vendor_finance' | undefined) ||
-    'dealer_finance';
+    (route?.params?.productType as
+      | 'dealer_finance'
+      | 'vendor_finance'
+      | 'purchase_invoice_discounting'
+      | undefined) || 'dealer_finance';
   const isVendorFinance = productType === 'vendor_finance';
+  const isPid = productType === 'purchase_invoice_discounting';
   const previewInvoiceStatus =
     (route?.params?.previewInvoiceStatus as string | undefined) || 'Draft';
   const previewApprovalStatus =
     (route?.params?.previewApprovalStatus as string | undefined) || '';
-  // Web VF uses Counter Party; DF uses Dealer Name / Dealer Code.
-  const counterPartyLabel = isVendorFinance ? 'Counter Party' : 'Dealer Name';
-  const counterPartyCodeLabel = isVendorFinance
-    ? 'Counter Party Code'
-    : 'Dealer Code';
+  const counterPartyLabel =
+    isVendorFinance || isPid ? 'Counter Party' : 'Dealer Name';
+  const counterPartyCodeLabel =
+    isVendorFinance || isPid ? 'Counter Party Code' : 'Dealer Code';
   const advanceInterestBreakdown = route?.params?.advanceInterestBreakdown as
     | AdvanceInterestBreakdown
     | null

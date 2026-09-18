@@ -169,7 +169,10 @@ export function getOcrPartyLabels(productType: InvoiceProductType): {
   code: string;
   od: string;
 } {
-  if (productType === 'vendor_finance') {
+  if (
+    productType === 'vendor_finance' ||
+    productType === 'purchase_invoice_discounting'
+  ) {
     return {
       party: 'Vendor',
       code: 'Vendor Code',
@@ -181,6 +184,13 @@ export function getOcrPartyLabels(productType: InvoiceProductType): {
     code: 'Dealer Code',
     od: 'OD Account',
   };
+}
+
+/** True when create payload must send vendorMappingId (PID/SID standalone). */
+export function isPidProductType(
+  productType: InvoiceProductType | string | null | undefined,
+): boolean {
+  return productType === 'purchase_invoice_discounting';
 }
 
 /** VF Upfront submit guard — AI expected but calculated as zero. */

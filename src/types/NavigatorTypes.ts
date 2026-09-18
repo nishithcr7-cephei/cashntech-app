@@ -9,6 +9,11 @@ export type AuthNavigatorType = {
   ContactUs: undefined;
   SignupScreen: SignupScreenParams | undefined;
   OTPInputScreen: OTPInputScreenParams;
+  ConsentScreen: {
+    mobile_number: string;
+    continuationToken: string;
+    pendingAgreementTypes: string[];
+  };
   PasswordScreen: PasswordScreenParams;
 
   SigninScreen: SigninScreenParams | undefined;
@@ -114,7 +119,7 @@ export type HomeNavigatorType = {
     previewFields?: import('./Invoice').InvoiceFields;
     previewAttachment?: import('@react-native-documents/picker').DocumentPickerResponse;
     previewAnchorName?: string;
-    productType?: 'dealer_finance' | 'vendor_finance';
+    productType?: 'dealer_finance' | 'vendor_finance' | 'purchase_invoice_discounting';
   };
   DealerInvoiceDetailsScreen: {
     dealerName?: string;

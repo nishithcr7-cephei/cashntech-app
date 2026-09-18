@@ -219,11 +219,14 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
 }) => {
   const effectiveCode = getEffectiveProductCode(productCode);
   const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
-  const partyLabel = isVendorFinance ? 'Vendor' : 'Dealer';
+  const isPid = effectiveCode === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING;
+  const partyLabel = isVendorFinance || isPid ? 'Vendor' : 'Dealer';
   const productDisplayName = PRODUCT_DISPLAY_NAMES[effectiveCode];
-  const modalTitle = isVendorFinance
-    ? 'Vendor Finance Request'
-    : 'Dealer Finance Request';
+  const modalTitle = isPid
+    ? 'Purchase Invoice Discounting Request'
+    : isVendorFinance
+      ? 'Vendor Finance Request'
+      : 'Dealer Finance Request';
   const [preferredDisbursementDateInput, setPreferredDisbursementDateInput] =
     useState('');
   const [preferredDateError, setPreferredDateError] = useState<string | null>(

@@ -107,7 +107,16 @@ export type CreateInvoicePayloadInput = {
   partnerBank: string;
   program: string;
   product: string;
+  /**
+   * DF/VF: AnchorProgramParticipantMapping UUID.
+   * PID/SID: leave empty and set `vendorMappingId` instead.
+   */
   anchorParticipantMapping: string;
+  /**
+   * PID/SID Standalone: ProgramVendorDetails UUID (party-info `mappingId`).
+   * When set, create payload sends `vendorMappingId` and omits APM keys.
+   */
+  vendorMappingId?: string;
   party: string;
   counterPartyName: string;
   counterPartyCode: string;
@@ -115,9 +124,8 @@ export type CreateInvoicePayloadInput = {
   attachment?: DocumentPickerResponse | null;
   /**
    * UUID of the credit-to bank account row (party-info `bankAccounts.id`).
-   * Required by the unified backend `POST /invoice` for DF + VF alike (PR6).
-   * Typed optional here so callers get a clear runtime/UI validation error
-   * instead of a type error; `createInvoice` still sends it whenever set.
+   * Required by the unified backend `POST /invoice` for DF + VF + PID alike.
+   * For PID this is a ProgramVendorBankAccount id.
    */
   creditToAccountId?: string;
 };
@@ -135,6 +143,7 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     program,
     product,
     anchorParticipantMapping,
+    vendorMappingId,
     party,
     counterPartyName,
     counterPartyCode,
@@ -200,6 +209,7 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     return baseItem;
   });
 
+  const standaloneVendorId = vendorMappingId?.trim() || '';
   const payload: Record<string, unknown> = {
     invoice_ref_no: fields.invoiceNumber?.trim() || '',
     counter_party_name: counterPartyName,
@@ -214,8 +224,6 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     partnerBank,
     program,
     product,
-    anchorParticipantMapping,
-    anchorParticipantMappingId: anchorParticipantMapping,
     party,
     tenor: parseTenorDays(fields.tenor),
     sub_total: Ue(subtotal),
@@ -229,13 +237,24 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     items,
   };
 
-  // Required by the unified backend for DF + VF alike (createInvoice.dto
-  // @IsUUID, not @IsOptional). UI validation (CreateInvoice.tsx) blocks
-  // submit before this is ever unset — see requiresCreditToAccountId.
+  // PID/SID: vendorMappingId only. DF/VF: dual APM keys (legacy + new DTO name).
+  if (standaloneVendorId) {
+    payload.vendorMappingId = standaloneVendorId;
+  } else {
+    payload.anchorParticipantMapping = anchorParticipantMapping;
+    payload.anchorParticipantMappingId = anchorParticipantMapping;
+  }
+
+  // Required by the unified backend (createInvoice.dto @IsUUID).
+  // PID uses ProgramVendorBankAccount UUID from party-info bankAccounts.id.
   const accountId =
     creditToAccountId?.trim() || fields.creditToAccountId?.trim() || '';
   if (accountId) {
     payload.credit_to_account_id = accountId;
+  } else {
+    console.warn(
+      '[invoice.api] create payload missing credit_to_account_id (required UUID)',
+    );
   }
 
   if (fields.grnDate?.trim()) {

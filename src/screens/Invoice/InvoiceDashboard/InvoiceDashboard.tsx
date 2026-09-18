@@ -115,7 +115,9 @@ export const InvoiceDashboard: React.FC = () => {
             onPress={() => setActiveTab('dealers')}>
             <Text style={[styles.tabText, activeTab === 'dealers' && styles.activeTabText]}>
               {(isAnchorMaker || isAnchorChecker)
-                ? 'Summary of Dealers'
+                ? (productTab === 'pid' || productTab === 'vendor_finance'
+                    ? 'Summary of Vendors'
+                    : 'Summary of Dealers')
                 : (isDealerMaker || isDealerChecker)
                   ? 'Summary of Anchors'
                   : isCashnTechUser

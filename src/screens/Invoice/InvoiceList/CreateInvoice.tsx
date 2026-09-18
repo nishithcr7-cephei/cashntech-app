@@ -43,10 +43,14 @@ import {
   computeCreateInvoiceTotals,
   computeInvoiceAmountForLimitCheck,
   getOcrPartyLabels,
+  isPidProductType,
   shouldWarnVfZeroAdvanceInterest,
 } from '@utils/invoiceCreateCalc';
 import {convertOcrLineItems} from '@utils/ocrLineItemMapper';
-import {normalizeOcrPatch} from '@utils/ocrPatchNormalizer';
+import {
+  normalizeOcrPatch,
+  type InvoiceProductType,
+} from '@utils/ocrPatchNormalizer';
 import {expectedNextApprovalAfterCreate} from '@utils/invoiceStatusDisplay';
 import {invoiceApi} from '@services/api/invoice.api';
 import {
@@ -75,10 +79,10 @@ import {PERMISSIONS} from '@constants/permissions';
 import {AppRole, ROLE_LABELS} from '@constants/roles';
 import {
   fetchPermissionsRequest,
-  selectPermissions,
   selectPermissionsLoading,
   selectPermissionsError,
 } from '@store/permissions';
+import {useHasPermission} from '@hooks/useHasPermission';
 import type {DealerInfoParticipant} from '@store/invoice/inv.types';
 import {getParticipantAvailableLimit} from '@utils/normalizeDealerInfo';
 import {decryptValue} from '@utils/decrypt';
@@ -219,7 +223,6 @@ export const CreateInvoice: React.FC = () => {
   const createInvoiceError = useSelector(selectCreateInvoiceError);
   const userId = useSelector((s: any) => s.user?.id);
   const userPartyName = useSelector((s: any) => s.user?.party_name as string | null | undefined);
-  const permissions = useSelector(selectPermissions) || [];
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const permissionsError = useSelector(selectPermissionsError);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
@@ -240,27 +243,44 @@ export const CreateInvoice: React.FC = () => {
   // Stores the available limit for the specific participant in edit mode.
   // Fetched fresh when invoice details load, matching Web Portal behavior.
   const [apmAvailableLimit, setApmAvailableLimit] = useState<number | null>(null);
+  const [selectedParticipant, setSelectedParticipant] =
+    useState<DealerInfoParticipant | null>(null);
+  const selectedParticipantRef = useRef(selectedParticipant);
+  selectedParticipantRef.current = selectedParticipant;
 
   const effectiveProductCode = useSelector(selectEffectiveProductCode);
   const activeProductId = useSelector(selectActiveProductId);
   const invoiceNo: string | undefined = route?.params?.invoiceNo;
   const mode: 'edit' | 'recreate' | undefined = route?.params?.mode;
-  // Product-aware labels (Dealer vs Vendor): prefer the selected program's
-  // own product name (most accurate for the invoice being created/edited),
-  // falling back to the active product context from PR1/PR2.
-  const productType = useMemo<'dealer_finance' | 'vendor_finance'>(() => {
+  // Product-aware labels (Dealer vs Vendor vs PID): prefer the selected program's
+  // own product name, falling back to the active product context.
+  const productType = useMemo<InvoiceProductType>(() => {
     const fromProgram = resolveProductCodeFromName(programSelection?.productName);
     const code = fromProgram ?? effectiveProductCode;
-    return code === PRODUCT_CODES.VENDOR_FINANCE ? 'vendor_finance' : 'dealer_finance';
+    if (code === PRODUCT_CODES.VENDOR_FINANCE) {
+      return 'vendor_finance';
+    }
+    if (code === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING) {
+      return 'purchase_invoice_discounting';
+    }
+    return 'dealer_finance';
   }, [programSelection?.productName, effectiveProductCode]);
 
   const isVendorFinance = productType === 'vendor_finance';
+  const isPid = isPidProductType(productType);
 
   const creditToOptions = useMemo<CreditToOption[]>(() => {
+    // PID: prefer the selected vendor's bank accounts (ProgramVendorBankAccount).
+    // DF/VF: program / party bank_details aggregate.
     const details =
-      dealerInfo?.bank_details || dealerInfo?.party?.party_bank_details;
+      (selectedParticipant?.bank_details &&
+      selectedParticipant.bank_details.length > 0
+        ? selectedParticipant.bank_details
+        : null) ||
+      dealerInfo?.bank_details ||
+      dealerInfo?.party?.party_bank_details;
     // Dedupe by decrypted account number; prefer rows with a real UUID
-    // (party-info bankAccounts.id) — required for DF + VF create alike.
+    // (party-info bankAccounts.id) — required for DF + VF + PID create alike.
     const byAccount = new Map<string, CreditToOption>();
     for (const b of details ?? []) {
       const rawAccount = String((b as any)?.account_number ?? '');
@@ -286,7 +306,7 @@ export const CreateInvoice: React.FC = () => {
       }
     }
     return Array.from(byAccount.values());
-  }, [dealerInfo]);
+  }, [dealerInfo, selectedParticipant]);
 
   const resolvedCreditAccountId = useMemo(
     () =>
@@ -357,9 +377,6 @@ export const CreateInvoice: React.FC = () => {
   }, [fields, mode, productType, resolvedCreditAccountId]);
 
   console.log('[CreateInvoice] Render, createInvoiceLoading:', createInvoiceLoading, 'isFormValid:', isFormValid);
-  const [selectedParticipant, setSelectedParticipant] = useState<DealerInfoParticipant | null>(null);
-  const selectedParticipantRef = useRef(selectedParticipant);
-  selectedParticipantRef.current = selectedParticipant;
   const [selectedAttachment, setSelectedAttachment] = useState<DocumentPickerResponse | null>(null);
   const disabled = useMemo(
     () =>
@@ -378,14 +395,14 @@ export const CreateInvoice: React.FC = () => {
     [productType],
   );
   const hasCreatePerm =
-    permissions.includes(createPermissionKey) ||
-    permissions.includes(PERMISSIONS.INVOICE_LIST_CREATE);
-  const hasEditPerm = permissions.includes(PERMISSIONS.INVOICE_LIST_EDIT);
-  const hasRecreatePerm = permissions.includes(PERMISSIONS.INVOICE_LIST_RECREATE);
+    useHasPermission(createPermissionKey) ||
+    useHasPermission(PERMISSIONS.INVOICE_LIST_CREATE);
+  const hasEditPerm = useHasPermission(PERMISSIONS.INVOICE_LIST_EDIT);
+  const hasRecreatePerm = useHasPermission(PERMISSIONS.INVOICE_LIST_RECREATE);
   const hasUploadPerm =
-    permissions.includes(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY) ||
-    permissions.includes(PERMISSIONS.VF_INVOICE_LIST_UPLOAD_VERIFY);
-  const hasAttachmentPerm = permissions.includes(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
+    useHasPermission(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY) ||
+    useHasPermission(PERMISSIONS.VF_INVOICE_LIST_UPLOAD_VERIFY);
+  const hasAttachmentPerm = useHasPermission(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
   // Create Invoice must show "Add Attachments" for DF + VF makers so they can
   // attach the invoice file (web parity). Do not require DF-only
   // upload_verify ∩ attachment — that hid the button for VF and many DF users.
@@ -858,13 +875,46 @@ export const CreateInvoice: React.FC = () => {
         if (cancelled || !res) return;
         const data = res;
         const apm = data.anchorParticipantMapping;
+        const pvd = data.programVendorDetails;
+        const productName = String(
+          data.product?.name ||
+            data.program?.productConfig?.product?.name ||
+            data.product_name ||
+            '',
+        );
+        const isPidInvoice =
+          !!pvd?.id ||
+          /purchase\s*invoice\s*discounting/i.test(productName);
 
-        // In edit mode the dealer field is read-only (not a dropdown), so store the decrypted name for display
-        const rawDealerEntityName = apm?.party?.entity_name || '';
-        const decryptedDealerName = decryptValue(rawDealerEntityName) || rawDealerEntityName;
-        const dealerCode = apm?.company_code_given_by_party || '';
-        const odAccountNumber =
-          decryptValue(apm?.od_account_no ?? '') || apm?.od_account_no || '';
+        // Edit/recreate: PID uses programVendorDetails; DF/VF use APM.
+        const rawDealerEntityName = isPidInvoice
+          ? pvd?.vendor_name ||
+            data.counter_party_name ||
+            ''
+          : apm?.party?.entity_name || data.counter_party_name || '';
+        const decryptedDealerName =
+          decryptValue(rawDealerEntityName) || rawDealerEntityName;
+        const dealerCode = isPidInvoice
+          ? pvd?.vendor_code ||
+            data.counter_party_code ||
+            ''
+          : apm?.company_code_given_by_party || data.counter_party_code || '';
+        const programLoanAccount = String(
+          data.program?.basic_parameters?.loan_account_no ||
+            (typeof data.program?.basic_parameters === 'object'
+              ? (data.program.basic_parameters as any)?.loan_account_no
+              : '') ||
+            '',
+        );
+        const odAccountNumber = isPidInvoice
+          ? decryptValue(programLoanAccount) ||
+            programLoanAccount ||
+            decryptValue(data.counter_party_od_account ?? '') ||
+            data.counter_party_od_account ||
+            ''
+          : decryptValue(apm?.od_account_no ?? '') ||
+            apm?.od_account_no ||
+            '';
 
         const mappedItems: InvoiceLineItem[] = (data.invoiceItems || []).map(
           (item: any) => ({
@@ -889,6 +939,8 @@ export const CreateInvoice: React.FC = () => {
 
         const bankDetails = data.program?.bank_details;
         const rawCreditAccount =
+          data.creditToBankAccount?.accountNumber ||
+          data.creditToBankAccount?.account_number ||
           (Array.isArray(bankDetails)
             ? bankDetails[0]?.account_number
             : bankDetails?.account_number) ||
@@ -961,14 +1013,29 @@ export const CreateInvoice: React.FC = () => {
           invoiceApi.getDealerInfo(data.program.id)
             .then((dealerRes: any) => {
               const participants = dealerRes?.data?.participants || dealerRes?.participants || [];
-              const apmId = apm?.id;
-              const apmCode = apm?.company_code_given_by_party;
+              const apmId = isPidInvoice ? pvd?.id : apm?.id;
+              const apmCode = isPidInvoice
+                ? pvd?.vendor_code
+                : apm?.company_code_given_by_party;
 
               const matchedP = participants.find((p: any) => {
                 const pIdMatch = p.id && apmId && String(p.id) === String(apmId);
-                const partyIdMatch = p.party?.id && apm?.party?.id && String(p.party.id) === String(apm.party.id);
-                const codeMatch = p.company_code && apm?.company_code && String(p.company_code) === String(apm.company_code);
-                const givenCodeMatch = p.company_code_given_by_party && apmCode && String(p.company_code_given_by_party) === String(apmCode);
+                const partyIdMatch =
+                  !isPidInvoice &&
+                  p.party?.id &&
+                  apm?.party?.id &&
+                  String(p.party.id) === String(apm.party.id);
+                const codeMatch =
+                  p.company_code &&
+                  (isPidInvoice
+                    ? pvd?.vendor_code &&
+                      String(p.company_code) === String(pvd.vendor_code)
+                    : apm?.company_code &&
+                      String(p.company_code) === String(apm.company_code));
+                const givenCodeMatch =
+                  p.company_code_given_by_party &&
+                  apmCode &&
+                  String(p.company_code_given_by_party) === String(apmCode);
                 const nameMatch = p.party?.entity_name && (
                   decryptValue(p.party.entity_name) === decryptedDealerName ||
                   p.party.entity_name === rawDealerEntityName
@@ -1082,12 +1149,12 @@ export const CreateInvoice: React.FC = () => {
         return undefined;
       case 'dealer':
         if (!value?.trim()) {
-          return 'Dealer Name is required';
+          return `${ocrPartyLabels.party} Name is required`;
         }
         return undefined;
       case 'dealerCode':
         if (!value?.trim()) {
-          return 'Dealer Code is required';
+          return `${ocrPartyLabels.code} is required`;
         }
         return undefined;
       case 'invoiceDate':
@@ -1238,7 +1305,15 @@ export const CreateInvoice: React.FC = () => {
       });
       if (participant) {
         patch.dealerCode = decryptValue(participant.company_code ?? '') || participant.company_code;
-        patch.odAccountNumber = decryptValue(participant.od_account_no ?? '') || participant.od_account_no;
+        patch.odAccountNumber =
+          decryptValue(participant.od_account_no ?? '') ||
+          participant.od_account_no ||
+          String((dealerInfo?.basic_parameters as any)?.loan_account_no || '');
+        if (isPid && mode !== 'edit' && mode !== 'recreate') {
+          // Vendor banks differ per PID vendor — clear prior Credit To.
+          patch.creditTo = '';
+          patch.creditToAccountId = undefined;
+        }
         if (mode !== 'edit' && mode !== 'recreate') {
           // Try participant-level default first, then program-level
           const participantDefaultTerms = Number(
@@ -1395,7 +1470,7 @@ export const CreateInvoice: React.FC = () => {
 
   const previewDisabledReasonInternal = useMemo(() => {
     if (!fields.dealer?.trim()) {
-      return productType === 'vendor_finance'
+      return isPid || productType === 'vendor_finance'
         ? 'Please select Party (Anchor/Vendor) to preview'
         : 'Please select Dealer / Party to preview';
     }
@@ -1739,7 +1814,7 @@ export const CreateInvoice: React.FC = () => {
     if (dealerInfo && (!selectedParticipant || !partnerBankId)) {
       Toast.show({
         type: 'error',
-        text1: 'Please select a Program (with Bank) and Dealer first.',
+        text1: `Please select a Program (with Bank) and ${ocrPartyLabels.party} first.`,
         visibilityTime: 3000,
       });
       return;
@@ -1769,7 +1844,7 @@ export const CreateInvoice: React.FC = () => {
         return;
       }
 
-      // Golden rule: credit_to_account_id is required on create for DF + VF
+      // Golden rule: credit_to_account_id is required on create for DF + VF + PID
       // alike on the unified backend. Resolve UUID from selected account
       // number when dropdown showed a value but accountId wasn't synced.
       const resolvedCreditToAccountId = resolvedCreditAccountId;
@@ -1782,7 +1857,7 @@ export const CreateInvoice: React.FC = () => {
         return;
       }
 
-      // invoice.party must be the program's Anchor party (DF + VF alike).
+      // invoice.party must be the program's Anchor party (DF + VF + PID alike).
       // Prefer party-info `anchorPartyId` (dealerInfo.party.id) over
       // programSelection.partyId: for VF Vendor Maker / DF Dealer Pull,
       // scope bank.partyId is the logged-in counterparty (self), not the
@@ -1793,11 +1868,26 @@ export const CreateInvoice: React.FC = () => {
           '',
       ).trim();
 
+      const participantMappingId = String(selectedParticipant?.id || '').trim();
+      const programLoanOd = String(
+        (dealerInfo?.basic_parameters as any)?.loan_account_no ||
+          selectedParticipant?.od_account_no ||
+          '',
+      ).trim();
+      const counterPartyOdAccount = String(
+        decryptValue(
+          (isPid ? programLoanOd : selectedParticipant?.od_account_no) || '',
+        ) ||
+          (isPid ? programLoanOd : selectedParticipant?.od_account_no) ||
+          '',
+      );
+
       console.log('[CreateInvoice] Attempting to dispatch createInvoiceRequest', {
         partnerBankId,
         programId: programSelection?.programId,
         productId: programSelection?.productId || activeProductId,
-        participantId: selectedParticipant?.id,
+        participantId: participantMappingId,
+        isPid,
         partyId: anchorPartyId,
         scopePartyId: programSelection?.partyId,
         partyInfoAnchorId: (dealerInfo as any)?.party?.id,
@@ -1815,11 +1905,13 @@ export const CreateInvoice: React.FC = () => {
             // Active product context from PR1/PR2: prefer the program's own
             // productId; fall back to the globally active product.
             product: String(programSelection?.productId || activeProductId || ''),
-            anchorParticipantMapping: String(selectedParticipant?.id || ''),
+            // DF/VF: APM id. PID: leave empty; vendorMappingId sent instead.
+            anchorParticipantMapping: isPid ? '' : participantMappingId,
+            vendorMappingId: isPid ? participantMappingId : undefined,
             party: anchorPartyId,
             // Pull (VF vendor / DF dealer maker): party-info row entityName is
-            // the Anchor; counterparty is the logged-in party. Push: selected
-            // participant is the counterparty (dealer/vendor).
+            // the Anchor; counterparty is the logged-in party. Push / PID:
+            // selected participant (vendor/dealer) is the counterparty.
             counterPartyName: String(
               (String(programSelection?.method || '').toLowerCase() === 'pull'
                 ? decryptValue(userPartyName || '') ||
@@ -1834,11 +1926,7 @@ export const CreateInvoice: React.FC = () => {
                 selectedParticipant?.company_code ||
                 '',
             ),
-            counterPartyOdAccount: String(
-              decryptValue(selectedParticipant?.od_account_no || '') ||
-                selectedParticipant?.od_account_no ||
-                '',
-            ),
+            counterPartyOdAccount,
             attachment: selectedAttachment ?? undefined,
             creditToAccountId: resolvedCreditToAccountId,
           }),
@@ -2172,8 +2260,8 @@ export const CreateInvoice: React.FC = () => {
     // because the data is already pre-filled and often read-only.
     if (mode === 'edit') return undefined;
 
-    if (!fields.dealer?.trim()) return 'Dealer Name is required';
-    if (!fields.dealerCode?.trim()) return 'Dealer Code is required';
+    if (!fields.dealer?.trim()) return `${ocrPartyLabels.party} Name is required`;
+    if (!fields.dealerCode?.trim()) return `${ocrPartyLabels.code} is required`;
     if (!fields.invoiceNumber?.trim()) return 'Invoice / Unique Ref. No is required';
     if (!fields.invoiceDate?.trim()) return 'Invoice Date is required';
     const tenorDaysHint = parseInt(String(fields.tenor ?? '').trim(), 10);
@@ -2209,7 +2297,7 @@ export const CreateInvoice: React.FC = () => {
       return 'Please upload the invoice file';
     }
     return undefined;
-  }, [fields, canUploadFinal, hasAnyAttachment, mode, productType, creditToOptions]);
+  }, [fields, canUploadFinal, hasAnyAttachment, mode, productType, creditToOptions, ocrPartyLabels]);
 
   const dealerOptions = useMemo(
     () =>

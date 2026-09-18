@@ -12,6 +12,7 @@ import {
   IResetLinkSuccessResponse,
   ISigninOtpVerifyPayload,
   ISigninOtpVerifySuccessResponse,
+  ICompleteConsentPayload,
   ISigninPayload,
   ISigninSuccessResponse,
   ISignupPayload,
@@ -73,6 +74,49 @@ const apiSigninOtpVerify = async (payload: ISigninOtpVerifyPayload) => {
     data: data.data,
     error: null,
   };
+};
+
+/**
+ * Complete SCF consent after verify-otp returned pendingConsent.
+ */
+const apiCompleteConsent = async (payload: ICompleteConsentPayload) => {
+  const {data, error} = await tryCatch<
+    AxiosResponse<ISigninOtpVerifySuccessResponse>
+  >(Api.post(Endpoints.apiCompleteConsent, payload));
+  if (error) {
+    return {data: null, error};
+  }
+  return {data: data.data, error: null};
+};
+
+/**
+ * Exchange refresh token for a new access (+ rotated refresh) token.
+ */
+const apiRefreshToken = async (refreshToken: string) => {
+  const {data, error} = await tryCatch<
+    AxiosResponse<{
+      statusCode: number;
+      message: string;
+      data: {token: string; refreshToken?: string};
+    }>
+  >(Api.post(Endpoints.apiRefreshToken, {refreshToken}));
+  if (error) {
+    return {data: null, error};
+  }
+  return {data: data.data, error: null};
+};
+
+/**
+ * Revoke refresh token server-side (best-effort on logout).
+ */
+const apiLogout = async (refreshToken?: string | null) => {
+  const {data, error} = await tryCatch<AxiosResponse<any>>(
+    Api.post(Endpoints.apiLogout, refreshToken ? {refreshToken} : {}),
+  );
+  if (error) {
+    return {data: null, error};
+  }
+  return {data: data.data, error: null};
 };
 
 /**
@@ -172,6 +216,9 @@ export default {
   apiSignup,
   apiSignupOtpVerify,
   apiSigninOtpVerify,
+  apiCompleteConsent,
+  apiRefreshToken,
+  apiLogout,
   apiCreatePassword,
   apiSendResetLink,
   apiResetPassword,

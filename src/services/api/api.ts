@@ -15,6 +15,7 @@ import axios, {
   InternalAxiosRequestConfig,
 } from 'axios';
 import Toast from 'react-native-toast-message';
+import ApiEndPoints from '@constants/ApiEndPoints';
 
 const GENERAL_TIMEOUT = 10000;
 
@@ -38,6 +39,17 @@ const axiosInstance = axios.create({
   timeout: GENERAL_TIMEOUT,
 });
 
+/** Bare client for refresh/logout — avoids interceptor recursion. */
+const refreshClient = axios.create({
+  baseURL: BASE_URL,
+  headers: {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+    'device-type': 'mobile',
+  },
+  timeout: GENERAL_TIMEOUT,
+});
+
 console.log('🌐 [api.ts] Axios instance created with baseURL:', axiosInstance.defaults.baseURL);
 
 export type CustomRequestConfig = InternalAxiosRequestConfig & {
@@ -46,49 +58,70 @@ export type CustomRequestConfig = InternalAxiosRequestConfig & {
   controller?: AbortController;
   /** Skip decrypt/transform on binary responses (e.g. Excel export). */
   skipResponseTransform?: boolean;
+  /** Internal: request already retried after a refresh. */
+  _retryAfterRefresh?: boolean;
 };
 
 const cancelTokens: Array<AbortController> = [];
 
 /**
  * Whitelist of authentication endpoints that should not trigger logout on 401 errors.
- * These endpoints handle authentication failures internally and should not cause
- * the user to be logged out.
  */
 const AUTH_ENDPOINTS_WHITELIST = [
   '/auth/login',
   '/auth/register',
   '/auth/forgot-password',
   '/auth/reset-password',
-  '/auth/refresh-token',
+  '/auth/refresh',
+  '/auth/complete-consent',
+  '/auth/verify-otp',
   '/auth/verify-email',
   '/auth/resend-verification',
   '/auth/logout',
 ];
 
-/**
- * Checks if the given URL is an authentication endpoint that should be excluded
- * from triggering logout on 401 errors.
- *
- * @param {string} url - The request URL to check
- * @returns {boolean} True if the URL is an auth endpoint, false otherwise
- */
 const isAuthEndpoint = (url: string): boolean => {
-  if (!url) {return false;}
-  // Use simple string matching — new URL().pathname is not available in React Native
-  return AUTH_ENDPOINTS_WHITELIST.some(endpoint =>
-    url.includes(endpoint),
-  );
+  if (!url) {
+    return false;
+  }
+  return AUTH_ENDPOINTS_WHITELIST.some(endpoint => url.includes(endpoint));
 };
 
+let refreshInFlight: Promise<string | null> | null = null;
 
-/**
- * Request interceptor to add the access token to the authorization header
- * if the authRequired flag is set.
- *
- * @param {CustomRequestConfig} config - The request configuration.
- * @returns {Promise<CustomRequestConfig>} The modified request configuration.
- */
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = storage.getString(StorageKeys.REFRESH_TOKEN);
+  if (!refreshToken) {
+    return null;
+  }
+  try {
+    const response = await refreshClient.post(ApiEndPoints.apiRefreshToken, {
+      refreshToken,
+    });
+    const nextToken = response?.data?.data?.token;
+    const nextRefresh = response?.data?.data?.refreshToken;
+    if (!nextToken || typeof nextToken !== 'string') {
+      return null;
+    }
+    storage.set(StorageKeys.TOKEN, nextToken);
+    if (nextRefresh && typeof nextRefresh === 'string') {
+      storage.set(StorageKeys.REFRESH_TOKEN, nextRefresh);
+    }
+    return nextToken;
+  } catch {
+    return null;
+  }
+}
+
+function queueRefresh(): Promise<string | null> {
+  if (!refreshInFlight) {
+    refreshInFlight = refreshAccessToken().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
 axiosInstance.interceptors.request.use(
   async (config: CustomRequestConfig): Promise<CustomRequestConfig> => {
     const controller = new AbortController();
@@ -97,21 +130,25 @@ axiosInstance.interceptors.request.use(
     cancelTokens.push(controller);
 
     if (config.authRequired) {
-      const token = storage.getString(StorageKeys.TOKEN);
-      if (token && config.headers) {
-        // Check if token is expired before making the request
-        if (isTokenExpired(token)) {
-          const url = config.url || '';
-          if (!isAuthEndpoint(url)) {
-            Toast.show({
-              type: 'error',
-              text1: 'Session Expired',
-              text2: 'Your session has expired. Please log in again.',
-            });
-            logoutUser();
-            return Promise.reject(new Error('Token expired'));
-          }
+      let token = storage.getString(StorageKeys.TOKEN);
+      const url = config.url || '';
+
+      if (token && isTokenExpired(token) && !isAuthEndpoint(url)) {
+        const refreshed = await queueRefresh();
+        if (refreshed) {
+          token = refreshed;
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'Session Expired',
+            text2: 'Your session has expired. Please log in again.',
+          });
+          logoutUser();
+          return Promise.reject(new Error('Token expired'));
         }
+      }
+
+      if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
@@ -142,20 +179,11 @@ axiosInstance.interceptors.request.use(
   },
 );
 
-// Response Interceptor
-/**
- * Logs the request and response data to the console and transforms the response
- * by decrypting any encrypted strings.
- *
- * @param {AxiosResponse} response - The response object.
- * @returns {AxiosResponse} The response object with transformed data.
- */
 axiosInstance.interceptors.response.use(
   (response: AxiosResponse) => {
     const skipTransform = (response.config as CustomRequestConfig)
       ?.skipResponseTransform;
     if (response.data && !skipTransform) {
-      // Transform the response data recursively to decrypt any encrypted strings
       response.data = transformApiResponse(response.data);
     }
 
@@ -175,12 +203,6 @@ axiosInstance.interceptors.response.use(
     }
     return response;
   },
-  /**
-   * Logs the request and error data to the console.
-   *
-   * @param {AxiosError} error - The error object.
-   * @returns {Promise<never>} The error object.
-   */
   async (error: AxiosError): Promise<never> => {
     const skipTransform = (error.config as CustomRequestConfig)
       ?.skipResponseTransform;
@@ -201,12 +223,30 @@ axiosInstance.interceptors.response.use(
       console.groupEnd();
     }
 
-    // 401 from a response means the action was unauthorised (e.g. "Action not allowed").
-    // The request interceptor already handles real token expiry before the request fires,
-    // so we must NOT logout here — just surface the API error message to the user.
-    if (error.response?.status === 401) {
-      const data = error.response.data as any;
-      const msg = data?.message || 'You are not authorised to perform this action.';
+    const original = error.config as CustomRequestConfig | undefined;
+    const status = error.response?.status;
+    const url = original?.url || '';
+
+    // Access token rejected — try one refresh + retry (non-auth endpoints).
+    if (
+      status === 401 &&
+      original?.authRequired &&
+      !original._retryAfterRefresh &&
+      !isAuthEndpoint(url)
+    ) {
+      const refreshed = await queueRefresh();
+      if (refreshed) {
+        original._retryAfterRefresh = true;
+        original.headers = original.headers || {};
+        original.headers.Authorization = `Bearer ${refreshed}`;
+        return axiosInstance.request(original) as Promise<never>;
+      }
+    }
+
+    if (status === 401) {
+      const data = error.response?.data as any;
+      const msg =
+        data?.message || 'You are not authorised to perform this action.';
       Toast.show({
         type: 'error',
         text1: 'Action Not Allowed',
@@ -216,10 +256,6 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error);
   },
 );
-/**
- * Cancels all ongoing API requests by aborting them and clears
- * the list of stored cancellation tokens.
- */
 
 export const cancelAllRequests = () => {
   cancelTokens.forEach(controller => controller.abort());
@@ -227,10 +263,15 @@ export const cancelAllRequests = () => {
 };
 
 /**
- * Logs out the user by clearing the access and refresh tokens from storage.
+ * Logs out the user. Best-effort revoke of refresh token, then clear local state.
  */
-
 export const logoutUser = () => {
+  const refreshToken = storage.getString(StorageKeys.REFRESH_TOKEN);
+  if (refreshToken) {
+    refreshClient
+      .post(ApiEndPoints.apiLogout, {refreshToken})
+      .catch(() => undefined);
+  }
   cancelAllRequests();
   storage.clearAll();
   store.dispatch(authActions.resetAuthState());

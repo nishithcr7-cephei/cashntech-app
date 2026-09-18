@@ -9,15 +9,19 @@ type ProductIconProps = {
 };
 
 /**
- * Single source of truth for product glyphs (Tabler building-bank / building-store
- * equivalents from the app's FontAwesome6 set):
- * Dealer Finance = building-columns (bank), Vendor Finance = store (storefront).
+ * Product glyphs (FontAwesome6):
+ * DF = building-columns, VF = store, PID = file-invoice-dollar.
  */
-export const ProductIcon: React.FC<ProductIconProps> = ({code, size, color}) => (
-  <FontAwesome6
-    name={code === PRODUCT_CODES.VENDOR_FINANCE ? 'store' : 'building-columns'}
-    iconStyle="solid"
-    size={size}
-    color={color}
-  />
-);
+export const ProductIcon: React.FC<ProductIconProps> = ({code, size, color}) => {
+  let name: 'building-columns' | 'store' | 'file-invoice-dollar' =
+    'building-columns';
+  if (code === PRODUCT_CODES.VENDOR_FINANCE) {
+    name = 'store';
+  } else if (code === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING) {
+    name = 'file-invoice-dollar';
+  }
+
+  return (
+    <FontAwesome6 name={name} iconStyle="solid" size={size} color={color} />
+  );
+};

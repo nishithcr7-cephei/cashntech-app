@@ -1,7 +1,10 @@
 import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 
 /** Product context for Create Invoice — DF vs VF isolation. */
-export type InvoiceProductType = 'dealer_finance' | 'vendor_finance';
+export type InvoiceProductType =
+  | 'dealer_finance'
+  | 'vendor_finance'
+  | 'purchase_invoice_discounting';
 
 /**
  * OCR patch normalizer — product-guarded.

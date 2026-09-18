@@ -21,7 +21,7 @@ export type InvoicePartyInfoRouteOptions = {
   partySide?: PartySide | null;
 };
 
-/** Unified backend always serves party-info for DF and VF. */
+/** Unified backend always serves party-info for DF, VF, and PID. */
 export function usesPartyInfoRoute(
   _productCode?: ProductCode | string | null,
 ): boolean {
@@ -38,7 +38,7 @@ export function resolveInvoicePartyInfoPath(
 /**
  * True when create payload must include credit_to_account_id.
  * Unified backend (`createInvoice.dto.ts`) requires this UUID for ALL
- * products — DF and VF alike. Parameter kept for call-site compatibility
+ * products — DF, VF, and PID alike. Parameter kept for call-site compatibility
  * but no longer changes the result (PR6).
  */
 export function requiresCreditToAccountId(
