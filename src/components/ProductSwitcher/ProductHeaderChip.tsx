@@ -4,6 +4,7 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {UpChevron} from '@assets/Icons';
 import {useProductSwitcherSheet} from '@hooks/useProductSwitcherSheet';
+import {getProductFullDisplayName, getProductNavLabel} from '@store/product/product.resolver';
 import {ProductBottomSheet} from './ProductBottomSheet';
 import {ProductIcon} from './ProductIcon';
 
@@ -38,8 +39,12 @@ export const ProductHeaderChip: React.FC<ProductHeaderChipProps> = ({
           size={scaleHeight(12)}
           color={Colors.primaryColor}
         />
-        <Text style={styles.pillText} numberOfLines={1} ellipsizeMode="tail">
-          {activeProduct.name}
+        <Text
+          style={styles.pillText}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          accessibilityLabel={getProductFullDisplayName(activeProduct)}>
+          {getProductNavLabel(activeProduct.code)}
         </Text>
         <UpChevron rotation={180} height={scaleHeight(8)} width={scaleWidth(8)} />
       </TouchableOpacity>

@@ -31,10 +31,12 @@ import {
   selectActiveProductId,
   selectActiveProductName,
   selectEffectiveProductCode,
-  selectIsVendorFinanceActive,
 } from '@store/product/product.selectors';
-import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
-import {resolveWorkspaceProductId} from '@store/product/product.resolver';
+import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {
+  resolveWorkspaceProductId,
+  usesVendorPartyLabels,
+} from '@store/product/product.resolver';
 import {FetchDPDListRequest} from '@store/dpd/dpd.types';
 import {invoiceApi, DpdKpisResponse} from '@services/api/invoice.api';
 import {decryptValue} from '@utils/decrypt';
@@ -87,11 +89,11 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
   const effectiveCode = useSelector(selectEffectiveProductCode);
   const activeProductId = useSelector(selectActiveProductId);
   const activeProductName = useSelector(selectActiveProductName);
-  const isVendorFinance = useSelector(selectIsVendorFinanceActive);
+  const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
-  const primaryPartyLabel = isVendorFinance ? 'Vendor' : 'Primary Party';
-  const counterPartyLabel = isVendorFinance ? 'Anchor' : 'Counter Party';
+  const primaryPartyLabel = vendorPartyLabels ? 'Vendor' : 'Primary Party';
+  const counterPartyLabel = vendorPartyLabels ? 'Anchor' : 'Counter Party';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -381,7 +383,7 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
                   <Text style={styles.indexText}>{index + 1}</Text>
                 </View>
                 <View style={styles.infoGrid}>
-                  {isVendorFinance ? (
+                  {vendorPartyLabels ? (
                     <>
                       {/* VF DPD web labels: Invoice No → Bank → Product → Vendor → Anchor → Invoice Date → GRN Date → Due Date → Disbursement Date → Invoice Amount → Disbursed Amount → DPD Days → O/S Principal → O/S Interest Accrued → O/S Penal → O/S Total → NPA Status */}
                       <View style={styles.infoColumn}>

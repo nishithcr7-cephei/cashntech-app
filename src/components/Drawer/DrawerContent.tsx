@@ -37,6 +37,9 @@ import {
 } from '@store/product/product.selectors';
 import {
   getEffectiveProductCode,
+  getProductFullDisplayName,
+  getProductNavLabel,
+  hasCompactNavLabel,
   uniqueProductsByCode,
 } from '@store/product/product.resolver';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES, ResolvedProduct} from '@store/product/product.types';
@@ -423,9 +426,12 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       });
     }
 
+    const fullName = getProductFullDisplayName(product);
+
     return {
       key: `product-${product.code}`,
-      label: product.name,
+      label: getProductNavLabel(product.code),
+      fullLabel: hasCompactNavLabel(product.code) ? fullName : undefined,
       icon: getProductBranchIcon(product.code, isActiveProductBranch),
       isActiveProductBranch,
       isInactiveProductBranch: hasMultipleProducts && !isActiveProductBranch,
@@ -524,72 +530,96 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
           backgroundColor: headerColors.bg,
           borderColor: headerColors.border,
         }]}>
-          <TouchableOpacity
-            style={styles.rowCenter}
-            activeOpacity={0.8}
-            onPress={() => {
-              navigation.closeDrawer();
-              navigation.navigate('Profile' as never);
-            }}>
-            <View style={styles.imageWrapper}>
-              <Image source={UserImg} style={styles.image} resizeMode="cover" />
-            </View>
-            <View style={styles.infoContainer}>
-              <Text style={styles.title} numberOfLines={2}>
-                {fullName?.trim() ||
-                  `${userInfo.first_name} ${userInfo.last_name}`.trim() ||
-                  'User Name'}
-              </Text>
-              {!!userInfo.party_name && (
-                <Text style={styles.partyText} numberOfLines={1}>
-                  ({userInfo.party_name})
-                </Text>
-              )}
-              <Text style={styles.subTitle} numberOfLines={1}>
-                {userInfo.mobile_number || '9814756321'}
-              </Text>
-              {!!roleLabel && (
-                <View style={styles.roleBadge}>
-                  <Text style={styles.roleBadgeText}>{`Role: ${roleLabel}`}</Text>
+          <View style={styles.headerLeft}>
+            <View style={styles.headerProfileRow}>
+              <TouchableOpacity
+                style={styles.headerProfileTouchable}
+                activeOpacity={0.8}
+                onPress={() => {
+                  navigation.closeDrawer();
+                  navigation.navigate('Profile' as never);
+                }}>
+                <View style={styles.imageWrapper}>
+                  <Image source={UserImg} style={styles.image} resizeMode="cover" />
                 </View>
-              )}
+                <View style={styles.infoContainer}>
+                  <Text style={styles.title} numberOfLines={2}>
+                    {fullName?.trim() ||
+                      `${userInfo.first_name} ${userInfo.last_name}`.trim() ||
+                      'User Name'}
+                  </Text>
+                  {!!userInfo.party_name && (
+                    <Text
+                      style={styles.partyText}
+                      numberOfLines={2}
+                      ellipsizeMode="tail">
+                      {userInfo.party_name}
+                    </Text>
+                  )}
+                  <Text style={styles.subTitle} numberOfLines={1}>
+                    {userInfo.mobile_number || '9814756321'}
+                  </Text>
+                  {!!roleLabel && (
+                    <View style={styles.roleBadge}>
+                      <Text style={styles.roleBadgeText}>{`Role: ${roleLabel}`}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
+
+            {activeProduct ? (
+              hasMultipleProducts ? (
+                <TouchableOpacity
+                  style={styles.headerActiveProductStrip}
+                  activeOpacity={0.8}
+                  onPress={openSheet}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Active product ${getProductFullDisplayName(activeProduct)}. Tap to switch.`}>
+                  <View style={styles.headerActiveProductContent}>
+                    <Text style={styles.headerActiveProductLabel}>Active Product</Text>
+                    <Text
+                      style={styles.headerActiveProductName}
+                      numberOfLines={2}
+                      ellipsizeMode="tail">
+                      {getProductFullDisplayName(activeProduct)}
+                    </Text>
+                  </View>
+                  <UpChevron
+                    rotation={180}
+                    height={scaleHeight(10)}
+                    width={scaleWidth(10)}
+                    color="#84919A"
+                  />
+                </TouchableOpacity>
+              ) : (
+                <View
+                  style={styles.headerActiveProductStrip}
+                  accessibilityLabel={`Active product ${getProductFullDisplayName(activeProduct)}`}>
+                  <View style={styles.headerActiveProductContent}>
+                    <Text style={styles.headerActiveProductLabel}>Active Product</Text>
+                    <Text
+                      style={styles.headerActiveProductName}
+                      numberOfLines={2}
+                      ellipsizeMode="tail">
+                      {getProductFullDisplayName(activeProduct)}
+                    </Text>
+                  </View>
+                </View>
+              )
+            ) : null}
+
+            {hasMultipleProducts ? (
+              <ProductBottomSheet visible={sheetVisible} onClose={closeSheet} />
+            ) : null}
+          </View>
+
           <TouchableOpacity
             style={styles.closeButton}
             onPress={() => navigation.closeDrawer()}>
             <LeftChevron height={scaleHeight(10)} width={scaleWidth(10)} />
           </TouchableOpacity>
         </View>
-
-        {/* Active product — single chip; full list lives in ProductBottomSheet */}
-        {hasMultipleProducts && activeProduct ? (
-          <View style={styles.activeProductSection}>
-            <Text style={styles.sectionLabel}>ACTIVE PRODUCT</Text>
-            <TouchableOpacity
-              style={styles.activeProductChip}
-              activeOpacity={0.8}
-              onPress={openSheet}>
-              <ProductIcon
-                code={activeProduct.code}
-                size={scaleHeight(12)}
-                color={Colors.primaryColor}
-              />
-              <Text
-                style={styles.activeProductChipText}
-                numberOfLines={1}
-                ellipsizeMode="tail">
-                {activeProduct.name}
-              </Text>
-              <UpChevron
-                rotation={180}
-                height={scaleHeight(8)}
-                width={scaleWidth(8)}
-              />
-            </TouchableOpacity>
-            <ProductBottomSheet visible={sheetVisible} onClose={closeSheet} />
-          </View>
-        ) : null}
 
         {/* Buttons */}
         <ScrollView
@@ -727,14 +757,57 @@ const styles = StyleSheet.create({
   rowCenter: {flexDirection: 'row', flex: 1, alignItems: 'center'},
   headerContainer: {
     padding: scaleWidth(16),
-    paddingBottom: scaleHeight(26),
+    paddingBottom: scaleHeight(20),
     backgroundColor: '#FFE9E9',
     borderTopRightRadius: scaleWidth(8),
     borderBottomWidth: scaleWidth(2),
     borderColor: 'rgba(227, 6, 19, 0.5)',
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
+  },
+  headerLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  headerProfileTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+  },
+  headerActiveProductStrip: {
+    marginTop: scaleHeight(12),
+    paddingTop: scaleHeight(12),
+    paddingBottom: scaleHeight(4),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(0, 0, 0, 0.08)',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    width: '100%',
+  },
+  headerActiveProductContent: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: scaleWidth(8),
+  },
+  headerActiveProductLabel: {
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroySemiBold,
+    color: '#84919A',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: scaleHeight(4),
+  },
+  headerActiveProductName: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: '#374151',
+    lineHeight: scaleHeight(20),
   },
   closeButton: {
     backgroundColor: 'rgba(236, 74, 83, 0.3)',
@@ -757,10 +830,11 @@ const styles = StyleSheet.create({
     width: scaleWidth(46),
   },
   infoContainer: {
-    marginStart: scaleWidth(16),
+    marginStart: scaleWidth(12),
     flex: 1,
-    marginEnd: scaleWidth(20),
+    marginEnd: scaleWidth(4),
     alignItems: 'flex-start',
+    alignSelf: 'stretch',
     minWidth: 0,
   },
   title: {
@@ -775,6 +849,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroyMedium,
     color: '#95969C',
     marginTop: scaleHeight(2),
+    lineHeight: scaleHeight(16),
+    alignSelf: 'stretch',
   },
   subTitle: {
     fontSize: scaleFont(11),
@@ -792,42 +868,6 @@ const styles = StyleSheet.create({
   },
   roleBadgeText: {
     fontSize: scaleFont(11),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.primaryColor,
-  },
-  activeProductSection: {
-    paddingTop: scaleHeight(14),
-    paddingBottom: scaleHeight(10),
-    paddingHorizontal: scaleWidth(16),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E6E6E6',
-  },
-  sectionLabel: {
-    fontSize: scaleFont(11),
-    fontFamily: Fonts.GilroySemiBold,
-    color: '#84919A',
-    letterSpacing: 0.5,
-    marginBottom: scaleHeight(8),
-  },
-  activeProductChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: scaleWidth(6),
-    maxWidth: '100%',
-    minHeight: scaleHeight(36),
-    paddingHorizontal: scaleWidth(10),
-    paddingVertical: scaleHeight(8),
-    borderRadius: scaleWidth(16),
-    backgroundColor: '#FFF5F5',
-    borderWidth: 1,
-    borderColor: Colors.primaryColor,
-  },
-  activeProductChipText: {
-    flexShrink: 1,
-    minWidth: 0,
-    maxWidth: scaleWidth(180),
-    fontSize: scaleFont(12),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.primaryColor,
   },

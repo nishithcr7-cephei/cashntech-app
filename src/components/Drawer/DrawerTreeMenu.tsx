@@ -1,5 +1,6 @@
 import React from 'react';
-import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet, Alert} from 'react-native';
+import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {UpChevron} from '@assets/Icons';
@@ -12,6 +13,8 @@ import type {ResolvedProduct} from '@store/product/product.types';
 export type DrawerMenuNode = {
   key: string;
   label: string;
+  /** Full product name shown via info icon / accessibility when label is compact (e.g. PID). */
+  fullLabel?: string;
   /** Only rendered for expandable (parent) nodes, matching existing drawer style. */
   icon?: React.ReactNode;
   route?: string;
@@ -109,9 +112,25 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
                     <Text
                       numberOfLines={1}
                       ellipsizeMode="tail"
+                      accessibilityLabel={node.fullLabel ?? node.label}
                       style={getParentTextStyle(node, isOpen)}>
                       {node.label}
                     </Text>
+                    {node.fullLabel ? (
+                      <TouchableOpacity
+                        style={styles.infoButton}
+                        hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Show full product name: ${node.fullLabel}`}
+                        onPress={() => Alert.alert('Product', node.fullLabel)}>
+                        <FontAwesome6
+                          name="circle-info"
+                          iconStyle="solid"
+                          size={scaleFont(14)}
+                          color="#84919A"
+                        />
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                   <View style={styles.arrowContainer}>
                     <UpChevron rotation={isOpen ? 0 : 180} />
@@ -168,7 +187,11 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
 };
 
 const styles = StyleSheet.create({
-  rowCenter: {flexDirection: 'row', flex: 1, alignItems: 'center'},
+  rowCenter: {flexDirection: 'row', flex: 1, alignItems: 'center', minWidth: 0},
+  infoButton: {
+    marginLeft: scaleWidth(6),
+    padding: scaleWidth(2),
+  },
   iconBox: {
     width: scaleWidth(24),
     alignItems: 'center',

@@ -2,6 +2,7 @@ import {
   DEFAULT_PRODUCT_CODE,
   PRODUCT_CODES,
   PRODUCT_DISPLAY_NAMES,
+  PRODUCT_NAV_LABELS,
   ProductCode,
   ProductLike,
   ResolvedProduct,
@@ -275,4 +276,21 @@ export function uniqueProductsByCode(
     result.push(product);
   });
   return result;
+}
+
+/** Compact nav label (e.g. PID) for drawer and header chips. */
+export function getProductNavLabel(code: ProductCode): string {
+  return PRODUCT_NAV_LABELS[code];
+}
+
+/** Full display name for tooltips / bottom sheets. */
+export function getProductFullDisplayName(
+  product: Pick<ResolvedProduct, 'code' | 'name'>,
+): string {
+  return (product.name && product.name.trim()) || PRODUCT_DISPLAY_NAMES[product.code];
+}
+
+/** True when nav label is shorter than the canonical display name. */
+export function hasCompactNavLabel(code: ProductCode): boolean {
+  return PRODUCT_NAV_LABELS[code] !== PRODUCT_DISPLAY_NAMES[code];
 }

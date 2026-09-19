@@ -13,7 +13,12 @@ import {
 } from 'react-native';
 import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
-import {AppBar, Container, BusyOverlay} from '@components/index';
+import {
+  AppBar,
+  Container,
+  BusyOverlay,
+  InvoiceProgramLimitBanner,
+} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
@@ -84,12 +89,56 @@ import {
 } from '@store/permissions';
 import {useHasPermission} from '@hooks/useHasPermission';
 import type {DealerInfoParticipant} from '@store/invoice/inv.types';
-import {getParticipantAvailableLimit} from '@utils/normalizeDealerInfo';
+import {
+  getParticipantAvailableLimit,
+} from '@utils/normalizeDealerInfo';
+import {formatIndianNumber} from '@utils/Utils';
 import {decryptValue} from '@utils/decrypt';
 import {requiresCreditToAccountId} from '@utils/invoicePartyInfoRoute';
 import {resolveProductCodeFromName} from '@store/product/product.resolver';
 import {selectEffectiveProductCode, selectActiveProductId} from '@store/product/product.selectors';
 import {PRODUCT_CODES} from '@store/product/product.types';
+
+function matchDealerInfoParticipant(
+  participants: DealerInfoParticipant[] | undefined,
+  dealerName: string | undefined,
+  dealerCode: string | undefined,
+): DealerInfoParticipant | null {
+  if (!participants?.length) {
+    return null;
+  }
+  if (!dealerName?.trim() && !dealerCode?.trim()) {
+    return null;
+  }
+  return (
+    participants.find(p => {
+      const decryptedName =
+        decryptValue(p.party?.entity_name || '') || p.party?.entity_name;
+      const rawName = p.party?.entity_name;
+      const codeMatched =
+        !!dealerCode &&
+        (p.company_code_given_by_party === dealerCode ||
+          p.company_code === dealerCode);
+      return (
+        (!!dealerName &&
+          (decryptedName === dealerName || rawName === dealerName)) ||
+        codeMatched
+      );
+    }) ?? null
+  );
+}
+
+function formatLimitInr(amount: number): string {
+  return `₹${formatIndianNumber(String(Number(amount.toFixed(2))))}`;
+}
+
+function parseLimitNumber(value: unknown): number {
+  if (value === undefined || value === null || value === '') {
+    return 0;
+  }
+  const n = typeof value === 'string' ? parseFloat(value) : Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
 
 const getInitialFields = (): InvoiceFields => ({
   dealer: '',
@@ -1666,57 +1715,14 @@ export const CreateInvoice: React.FC = () => {
     // In edit mode, use the pre-fetched available limit (loaded when screen opened, like Web Portal).
     // In create mode, calculate from selected participant.
 
-    if (mode === 'edit') {
-      // apmAvailableLimit is set at screen load from fresh getDealerInfo call.
-      // If null → fetch failed (don't block, allow cautiously). If number → enforce.
-      if (apmAvailableLimit !== null) {
-        const invoiceTotal = computeInvoiceAmountForLimitCheck(fields.items, {
-          cgst: fields.cgst,
-          sgst: fields.sgst,
-          taxTotal: fields.taxTotal,
-        });
-
-        console.log('[EditMode] Limit check: invoiceTotal=', invoiceTotal, 'availableLimit=', apmAvailableLimit);
-
-        if (invoiceTotal > apmAvailableLimit) {
-          Alert.alert(
-            'Limit Exceeded',
-            'Transaction failed: Invoice amount exceeds the available program limit.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-      }
-    } else {
-      // Create mode: calculate from participant
-      const invoiceTotal = computeInvoiceAmountForLimitCheck(fields.items, {
-        cgst: fields.cgst,
-        sgst: fields.sgst,
-        taxTotal: fields.taxTotal,
-      });
-
-      let participant = selectedParticipant;
-      if (!participant && dealerInfo?.participants?.length && fields.dealer) {
-        participant = dealerInfo.participants.find(p => {
-          const decryptedName = decryptValue(p.party?.entity_name || '') || p.party?.entity_name;
-          const rawName = p.party?.entity_name;
-          const codeMatched = p.company_code_given_by_party === fields.dealerCode;
-          return decryptedName === fields.dealer || rawName === fields.dealer || codeMatched;
-        }) || null;
-      }
-
-      if (participant) {
-        const availableLimit = getParticipantAvailableLimit(participant);
-
-        if (invoiceTotal > availableLimit) {
-          Alert.alert(
-            'Limit Exceeded',
-            'Transaction failed: Invoice amount exceeds the available program limit.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-      }
+    if (isLimitExceeded && availableProgramLimit !== null) {
+      const overBy = invoiceAmountForLimit - availableProgramLimit;
+      Alert.alert(
+        'Limit Exceeded',
+        `Invoice amount ${formatLimitInr(invoiceAmountForLimit)} exceeds available limit ${formatLimitInr(availableProgramLimit)}. Reduce by at least ${formatLimitInr(overBy)}.`,
+        [{text: 'OK'}],
+      );
+      return;
     }
 
     // Final Total Integrity Check (0.01 precision)
@@ -2253,8 +2259,75 @@ export const CreateInvoice: React.FC = () => {
   );
 
   const hasAnyAttachment = !!selectedAttachment || (fields.attachments && fields.attachments.length > 0);
-  const submitButtonAppearsDisabledInternal = (canUploadFinal && !hasAnyAttachment) || !isFormValid;
-  
+
+  const limitCheckParticipant = useMemo(
+    () =>
+      selectedParticipant ??
+      matchDealerInfoParticipant(
+        dealerInfo?.participants,
+        fields.dealer,
+        fields.dealerCode,
+      ),
+    [
+      selectedParticipant,
+      dealerInfo?.participants,
+      fields.dealer,
+      fields.dealerCode,
+    ],
+  );
+
+  const limitDisplayParticipant = useMemo(() => {
+    if (limitCheckParticipant) {
+      return limitCheckParticipant;
+    }
+    if (isPid && dealerInfo?.participants?.length) {
+      return dealerInfo.participants[0];
+    }
+    return null;
+  }, [limitCheckParticipant, isPid, dealerInfo?.participants]);
+
+  const availableProgramLimit = useMemo(() => {
+    if (mode === 'edit' && apmAvailableLimit !== null) {
+      return apmAvailableLimit;
+    }
+    if (limitDisplayParticipant) {
+      return getParticipantAvailableLimit(limitDisplayParticipant);
+    }
+    return null;
+  }, [mode, apmAvailableLimit, limitDisplayParticipant]);
+
+  const invoiceAmountForLimit = useMemo(
+    () =>
+      computeInvoiceAmountForLimitCheck(fields.items, {
+        cgst: fields.cgst,
+        sgst: fields.sgst,
+        taxTotal: fields.taxTotal,
+      }),
+    [fields.items, fields.cgst, fields.sgst, fields.taxTotal],
+  );
+
+  const isLimitExceeded = useMemo(() => {
+    if (availableProgramLimit === null || !limitCheckParticipant) {
+      return false;
+    }
+    if (invoiceAmountForLimit <= 0) {
+      return false;
+    }
+    return invoiceAmountForLimit > availableProgramLimit;
+  }, [
+    availableProgramLimit,
+    limitCheckParticipant,
+    invoiceAmountForLimit,
+  ]);
+
+  const showProgramLimitBanner =
+    availableProgramLimit !== null && !!limitDisplayParticipant && !!dealerInfo;
+
+  const submitButtonAppearsDisabledInternal =
+    (canUploadFinal && !hasAnyAttachment) ||
+    !isFormValid ||
+    isLimitExceeded;
+
   const submitDisabledReasonInternal = useMemo(() => {
     // In Edit mode, we skip field-level mandatory checks for the button state
     // because the data is already pre-filled and often read-only.
@@ -2296,8 +2369,27 @@ export const CreateInvoice: React.FC = () => {
     if (canUploadFinal && !hasAnyAttachment) {
       return 'Please upload the invoice file';
     }
+    if (
+      isLimitExceeded &&
+      availableProgramLimit !== null &&
+      invoiceAmountForLimit > 0
+    ) {
+      const overBy = invoiceAmountForLimit - availableProgramLimit;
+      return `Invoice amount ${formatLimitInr(invoiceAmountForLimit)} exceeds available limit ${formatLimitInr(availableProgramLimit)}. Reduce by at least ${formatLimitInr(overBy)}.`;
+    }
     return undefined;
-  }, [fields, canUploadFinal, hasAnyAttachment, mode, productType, creditToOptions, ocrPartyLabels]);
+  }, [
+    fields,
+    canUploadFinal,
+    hasAnyAttachment,
+    mode,
+    productType,
+    creditToOptions,
+    ocrPartyLabels,
+    isLimitExceeded,
+    availableProgramLimit,
+    invoiceAmountForLimit,
+  ]);
 
   const dealerOptions = useMemo(
     () =>
@@ -2436,6 +2528,25 @@ export const CreateInvoice: React.FC = () => {
           style={styles.formContainer}
           contentContainerStyle={styles.formContent}
           showsVerticalScrollIndicator={false}>
+          {showProgramLimitBanner && availableProgramLimit !== null ? (
+            <InvoiceProgramLimitBanner
+              availableLimit={availableProgramLimit}
+              invoiceAmount={invoiceAmountForLimit}
+              sanctionedLimit={parseLimitNumber(
+                limitDisplayParticipant?.sanctioned_limit,
+              )}
+              utilizedAmount={parseLimitNumber(
+                limitDisplayParticipant?.utilized_amount,
+              )}
+              pipelineRequests={parseLimitNumber(
+                limitDisplayParticipant?.pipeline_requests,
+              )}
+              showLiveStatus={!!limitCheckParticipant}
+              isProgramLevel={isPid}
+              counterpartyLabel={ocrPartyLabels.party}
+              vendorNotSelectedYet={isPid && !limitCheckParticipant}
+            />
+          ) : null}
           <InvoiceForm
             value={fields}
             onChange={applyPatch}

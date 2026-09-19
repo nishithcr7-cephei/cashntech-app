@@ -31,10 +31,12 @@ import {
   selectActiveProductId,
   selectActiveProductName,
   selectEffectiveProductCode,
-  selectIsVendorFinanceActive,
 } from '@store/product/product.selectors';
-import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
-import {resolveWorkspaceProductId} from '@store/product/product.resolver';
+import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {
+  resolveWorkspaceProductId,
+  usesVendorPartyLabels,
+} from '@store/product/product.resolver';
 import {FetchRepaymentListRequest} from '@store/repayment/repayment.types';
 import {decryptValue} from '@utils/decrypt';
 import {formatDateDash, formatStatus} from '../InvoiceList/components/InvoiceDetails/types';
@@ -64,11 +66,11 @@ export const RepaymentSettlementScreen: React.FC = () => {
   const effectiveCode = useSelector(selectEffectiveProductCode);
   const activeProductId = useSelector(selectActiveProductId);
   const activeProductName = useSelector(selectActiveProductName);
-  const isVendorFinance = useSelector(selectIsVendorFinanceActive);
+  const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
-  const primaryPartyLabel = isVendorFinance ? 'Vendor' : 'Primary Party';
-  const counterPartyLabel = isVendorFinance ? 'Anchor' : 'Counter Party';
+  const primaryPartyLabel = vendorPartyLabels ? 'Vendor' : 'Primary Party';
+  const counterPartyLabel = vendorPartyLabels ? 'Anchor' : 'Counter Party';
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -76,7 +78,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
 
   useEffect(() => {
     setAppliedFilters({});
-  }, [isVendorFinance]);
+  }, [vendorPartyLabels]);
   
   const dispatch = useDispatch();
   const repaymentData = useSelector(repaymentSelectors.selectRepaymentList);
@@ -240,10 +242,10 @@ export const RepaymentSettlementScreen: React.FC = () => {
       productName: item.name || '-',
       programName: item.program_name || '-',
       primaryParty: decryptValue(
-        (isVendorFinance ? item.counterPartyName : item.partyName) ?? '',
+        (vendorPartyLabels ? item.counterPartyName : item.partyName) ?? '',
       ) || '-',
       counterParty: decryptValue(
-        (isVendorFinance ? item.partyName : item.counterPartyName) ?? '',
+        (vendorPartyLabels ? item.partyName : item.counterPartyName) ?? '',
       ) || '-',
       invoiceAmount: fmtMoney(item.final_total),
       invoiceDate: fmtDate(item.invoice_date),
@@ -275,7 +277,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
       );
     }
     return data;
-  }, [searchText, repaymentData, isVendorFinance]);
+  }, [searchText, repaymentData, vendorPartyLabels]);
 
   const handleInvoiceNoPress = useCallback(
     (row: any) => {
@@ -380,7 +382,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
                       <Text style={styles.indexText}>{filteredData.indexOf(row) + 1}</Text>
                     </View>
                   <View style={styles.infoGrid}>
-                    {isVendorFinance ? (
+                    {vendorPartyLabels ? (
                       <>
                         {/* VF web parity: Invoice No → Bank & Product → Parties → Invoice Date → GRN Date → Due Date → Disbursement Date → Invoice Amount → Disbursed Amount → O/S Principal → Advance Interest Paid → O/S Interest Accrued → O/S Penal → O/S Total → Invoice Status */}
                         <View style={styles.infoColumn}>
@@ -618,7 +620,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
           setAppliedFilters(filters);
           setShowFilterModal(false);
         }}
-        filterData={isVendorFinance ? repaymentFilterDataVf : repaymentFilterDataDf}
+        filterData={vendorPartyLabels ? repaymentFilterDataVf : repaymentFilterDataDf}
         appliedFilters={appliedFilters}
       />
     </Container>

@@ -31,7 +31,11 @@ import {
   selectEffectiveProductCode,
   selectIsVendorFinanceActive,
 } from '@store/product/product.selectors';
-import {getEffectiveProductCode, resolveWorkspaceProductId} from '@store/product/product.resolver';
+import {
+  getEffectiveProductCode,
+  resolveWorkspaceProductId,
+  usesVendorPartyLabels,
+} from '@store/product/product.resolver';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 
 type InterestAccrualInvoiceRow = {
@@ -71,11 +75,12 @@ export const InterestAccrualsScreen: React.FC = () => {
   const activeProductId = useSelector(selectActiveProductId);
   const effectiveCode = useSelector(selectEffectiveProductCode);
   const isVendorFinance = useSelector(selectIsVendorFinanceActive);
+  const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
   const productBreadcrumbLabel =
     activeProductName ||
     PRODUCT_DISPLAY_NAMES[getEffectiveProductCode(activeProductCode)];
-  const primaryPartyLabel = isVendorFinance ? 'Vendor' : 'Primary Party';
-  const counterPartyLabel = isVendorFinance ? 'Anchor' : 'Counter Party';
+  const primaryPartyLabel = vendorPartyLabels ? 'Vendor' : 'Primary Party';
+  const counterPartyLabel = vendorPartyLabels ? 'Anchor' : 'Counter Party';
   const programName = programSelection?.programName ?? '';
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
@@ -87,7 +92,7 @@ export const InterestAccrualsScreen: React.FC = () => {
 
   useEffect(() => {
     setAppliedFilters({});
-  }, [isVendorFinance]);
+  }, [vendorPartyLabels]);
   const programIds = useMemo(
     () =>
       programSelection?.programScope === 'all' && allProgramIds?.length
@@ -222,8 +227,14 @@ export const InterestAccrualsScreen: React.FC = () => {
         bankName: item.bank_name ?? '-',
         productName: item.name ?? '-',
         programName: item.program_name ?? '-',
-        primaryParty: decryptValue(item.partyName ?? '') || '-',
-        counterParty: decryptValue(item.counterPartyName ?? '') || '-',
+        primaryParty:
+          decryptValue(
+            (vendorPartyLabels ? item.counterPartyName : item.partyName) ?? '',
+          ) || '-',
+        counterParty:
+          decryptValue(
+            (vendorPartyLabels ? item.partyName : item.counterPartyName) ?? '',
+          ) || '-',
         invoiceAmount: fmtMoney(item.final_total),
         invoiceDate:
           !invoiceDate || invoiceDate === 'dd-mm-yyyy' ? '-' : invoiceDate,
@@ -240,7 +251,7 @@ export const InterestAccrualsScreen: React.FC = () => {
         cumulativeInterestRaw: displayAccrualRaw,
       };
     });
-  }, [interestList, isVendorFinance]);
+  }, [interestList, isVendorFinance, vendorPartyLabels]);
 
   // Client-side filter + search
   const filteredBySearch = !searchText.trim()

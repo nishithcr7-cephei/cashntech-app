@@ -18,6 +18,13 @@ export const PRODUCT_DISPLAY_NAMES: Record<ProductCode, string> = {
     'Purchase Invoice Discounting',
 };
 
+/** Compact labels for drawer / header chips where full names truncate. */
+export const PRODUCT_NAV_LABELS: Record<ProductCode, string> = {
+  [PRODUCT_CODES.DEALER_FINANCE]: 'Dealer Finance',
+  [PRODUCT_CODES.VENDOR_FINANCE]: 'Vendor Finance',
+  [PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING]: 'PID',
+};
+
 /** Canonical default when no product context is set (preserves DF production behavior). */
 export const DEFAULT_PRODUCT_CODE: ProductCode = PRODUCT_CODES.DEALER_FINANCE;
 
