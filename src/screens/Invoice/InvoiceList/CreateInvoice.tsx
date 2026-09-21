@@ -11,7 +11,12 @@ import {
   BackHandler,
   InteractionManager,
 } from 'react-native';
-import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
+import {
+  useNavigation,
+  useRoute,
+  useFocusEffect,
+  useIsFocused,
+} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
 import {
   AppBar,
@@ -221,6 +226,7 @@ export const CreateInvoice: React.FC = () => {
   const navigation = useNavigation();
   const route = useRoute<any>();
   const dispatch = useDispatch();
+  const isFocused = useIsFocused();
   const programSelection = useSelector((state: any) => state.programSelection);
 
   const resetScreenData = useCallback(() => {
@@ -231,6 +237,8 @@ export const CreateInvoice: React.FC = () => {
   }, [dispatch]);
 
   const lastPreviewTokenRef = useRef<number | undefined>();
+  // After user confirms Leave/Cancel / success — skip second beforeRemove prompt.
+  const allowLeaveRef = useRef(false);
 
   const clearCreateInvoiceRouteParams = useCallback(() => {
     try {
@@ -246,14 +254,21 @@ export const CreateInvoice: React.FC = () => {
     lastPreviewTokenRef.current = undefined;
   }, [navigation]);
 
+  /** Leave Create → list. Prefer replace so hardware back does not reopen Create + BusyOverlay. */
   const goToInvoiceList = useCallback(
     (refreshList = true) => {
-      (navigation as any).navigate(
-        'InvoiceDetails',
-        refreshList ? {refreshList: true} : undefined,
-      );
+      dispatch(resetCreateInvoiceState());
+      dispatch(setLeavingCreateInvoice(false));
+      dispatch(setOpeningCreateInvoice(false));
+      const params = refreshList ? {refreshList: true} : undefined;
+      const nav = navigation as any;
+      if (typeof nav.replace === 'function') {
+        nav.replace('InvoiceDetails', params);
+      } else {
+        nav.navigate('InvoiceDetails', params);
+      }
     },
-    [navigation],
+    [dispatch, navigation],
   );
 
   // Permissions refresh on focus only — do NOT flush form here.
@@ -1157,11 +1172,27 @@ export const CreateInvoice: React.FC = () => {
       setSelectedParticipant(null);
       setSelectedAttachment(null);
       setIsOcrPopulated(false);
-      Alert.alert('Success', mode === 'edit' ? 'Invoice updated successfully.' : 'Invoice created successfully.', [
-        {text: 'OK', onPress: () => goToInvoiceList(true)},
-      ]);
+      setShowCamera(false);
+      setIsOcrUploadModalVisible(false);
+      setIsProofUploadModalVisible(false);
+      setOcrLoading(false);
+      Alert.alert(
+        'Success',
+        mode === 'edit'
+          ? 'Invoice updated successfully.'
+          : 'Invoice created successfully.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              allowLeaveRef.current = true;
+              goToInvoiceList(true);
+            },
+          },
+        ],
+      );
     }
-  }, [createInvoiceSuccess, dispatch, navigation]);
+  }, [createInvoiceSuccess, dispatch, goToInvoiceList, mode]);
 
   useEffect(() => {
     if (createInvoiceError) {
@@ -2077,10 +2108,6 @@ export const CreateInvoice: React.FC = () => {
     ]),
   );
 
-  // After user confirms Leave/Cancel — skip second beforeRemove prompt
-  // (setState may not have flushed before navigate).
-  const allowLeaveRef = useRef(false);
-
   const beginLeaveToInvoiceList = useCallback((onLeave: () => void) => {
     if (isLeavingCreate) {
       return;
@@ -2098,6 +2125,9 @@ export const CreateInvoice: React.FC = () => {
     useCallback(() => {
       dispatch(setLeavingCreateInvoice(false));
       return () => {
+        // Clear loading / leave flags when leaving Create so list is never
+        // covered by a stuck BusyOverlay Modal from this screen.
+        dispatch(resetCreateInvoiceState());
         dispatch(setLeavingCreateInvoice(false));
         dispatch(setOpeningCreateInvoice(false));
       };
@@ -2629,7 +2659,7 @@ export const CreateInvoice: React.FC = () => {
       />
     </Container>
     <BusyOverlay
-      visible={!!createInvoiceLoading}
+      visible={isFocused && !!createInvoiceLoading}
       message={
         mode === 'edit'
           ? 'Updating invoice…'

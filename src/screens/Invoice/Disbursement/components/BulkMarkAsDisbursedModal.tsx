@@ -24,6 +24,7 @@ import {
   isVfUpfrontChargeType,
   resolveDisbursementUsanceDaysDisplay,
 } from '@utils/invoiceTotals';
+import {dismissKeyboardOrClose} from './dismissKeyboardOrClose';
 
 const WINDOW_HEIGHT = Dimensions.get('window').height;
 const SHEET_HEIGHT = WINDOW_HEIGHT * 0.96;
@@ -458,6 +459,10 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
     onClose();
   };
 
+  const handleRequestClose = () => {
+    dismissKeyboardOrClose(handleClose);
+  };
+
   const checkedRows = rows.filter(r => checkedIds.has(r.id));
   const checkedCount = checkedRows.length;
   const checkedTotal = checkedRows.reduce((sum, r) => sum + r.amount, 0);
@@ -474,7 +479,11 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
   );
 
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={handleClose}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="slide"
+      onRequestClose={handleRequestClose}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
@@ -742,6 +751,8 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
           </View>
         </View>
       </View>
+      {/* Toast inside Modal so validation/errors are visible above the sheet */}
+      <Toast topOffset={60} />
     </Modal>
   );
 };

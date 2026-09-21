@@ -41,6 +41,7 @@ import {
   resolveVfDisbursementModalAmounts,
 } from '@utils/invoiceTotals';
 import {computeUsanceDays} from '@utils/usanceDays';
+import {dismissKeyboardOrClose} from './dismissKeyboardOrClose';
 
 type MarkAsDisbursedModalProps = {
   visible: boolean;
@@ -269,8 +270,15 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
           setComputedDueDate(initialDueDisplay);
         }
 
-        const odRaw = apm.od_account_no ?? '';
-        const odDisplay = decryptValue(String(odRaw)) || String(odRaw);
+        // DF/VF: participant OD; PID (APM null): program loan OD — same as display.loanOdAccount
+        const programLoan =
+          invoiceData.program?.basic_parameters?.loan_account_no ??
+          invoiceData.counter_party_od_account ??
+          '';
+        const odRaw = apm.od_account_no || programLoan || '';
+        const odDisplay = odRaw
+          ? decryptValue(String(odRaw)) || String(odRaw)
+          : '';
         setDebitFrom(odDisplay);
 
         const creditAcc =
@@ -629,6 +637,15 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     onClose();
   };
 
+  const handleRequestClose = () => {
+    dismissKeyboardOrClose(handleClose);
+  };
+
+  const handleOverlayPress = () => {
+    // Backdrop: dismiss keyboard only — do not close the form accidentally.
+    Keyboard.dismiss();
+  };
+
   const validateDisbursedAmount = (rawAmount: string): string | null => {
     const amountNum = Number(rawAmount.replace(/[,\s₹]/g, '').trim());
     if (!Number.isFinite(amountNum) || amountNum <= 0) {
@@ -749,15 +766,19 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     !disbursementAction ||
     !!amountError ||
     (disbursementAction === 'Disbursed' &&
-      (!date || !utrNo.trim() || !transactionNo.trim() || !disbursedAmount));
+      (!date ||
+        !utrNo.trim() ||
+        !transactionNo.trim() ||
+        !disbursedAmount ||
+        !debitFrom.trim()));
 
   return (
     <Modal
       transparent
       visible={visible}
       animationType="fade"
-      onRequestClose={handleClose}>
-      <TouchableWithoutFeedback onPress={handleClose}>
+      onRequestClose={handleRequestClose}>
+      <TouchableWithoutFeedback onPress={handleOverlayPress}>
         <View
           style={[
             styles.overlay,
@@ -1096,6 +1117,8 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
         onConfirm={handleConfirmNewDueDate}
         onClose={handleKeepCurrentDueDate}
       />
+      {/* Toast inside Modal so validation/errors are visible above the sheet */}
+      <Toast topOffset={60} />
     </Modal>
   );
 };
