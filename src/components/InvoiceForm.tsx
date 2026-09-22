@@ -144,6 +144,8 @@ type Props = {
   onDeleteItemTax?: (itemIndex: number, taxIndex: number) => void;
   canUploadFinal?: boolean;
   onAddAttachment?: () => void;
+  /** Clear a locally picked file before submit (create flow — no server delete). */
+  onClearAttachment?: () => void;
   selectedAttachment?: any; // To avoid import complexity now, using any for DocumentPickerResponse
   /** Open invoice preview again to cross-check before submit. */
   onPreview?: () => void;
@@ -184,6 +186,7 @@ export const InvoiceForm: React.FC<Props> = ({
   onDeleteItemTax,
   canUploadFinal = false,
   onAddAttachment,
+  onClearAttachment,
   selectedAttachment,
   onPreview,
   previewButtonAppearsDisabled = false,
@@ -1560,6 +1563,15 @@ export const InvoiceForm: React.FC<Props> = ({
                <TouchableOpacity onPress={onAddAttachment} style={styles.changeFileButton}>
                  <Text style={styles.changeFileText}>Change</Text>
                </TouchableOpacity>
+               {onClearAttachment ? (
+                 <TouchableOpacity
+                   onPress={onClearAttachment}
+                   style={styles.removeFileButton}
+                   accessibilityLabel="Remove attachment"
+                   hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                   <FontAwesome6 name="trash" iconStyle="solid" size={14} color="#DC3545" />
+                 </TouchableOpacity>
+               ) : null}
              </View>
            ) : (
              <TouchableOpacity 
@@ -2417,5 +2429,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#337ab7',
     fontWeight: '600',
+  },
+  removeFileButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
 });

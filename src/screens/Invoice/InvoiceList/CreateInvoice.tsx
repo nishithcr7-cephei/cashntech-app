@@ -220,7 +220,31 @@ function resolveCreditAccountIdFromOptions(
   return undefined;
 }
 
-
+function validateCreditToField(
+  creditTo: string | undefined,
+  creditToOptions: Array<{label: string; value: string; accountId?: string}>,
+  opts: {
+    creditToAccountId?: string;
+    mode?: string;
+    productType?: InvoiceProductType | string;
+  },
+): string | undefined {
+  if (!creditTo?.trim()) {
+    return 'Credit To is required';
+  }
+  if (
+    opts.mode !== 'edit' &&
+    requiresCreditToAccountId(opts.productType) &&
+    !resolveCreditAccountIdFromOptions(
+      creditTo,
+      creditToOptions,
+      opts.creditToAccountId,
+    )
+  ) {
+    return 'Please select a valid Credit To account from the list';
+  }
+  return undefined;
+}
 
 export const CreateInvoice: React.FC = () => {
   const navigation = useNavigation();
@@ -403,19 +427,39 @@ export const CreateInvoice: React.FC = () => {
     const resolved = resolvedCreditAccountId;
     if (resolved && resolved !== fields.creditToAccountId) {
       setFields(prev => ({...prev, creditToAccountId: resolved}));
-      // Clear stale field error once UUID is linked (same account already shown).
-      setErrors(prev => {
-        if (!prev.creditTo) return prev;
-        const next = {...prev};
-        delete next.creditTo;
-        return next;
-      });
     }
   }, [
     creditToOptions,
     fields.creditTo,
     fields.creditToAccountId,
     mode,
+    resolvedCreditAccountId,
+  ]);
+
+  // applyPatch validates creditTo; auto-fill / party-info sync uses setFields
+  // only — reconcile stale "Credit To is required" once value or UUID catches up.
+  useEffect(() => {
+    if (mode === 'edit' || mode === 'recreate') return;
+    setErrors(prev => {
+      if (!prev.creditTo) return prev;
+      const err = validateCreditToField(fields.creditTo, creditToOptions, {
+        creditToAccountId: fields.creditToAccountId ?? resolvedCreditAccountId,
+        mode,
+        productType,
+      });
+      if (err) {
+        return prev.creditTo === err ? prev : {...prev, creditTo: err};
+      }
+      const next = {...prev};
+      delete next.creditTo;
+      return next;
+    });
+  }, [
+    fields.creditTo,
+    fields.creditToAccountId,
+    creditToOptions,
+    mode,
+    productType,
     resolvedCreditAccountId,
   ]);
 
@@ -1260,23 +1304,11 @@ export const CreateInvoice: React.FC = () => {
       case 'paymentDate':
         return undefined;
       case 'creditTo':
-        if (!value?.trim()) {
-          return 'Credit To is required';
-        }
-        // Unified backend requires credit_to_account_id (UUID) on create.
-        // Use fieldState so a same-patch creditToAccountId is not ignored.
-        if (
-          mode !== 'edit' &&
-          requiresCreditToAccountId(productType) &&
-          !resolveCreditAccountIdFromOptions(
-            String(value || ''),
-            creditToOptions,
-            fieldState.creditToAccountId,
-          )
-        ) {
-          return 'Please select a valid Credit To account from the list';
-        }
-        return undefined;
+        return validateCreditToField(String(value || ''), creditToOptions, {
+          creditToAccountId: fieldState.creditToAccountId,
+          mode,
+          productType,
+        });
       case 'items':
         if (!value || value.length === 0) {
           return 'At least one item is required';
@@ -1572,6 +1604,18 @@ export const CreateInvoice: React.FC = () => {
     // after camera/picker briefly blurred this screen.
     openUploadPreview(fieldsRef.current, file);
   };
+
+  const handleClearAttachment = useCallback(() => {
+    setSelectedAttachment(null);
+    setErrors(prev => {
+      if (!prev.attachment) {
+        return prev;
+      }
+      const next = {...prev};
+      delete next.attachment;
+      return next;
+    });
+  }, []);
 
   const openCamera = async () => {
     const ok = await ensureCameraPermission();
@@ -2604,6 +2648,7 @@ export const CreateInvoice: React.FC = () => {
             onDeleteItemTax={handleDeleteItemTax}
             canUploadFinal={canUploadFinal}
             onAddAttachment={() => setIsProofUploadModalVisible(true)}
+            onClearAttachment={handleClearAttachment}
             selectedAttachment={selectedAttachment}
             onPreview={handleInvoicePreview}
             previewButtonAppearsDisabled={!canPreviewInvoice}
