@@ -16,7 +16,7 @@ import {PERMISSIONS} from '@constants/permissions';
 import {useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
 import {userSelector} from '@store/user';
-import {canShowCashnTechInvoiceVerification, canShowFinanceRequest, canShowInvoiceListEdit, canShowWorkflowApproveReject} from '@utils/invoiceListActionable';
+import {canShowCashnTechInvoiceVerification, canShowFinanceRequest, canShowInvoiceListDelete, canShowInvoiceListEdit, canShowWorkflowApproveReject} from '@utils/invoiceListActionable';
 
 /**
  * Visibility and Actionability Logic for "Manage Attachment"
@@ -89,6 +89,8 @@ type Props = {
   rawInvoiceStatus?: string;
   /** List-retained actionable flag — preferred over approval_status parsing */
   listActionable?: boolean;
+  /** List-retained deletable flag — mirrors backend deleteInvoice authorization */
+  listDeletable?: boolean;
   /** Current workflow step action type from list API */
   currentStepActionType?: string | null;
   userDepartment?: string;
@@ -117,6 +119,7 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   rawApprovalStatus,
   rawInvoiceStatus,
   listActionable,
+  listDeletable,
   currentStepActionType,
   userDepartment: _userDepartment,
   approvalLogsCount: _approvalLogsCount = 0,
@@ -160,9 +163,11 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
     },
   );
 
-  // Show Delete for all invoices when permission exists — matches web view.
-  // Backend enforces actual authorization (returns 401 when not allowed).
-  const isDeletable = canDelete;
+  const isDeletable = canShowInvoiceListDelete(
+    {rawInvoiceStatus},
+    canDelete,
+    listDeletable,
+  );
 
   const roleLabel = (
     userInfo?.permission_group?.[0]?.business_role ||

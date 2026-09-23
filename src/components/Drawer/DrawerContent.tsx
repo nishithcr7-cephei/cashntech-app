@@ -653,9 +653,8 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
                     </View>
                     <Text
                       style={[
-                        isReportingOpen
-                          ? styles.parentMenuText
-                          : styles.buttonText,
+                        styles.buttonText,
+                        isReportingOpen && styles.parentMenuText,
                       ]}>
                       Reporting & Analysis
                     </Text>

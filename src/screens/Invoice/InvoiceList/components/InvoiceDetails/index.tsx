@@ -122,6 +122,7 @@ export const InvoiceDetails: React.FC = () => {
     selectedInvoiceRawApprovalStatus,
     selectedInvoiceRawInvoiceStatus,
     selectedInvoiceActionable,
+    selectedInvoiceDeletable,
     selectedInvoiceCurrentStepActionType,
     selectedInvoiceApprovalLogsCount,
     selectedInvoiceCurrentStepSequenceNo,
@@ -484,6 +485,7 @@ export const InvoiceDetails: React.FC = () => {
         rawApprovalStatus={selectedInvoiceRawApprovalStatus}
         rawInvoiceStatus={selectedInvoiceRawInvoiceStatus}
         listActionable={selectedInvoiceActionable}
+        listDeletable={selectedInvoiceDeletable}
         currentStepActionType={selectedInvoiceCurrentStepActionType}
         userDepartment={userDepartment}
         approvalLogsCount={selectedInvoiceApprovalLogsCount}

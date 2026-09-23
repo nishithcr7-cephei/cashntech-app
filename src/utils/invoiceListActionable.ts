@@ -200,6 +200,28 @@ export function canShowInvoiceListEdit(
 }
 
 /**
+ * 3-dots Delete — permission + backend list `deletable` when present.
+ * Falls back to Disbursed/Closed hide for older API responses.
+ */
+export function canShowInvoiceListDelete(
+  row: Pick<InvoiceEditRow, 'rawInvoiceStatus'>,
+  canDelete: boolean,
+  listDeletable?: boolean,
+): boolean {
+  if (!canDelete) {
+    return false;
+  }
+  if (typeof listDeletable === 'boolean') {
+    return listDeletable;
+  }
+  const status = (row.rawInvoiceStatus || '').trim().toLowerCase();
+  if (status.includes('disbursed') || status === 'closed') {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Bulk-select / pending eligibility.
  * CashnTech: actionable && invoice_verification (web Ze pending count).
  * Fallback to Pending Verification only when actionable is undefined.

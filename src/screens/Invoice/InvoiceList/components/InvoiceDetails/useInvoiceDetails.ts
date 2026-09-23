@@ -1713,6 +1713,7 @@ export function useInvoiceDetails() {
     selectedInvoiceRawApprovalStatus: selectedRowForMenu?.rawApprovalStatus,
     selectedInvoiceRawInvoiceStatus: selectedRowForMenu?.rawInvoiceStatus,
     selectedInvoiceActionable: selectedRowForMenu?.actionable,
+    selectedInvoiceDeletable: selectedRowForMenu?.deletable,
     selectedInvoiceCurrentStepActionType:
       selectedRowForMenu?.currentStepActionType ?? null,
     selectedInvoiceApprovalLogsCount: selectedRowForMenu?.approvalLogsCount || 0,

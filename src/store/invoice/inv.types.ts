@@ -127,6 +127,8 @@ export type InvoiceListItemApi = {
   attachments?: unknown;
   /** Whether the current user can act on this invoice now (unified backend list). */
   actionable?: boolean;
+  /** Whether the current user may delete this invoice (unified backend list). */
+  deletable?: boolean;
   /** Workflow pointer populated on unified backend list responses. */
   current_step?: InvoiceCurrentStep | null;
   /** VF/CWF create/detail: UUID of credit-to bank account row */

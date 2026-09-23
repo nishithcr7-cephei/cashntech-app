@@ -201,18 +201,28 @@ function formatListAmount(value: number | string | null | undefined): string {
 function resolveDisbursementRequestedAmount(
   item: InvoiceListItemApi,
 ): string {
-  if (item.sub_total == null || item.sub_total === '') {
-    return '-';
-  }
-  const subTotal = Number(item.sub_total);
-  if (!Number.isFinite(subTotal)) {
-    return '-';
-  }
+  const subRaw = item.sub_total;
+  const subTotal =
+    subRaw != null && subRaw !== '' ? Number(subRaw) : Number.NaN;
   const discountTotal = Number(item.discount_total) || 0;
   const taxTotal = Number(item.tax_total) || 0;
   const tdsAmount = Number(item.tds_amount) || 0;
-  const invoiceAmount = Math.max(0, subTotal - discountTotal + taxTotal);
-  return formatListAmount(Math.max(0, invoiceAmount - tdsAmount));
+
+  if (Number.isFinite(subTotal) && subTotal > 0) {
+    const invoiceAmount = Math.max(0, subTotal - discountTotal + taxTotal);
+    return formatListAmount(Math.max(0, invoiceAmount - tdsAmount));
+  }
+
+  // Bulk-upload rows often store amount in final_total_after_tds with sub_total=0.
+  const draRaw = item.final_total_after_tds;
+  if (draRaw != null && draRaw !== '') {
+    const dra = Number(draRaw);
+    if (Number.isFinite(dra)) {
+      return formatListAmount(dra);
+    }
+  }
+
+  return '-';
 }
 
 export type InvoiceRow = {
@@ -245,6 +255,8 @@ export type InvoiceRow = {
   absoluteIndex?: number;
   /** From list API — drives Approve/Reject when present */
   actionable?: boolean;
+  /** From list API — drives Delete visibility when present */
+  deletable?: boolean;
   currentStepRole?: string;
   currentStepActionType?: string;
   /** Backend edit gate: sequence_no <= 2 (or Draft/Rejected) */
@@ -308,6 +320,7 @@ export function mapApiToRow(item: InvoiceListItemApi): InvoiceRow {
     counterParty,
     approvalLogsCount: Array.isArray(item.approvalLogs) ? item.approvalLogs.length : 0,
     actionable: typeof item.actionable === 'boolean' ? item.actionable : undefined,
+    deletable: typeof item.deletable === 'boolean' ? item.deletable : undefined,
     currentStepRole: item.current_step?.role,
     currentStepActionType: item.current_step?.action_type,
     currentStepSequenceNo:

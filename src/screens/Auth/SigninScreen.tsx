@@ -39,8 +39,8 @@ const Strings = {
 export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
   
   //1.Cashntech-user
-  //const [email, setEmail] = useState('piyush.sharma@cepheiinfotech.com');
-  //const [passwordValue, setPassword] = useState('admin@123');
+  const [email, setEmail] = useState('piyush.sharma@cepheiinfotech.com');
+  const [passwordValue, setPassword] = useState('admin@123');
 
   //const [email, setEmail] = useState('sunilpatil23@yopmail.com');
   //const [email, setEmail] = useState('satishpatil54@yopmail.com');
@@ -49,6 +49,10 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
 
   //Pid Anchor-maker email id
   //const [email, setEmail] = useState('kishork90@yopmail.com')
+  //const [passwordValue, setPassword] = useState('Welcome@123');
+
+  //Pid Anchor-checker email id
+  //const [email, setEmail] = useState('utml932@yopmail.com')
   //const [passwordValue, setPassword] = useState('Welcome@123');
 
   //2.Anchor-maker
@@ -67,8 +71,8 @@ export const SigninScreen = ({navigation, route: {params}}: SigninProps) => {
   //const [email, setEmail] = useState('dl_chcker21@yopmail.com');
   //const [passwordValue, setPassword] = useState('Welcome@123');
 
-  const [email, setEmail] = useState('');
-  const [passwordValue, setPassword] = useState('');
+  //const [email, setEmail] = useState('');
+  //const [passwordValue, setPassword] = useState('');
 
 
   const [showPassword, setShowPassword] = useState(false);
