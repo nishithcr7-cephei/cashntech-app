@@ -133,6 +133,12 @@ export const InvoiceDetails: React.FC = () => {
     pendingCount,
     draftCount,
     actionRequiredCount,
+    summaryFocus,
+    onSummaryFocusChange,
+    listEmptyMessage,
+    summaryFocusHint,
+    summaryFocusSwitching,
+    summaryFocusSwitchMessage,
     selectedInvoices,
     setSelectedInvoices,
     bulkAction,
@@ -207,147 +213,177 @@ export const InvoiceDetails: React.FC = () => {
             </Text>
           </View>
         </ScrollView>
-      ) : invoiceListError ? (
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-          <View style={styles.emptyState}>
-            <Text style={styles.errorStateText}>{invoiceListError}</Text>
-            <TouchableOpacity
-              style={styles.errorRefreshButton}
-              onPress={refreshInvoiceList}
-              disabled={invoiceListLoading}
-              activeOpacity={0.8}>
-              {invoiceListLoading ? (
-                <ActivityIndicator size="small" color={Colors.white} />
-              ) : (
-                <>
-                  <FontAwesome6
-                    name="arrow-rotate-right"
-                    iconStyle="solid"
-                    size={16}
-                    color={Colors.white}
-                  />
-                  <Text style={styles.errorRefreshButtonText}>Refresh</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      ) : invoiceListLoading && invoiceData.length === 0 ? (
-        <View style={styles.fullScreenLoading}>
-          <ActivityIndicator size="large" color={Colors.primaryColor} />
-          <Text style={styles.loadingText}>Loading Invoices...</Text>
-        </View>
       ) : (
         <>
-          <FlatList
-            style={styles.scroll}
-            contentContainerStyle={styles.content}
-            data={paginatedData}
-            keyExtractor={row => row.id}
-            ListHeaderComponent={
-              <>
-                <InvoiceDetailsControls
-                  dealerListTitle={dealerListTitle}
-                  invoiceCount={invoiceData.length}
-                  isDealerMaker={isDealerMaker}
-                  isAnchorMaker={isAnchorMaker}
-                  isAnchorChecker={isAnchorChecker}
-                  isDealerChecker={isDealerChecker}
-                  isCashnTechUser={isCashnTechUser}
-                  isAnchorAllAccess={isAnchorAllAccess}
-                  isDealerAllAccess={isDealerAllAccess}
-                  filteredDataLength={filteredData.length}
-                  searchText={searchText}
-                  setSearchText={setSearchText}
-                  onOpenFilterModal={() => setShowFilterModal(true)}
-                  navigation={navigation}
-                  allSelectedOnScreen={allSelectedOnScreen}
-                  onToggleSelectAllVisible={toggleSelectAllVisible}
-                  selectedInvoiceIdsLength={selectedInvoiceIds.length}
-                  onOpenSendForApprovalModal={() => setShowBulkActionSheet(true)}
-                  onCreateInvoicePress={onCreateInvoicePress}
-                  isCreateInvoiceEnabled={isCreateInvoiceEnabled}
-                  createInvoiceDisabledReason={createInvoiceDisabledReason}
-                  user={userInfoFull}
-                  actionRequiredCount={actionRequiredCount}
-                  pendingCount={pendingCount}
-                  draftCount={draftCount}
-                  onBulkAction={handleBulkAction}
-                  canEdit={canEdit}
-                  canImport={canImport}
-                  onRefresh={refreshInvoiceList}
-                  listRefreshing={invoiceListLoading}
-                />
-                <View style={styles.listTopSeparator} />
-              </>
-            }
-            ItemSeparatorComponent={() => <View style={{height: scaleHeight(12)}} />}
-            renderItem={({item: row, index}) => (
-              <InvoiceDetailsCard
-                row={row}
-                index={index}
-                isAnchorMaker={isAnchorMaker}
-                isDealerMaker={isDealerMaker}
-                isDealerChecker={isDealerChecker}
-                isAnchorChecker={isAnchorChecker}
-                isCashnTechUser={isCashnTechUser}
-                isAnchorAllAccess={isAnchorAllAccess}
-                isDealerAllAccess={isDealerAllAccess}
-                storedUserRole={storedUserRole}
-                transparency={invoiceListLoading ? 0.6 : 1}
-                isSelected={
-                  (isDealerChecker ||
-                    isAnchorChecker ||
-                    isCashnTechUser ||
-                    isVfAnchorMaker) &&
-                  selectedInvoiceIds.includes(row.id)
-                }
-                onMenuToggle={handleMenuToggle}
-                onToggleSelection={toggleInvoiceSelection}
-                onInvoiceNoPress={handleInvoiceNoPress}
-                registerMenuRef={registerMenuRef}
-                isSelectable={isInvoiceSelectable(row)}
-                showBulkCheckbox={isVfAnchorMaker}
-              />
-            )}
-            ListEmptyComponent={
-              invoiceListLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={Colors.primaryColor} />
-                  <Text style={styles.loadingText}>Loading Invoices...</Text>
-                </View>
-              ) : filteredData.length === 0 ? (
-                <View style={styles.loadingContainer}>
-                  <Text style={styles.loadingText}>
-                    {selectedDealerName
-                      ? `No invoices found for ${selectedDealerName}`
-                      : 'No invoices found'}
-                  </Text>
-                </View>
-              ) : null
-            }
-            onEndReached={hasMore ? loadMore : undefined}
-            onEndReachedThreshold={0.3}
-            onScrollBeginDrag={() => {
-              setOpenMenuId(null);
-              setMenuAnchor(null);
-            }}
-            ListFooterComponent={
-              hasMore && !invoiceListLoading ? (
-                <View style={styles.loadMoreFooter}>
-                  <ActivityIndicator size="small" color={Colors.primaryColor} />
-                  <Text style={styles.loadMoreText}>Loading more...</Text>
-                </View>
-              ) : null
-            }
-          />
-          {invoiceListLoading && (
-            <View style={styles.loadingOverlay}>
-              <View style={styles.overlaySpinnerContainer}>
-                <ActivityIndicator size="large" color={Colors.primaryColor} />
-                <Text style={styles.overlayLoadingText}>Loading Invoices...</Text>
+          <View style={styles.controlsOutsideList}>
+            <InvoiceDetailsControls
+              dealerListTitle={dealerListTitle}
+              invoiceCount={filteredData.length}
+              listHeaderTitle={
+                summaryFocus === 'pending'
+                  ? 'Pending Invoices'
+                  : summaryFocus === 'draft'
+                    ? 'Draft Invoices'
+                    : summaryFocus === 'actionRequired'
+                      ? 'Action Required'
+                      : dealerListTitle
+              }
+              isDealerMaker={isDealerMaker}
+              isAnchorMaker={isAnchorMaker}
+              isAnchorChecker={isAnchorChecker}
+              isDealerChecker={isDealerChecker}
+              isCashnTechUser={isCashnTechUser}
+              isAnchorAllAccess={isAnchorAllAccess}
+              isDealerAllAccess={isDealerAllAccess}
+              filteredDataLength={filteredData.length}
+              searchText={searchText}
+              setSearchText={setSearchText}
+              onOpenFilterModal={() => setShowFilterModal(true)}
+              navigation={navigation}
+              allSelectedOnScreen={allSelectedOnScreen}
+              onToggleSelectAllVisible={toggleSelectAllVisible}
+              selectedInvoiceIdsLength={selectedInvoiceIds.length}
+              onOpenSendForApprovalModal={() => setShowBulkActionSheet(true)}
+              onCreateInvoicePress={onCreateInvoicePress}
+              isCreateInvoiceEnabled={isCreateInvoiceEnabled}
+              createInvoiceDisabledReason={createInvoiceDisabledReason}
+              user={userInfoFull}
+              actionRequiredCount={actionRequiredCount}
+              pendingCount={pendingCount}
+              draftCount={draftCount}
+              summaryFocus={summaryFocus}
+              onSummaryFocusChange={onSummaryFocusChange}
+              summaryFocusHint={summaryFocusHint}
+              onBulkAction={handleBulkAction}
+              canEdit={canEdit}
+              canImport={canImport}
+              onRefresh={refreshInvoiceList}
+              listRefreshing={invoiceListLoading}
+              showSearchAndFilter={invoiceData.length > 0 && !invoiceListError}
+            />
+            <View style={styles.listTopSeparator} />
+          </View>
+
+          {invoiceListError ? (
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.content}>
+              <View style={styles.emptyState}>
+                <Text style={styles.errorStateTitle}>Unable to load invoices</Text>
+                <Text style={styles.errorStateText}>{invoiceListError}</Text>
+                <TouchableOpacity
+                  style={styles.errorRefreshButton}
+                  onPress={refreshInvoiceList}
+                  disabled={invoiceListLoading}
+                  activeOpacity={0.8}>
+                  {invoiceListLoading ? (
+                    <ActivityIndicator size="small" color={Colors.white} />
+                  ) : (
+                    <>
+                      <FontAwesome6
+                        name="arrow-rotate-right"
+                        iconStyle="solid"
+                        size={16}
+                        color={Colors.white}
+                      />
+                      <Text style={styles.errorRefreshButtonText}>Try again</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
               </View>
+            </ScrollView>
+          ) : invoiceListLoading && invoiceData.length === 0 ? (
+            <View style={styles.fullScreenLoading}>
+              <ActivityIndicator size="large" color={Colors.primaryColor} />
+              <Text style={styles.loadingText}>Loading Invoices...</Text>
             </View>
+          ) : (
+            <>
+              <FlatList
+                style={styles.scroll}
+                contentContainerStyle={styles.content}
+                data={paginatedData}
+                keyExtractor={row => row.id}
+                ItemSeparatorComponent={() => (
+                  <View style={{height: scaleHeight(12)}} />
+                )}
+                renderItem={({item: row, index}) => (
+                  <InvoiceDetailsCard
+                    row={row}
+                    index={index}
+                    isAnchorMaker={isAnchorMaker}
+                    isDealerMaker={isDealerMaker}
+                    isDealerChecker={isDealerChecker}
+                    isAnchorChecker={isAnchorChecker}
+                    isCashnTechUser={isCashnTechUser}
+                    isAnchorAllAccess={isAnchorAllAccess}
+                    isDealerAllAccess={isDealerAllAccess}
+                    storedUserRole={storedUserRole}
+                    transparency={invoiceListLoading ? 0.6 : 1}
+                    isSelected={
+                      (isDealerChecker ||
+                        isAnchorChecker ||
+                        isCashnTechUser ||
+                        isVfAnchorMaker) &&
+                      selectedInvoiceIds.includes(row.id)
+                    }
+                    onMenuToggle={handleMenuToggle}
+                    onToggleSelection={toggleInvoiceSelection}
+                    onInvoiceNoPress={handleInvoiceNoPress}
+                    registerMenuRef={registerMenuRef}
+                    isSelectable={isInvoiceSelectable(row)}
+                    showBulkCheckbox={isVfAnchorMaker}
+                  />
+                )}
+                ListEmptyComponent={
+                  invoiceListLoading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator
+                        size="large"
+                        color={Colors.primaryColor}
+                      />
+                      <Text style={styles.loadingText}>Loading Invoices...</Text>
+                    </View>
+                  ) : filteredData.length === 0 ? (
+                    <View style={styles.loadingContainer}>
+                      <Text style={styles.loadingText}>{listEmptyMessage}</Text>
+                    </View>
+                  ) : null
+                }
+                onEndReached={hasMore ? loadMore : undefined}
+                onEndReachedThreshold={0.3}
+                onScrollBeginDrag={() => {
+                  setOpenMenuId(null);
+                  setMenuAnchor(null);
+                }}
+                ListFooterComponent={
+                  hasMore && !invoiceListLoading ? (
+                    <View style={styles.loadMoreFooter}>
+                      <ActivityIndicator
+                        size="small"
+                        color={Colors.primaryColor}
+                      />
+                      <Text style={styles.loadMoreText}>Loading more...</Text>
+                    </View>
+                  ) : null
+                }
+              />
+              { (invoiceListLoading || summaryFocusSwitching) && (
+                <View style={styles.loadingOverlay}>
+                  <View style={styles.overlaySpinnerContainer}>
+                    <ActivityIndicator
+                      size="large"
+                      color={Colors.primaryColor}
+                    />
+                    <Text style={styles.overlayLoadingText}>
+                      {summaryFocusSwitching
+                        ? summaryFocusSwitchMessage
+                        : 'Loading Invoices...'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </>
           )}
         </>
       )}

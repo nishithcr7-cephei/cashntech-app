@@ -99,6 +99,8 @@ const invoiceSlice = createSlice({
     fetchInvoiceListFailure: (state, action: PayloadAction<string>) => {
       state.invoiceListLoading = false;
       state.invoiceListError = action.payload;
+      // Clear stale rows so a technical error never looks like an empty list.
+      state.invoiceList = [];
     },
     updateInvoiceStatusRequest: (
       _state,

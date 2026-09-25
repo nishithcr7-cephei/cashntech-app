@@ -48,6 +48,7 @@ import {
 } from '@store/product/product.selectors';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {resolveWorkspaceProductId} from '@store/product/product.resolver';
+import {getApiErrorMessage} from '@utils/apiErrorMessage';
 import {getUserCapability} from '@store/user/user.selector';
 import type {InvoiceListFilters} from './inv.types';
 import type {InvoicePartyInfoRouteOptions} from '@utils/invoicePartyInfoRoute';
@@ -228,12 +229,12 @@ function* fetchInvoiceListSaga(
       productId ? {productId} : undefined,
     );
     yield put(fetchInvoiceListSuccess(data));
-  } catch (error: any) {
-    const msg =
-      error?.message?.includes('fetch') || error?.code === 'ECONNABORTED'
-        ? 'Network error. Check connection.'
-        : error?.message || 'Failed to fetch invoice list';
-    yield put(fetchInvoiceListFailure(msg));
+  } catch (error: unknown) {
+    yield put(
+      fetchInvoiceListFailure(
+        getApiErrorMessage(error, 'Failed to fetch invoice list'),
+      ),
+    );
   }
 }
 

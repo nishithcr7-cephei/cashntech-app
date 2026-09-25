@@ -1,8 +1,10 @@
 import * as React from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -24,9 +26,12 @@ import {shouldShowCreateInvoice} from '@utils/permissionHelpers';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
 import {PRODUCT_CODES} from '@store/product/product.types';
 
+type SummaryFocus = 'all' | 'pending' | 'draft' | 'actionRequired';
+
 type Props = {
   dealerListTitle: string;
   invoiceCount: number;
+  listHeaderTitle?: string;
   isDealerMaker: boolean;
   isAnchorMaker: boolean;
   isAnchorChecker: boolean;
@@ -50,16 +55,22 @@ type Props = {
   actionRequiredCount?: number;
   pendingCount?: number;
   draftCount?: number;
+  summaryFocus?: SummaryFocus;
+  onSummaryFocusChange?: (focus: SummaryFocus) => void;
+  summaryFocusHint?: string | null;
   onBulkAction?: (action: 'Verify' | 'Reject' | 'On Hold') => void;
   canEdit?: boolean;
   canImport?: boolean;
   onRefresh?: () => void;
   listRefreshing?: boolean;
+  /** Search + Filters only when the list has at least one invoice. */
+  showSearchAndFilter?: boolean;
 };
 
 export const InvoiceDetailsControls: React.FC<Props> = ({
   dealerListTitle,
   invoiceCount,
+  listHeaderTitle,
   isDealerMaker,
   isAnchorMaker,
   isAnchorChecker,
@@ -83,11 +94,15 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   actionRequiredCount = 0,
   pendingCount = 0,
   draftCount = 0,
+  summaryFocus = 'all',
+  onSummaryFocusChange,
+  summaryFocusHint = null,
   onBulkAction,
   canEdit = false,
   canImport = false,
   onRefresh,
   listRefreshing = false,
+  showSearchAndFilter = true,
 }) => {
   const dispatch = useDispatch();
   const [showSearchHelp, setShowSearchHelp] = React.useState(false);
@@ -119,6 +134,14 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
 
   // Composite Role-based visibility check for "Create Invoice"
   const showCreateButton = shouldShowCreateInvoice(user, canCreateInvoice);
+  const showDraftChip =
+    draftCount > 0 &&
+    (isAnchorMaker || isDealerMaker || isAnchorAllAccess || isDealerAllAccess) &&
+    canImport;
+  const showActionChip =
+    actionRequiredCount > 0 &&
+    (isAnchorMaker || isDealerMaker || isAnchorAllAccess || isDealerAllAccess) &&
+    canEdit;
 
   const onPressCreateInvoice = () => {
     if (!isCreateInvoiceEnabled) {
@@ -135,173 +158,241 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
     handler();
   };
 
+  const renderInfoChip = (label: string, count: number) => (
+    <View key={label} style={[styles.statChip, styles.infoChip]}>
+      <Text style={styles.infoChipCount}>{count}</Text>
+      <Text style={styles.infoChipLabel} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+
+  const renderActionChip = (
+    key: SummaryFocus,
+    label: string,
+    count: number,
+    tone: 'pending' | 'draft' | 'action',
+  ) => {
+    const active = summaryFocus === key;
+    const toneStyle =
+      tone === 'pending'
+        ? styles.actionChipPending
+        : tone === 'draft'
+          ? styles.actionChipDraft
+          : styles.actionChipRequired;
+    const activeStyle =
+      tone === 'pending'
+        ? styles.actionChipPendingActive
+        : tone === 'draft'
+          ? styles.actionChipDraftActive
+          : styles.actionChipRequiredActive;
+    const countStyle =
+      tone === 'pending'
+        ? styles.actionCountPending
+        : tone === 'draft'
+          ? styles.actionCountDraft
+          : styles.actionCountRequired;
+
+    return (
+      <TouchableOpacity
+        key={key}
+        activeOpacity={0.75}
+        onPress={() => onSummaryFocusChange?.(key)}
+        style={[styles.statChip, toneStyle, active && activeStyle]}
+        accessibilityRole="button"
+        accessibilityState={{selected: active}}
+        accessibilityLabel={`${label}: ${count}. Tap to filter.`}>
+        <Text style={[styles.actionChipCount, countStyle]}>{count}</Text>
+        <Text style={[styles.actionChipLabel, countStyle]} numberOfLines={1}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const showCreateForAnchorOrCashn =
+    (isAnchorMaker || isCashnTechUser || isAnchorAllAccess) && showCreateButton;
+  const showCreateForDealer =
+    (isDealerMaker || isDealerAllAccess) && !isCashnTechUser && showCreateButton;
+  const showCreate = showCreateForAnchorOrCashn || showCreateForDealer;
+  const createLabel =
+    Dimensions.get('window').width < 360 ? 'Create' : 'Create Invoice';
+
   return (
     <View style={styles.controlsSection}>
-      <View style={styles.summaryRow}>
-        <View style={[styles.summaryCard, styles.pendingCard]}>
-          <View style={styles.pendingDotSmall} />
-          <Text style={[styles.summaryCount, styles.pendingText]}>{pendingCount}</Text>
-          <Text style={styles.summaryLabel}>PENDING FOR APPROVAL</Text>
-        </View>
-        {draftCount > 0 && (isAnchorMaker || isDealerMaker || isAnchorAllAccess || isDealerAllAccess) && canImport && (
-          <View style={[styles.summaryCard, styles.draftCard]}>
-            <View style={styles.draftDotSmall} />
-            <Text style={[styles.summaryCount, styles.draftText]}>{draftCount}</Text>
-            <Text style={styles.summaryLabel}>DRAFT</Text>
-          </View>
-        )}
-        {actionRequiredCount > 0 && (isAnchorMaker || isDealerMaker || isAnchorAllAccess || isDealerAllAccess) && canEdit && (
-          <View style={[styles.summaryCard, styles.actionRequiredCard]}>
-            <View style={styles.actionDotSmall} />
-            <Text style={[styles.summaryCount, styles.actionRequiredText]}>{actionRequiredCount}</Text>
-            <Text style={styles.summaryLabel}>ACTION REQUIRED</Text>
-          </View>
-        )}
-      </View>
-
-
-      {/* Search moved below */}
-
-      {/* Legend replaced by summary cards above */}
-
-      <View style={styles.selectAllCreateRow}>
-        <View style={styles.dmSelectAllWrapper}>
-          {showBulkSelectUi && (
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={[
-                styles.dmSelectAllRow,
-                {opacity: filteredDataLength > 0 ? 1 : 0},
-              ]}
-              disabled={filteredDataLength === 0}
-              onPress={onToggleSelectAllVisible}>
-              <View
-                style={[
-                  styles.checkboxBox,
-                  allSelectedOnScreen && styles.checkboxBoxSelected,
-                ]}>
-                {allSelectedOnScreen && (
-                  <Text style={styles.checkboxTick}>✓</Text>
-                )}
-              </View>
-              <Text style={styles.dmSelectAllText}>Select all</Text>
-              {(isCashnTechUser ||
-                isAnchorChecker ||
-                isDealerChecker ||
-                isAnchorAllAccess ||
-                isDealerAllAccess ||
-                (isAnchorMaker && isVendorFinance)) && (
-                <View style={styles.bulkBadge}>
-                  <Text style={styles.bulkBadgeText}>Bulk Actions</Text>
-                </View>
+      {/* Row 1: chips (scroll) + Create */}
+      <View style={styles.topControlsRow}>
+        <View style={styles.chipsScrollWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.summaryChipRow}
+            style={styles.chipsScroll}>
+            {pendingCount > 0
+              ? renderActionChip('pending', 'Pending', pendingCount, 'pending')
+              : renderInfoChip('Pending', pendingCount)}
+            {showDraftChip &&
+              renderActionChip('draft', 'Draft', draftCount, 'draft')}
+            {showActionChip &&
+              renderActionChip(
+                'actionRequired',
+                'Action',
+                actionRequiredCount,
+                'action',
               )}
-            </TouchableOpacity>
-          )}
+          </ScrollView>
         </View>
-
-        <View style={styles.primaryActionsRow}>
-          {(isAnchorMaker || isCashnTechUser || isAnchorAllAccess) && showCreateButton && (
-            <TouchableOpacity
-              style={[
-                styles.primaryButton,
-                styles.primaryButtonSingle,
-                (!isCreateInvoiceEnabled || permissionsLoading) && styles.primaryButtonDisabled,
-              ]}
-              disabled={permissionsLoading}
-              onPress={onPressCreateInvoice}>
-              <View style={styles.buttonIconContainer}>
-                <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
-              </View>
-              <Text style={styles.primaryButtonText}>Create Invoice</Text>
-            </TouchableOpacity>
-          )}
-          {(isDealerMaker || isDealerAllAccess) && !isCashnTechUser && (
-            <>
-              {showCreateButton && (
-                <TouchableOpacity
-                  style={[
-                    styles.primaryButton,
-                    styles.primaryButtonSingle,
-                    (!isCreateInvoiceEnabled || permissionsLoading) && styles.primaryButtonDisabled,
-                  ]}
-                  disabled={permissionsLoading}
-                  onPress={onPressCreateInvoice}>
-                  <View style={styles.buttonIconContainer}>
-                    <Plus width={scaleWidth(14)} height={scaleHeight(14)} />
-                  </View>
-                  <Text style={styles.primaryButtonText}>Create Invoice</Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-        </View>
-      </View>
-
-      <View style={styles.searchFilterRow}>
-        <View style={styles.searchContainer}>
-          <Search width={scaleWidth(18)} height={scaleHeight(18)} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search Invoices"
-            placeholderTextColor={Colors.graybase}
-            value={searchText}
-            onChangeText={setSearchText}
-            returnKeyType="search"
-            multiline={false}
-            numberOfLines={1}
-            accessibilityLabel="Search invoices"
-            accessibilityHint="Search by invoice number, program, or party. Tap the info button for details."
-          />
+        {showCreate && (
           <TouchableOpacity
-            onPress={() => setShowSearchHelp(true)}
-            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
-            activeOpacity={0.7}
-            accessibilityLabel="Search help"
-            accessibilityRole="button">
-            <FontAwesome6
-              name="circle-info"
-              iconStyle="solid"
-              size={17}
-              color={Colors.graybase}
-            />
+            style={[
+              styles.createBtnCompact,
+              (!isCreateInvoiceEnabled || permissionsLoading) &&
+                styles.primaryButtonDisabled,
+            ]}
+            disabled={permissionsLoading}
+            onPress={onPressCreateInvoice}
+            accessibilityRole="button"
+            accessibilityLabel="Create Invoice">
+            <View style={styles.buttonIconContainer}>
+              <Plus width={scaleWidth(10)} height={scaleHeight(10)} />
+            </View>
+            <Text style={styles.createBtnText} numberOfLines={1}>
+              {createLabel}
+            </Text>
           </TouchableOpacity>
-          {searchText.length > 0 && (
-            <TouchableOpacity 
-              onPress={() => setSearchText('')}
-              hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-              activeOpacity={0.7}>
-              <FontAwesome6 name="circle-xmark" iconStyle="solid" size={18} color={Colors.graybase} />
-            </TouchableOpacity>
-          )}
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.refreshButton,
-            listRefreshing && styles.refreshButtonDisabled,
-          ]}
-          onPress={onRefresh}
-          disabled={!onRefresh || listRefreshing}
-          activeOpacity={0.8}
-          accessibilityLabel="Refresh invoice list"
-          accessibilityRole="button">
-          {listRefreshing ? (
-            <ActivityIndicator size="small" color={Colors.primaryColor} />
-          ) : (
-            <FontAwesome6
-              name="arrow-rotate-right"
-              iconStyle="solid"
-              size={18}
-              color={Colors.primaryColor}
-            />
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={onOpenFilterModal}>
-          <Filter width={scaleWidth(18)} height={scaleHeight(18)} />
-          <Text style={styles.filterButtonText}>Filters</Text>
-        </TouchableOpacity>
+        )}
       </View>
+      {!!summaryFocusHint && (
+        <Text style={styles.summaryFocusHint}>{summaryFocusHint}</Text>
+      )}
+
+      {/* Row 2: Search + Refresh + Filters */}
+      {showSearchAndFilter ? (
+        <View style={styles.searchFilterRow}>
+          <View style={styles.searchContainer}>
+            <Search width={scaleWidth(16)} height={scaleHeight(16)} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search Invoices"
+              placeholderTextColor={Colors.graybase}
+              value={searchText}
+              onChangeText={setSearchText}
+              returnKeyType="search"
+              multiline={false}
+              numberOfLines={1}
+              accessibilityLabel="Search invoices"
+              accessibilityHint="Search by invoice number, program, or party. Tap the info button for details."
+            />
+            <TouchableOpacity
+              onPress={() => setShowSearchHelp(true)}
+              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+              activeOpacity={0.7}
+              accessibilityLabel="Search help"
+              accessibilityRole="button">
+              <FontAwesome6
+                name="circle-info"
+                iconStyle="solid"
+                size={15}
+                color={Colors.graybase}
+              />
+            </TouchableOpacity>
+            {searchText.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchText('')}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                activeOpacity={0.7}>
+                <FontAwesome6
+                  name="circle-xmark"
+                  iconStyle="solid"
+                  size={16}
+                  color={Colors.graybase}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.refreshButton,
+              listRefreshing && styles.refreshButtonDisabled,
+            ]}
+            onPress={onRefresh}
+            disabled={!onRefresh || listRefreshing}
+            activeOpacity={0.8}
+            accessibilityLabel="Refresh invoice list"
+            accessibilityRole="button">
+            {listRefreshing ? (
+              <ActivityIndicator size="small" color={Colors.primaryColor} />
+            ) : (
+              <FontAwesome6
+                name="arrow-rotate-right"
+                iconStyle="solid"
+                size={16}
+                color={Colors.primaryColor}
+              />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={onOpenFilterModal}
+            accessibilityRole="button"
+            accessibilityLabel="Filters">
+            <Filter width={scaleWidth(14)} height={scaleHeight(14)} />
+            <Text style={styles.filterButtonText}>Filters</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.refreshOnlyRow}>
+          <TouchableOpacity
+            style={[
+              styles.refreshButton,
+              listRefreshing && styles.refreshButtonDisabled,
+            ]}
+            onPress={onRefresh}
+            disabled={!onRefresh || listRefreshing}
+            activeOpacity={0.8}
+            accessibilityLabel="Refresh invoice list"
+            accessibilityRole="button">
+            {listRefreshing ? (
+              <ActivityIndicator size="small" color={Colors.primaryColor} />
+            ) : (
+              <FontAwesome6
+                name="arrow-rotate-right"
+                iconStyle="solid"
+                size={16}
+                color={Colors.primaryColor}
+              />
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Row 3: Select all / Bulk — checkers only */}
+      {showBulkSelectUi && (
+        <View style={styles.bulkSelectRow}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[
+              styles.dmSelectAllRow,
+              {opacity: filteredDataLength > 0 ? 1 : 0.35},
+            ]}
+            disabled={filteredDataLength === 0}
+            onPress={onToggleSelectAllVisible}>
+            <View
+              style={[
+                styles.checkboxBox,
+                allSelectedOnScreen && styles.checkboxBoxSelected,
+              ]}>
+              {allSelectedOnScreen && (
+                <Text style={styles.checkboxTick}>✓</Text>
+              )}
+            </View>
+            <Text style={styles.dmSelectAllText}>Select all</Text>
+            <View style={styles.bulkBadge}>
+              <Text style={styles.bulkBadgeText}>Bulk Actions</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Modal
         transparent
@@ -337,16 +428,14 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
 
       <View style={styles.listHeader}>
         <Text style={styles.listHeaderLabel}>
-          {dealerListTitle}
+          {listHeaderTitle || dealerListTitle}
         </Text>
         <View style={styles.countBadge}>
           <Text style={styles.countBadgeText}>{invoiceCount}</Text>
         </View>
       </View>
 
-
-      {showBulkSelectUi &&
-        selectedInvoiceIdsLength > 0 && (
+      {showBulkSelectUi && selectedInvoiceIdsLength > 0 && (
         <TouchableOpacity
           style={styles.proceedButton}
           onPress={onOpenSendForApprovalModal}>
@@ -361,81 +450,64 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   controlsSection: {
-    marginTop: scaleHeight(8),
-    marginBottom: scaleHeight(8),
+    marginTop: scaleHeight(2),
+    marginBottom: scaleHeight(2),
     gap: scaleHeight(8),
   },
-  topRow: {
+  topControlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scaleWidth(12),
-  },
-  dealersBadgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: scaleHeight(40),
     gap: scaleWidth(8),
   },
-  dealersLabel: {
-    fontSize: scaleFont(16),
-    fontFamily: Fonts.GilroySemiBold,
-    color: Colors.darkblack,
+  chipsScrollWrap: {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
   },
-  dealersBadge: {
-    backgroundColor: Colors.primaryColor,
-    borderRadius: scaleWidth(12),
-    paddingHorizontal: scaleWidth(10),
-    paddingVertical: scaleHeight(4),
-    minWidth: scaleWidth(40),
-    alignItems: 'center',
+  chipsScroll: {
+    flexGrow: 0,
   },
-  dealersBadgeText: {
-    color: Colors.white,
-    fontSize: scaleFont(14),
-    fontFamily: Fonts.GilroySemiBold,
-  },
-  blueDotLegendRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginTop: scaleHeight(8),
-    paddingRight: scaleWidth(2),
-  },
-  blueDotLegendContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scaleWidth(6),
-    maxWidth: '92%',
-  },
-  blueDotLegendText: {
+  summaryFocusHint: {
     fontSize: scaleFont(11),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.graybase,
-    flexShrink: 1,
-    textAlign: 'right',
+    marginTop: scaleHeight(-2),
+    marginBottom: scaleHeight(2),
   },
-  pendingDot: {
-    width: scaleWidth(8),
-    height: scaleWidth(8),
-    borderRadius: scaleWidth(4),
-    backgroundColor: Colors.tertiaryBlue,
-  },
-  legendStackRow: {
-    width: '100%',
+  summaryChipRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginTop: scaleHeight(8),
-    gap: scaleWidth(12),
-    paddingRight: scaleWidth(2),
+    gap: scaleWidth(8),
+    paddingRight: scaleWidth(4),
+    minHeight: scaleHeight(40),
   },
-  /* Legend styles removed */
+  createBtnCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primaryColor,
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(6),
+    borderRadius: scaleWidth(8),
+    gap: scaleWidth(3),
+    minHeight: scaleHeight(32),
+    flexShrink: 0,
+  },
+  createBtnText: {
+    color: Colors.white,
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  bulkSelectRow: {
+    minHeight: scaleHeight(40),
+    justifyContent: 'center',
+  },
   dmSelectAllRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: scaleHeight(4),
-    marginBottom: scaleHeight(2),
+    minHeight: scaleHeight(40),
   },
   dmSelectAllText: {
     fontSize: scaleFont(13),
@@ -469,22 +541,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: '#E6E4DC',
-    borderRadius: scaleWidth(12),
-    paddingHorizontal: scaleWidth(10),
-    paddingVertical: scaleHeight(8),
-    minHeight: scaleHeight(44),
-    gap: scaleWidth(6),
+    borderRadius: scaleWidth(10),
+    paddingHorizontal: scaleWidth(8),
+    minHeight: scaleHeight(36),
+    gap: scaleWidth(4),
   },
   searchInput: {
     flex: 1,
     minWidth: 0,
-    fontSize: scaleFont(13),
+    fontSize: scaleFont(12),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.darkblack,
     padding: 0,
     margin: 0,
-    height: scaleHeight(22),
-    lineHeight: scaleHeight(18),
+    height: scaleHeight(20),
+    lineHeight: scaleHeight(16),
     ...(Platform.OS === 'android'
       ? {includeFontPadding: false, textAlignVertical: 'center' as const}
       : {}),
@@ -492,8 +563,13 @@ const styles = StyleSheet.create({
   searchFilterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scaleWidth(8),
-    marginTop: scaleHeight(4),
+    gap: scaleWidth(6),
+    minHeight: scaleHeight(36),
+  },
+  refreshOnlyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   refreshButton: {
     alignItems: 'center',
@@ -501,9 +577,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: '#E6E4DC',
-    width: scaleWidth(44),
-    height: scaleWidth(44),
-    borderRadius: scaleWidth(12),
+    width: scaleWidth(36),
+    height: scaleWidth(36),
+    borderRadius: scaleWidth(10),
     flexShrink: 0,
   },
   refreshButtonDisabled: {
@@ -513,17 +589,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.primaryColor,
-    paddingHorizontal: scaleWidth(10),
-    paddingVertical: scaleHeight(12),
-    borderRadius: scaleWidth(12),
+    paddingHorizontal: scaleWidth(8),
+    height: scaleHeight(36),
+    borderRadius: scaleWidth(10),
     gap: scaleWidth(4),
     justifyContent: 'center',
-    minWidth: scaleWidth(76),
     flexShrink: 0,
   },
   filterButtonText: {
     color: Colors.white,
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(12),
     fontFamily: Fonts.GilroySemiBold,
   },
   searchHelpOverlay: {
@@ -555,64 +630,14 @@ const styles = StyleSheet.create({
     color: Colors.graybase,
     lineHeight: scaleHeight(20),
   },
-  primaryActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: scaleWidth(10),
-  },
-  selectAllCreateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: scaleHeight(4),
-    marginBottom: scaleHeight(4),
-    minHeight: scaleHeight(44), // Lock height to prevent shift
-  },
-  dmSelectAllWrapper: {
-    flex: 1,
-    justifyContent: 'center',
-    minHeight: scaleHeight(32),
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primaryColor,
-    paddingHorizontal: scaleWidth(14),
-    paddingVertical: scaleHeight(10),
-    borderRadius: scaleWidth(10),
-    gap: scaleWidth(6),
-  },
-  primaryButtonHalf: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: scaleWidth(10),
-  },
-  primaryButtonSingle: {
-    marginLeft: 'auto',
-    paddingHorizontal: scaleWidth(18),
-  },
   primaryButtonDisabled: {
     opacity: 0.5,
   },
-  disabledHintContainer: {
-    marginTop: scaleHeight(4),
-  },
-  disabledHintText: {
-    fontSize: scaleFont(12),
-    fontFamily: Fonts.GilroyMedium,
-    color: Colors.graybase,
-  },
   buttonIconContainer: {
-    width: scaleWidth(18),
-    height: scaleHeight(18),
+    width: scaleWidth(14),
+    height: scaleHeight(14),
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  primaryButtonText: {
-    color: Colors.white,
-    fontSize: scaleFont(13),
-    fontFamily: Fonts.GilroySemiBold,
   },
   proceedButton: {
     backgroundColor: Colors.primaryColor,
@@ -620,7 +645,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaleWidth(16),
     borderRadius: scaleWidth(10),
     alignItems: 'center',
-    marginTop: scaleHeight(8),
+    marginTop: scaleHeight(4),
   },
   proceedButtonText: {
     color: Colors.white,
@@ -642,119 +667,95 @@ const styles = StyleSheet.create({
     color: '#4338CA',
     textTransform: 'uppercase',
   },
-  summaryRow: {
+  statChip: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    paddingHorizontal: scaleWidth(12),
-    paddingBottom: scaleHeight(4),
-    gap: scaleWidth(8),
-  },
-  summaryCard: {
-    flex: 1,
-    minHeight: scaleHeight(50),
-    backgroundColor: Colors.white,
-    borderRadius: scaleWidth(6),
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  pendingCard: {
-    borderColor: '#E2E8F0',
-  },
-  draftCard: {
-    borderColor: '#E2E8F0',
-  },
-  totalCard: {
-    backgroundColor: Colors.white,
+    height: scaleHeight(36),
+    paddingHorizontal: scaleWidth(10),
+    borderRadius: scaleWidth(18),
     borderWidth: 1,
-    borderColor: '#E6E4DC',
+    gap: scaleWidth(6),
   },
-  summaryCount: {
-    fontSize: scaleFont(18),
+  infoChip: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+  },
+  infoChipCount: {
+    fontSize: scaleFont(13),
     fontFamily: Fonts.GilroyBold,
-    lineHeight: scaleHeight(22),
+    color: '#334155',
   },
-  pendingText: {
+  infoChipLabel: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: '#64748B',
+  },
+  actionChipPending: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+  },
+  actionChipPendingActive: {
+    backgroundColor: '#DBEAFE',
+    borderColor: Colors.tertiaryBlue,
+  },
+  actionChipDraft: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  actionChipDraftActive: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
+  actionChipRequired: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  actionChipRequiredActive: {
+    backgroundColor: '#FEE2E2',
+    borderColor: Colors.red,
+  },
+  actionChipCount: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyBold,
+  },
+  actionChipLabel: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroySemiBold,
+  },
+  actionCountPending: {
     color: Colors.tertiaryBlue,
   },
-  draftText: {
-    color: '#F59E0B',
+  actionCountDraft: {
+    color: '#D97706',
   },
-  totalText: {
-    color: '#17160F',
-  },
-  actionRequiredCard: {
-    borderColor: '#E2E8F0',
-  },
-  actionRequiredText: {
+  actionCountRequired: {
     color: Colors.red,
-  },
-  summaryLabel: {
-    fontSize: scaleFont(9),
-    fontFamily: Fonts.GilroySemiBold,
-    textTransform: 'uppercase',
-    color: '#64748B',
-    marginTop: scaleHeight(2),
-    textAlign: 'center',
-    paddingHorizontal: scaleWidth(4),
   },
   listHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scaleWidth(20),
-    paddingBottom: scaleHeight(4),
+    paddingTop: scaleHeight(4),
+    paddingBottom: scaleHeight(2),
     gap: scaleWidth(8),
   },
   listHeaderLabel: {
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(14),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
   },
   countBadge: {
     backgroundColor: Colors.primaryColor,
-    paddingHorizontal: scaleWidth(10),
-    paddingVertical: scaleHeight(4),
-    borderRadius: scaleWidth(12),
-    minWidth: scaleWidth(40),
+    paddingHorizontal: scaleWidth(8),
+    paddingVertical: scaleHeight(3),
+    borderRadius: scaleWidth(10),
+    minWidth: scaleWidth(32),
     alignItems: 'center',
     justifyContent: 'center',
   },
   countBadgeText: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(12),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.white,
-  },
-  pendingDotSmall: {
-    width: scaleWidth(6),
-    height: scaleWidth(6),
-    borderRadius: scaleWidth(3),
-    backgroundColor: Colors.tertiaryBlue,
-    position: 'absolute',
-    top: scaleHeight(6),
-    right: scaleWidth(6),
-  },
-  draftDotSmall: {
-    width: scaleWidth(6),
-    height: scaleWidth(6),
-    borderRadius: scaleWidth(3),
-    backgroundColor: '#F59E0B',
-    position: 'absolute',
-    top: scaleHeight(6),
-    right: scaleWidth(6),
-  },
-  actionDotSmall: {
-    width: scaleWidth(6),
-    height: scaleWidth(6),
-    borderRadius: scaleWidth(3),
-    backgroundColor: Colors.red,
-    position: 'absolute',
-    top: scaleHeight(6),
-    right: scaleWidth(6),
   },
 });
 

@@ -87,9 +87,13 @@ export type HomeNavigatorType = {
   FundingLimitsForDealers: undefined;
   ANCreditAccount: undefined;
   CreditAccountDetails: {
+    id?: string;
+    programId?: string;
     dealerName?: string;
     creditAccount?: string;
     anchor?: string;
+    bankName?: string;
+    status?: string;
   };
   CreditAccountInvoiceNumber: {
     creditAccountNo?: string;

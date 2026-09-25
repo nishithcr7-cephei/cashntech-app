@@ -27,6 +27,7 @@ import {
   selectEffectiveProductCode,
 } from '@store/product/product.selectors';
 import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {isStandaloneProduct} from '@store/product/product.resolver';
 
 export const StatementOfAccount: React.FC = () => {
   const navigation = useNavigation();
@@ -35,6 +36,7 @@ export const StatementOfAccount: React.FC = () => {
   const activeProductName = useSelector(selectActiveProductName);
   const activeProductId = useSelector(selectActiveProductId);
   const effectiveProductCode = useSelector(selectEffectiveProductCode);
+  const isPidSoa = isStandaloneProduct(effectiveProductCode);
   const primaryPartyLabel = 'Primary Party';
   const productBreadcrumbLabel =
     activeProductName || PRODUCT_DISPLAY_NAMES[effectiveProductCode];
@@ -89,7 +91,19 @@ export const StatementOfAccount: React.FC = () => {
             <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>Bank Name</Text>
               <TouchableOpacity
-                onPress={() =>
+                onPress={() => {
+                  // PID/standalone: program-level SOA tabs (web parity) — skip vendor list.
+                  if (isPidSoa && item.programId) {
+                    (navigation as any).navigate('CreditAccountDetails', {
+                      id: item.programId,
+                      programId: item.programId,
+                      dealerName: item.partyName || 'Anchor',
+                      anchor: item.programName,
+                      bankName: item.bankName,
+                      status: item.status,
+                    });
+                    return;
+                  }
                   (navigation as any).navigate('SOADealerList', {
                     programId: item.programId,
                     programIds: item.programId ? [item.programId] : [],
@@ -99,8 +113,8 @@ export const StatementOfAccount: React.FC = () => {
                     status: item.status,
                     totalSanctionedAmount: item.totalSanctionedAmount,
                     totalOutstanding: item.totalOutstanding,
-                  })
-                }>
+                  });
+                }}>
                 <Text style={[styles.infoValue, styles.linkText]}>{item.bankName || '-'}</Text>
               </TouchableOpacity>
             </View>

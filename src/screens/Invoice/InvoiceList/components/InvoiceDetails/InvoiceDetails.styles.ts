@@ -183,11 +183,21 @@ export const styles = StyleSheet.create({
     paddingHorizontal: scaleWidth(16),
     alignItems: 'center',
   },
+  controlsOutsideList: {
+    paddingHorizontal: scaleWidth(16),
+  },
   emptyStateText: {
     fontSize: scaleFont(14),
     color: Colors.graybase,
     fontFamily: Fonts.GilroyMedium,
     textAlign: 'center',
+  },
+  errorStateTitle: {
+    fontSize: scaleFont(16),
+    color: Colors.darkblack,
+    fontFamily: Fonts.GilroySemiBold,
+    textAlign: 'center',
+    marginBottom: scaleHeight(8),
   },
   errorStateText: {
     fontSize: scaleFont(14),

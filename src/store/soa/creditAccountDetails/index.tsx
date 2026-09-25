@@ -33,7 +33,10 @@ import {
   selectRepaymentMessage,
 } from './selector';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
-import {PRODUCT_CODES} from '@store/product/product.types';
+import {
+  isPid,
+  usesVendorPartyLabels,
+} from '@store/product/product.resolver';
 import {SOAVendorListProgramHeader} from '@screens/Invoice/Account/SOAVendorListProgramHeader';
 
 const TABS = [
@@ -43,6 +46,20 @@ const TABS = [
   'Closed Invoice',
   'Repayment',
 ];
+
+/** Parse ₹ / comma / dash amounts from SOA transaction rows. */
+function parseTxnAmount(raw?: string | null): number {
+  const cleaned = String(raw ?? '')
+    .replace(/[,\s₹]/g, '')
+    .replace(/[—–-]/g, '')
+    .trim();
+  if (!cleaned) return 0;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+
+const formatTxnTotalInr = (n: number) =>
+  `₹${formatIndianNumber(String(Number.isFinite(n) ? n : 0))}`;
 
 export const CreditAccountDetails: React.FC = () => {
   const navigation = useNavigation();
@@ -56,19 +73,48 @@ export const CreditAccountDetails: React.FC = () => {
   const id = (route.params as any)?.id;
   const programId = (route.params as any)?.programId;
   const effectiveProductCode = useSelector(selectEffectiveProductCode);
-  const isVendorFinance = effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE;
+  const isPidProduct = isPid(effectiveProductCode);
+  const vendorPartyLabels = usesVendorPartyLabels(effectiveProductCode);
   const dealerName =
-    (route.params as any)?.dealerName || (isVendorFinance ? 'Vendor' : 'Dealer');
+    (route.params as any)?.dealerName ||
+    (isPidProduct ? 'Anchor' : vendorPartyLabels ? 'Vendor' : 'Dealer');
   const programName = (route.params as any)?.anchor || 'Program';
-  const partyLabel = isVendorFinance ? 'Vendor Name' : 'Dealer Name';
-  const emptyPartyLabel = isVendorFinance ? 'vendors' : 'dealers';
-  const invoiceRefLabel = isVendorFinance ? 'Invoice Ref. No' : 'Invoice Number';
+  // PID SOA is program/anchor level (web parity); VF/DF use counterparty labels.
+  const partyLabel = isPidProduct
+    ? 'Anchor'
+    : vendorPartyLabels
+      ? 'Vendor Name'
+      : 'Dealer Name';
+  const emptyPartyLabel = isPidProduct
+    ? 'OD accounts'
+    : vendorPartyLabels
+      ? 'vendors'
+      : 'dealers';
+  const invoiceRefLabel = vendorPartyLabels ? 'Invoice Ref. No' : 'Invoice Number';
   const disbursementDateLabel = 'Disbursement Date';
-  const sanctionedAmountLabel = isVendorFinance ? 'Sanctioned Amount' : 'Sanction Amount';
+  const sanctionedAmountLabel = vendorPartyLabels
+    ? 'Sanctioned Amount'
+    : 'Sanction Amount';
+  const pageTitle = isPidProduct
+    ? `SOA — ${programName}`
+    : `Credit Account Details of ${dealerName}`;
+
+  const navigateBackFromDetails = React.useCallback(() => {
+    if (isPidProduct) {
+      (navigation as any).navigate('StatementOfAccount');
+      return;
+    }
+    (navigation as any).navigate('SOADealerList', {
+      programId,
+      programName,
+      bankName: (route.params as any)?.bankName,
+      status: (route.params as any)?.status,
+    });
+  }, [isPidProduct, navigation, programId, programName, route.params]);
 
   const formatParticulars = (particulars?: string) => {
     if (!particulars) return '-';
-    if (isVendorFinance && particulars === 'Repayment Received') {
+    if (vendorPartyLabels && particulars === 'Repayment Received') {
       return 'Repayment from Anchor';
     }
     return particulars;
@@ -90,10 +136,7 @@ export const CreditAccountDetails: React.FC = () => {
 
   useEffect(() => {
     const backAction = () => {
-      (navigation as any).navigate('SOADealerList', {
-        programId,
-        anchor: programName,
-      });
+      navigateBackFromDetails();
       return true;
     };
     const backHandler = BackHandler.addEventListener(
@@ -101,7 +144,7 @@ export const CreditAccountDetails: React.FC = () => {
       backAction,
     );
     return () => backHandler.remove();
-  }, [navigation]);
+  }, [navigateBackFromDetails]);
 
   useEffect(() => {
     if (id && programId) {
@@ -121,6 +164,17 @@ export const CreditAccountDetails: React.FC = () => {
         item.status?.toLowerCase().includes(term),
     );
   }, [dealers, searchText]);
+
+  const transactionTotals = useMemo(() => {
+    return transactions.reduce(
+      (acc, row) => {
+        acc.debit += parseTxnAmount(row?.debit);
+        acc.credit += parseTxnAmount(row?.credit);
+        return acc;
+      },
+      {debit: 0, credit: 0},
+    );
+  }, [transactions]);
 
   const renderDealerCard = (item: any, index: number) => {
     const isDebitFreeze = item.status?.toLowerCase() === 'debit freeze';
@@ -340,12 +394,7 @@ export const CreditAccountDetails: React.FC = () => {
           navigation={navigation as any} 
           hideHamburger={true}
           renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
-          onPressLeftIcon={() => 
-            (navigation as any).navigate('SOADealerList', {
-              programId,
-              anchor: programName,
-            })
-          }
+          onPressLeftIcon={navigateBackFromDetails}
         />
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primaryColor} />
@@ -363,12 +412,7 @@ export const CreditAccountDetails: React.FC = () => {
           navigation={navigation as any} 
           hideHamburger={true}
           renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
-          onPressLeftIcon={() => 
-            (navigation as any).navigate('SOADealerList', {
-              programId,
-              anchor: programName,
-            })
-          }
+          onPressLeftIcon={navigateBackFromDetails}
         />
         <View style={styles.center}>
           <Text style={styles.errorText}>Oops! Something went wrong.</Text>
@@ -389,18 +433,15 @@ export const CreditAccountDetails: React.FC = () => {
         navigation={navigation as any} 
         hideHamburger={true}
         renderLeftIcon={<LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} />}
-        onPressLeftIcon={() => 
-          (navigation as any).navigate('SOADealerList', {
-            programId,
-            anchor: programName,
-          })
-        }
+        onPressLeftIcon={navigateBackFromDetails}
       />
-      
-      <ScrollView
-        stickyHeaderIndices={[2]}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+
+      <View style={styles.body}>
+        <ScrollView
+          style={styles.scroll}
+          stickyHeaderIndices={[2]}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}>
         
         {/* Page Title */}
         <View style={styles.pageTitleBar}>
@@ -409,11 +450,11 @@ export const CreditAccountDetails: React.FC = () => {
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}>
-            Credit Account Details of {dealerName}
+            {pageTitle}
           </Text>
         </View>
 
-        {/* Top Summary Card - Loan Details (web parity: DUE / RECEIVED) — DF + VF */}
+        {/* Top Summary Card - Loan Details (web parity: DUE / RECEIVED) — DF + VF + PID */}
         {(loading || accountLoanSummary) && (
           <View style={styles.loanDetailsWrap}>
             <SOAVendorListProgramHeader
@@ -515,7 +556,9 @@ export const CreditAccountDetails: React.FC = () => {
             
             {activeTab === 'Transaction Details' && (
               transactions.length > 0 ? (
-                transactions.map((item, index) => renderTransactionCard(item, index))
+                transactions.map((item, index) =>
+                  renderTransactionCard(item, index),
+                )
               ) : (
                 <View style={styles.emptyState}><Text style={styles.emptyText}>No transactions found</Text></View>
               )
@@ -562,14 +605,36 @@ export const CreditAccountDetails: React.FC = () => {
             )}
           </View>
         </View>
-      </ScrollView>
+        </ScrollView>
+
+        {/* Sticky Total footer — DF + VF + PID (Transaction Details only) */}
+        {activeTab === 'Transaction Details' && transactions.length > 0 && (
+          <View style={styles.txnTotalStickyFooter}>
+            <Text style={styles.txnTotalTitle}>Total</Text>
+            <View style={styles.txnTotalRow}>
+              <Text style={styles.txnTotalLabel}>Debit</Text>
+              <Text style={styles.txnTotalValue}>
+                {formatTxnTotalInr(transactionTotals.debit)}
+              </Text>
+            </View>
+            <View style={styles.txnTotalRow}>
+              <Text style={styles.txnTotalLabel}>Credit</Text>
+              <Text style={styles.txnTotalValue}>
+                {formatTxnTotalInr(transactionTotals.credit)}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
     </Container>
   );
 };
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  scrollContent: { paddingBottom: scaleHeight(40) },
+  body: { flex: 1 },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: scaleHeight(24) },
   pageTitleBar: { paddingHorizontal: scaleWidth(16), paddingVertical: scaleHeight(12), backgroundColor: Colors.white },
   pageTitleText: { fontSize: scaleFont(13), fontFamily: Fonts.GilroySemiBold, color: Colors.darkblack },
   loanDetailsWrap: {
@@ -665,6 +730,41 @@ const styles = StyleSheet.create({
   },
   emptyState: { alignItems: 'center', paddingVertical: scaleHeight(40) },
   emptyText: { fontSize: scaleFont(14), color: Colors.graybase, fontFamily: Fonts.GilroyMedium },
+  txnTotalStickyFooter: {
+    backgroundColor: Colors.white,
+    paddingHorizontal: scaleWidth(16),
+    paddingTop: scaleHeight(12),
+    paddingBottom: scaleHeight(16),
+    borderTopWidth: 1,
+    borderTopColor: '#E6E6E6',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: -2},
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  txnTotalTitle: {
+    fontSize: scaleFont(15),
+    fontFamily: Fonts.GilroyBold,
+    color: Colors.darkblack,
+    marginBottom: scaleHeight(6),
+  },
+  txnTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: scaleHeight(4),
+  },
+  txnTotalLabel: {
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
+  txnTotalValue: {
+    fontSize: scaleFont(14),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
+  },
   loadingText: { marginTop: scaleHeight(12), fontSize: scaleFont(14), color: Colors.graybase, fontFamily: Fonts.GilroyMedium },
   errorText: { fontSize: scaleFont(18), color: Colors.darkblack, fontFamily: Fonts.GilroyBold, marginBottom: scaleHeight(8) },
   errorSubText: { fontSize: scaleFont(14), color: Colors.graybase, fontFamily: Fonts.GilroyMedium, textAlign: 'center', paddingHorizontal: scaleWidth(40), marginBottom: scaleHeight(24) },

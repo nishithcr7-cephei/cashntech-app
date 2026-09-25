@@ -155,6 +155,10 @@ export function useInvoiceDetails() {
   const [selectedInvoiceNo, setSelectedInvoiceNo] = useState<string | null>(null);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const [attachmentFallback, setAttachmentFallback] = useState<InvoiceAttachmentItem[]>([]);
+  /** Compact summary chip focus: pending / draft / actionRequired filters the list. */
+  const [summaryFocus, setSummaryFocus] = useState<
+    'all' | 'pending' | 'draft' | 'actionRequired'
+  >('all');
   
   // Permission Checks
   const canApprove = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVE);
@@ -204,6 +208,91 @@ export function useInvoiceDetails() {
         (item.invoiceNo?.toLowerCase() || '').includes(term),
     );
   }
+
+  if (summaryFocus === 'pending') {
+    filteredData = filteredData.filter(row =>
+      isPendingInvoiceApprovalRow(row, {
+        isCashnTechUser,
+        canVerify,
+        isAnchorMaker,
+        isDealerMaker,
+        isAnchorChecker,
+        isDealerChecker,
+        isAnchorAllAccess,
+        isDealerAllAccess,
+        canApprove,
+        canReject,
+        roleLabel: storedUserRole,
+      }),
+    );
+  } else if (summaryFocus === 'draft') {
+    filteredData = filteredData.filter(row => {
+      const iStatusRaw = (row.rawInvoiceStatus || '').trim();
+      const approvalStatus = (row.rawApprovalStatus || '').trim();
+      return iStatusRaw === 'Draft' && approvalStatus === 'Pending Attachment';
+    });
+  } else if (summaryFocus === 'actionRequired') {
+    filteredData = filteredData.filter(
+      row => (row.rawInvoiceStatus || '').trim() === 'Rejected',
+    );
+  }
+
+  // Pending-first (stable): actionable blue-dot rows surface without deep scroll.
+  if (summaryFocus === 'all') {
+    const pendingCtx = {
+      isCashnTechUser,
+      canVerify,
+      isAnchorMaker,
+      isDealerMaker,
+      isAnchorChecker,
+      isDealerChecker,
+      isAnchorAllAccess,
+      isDealerAllAccess,
+      canApprove,
+      canReject,
+      roleLabel: storedUserRole,
+    };
+    filteredData = [...filteredData].sort((a, b) => {
+      const aPending = isPendingInvoiceApprovalRow(a, pendingCtx) ? 0 : 1;
+      const bPending = isPendingInvoiceApprovalRow(b, pendingCtx) ? 0 : 1;
+      if (aPending !== bPending) {
+        return aPending - bPending;
+      }
+      return (a.absoluteIndex ?? 0) - (b.absoluteIndex ?? 0);
+    });
+  }
+
+  const onSummaryFocusChange = useCallback(
+    (focus: 'all' | 'pending' | 'draft' | 'actionRequired') => {
+      setSummaryFocus(prev => (prev === focus ? 'all' : focus));
+    },
+    [],
+  );
+
+  const [summaryFocusSwitching, setSummaryFocusSwitching] = useState(false);
+  const [summaryFocusSwitchMessage, setSummaryFocusSwitchMessage] =
+    useState('Updating list...');
+  const skipFocusSwitchFeedback = React.useRef(true);
+
+  const listEmptyMessage =
+    summaryFocus === 'pending'
+      ? 'No pending invoices for approval'
+      : summaryFocus === 'draft'
+        ? 'No draft invoices'
+        : summaryFocus === 'actionRequired'
+          ? 'No action-required invoices'
+          : selectedDealerName
+            ? `No invoices found for ${selectedDealerName}`
+            : 'No invoices found';
+
+  const summaryFocusHint =
+    summaryFocus === 'pending'
+      ? 'Showing pending only · Tap Pending again to clear'
+      : summaryFocus === 'draft'
+        ? 'Showing drafts only · Tap Draft again to clear'
+        : summaryFocus === 'actionRequired'
+          ? 'Showing action required · Tap chip again to clear'
+          : null;
 
   const selectedRowForMenu = openMenuId 
     ? filteredData.find(r => r.id === openMenuId) || invoiceData.find(r => r.id === openMenuId)
@@ -642,13 +731,36 @@ export function useInvoiceDetails() {
 
   useEffect(() => {
     setVisibleCount(30);
-  }, [appliedFilters, searchText, programId, selectedDealerName]);
+  }, [appliedFilters, searchText, programId, selectedDealerName, summaryFocus]);
 
   const paginatedData = filteredData.slice(0, visibleCount);
   const hasMore = visibleCount < filteredData.length;
   const loadMore = useCallback(() => {
     setVisibleCount(prev => Math.min(prev + 20, filteredData.length));
   }, [filteredData.length]);
+
+  // Brief loader + reset pagination when Pending/Draft/Action chip toggles.
+  useEffect(() => {
+    if (skipFocusSwitchFeedback.current) {
+      skipFocusSwitchFeedback.current = false;
+      return;
+    }
+    setVisibleCount(30);
+    setSelectedInvoiceIds([]);
+    setSelectedInvoices([]);
+    const message =
+      summaryFocus === 'pending'
+        ? 'Showing pending invoices...'
+        : summaryFocus === 'draft'
+          ? 'Showing draft invoices...'
+          : summaryFocus === 'actionRequired'
+            ? 'Showing action-required invoices...'
+            : 'Showing all invoices...';
+    setSummaryFocusSwitchMessage(message);
+    setSummaryFocusSwitching(true);
+    const timer = setTimeout(() => setSummaryFocusSwitching(false), 450);
+    return () => clearTimeout(timer);
+  }, [summaryFocus]);
 
   const handleMenuToggle = (invoiceId: string) => {
     if (openMenuId === invoiceId) {
@@ -1616,6 +1728,17 @@ export function useInvoiceDetails() {
     storedUserRole,
   ]);
 
+  // Clear stale chip filter when that bucket becomes empty (e.g. after approve).
+  useEffect(() => {
+    if (summaryFocus === 'pending' && pendingCount === 0) {
+      setSummaryFocus('all');
+    } else if (summaryFocus === 'draft' && draftCount === 0) {
+      setSummaryFocus('all');
+    } else if (summaryFocus === 'actionRequired' && actionRequiredCount === 0) {
+      setSummaryFocus('all');
+    }
+  }, [summaryFocus, pendingCount, draftCount, actionRequiredCount]);
+
   return {
     programId,
     programName: isAllProgramScope
@@ -1726,6 +1849,12 @@ export function useInvoiceDetails() {
     pendingCount,
     draftCount,
     actionRequiredCount,
+    summaryFocus,
+    onSummaryFocusChange,
+    listEmptyMessage,
+    summaryFocusHint,
+    summaryFocusSwitching,
+    summaryFocusSwitchMessage,
     selectedInvoices,
     setSelectedInvoices,
     bulkAction,

@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     lineHeight: scaleFont(12),
   },
   cardTitle: {
-    fontSize: scaleFont(16),
+    fontSize: scaleFont(15),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
   },
@@ -624,12 +624,12 @@ const styles = StyleSheet.create({
     padding: scaleWidth(12),
   },
   infoLabel: {
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(11),
     color: Colors.graybase,
     marginBottom: scaleHeight(4),
   },
   infoValue: {
-    fontSize: scaleFont(14),
+    fontSize: scaleFont(13),
     color: Colors.darkblack,
     fontFamily: Fonts.GilroyMedium,
   },
@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
   },
   indexText: {
     color: Colors.graybase,
-    fontSize: scaleFont(12),
+    fontSize: scaleFont(11),
     fontFamily: Fonts.GilroyBold,
   },
 });

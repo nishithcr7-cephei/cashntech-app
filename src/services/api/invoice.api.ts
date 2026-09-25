@@ -495,6 +495,26 @@ export const invoiceApi = {
     const data = response?.data;
     if (Array.isArray(data)) return data;
     if (data?.data && Array.isArray(data.data)) return data.data;
+
+    // Error-shaped body (e.g. Nest { statusCode, message }) must not look like an empty list.
+    if (data && typeof data === 'object') {
+      const statusCode = Number((data as any).statusCode);
+      const hasErrorShape =
+        (Number.isFinite(statusCode) && statusCode >= 400) ||
+        typeof (data as any).error === 'string';
+      if (hasErrorShape) {
+        const rawMsg = (data as any).message;
+        const message = Array.isArray(rawMsg)
+          ? rawMsg.filter(Boolean).join('\n')
+          : typeof rawMsg === 'string'
+            ? rawMsg
+            : 'Failed to fetch invoice list';
+        const err: any = new Error(message);
+        err.response = {status: statusCode || 500, data};
+        throw err;
+      }
+    }
+
     return [];
   },
 
