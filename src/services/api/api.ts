@@ -8,6 +8,11 @@ import {clearProgramSelection} from '@store/programSelection/programSelection.sl
 import {clearPermissions} from '@store/permissions';
 import {clearProductContext} from '@store/product/product.slice';
 import {isTokenExpired} from '@utils/Utils';
+import {
+  getSessionExpiryReason,
+  SESSION_EXPIRY_MESSAGES,
+  SessionExpiryReason,
+} from '@utils/sessionActivity';
 import {transformApiResponse} from '@utils/apiTransformer';
 import axios, {
   AxiosError,
@@ -87,12 +92,18 @@ const isAuthEndpoint = (url: string): boolean => {
   return AUTH_ENDPOINTS_WHITELIST.some(endpoint => url.includes(endpoint));
 };
 
-let refreshInFlight: Promise<string | null> | null = null;
+type RefreshResult = {
+  token: string | null;
+  /** Backend refused the refresh token (expired / revoked / reused) — session is dead. */
+  rejected: boolean;
+};
 
-async function refreshAccessToken(): Promise<string | null> {
+let refreshInFlight: Promise<RefreshResult> | null = null;
+
+async function refreshAccessToken(): Promise<RefreshResult> {
   const refreshToken = storage.getString(StorageKeys.REFRESH_TOKEN);
   if (!refreshToken) {
-    return null;
+    return {token: null, rejected: true};
   }
   try {
     const response = await refreshClient.post(ApiEndPoints.apiRefreshToken, {
@@ -101,19 +112,20 @@ async function refreshAccessToken(): Promise<string | null> {
     const nextToken = response?.data?.data?.token;
     const nextRefresh = response?.data?.data?.refreshToken;
     if (!nextToken || typeof nextToken !== 'string') {
-      return null;
+      return {token: null, rejected: false};
     }
     storage.set(StorageKeys.TOKEN, nextToken);
     if (nextRefresh && typeof nextRefresh === 'string') {
       storage.set(StorageKeys.REFRESH_TOKEN, nextRefresh);
     }
-    return nextToken;
-  } catch {
-    return null;
+    return {token: nextToken, rejected: false};
+  } catch (err) {
+    const status = (err as AxiosError)?.response?.status;
+    return {token: null, rejected: status === 401 || status === 403};
   }
 }
 
-function queueRefresh(): Promise<string | null> {
+function queueRefresh(): Promise<RefreshResult> {
   if (!refreshInFlight) {
     refreshInFlight = refreshAccessToken().finally(() => {
       refreshInFlight = null;
@@ -133,17 +145,20 @@ axiosInstance.interceptors.request.use(
       let token = storage.getString(StorageKeys.TOKEN);
       const url = config.url || '';
 
+      if (!isAuthEndpoint(url)) {
+        const sessionReason = getSessionExpiryReason();
+        if (sessionReason) {
+          expireSession(sessionReason);
+          return Promise.reject(new Error('Session expired'));
+        }
+      }
+
       if (token && isTokenExpired(token) && !isAuthEndpoint(url)) {
         const refreshed = await queueRefresh();
-        if (refreshed) {
-          token = refreshed;
+        if (refreshed.token) {
+          token = refreshed.token;
         } else {
-          Toast.show({
-            type: 'error',
-            text1: 'Session Expired',
-            text2: 'Your session has expired. Please log in again.',
-          });
-          logoutUser();
+          expireSession('expired');
           return Promise.reject(new Error('Token expired'));
         }
       }
@@ -235,11 +250,22 @@ axiosInstance.interceptors.response.use(
       !isAuthEndpoint(url)
     ) {
       const refreshed = await queueRefresh();
-      if (refreshed) {
+      if (refreshed.token) {
         original._retryAfterRefresh = true;
         original.headers = original.headers || {};
-        original.headers.Authorization = `Bearer ${refreshed}`;
+        original.headers.Authorization = `Bearer ${refreshed.token}`;
         return axiosInstance.request(original) as Promise<never>;
+      }
+      // Backend also returns 401 for business/permission denials, so only
+      // end the session when the credentials themselves are gone.
+      const currentToken = storage.getString(StorageKeys.TOKEN);
+      if (
+        refreshed.rejected ||
+        !currentToken ||
+        isTokenExpired(currentToken)
+      ) {
+        expireSession('expired');
+        return Promise.reject(error);
       }
     }
 
@@ -279,6 +305,25 @@ export const logoutUser = () => {
   store.dispatch(clearProgramSelection());
   store.dispatch(clearPermissions());
   store.dispatch(clearProductContext());
+};
+
+let sessionEnding = false;
+
+/** Logout with a reason toast; concurrent callers collapse into one logout. */
+export const expireSession = (reason: SessionExpiryReason) => {
+  if (sessionEnding) {
+    return;
+  }
+  sessionEnding = true;
+  Toast.show({
+    type: 'error',
+    text1: 'Session Expired',
+    text2: SESSION_EXPIRY_MESSAGES[reason],
+  });
+  logoutUser();
+  setTimeout(() => {
+    sessionEnding = false;
+  }, 2000);
 };
 
 export default axiosInstance;

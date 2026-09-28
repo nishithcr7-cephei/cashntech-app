@@ -42,6 +42,7 @@ import {
 } from './auth.slice';
 import {setStorage} from '@services/localStorage';
 import StorageKeys from '@constants/StorageKeys';
+import {markSessionStarted} from '@utils/sessionActivity';
 import {userActions, userSelector} from '@store/user';
 import {
   deriveCapabilityFromUser,
@@ -76,6 +77,7 @@ function* persistAuthenticatedSession(session: ILmsVerifyOtpData): unknown {
   if (refreshToken) {
     setStorage(StorageKeys.REFRESH_TOKEN, refreshToken);
   }
+  markSessionStarted();
   setStorage(StorageKeys.USER_INFO, JSON.stringify(userData));
   const capability = userData
     ? deriveCapabilityFromUser({

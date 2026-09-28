@@ -4,6 +4,8 @@ import {authActions, authSelector} from '@store/auth';
 import {userActions} from '@store/user';
 import {hydrateProductRequest} from '@store/product/product.slice';
 import {isTokenExpired} from '@utils/Utils';
+import {clearBackground, getSessionExpiryReason} from '@utils/sessionActivity';
+import {expireSession} from '@services/api/api';
 import {useEffect, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 
@@ -23,20 +25,30 @@ export function useAuth() {
       return;
     }
 
-    // Check if token exists and is not expired
-    if (storedToken && !isTokenExpired(storedToken)) {
-      dispatch(hydrateProductRequest());
-      dispatch(userActions.loadInfoFromToken(storedToken));
-      dispatch(authActions.setIsLoggedIn(true));
-    } else if (storedToken && isTokenExpired(storedToken)) {
-      // Token is expired, clear it and log out
-      console.log('Token expired, logging out user');
-      setStorage(StorageKeys.TOKEN, null);
-      setStorage(StorageKeys.IS_LOGGED_IN, false);
+    if (!storedToken) {
       dispatch(authActions.setIsLoggedIn(false));
-    } else {
-      dispatch(authActions.setIsLoggedIn(false));
+      return;
     }
+
+    // Idle / background / max-session limit passed while the app was closed.
+    const sessionReason = getSessionExpiryReason();
+    if (sessionReason) {
+      expireSession(sessionReason);
+      return;
+    }
+
+    // An expired access token is fine while a refresh token exists — the API
+    // layer refreshes it on the first call.
+    const refreshToken = getStorage(StorageKeys.REFRESH_TOKEN);
+    if (isTokenExpired(storedToken) && !refreshToken) {
+      expireSession('expired');
+      return;
+    }
+
+    clearBackground();
+    dispatch(hydrateProductRequest());
+    dispatch(userActions.loadInfoFromToken(storedToken));
+    dispatch(authActions.setIsLoggedIn(true));
   }, [dispatch]);
 
   useEffect(() => {
