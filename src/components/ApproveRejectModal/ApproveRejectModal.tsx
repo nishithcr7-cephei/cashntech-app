@@ -36,6 +36,7 @@ import {resolveNetDisbursementAmountFromInvoice} from '@utils/invoiceTotals';
 import {InvoiceStatusBadges} from '@components/InvoiceStatusBadges';
 import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
 import {fileNameFromAttachmentUrl} from '@utils/invoiceAttachments';
+import {unitCodeToLabel} from '@utils/unitNormalizer';
 import {toYYYYMMDD} from '@services/api/invoice.api';
 
 export type ApproveRejectInvoiceItem = {
@@ -599,7 +600,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                           <View key={item.id} style={styles.itemCard}>
                             <Text style={styles.itemCardTitle}>{itemTitle}</Text>
                             <DetailRow label="Qty" value={fmtAmount(item.quantity)} />
-                            <DetailRow label="Unit" value={dash(item.unit)} />
+                            <DetailRow label="Unit" value={dash(unitCodeToLabel(item.unit))} />
                             <DetailRow label="Price" value={fmtAmount(item.price)} />
                             <DetailRow label="Discount" value={discountValue} />
                             <DetailRow label="Tax" value={taxValue} />

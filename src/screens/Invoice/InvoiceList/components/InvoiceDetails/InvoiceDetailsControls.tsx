@@ -236,7 +236,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
             {showActionChip &&
               renderActionChip(
                 'actionRequired',
-                'Action',
+                'Action Required',
                 actionRequiredCount,
                 'action',
               )}

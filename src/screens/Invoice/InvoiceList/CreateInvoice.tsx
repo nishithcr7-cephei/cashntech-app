@@ -56,7 +56,8 @@ import {
   isPidProductType,
   shouldWarnVfZeroAdvanceInterest,
 } from '@utils/invoiceCreateCalc';
-import {convertOcrLineItems} from '@utils/ocrLineItemMapper';
+import {convertOcrLineItems, getOcrLineItemIssues} from '@utils/ocrLineItemMapper';
+import {INVOICE_UNITS_HINT, unitCodeToLabel} from '@utils/unitNormalizer';
 import {
   normalizeOcrPatch,
   type InvoiceProductType,
@@ -143,6 +144,34 @@ function parseLimitNumber(value: unknown): number {
   }
   const n = typeof value === 'string' ? parseFloat(value) : Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+/** Name / qty / unit / price checks shared by field validation and the submit hint (manual + OCR). */
+function getLineItemError(item: InvoiceLineItem, index: number): string | undefined {
+  const label = `Item ${index + 1}`;
+  if (!item.itemName?.trim()) {
+    return `${label}: Item Name is required`;
+  }
+  const issues = getOcrLineItemIssues(item);
+  if (!item.quantity?.trim()) {
+    return `${label}: Valid Quantity is required`;
+  }
+  if (issues.invalidQty) {
+    return `${label}: Quantity must be at least 1`;
+  }
+  if (!item.unit?.trim()) {
+    return `${label}: Unit is required`;
+  }
+  if (issues.needsUnit) {
+    return `${label}: Unit must be one of: ${INVOICE_UNITS_HINT}`;
+  }
+  if (issues.missingPrice) {
+    return `${label}: Valid Price is required`;
+  }
+  if (issues.amountTooLarge) {
+    return `${label}: Line amount cannot exceed ₹9,99,99,999.99`;
+  }
+  return undefined;
 }
 
 const getInitialFields = (): InvoiceFields => ({
@@ -325,6 +354,8 @@ export const CreateInvoice: React.FC = () => {
   const isLeavingCreate = useSelector(selectLeavingCreateInvoice);
   const [ocrStatusText, setOcrStatusText] = useState('Extracting invoice data...');
   const [isOcrPopulated, setIsOcrPopulated] = useState(false);
+  /** Last invoice number filled by OCR — a different current value means the user typed it. */
+  const lastOcrInvoiceNumberRef = useRef('');
   const [showCamera, setShowCamera] = useState(false);
   const [isOcrUploadModalVisible, setIsOcrUploadModalVisible] = useState(false);
   const [isProofUploadModalVisible, setIsProofUploadModalVisible] = useState(false);
@@ -1030,7 +1061,7 @@ export const CreateInvoice: React.FC = () => {
             itemName: item.name || '',
             description: item.description || '',
             quantity: String(item.quantity || '0'),
-            unit: item.unit || 'PCS',
+            unit: unitCodeToLabel(item.unit),
             pricePerQuantity: String(item.price_per_quantity || '0'),
             total: String(item.total || '0'),
             // Normalize discount_type: convert 'absolute' to 'value' for the dropdown
@@ -1216,6 +1247,7 @@ export const CreateInvoice: React.FC = () => {
       setSelectedParticipant(null);
       setSelectedAttachment(null);
       setIsOcrPopulated(false);
+      lastOcrInvoiceNumberRef.current = '';
       setShowCamera(false);
       setIsOcrUploadModalVisible(false);
       setIsProofUploadModalVisible(false);
@@ -1316,17 +1348,9 @@ export const CreateInvoice: React.FC = () => {
         // Validate each item
         for (let i = 0; i < value.length; i++) {
           const item = value[i];
-          if (!item.itemName?.trim()) {
-            return `Item ${i + 1}: Item Name is required`;
-          }
-          if (!item.quantity?.trim() || parseFloat(item.quantity) <= 0) {
-            return `Item ${i + 1}: Valid Quantity is required`;
-          }
-          if (!item.unit?.trim()) {
-            return `Item ${i + 1}: Unit is required`;
-          }
-          if (!item.pricePerQuantity?.trim() || parseFloat(item.pricePerQuantity) <= 0) {
-            return `Item ${i + 1}: Valid Price is required`;
+          const lineItemError = getLineItemError(item, i);
+          if (lineItemError) {
+            return lineItemError;
           }
           // Discount is now optional
           /*
@@ -1652,6 +1676,36 @@ export const CreateInvoice: React.FC = () => {
     });
   }, []);
 
+  const confirmInvoiceNumberReplace = (current: string, scanned: string) =>
+    new Promise<boolean>(resolve => {
+      Alert.alert(
+        'Replace invoice number?',
+        `The form has "${current}". The scan read "${scanned}".`,
+        [
+          {text: 'Keep current', style: 'cancel', onPress: () => resolve(false)},
+          {text: 'Use scanned', onPress: () => resolve(true)},
+        ],
+        {cancelable: false},
+      );
+    });
+
+  const handleOcrRescan = () => {
+    Alert.alert(
+      'Rescan invoice?',
+      'Items from the new scan will replace the current items, including their discount and tax. Party, dates and other details stay as they are.',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {text: 'Upload', onPress: handleOcrUploadPress},
+        {
+          text: 'Capture',
+          onPress: () => {
+            handleOcrCapturePress();
+          },
+        },
+      ],
+    );
+  };
+
   const runOcrAndPatchForm = async (uriOrPath: string | null) => {
     if (!uriOrPath) return;
     try {
@@ -1660,94 +1714,74 @@ export const CreateInvoice: React.FC = () => {
       const {gstInvoice} = await runGSTInvoiceExtractionWithAI(uriOrPath, {
         onRetry: handleGeminiOcrRetry,
       });
-      const header = gstInvoice?.invoice_header;
-      const summary = gstInvoice?.financial_summary;
-      const gstLineItems = gstInvoice?.line_items ?? [];
-      const extractedItems =
-        gstLineItems.length > 0 ? convertOcrLineItems(gstLineItems) : [];
-      let cgst = '';
-      let sgst = '';
-      let taxTotal = '';
-      let grandTotal = '';
-      if (summary) {
-        const cgstAmt = summary.total_cgst_amount || 0;
-        const sgstAmt = summary.total_sgst_amount || 0;
-        const hasIgst = gstLineItems.some(
-          line => (line.tax_type || '').toUpperCase() === 'IGST',
-        );
-        if (cgstAmt > 0 || sgstAmt > 0) {
-          cgst = cgstAmt > 0 ? cgstAmt.toFixed(2) : '';
-          sgst = sgstAmt > 0 ? sgstAmt.toFixed(2) : '';
-        } else if (gstLineItems.some(
-          line => (line.tax_type || '').toUpperCase() === 'GST'
-          && (line.tax_amount || 0) > 0
-        )) {
-          // Invoice uses "GST" type (not split CGST/SGST)
-          const totalGST = gstLineItems.reduce(
-            (s, line) => s + ((line.tax_type || '').toUpperCase() === 'GST'
-              ? (line.tax_amount || 0) : 0), 0,
-          );
-          if (totalGST > 0) taxTotal = totalGST.toFixed(2);
-        } else if (hasIgst) {
-          const itemSubtotal = extractedItems.reduce(
-            (s, i) => s + (parseFloat(i.total) || 0), 0,
-          );
-          const grand = summary.grand_total_amount || 0;
-          const igstAmt = Math.max(0, grand - itemSubtotal);
-          if (igstAmt > 0) taxTotal = igstAmt.toFixed(2);
-        } else if (extractedItems.length > 0) {
-          const subtotal = extractedItems.reduce(
-            (s, i) => s + (parseFloat(i.total) || 0), 0,
-          );
-          const dealerTax = partyTaxOptions[0];
-          if (dealerTax && dealerTax.percentage > 0 && subtotal > 0) {
-            const gstAmt = Math.round(
-              (subtotal * dealerTax.percentage) / 100 * 100,
-            ) / 100;
-            cgst = (gstAmt / 2).toFixed(2);
-            sgst = (gstAmt / 2).toFixed(2);
-          }
-        }
-        if (summary.grand_total_amount > 0) {
-          grandTotal = summary.grand_total_amount.toFixed(2);
-        }
-      }
-      console.log('[OCR DEBUG]', JSON.stringify({
-        summary: gstInvoice?.financial_summary,
-        lineItems: gstInvoice?.line_items,
-        cgst,
-        sgst,
-        taxTotal,
-        grandTotal,
-      }));
-      setFields(prev => {
-        const ocrPatch = normalizeOcrPatch(
-          {
-            invoiceNumber: header?.invoice_number || prev.invoiceNumber,
-            associatedPO: header?.order_no || prev.associatedPO,
-            earlyPaymentDiscount:
-              header?.early_payment_discount || prev.earlyPaymentDiscount || '',
-            items: extractedItems.length > 0 ? extractedItems : prev.items,
-            cgst,
-            sgst,
-            taxTotal,
-            grandTotal,
-          },
-          productType,
-        );
-        return {...prev, ...ocrPatch};
-      });
+      const extractedItems = convertOcrLineItems(gstInvoice?.line_items ?? []);
 
       if (extractedItems.length === 0) {
-        setIsOcrPopulated(false);
         Toast.show({
           type: 'info',
           text1: 'No line items found on invoice',
-          text2: 'Scan again or add items manually',
+          text2: isOcrPopulated
+            ? 'Current items were kept. Try again with a clearer image.'
+            : 'Scan again or add items manually',
           visibilityTime: 4000,
         });
         return;
       }
+
+      const scannedInvoiceNumber =
+        gstInvoice?.invoice_header?.invoice_number?.trim() || '';
+      const currentInvoiceNumber = fieldsRef.current.invoiceNumber?.trim() || '';
+      let nextInvoiceNumber = currentInvoiceNumber;
+      if (scannedInvoiceNumber && scannedInvoiceNumber !== currentInvoiceNumber) {
+        const typedByUser =
+          !!currentInvoiceNumber &&
+          currentInvoiceNumber !== lastOcrInvoiceNumberRef.current;
+        const useScanned =
+          !typedByUser ||
+          (await confirmInvoiceNumberReplace(
+            currentInvoiceNumber,
+            scannedInvoiceNumber,
+          ));
+        if (useScanned) {
+          nextInvoiceNumber = scannedInvoiceNumber;
+        }
+      }
+      if (scannedInvoiceNumber) {
+        lastOcrInvoiceNumberRef.current = scannedInvoiceNumber;
+      }
+
+      // Discount and tax are program-specific, so OCR never fills them (items or header).
+      setFields(prev => ({
+        ...prev,
+        ...normalizeOcrPatch(
+          {
+            invoiceNumber: nextInvoiceNumber,
+            items: extractedItems,
+            cgst: '',
+            sgst: '',
+            taxTotal: '',
+          },
+          productType,
+        ),
+      }));
+
+      const firstItemError = extractedItems
+        .map((item, index) => getLineItemError(item, index))
+        .find(Boolean);
+      setErrors(prev => {
+        const next = {...prev};
+        if (nextInvoiceNumber) {
+          delete next.invoiceNumber;
+        } else {
+          next.invoiceNumber = 'Invoice number was not found in the scan. Please enter it.';
+        }
+        if (firstItemError) {
+          next.items = firstItemError;
+        } else {
+          delete next.items;
+        }
+        return next;
+      });
 
       setIsOcrPopulated(true);
       Toast.show({
@@ -1755,7 +1789,8 @@ export const CreateInvoice: React.FC = () => {
         text1: `OCR completed (${extractedItems.length} item${
           extractedItems.length === 1 ? '' : 's'
         } extracted)`,
-        visibilityTime: 2500,
+        text2: 'Check the invoice number, choose discount and tax for each item, and fill any missing unit.',
+        visibilityTime: 5000,
       });
     } catch (e: any) {
       Toast.show({
@@ -2131,6 +2166,7 @@ export const CreateInvoice: React.FC = () => {
     setIsOcrUploadModalVisible(false);
     setIsProofUploadModalVisible(false);
     setIsOcrPopulated(false);
+    lastOcrInvoiceNumberRef.current = '';
     setOcrLoading(false);
     lastPreviewTokenRef.current = undefined;
     clearCreateInvoiceRouteParams();
@@ -2430,14 +2466,10 @@ export const CreateInvoice: React.FC = () => {
     
     // Items detail check
     for (let i = 0; i < (fields.items?.length || 0); i++) {
-       const item = fields.items![i];
-       if (!item.itemName?.trim()) return `Item ${i + 1}: Item Name is required`;
-       if (!item.quantity?.trim() || parseFloat(item.quantity) <= 0) return `Item ${i + 1}: Valid Quantity is required`;
-       if (!item.unit?.trim()) return `Item ${i + 1}: Unit is required`;
-      if (!/^[A-Z]{1,3}$/.test(item.unit.trim().toUpperCase())) {
-        return `Item ${i + 1}: Unit must be 1 to 3 letters like PCS or BOX`;
+      const lineItemError = getLineItemError(fields.items![i], i);
+      if (lineItemError) {
+        return lineItemError;
       }
-       if (!item.pricePerQuantity?.trim() || parseFloat(item.pricePerQuantity) <= 0) return `Item ${i + 1}: Valid Price is required`;
     }
 
     if (canUploadFinal && !hasAnyAttachment) {
@@ -2655,6 +2687,7 @@ export const CreateInvoice: React.FC = () => {
             previewDisabledReason={previewDisabledReasonInternal}
             isOcrMode={isOcrPopulated}
             ocrLoading={ocrLoading}
+            onOcrRescan={!mode ? handleOcrRescan : undefined}
           />
         </ScrollView>
       </View>

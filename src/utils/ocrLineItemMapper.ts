@@ -1,144 +1,65 @@
 import type {InvoiceLineItem} from '@type/Invoice';
 import type {GSTInvoiceJSON} from '@services/gstInvoiceExtractor';
 import {round2} from '@utils/invoiceTotals';
+import {normalizeUnit} from '@utils/unitNormalizer';
 
-type GstLineItem = GSTInvoiceJSON['line_items'][number];
+/** Backend `numeric(10,2)` limit for `price_per_quantity` and `total`. */
+export const MAX_LINE_AMOUNT = 99999999.99;
 
-function normalizeOcrDiscountType(raw: string | undefined): string {
-  const t = String(raw || '').trim().toLowerCase();
-  if (t === 'percentage' || t === 'percent' || t === '%') {
-    return 'percentage';
-  }
-  if (t === 'value' || t === 'absolute') {
-    return 'value';
-  }
-  return '';
-}
-
-function mapOcrItemDiscount(
-  item: GstLineItem,
-  lineTotal: number,
-): Pick<InvoiceLineItem, 'discountType' | 'discountValue' | 'discountAmount'> {
-  const discountAmountRaw = Number(item.discount_amount) || 0;
-  const discountType = normalizeOcrDiscountType(item.discount_type);
-  const discountValueRaw = Number(item.discount_value) || 0;
-
-  if (discountAmountRaw > 0) {
-    return {
-      discountType: discountType || 'value',
-      discountValue:
-        discountValueRaw > 0
-          ? String(discountValueRaw)
-          : discountAmountRaw.toFixed(2),
-      discountAmount: discountAmountRaw.toFixed(2),
-    };
-  }
-
-  if (discountType === 'percentage' && discountValueRaw > 0 && lineTotal > 0) {
-    const amount = round2((lineTotal * discountValueRaw) / 100);
-    return {
-      discountType: 'percentage',
-      discountValue: String(discountValueRaw),
-      discountAmount: amount.toFixed(2),
-    };
-  }
-
-  if (discountType === 'value' && discountValueRaw > 0) {
-    const amount = round2(Math.min(discountValueRaw, lineTotal));
-    return {
-      discountType: 'value',
-      discountValue: amount.toFixed(2),
-      discountAmount: amount.toFixed(2),
-    };
-  }
-
-  return {
-    discountType: '',
-    discountValue: '',
-    discountAmount: '0.00',
-  };
-}
-
-function resolveOcrItemTax(item: GstLineItem): {
-  taxType: string;
-  taxPercentage: string;
-  taxAmount: string;
-  hasTax: boolean;
-} {
-  const empty = {
-    taxType: '',
-    taxPercentage: '',
-    taxAmount: '0.00',
-    hasTax: false,
-  };
-
-  const taxTypeRaw = String(item.tax_type || '').trim();
-  const taxType = taxTypeRaw || 'GST';
-  let taxAmount = Number(item.tax_amount) || 0;
-  let taxPct = Number(item.tax_percentage) || 0;
-  const taxable = Number(item.taxable_amount) || 0;
-
-  const hasTaxSignal =
-    taxAmount > 0 ||
-    taxPct > 0 ||
-    ['GST', 'CGST', 'SGST', 'IGST'].includes(taxTypeRaw.toUpperCase());
-
-  if (!hasTaxSignal) {
-    return empty;
-  }
-
-  if (taxAmount > 0 && taxPct <= 0 && taxable > 0) {
-    taxPct = round2((taxAmount / taxable) * 100);
-  } else if (taxPct > 0 && taxAmount <= 0 && taxable > 0) {
-    taxAmount = round2((taxable * taxPct) / 100);
-  }
-
-  if (taxAmount <= 0 && taxPct <= 0) {
-    return empty;
-  }
-
-  return {
-    taxType,
-    taxPercentage: taxPct > 0 ? String(taxPct) : '',
-    taxAmount: taxAmount.toFixed(2),
-    hasTax: true,
-  };
-}
-
-/** Map Gemini GST line items → Create Invoice form items (DF + VF OCR). */
+/**
+ * Map OCR line items → Create Invoice form items.
+ * OCR supplies name / qty / unit / price only. Discount and tax are left blank for
+ * the user to pick (program-specific), so OCR and manual entry use the same maths.
+ */
 export function convertOcrLineItems(
   gstItems: GSTInvoiceJSON['line_items'],
 ): InvoiceLineItem[] {
   return gstItems.map(item => {
     const qty = Number(item.quantity) || 0;
     const rate = Number(item.rate_per_unit) || 0;
-    const taxableFromOcr = Number(item.taxable_amount) || 0;
-    const lineTotal =
-      taxableFromOcr > 0 ? taxableFromOcr : round2(qty * rate);
-    const discount = mapOcrItemDiscount(item, lineTotal);
-    const tax = resolveOcrItemTax(item);
 
     return {
       itemName: item.description || '',
-      quantity: qty > 0 ? qty.toString() : String(item.quantity ?? ''),
-      unit: item.unit || 'PCS',
-      pricePerQuantity: rate > 0 ? rate.toString() : String(item.rate_per_unit ?? ''),
-      total: lineTotal.toFixed(2),
-      discountType: discount.discountType,
-      discountValue: discount.discountValue,
-      discountAmount: discount.discountAmount,
-      taxType: tax.hasTax ? tax.taxType : '',
-      taxPercentage: tax.hasTax ? tax.taxPercentage : '',
-      taxAmount: tax.hasTax ? tax.taxAmount : '0.00',
-      taxes: tax.hasTax
-        ? [
-            {
-              taxType: tax.taxType,
-              taxPercentage: tax.taxPercentage,
-              taxAmount: tax.taxAmount,
-            },
-          ]
-        : [{taxType: '', taxPercentage: '', taxAmount: '0.00'}],
+      quantity: qty > 0 ? String(qty) : '',
+      unit: normalizeUnit(item.unit),
+      pricePerQuantity: rate > 0 ? String(rate) : '',
+      total: round2(qty * rate).toFixed(2),
+      discountType: '',
+      discountValue: '',
+      discountAmount: '0.00',
+      taxType: '',
+      taxPercentage: '',
+      taxAmount: '0.00',
+      taxes: [{taxType: '', taxPercentage: '', taxAmount: '0.00'}],
     };
   });
+}
+
+export type OcrLineItemIssues = {
+  needsUnit: boolean;
+  /** Backend requires quantity ≥ 1. */
+  invalidQty: boolean;
+  missingPrice: boolean;
+  amountTooLarge: boolean;
+};
+
+function toNumber(value: string | undefined): number {
+  const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Derived from current values so issues clear as soon as the user fixes the row. */
+export function getOcrLineItemIssues(item: InvoiceLineItem): OcrLineItemIssues {
+  const qty = toNumber(item.quantity);
+  const price = toNumber(item.pricePerQuantity);
+  return {
+    needsUnit: normalizeUnit(item.unit) === '',
+    invalidQty: qty < 1,
+    missingPrice: price <= 0,
+    amountTooLarge: price > MAX_LINE_AMOUNT || round2(qty * price) > MAX_LINE_AMOUNT,
+  };
+}
+
+export function hasOcrLineItemIssues(item: InvoiceLineItem): boolean {
+  return Object.values(getOcrLineItemIssues(item)).some(Boolean);
 }

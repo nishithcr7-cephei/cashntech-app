@@ -52,6 +52,7 @@ import {
 } from '@utils/invoiceTotals';
 import { resolveApprovalStatusLabel } from '@utils/invoiceStatusDisplay';
 import { formatApiInvoiceDate } from '@utils/invoiceDateFormat';
+import { unitCodeToLabel } from '@utils/unitNormalizer';
 import { mapInvoiceAttachmentsWithUrls, buildInvoiceAttachmentUrl, type InvoiceAttachmentItem } from '@utils/invoiceAttachments';
 import type { WorkflowStep } from '@components/InvoiceTrackingModal/InvoiceTrackingModal';
 import type {
@@ -590,7 +591,7 @@ export function useInvoiceDetails() {
               itemName: it.name ?? '-',
               description: it.description ?? '',
               quantity: qty,
-              unit: String(it.unit ?? '-'),
+              unit: unitCodeToLabel(it.unit) || '-',
               price,
               discountAmount: lineDiscount,
               discountPercent,

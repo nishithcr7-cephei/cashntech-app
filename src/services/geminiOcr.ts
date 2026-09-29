@@ -5,68 +5,42 @@
 
 import type { GSTInvoiceJSON } from './gstInvoiceExtractor';
 import RNFS from 'react-native-fs';
+import { GEMINI_API_KEY } from '@config/config';
+import {
+  detectImageMimeType,
+  mapGeminiItemsResponse,
+} from '@utils/ocrGeminiResponse';
 
-// ✅ Gemini API Key
-// New account: My Project2
-const GEMINI_API_KEY = 'AIzaSyA2IZnB1q2RY6QJLpdgFLs3bCDCHOz9Wpw';
-// Using the model that AI Studio shows in the Playground: gemini-flash-latest
+// gemini-flash-latest returned frequent 503 (high demand) on the free tier.
 const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent';
 
 const INVOICE_EXTRACTION_SYSTEM_PROMPT = `
-You are an expert financial and accounting data extraction agent. Your sole task is to process the raw, unstructured image of a Tax Invoice (GST Invoice) and transform it into a perfectly structured JSON object.
-
-STRICT RULE: Adhere strictly to the required JSON schema provided below. Do not include any explanatory text, conversational responses, notes, or code outside of the final JSON block. The response must be valid, raw JSON only.
+You read images of Indian invoices and return a small JSON object. Return raw JSON only — no markdown, no comments, no extra text.
 
 REQUIRED JSON SCHEMA:
 
 {
-  "invoice_header": {
-    "invoice_number": "STRING",
-    "invoice_date": "YYYY-MM-DD format, e.g., 2026-10-16",
-    "seller_name": "STRING (e.g., OM MARKETING)",
-    "seller_gstin": "STRING",
-    "buyer_name": "STRING (e.g., SHREE ENTERPRISES UMBEDI (MARINO))",
-    "buyer_gstin": "STRING",
-    "order_no": "STRING",
-    "early_payment_discount": "STRING (e.g. 2 for 2% - only if mentioned on invoice, else empty)",
-    "grn_date": "STRING in YYYY-MM-DD (Goods Receipt Note date - only if on invoice, else empty)"
-  },
-  "line_items": [
+  "invoice_number": "STRING or null",
+  "items": [
     {
-      "description": "STRING (Full product name and description, grouped if multi-line)",
-      "hsn_code": "STRING",
-      "quantity": "FLOAT",
-      "rate_per_unit": "FLOAT (The item rate before tax)",
-      "taxable_amount": "FLOAT (The total amount for this line item)",
-      "unit": "STRING (PCS, KG, LTR, etc. - from invoice if visible, else PCS)",
-      "discount_type": "STRING (percentage or value - only if item has discount, else empty)",
-      "discount_value": "FLOAT (0 if no discount)",
-      "discount_amount": "FLOAT (0 if no discount)",
-      "tax_type": "STRING (GST/CGST/SGST/IGST - from invoice if item-level tax shown, else empty)",
-      "tax_percentage": "FLOAT (e.g. 2.5 for 2.5% - 0 if not on item)",
-      "tax_amount": "FLOAT (0 if not on item)"
+      "name": "STRING (product name; join multi-line names into one line)",
+      "quantity": "NUMBER or null",
+      "unit": "STRING or null (exactly as printed, e.g. PCS, NOS, KG, BOX)",
+      "price": "NUMBER or null (rate per single unit, before discount and before tax)"
     }
-  ],
-  "financial_summary": {
-    "sub_total_taxable_value": "FLOAT (Sum of all line_items taxable_amount)",
-    "total_cgst_amount": "FLOAT (Sum of all Output CGST amounts)",
-    "total_sgst_amount": "FLOAT (Sum of all Output SGST amounts)",
-    "grand_total_amount": "FLOAT (Total after all tax and rounding)",
-    "total_in_words": "STRING (The full total amount in words)"
-  }
+  ]
 }
 
-INSTRUCTIONS:
+RULES:
 
-1. Parse all data points from the image, converting all monetary and quantity values to FLOAT (decimals).
-2. Ensure the JSON output is clean and strictly follows the schema.
-3. Extract invoice number carefully - it should not include trailing text like "Invoice Date".
-4. Group multi-line product descriptions into a single description field.
-5. If a field is not found, use empty string "" for strings or 0 for numbers.
-6. early_payment_discount: Extract only if clearly mentioned on invoice (e.g. "2% early payment discount").
-7. grn_date: Extract only if Goods Receipt Note date or similar is visible on invoice.
-8. For line_items: Extract unit, discount, tax per item only if shown at item level. Otherwise use unit "PCS", discount 0, tax 0.
+1. Extract ONLY the fields above. Do NOT extract discount, tax, GST, CGST, SGST, IGST, HSN, line totals, sub total, grand total, dates, seller or buyer details.
+2. invoice_number: the invoice number / bill number exactly as printed, without labels such as "Invoice No:" or trailing text such as "Invoice Date".
+3. price must be the per-unit rate. Never put the line amount or total into price. If only a line amount is printed and no rate, use null.
+4. unit: copy it only if it is printed for that item. If it is not printed, use null. Never guess a unit.
+5. If any value is not clearly readable, use null. Never invent values.
+6. Numbers must be plain numbers: no commas, no currency symbols, no "Rs" or "INR".
+7. Include every product row in the item table, in the same order. Skip rows that are only totals, taxes, charges or discounts.
 `;
 
 export interface GeminiExtractionResult {
@@ -215,11 +189,17 @@ export async function extractWithGemini(
   filePath: string,
   options?: GeminiExtractionOptions,
 ): Promise<GeminiExtractionResult> {
+  if (!GEMINI_API_KEY) {
+    throw new Error(
+      'OCR is not configured in this build. Please enter invoice details manually.',
+    );
+  }
+
   try {
     // Convert image to base64
     const base64Data = await imageToBase64(filePath);
 
-    // Prepare API payload for gemini-flash-latest (multimodal, text + image)
+    // Prepare API payload (multimodal, text + image)
     const payload = {
       contents: [
         {
@@ -231,7 +211,7 @@ export async function extractWithGemini(
             },
             {
               inlineData: {
-                mimeType: 'image/jpeg',
+                mimeType: detectImageMimeType(base64Data),
                 data: base64Data,
               },
             },
@@ -240,6 +220,7 @@ export async function extractWithGemini(
       ],
       generationConfig: {
         temperature: 0.1,
+        responseMimeType: 'application/json',
       },
     };
 
@@ -269,7 +250,7 @@ export async function extractWithGemini(
 
     let gstInvoice: GSTInvoiceJSON;
     try {
-      gstInvoice = JSON.parse(cleanJsonString);
+      gstInvoice = mapGeminiItemsResponse(JSON.parse(cleanJsonString));
     } catch (parseError) {
       if (__DEV__) {
         console.warn('Gemini JSON parse error:', parseError, cleanJsonString);
@@ -306,49 +287,36 @@ export async function extractWithGemini(
  */
 function generateRawTextFromJSON(invoice: GSTInvoiceJSON): string {
   const lines: string[] = [];
-  
-  lines.push('=== INVOICE HEADER ===');
-  lines.push(`Invoice Number: ${invoice.invoice_header.invoice_number}`);
-  lines.push(`Invoice Date: ${invoice.invoice_header.invoice_date}`);
-  lines.push(`Seller: ${invoice.invoice_header.seller_name} (${invoice.invoice_header.seller_gstin})`);
-  lines.push(`Buyer: ${invoice.invoice_header.buyer_name} (${invoice.invoice_header.buyer_gstin})`);
-  lines.push(`Order No: ${invoice.invoice_header.order_no}`);
+  lines.push(`Invoice Number: ${invoice.invoice_header.invoice_number || '-'}`);
   lines.push('');
-  
-  lines.push('=== LINE ITEMS ===');
+  lines.push('=== ITEMS ===');
   invoice.line_items.forEach((item, idx) => {
-    lines.push(`${idx + 1}. ${item.description}`);
-    lines.push(`   HSN: ${item.hsn_code} | Qty: ${item.quantity} | Rate: ₹${item.rate_per_unit} | Amount: ₹${item.taxable_amount}`);
+    lines.push(
+      `${idx + 1}. ${item.description} | Qty: ${item.quantity} ${item.unit || ''} | Price: ₹${item.rate_per_unit}`,
+    );
   });
-  lines.push('');
-  
-  lines.push('=== FINANCIAL SUMMARY ===');
-  lines.push(`Subtotal: ₹${invoice.financial_summary.sub_total_taxable_value}`);
-  lines.push(`CGST: ₹${invoice.financial_summary.total_cgst_amount}`);
-  lines.push(`SGST: ₹${invoice.financial_summary.total_sgst_amount}`);
-  lines.push(`Grand Total: ₹${invoice.financial_summary.grand_total_amount}`);
-  lines.push(`In Words: ${invoice.financial_summary.total_in_words}`);
-  
   return lines.join('\n');
 }
 
 /**
- * Calculate confidence score based on data completeness
+ * Confidence from completeness of the items-only fields.
  */
 function calculateConfidence(invoice: GSTInvoiceJSON): 'high' | 'medium' | 'low' {
-  let score = 0;
-  
-  // Check critical fields
-  if (invoice.invoice_header.invoice_number) score += 2;
-  if (invoice.invoice_header.invoice_date) score += 2;
-  if (invoice.invoice_header.seller_name) score += 1;
-  if (invoice.invoice_header.seller_gstin && invoice.invoice_header.seller_gstin.length === 15) score += 2;
-  if (invoice.invoice_header.buyer_name) score += 1;
-  if (invoice.line_items.length > 0) score += 3;
-  if (invoice.financial_summary.grand_total_amount > 0) score += 2;
-  
-  if (score >= 10) return 'high';
-  if (score >= 6) return 'medium';
+  const items = invoice.line_items;
+  if (items.length === 0) {
+    return 'low';
+  }
+  const completeItems = items.filter(
+    item => item.description && item.quantity > 0 && item.rate_per_unit > 0,
+  ).length;
+  const hasInvoiceNumber = !!invoice.invoice_header.invoice_number;
+
+  if (completeItems === items.length && hasInvoiceNumber) {
+    return 'high';
+  }
+  if (completeItems > 0) {
+    return 'medium';
+  }
   return 'low';
 }
 

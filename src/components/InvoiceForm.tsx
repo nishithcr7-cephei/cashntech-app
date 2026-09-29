@@ -22,6 +22,8 @@ import {
 import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
+import {getOcrLineItemIssues} from '@utils/ocrLineItemMapper';
+import {tidyUnitInput} from '@utils/unitNormalizer';
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {useSelector} from 'react-redux';
@@ -60,8 +62,32 @@ export type PartyTaxOption = {
   isTds?: boolean;
 };
 
+/** Letters only, uppercase. Long enough for CARTON / BOTTLE and synonyms like KILOGRAMS. */
 function normalizeUnitInput(value: string): string {
-  return value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 3);
+  return value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, 12);
+}
+
+/** Row-level reminders for OCR-filled items; clear as soon as the user fixes the row. */
+function getOcrRowWarnings(item: InvoiceLineItem): string[] {
+  const issues = getOcrLineItemIssues(item);
+  const warnings: string[] = [];
+  if (issues.invalidQty) {
+    warnings.push('Quantity must be at least 1');
+  }
+  if (issues.needsUnit) {
+    warnings.push('Enter a valid unit');
+  }
+  if (issues.missingPrice) {
+    warnings.push('Enter price');
+  }
+  if (issues.amountTooLarge) {
+    warnings.push('Line amount too large');
+  }
+  const taxes = item.taxes?.length ? item.taxes : [{taxType: item.taxType}];
+  if (!taxes.some(tax => tax.taxType?.trim())) {
+    warnings.push('Choose tax');
+  }
+  return warnings;
 }
 
 const TEXT_INPUT_DEFAULTS = {
@@ -153,10 +179,12 @@ type Props = {
   previewButtonAppearsDisabled?: boolean;
   /** Reason shown when preview is pressed while not ready. */
   previewDisabledReason?: string;
-  /** When true, item discount/tax dropdowns and delete actions are locked (OCR-filled invoice). */
+  /** OCR-filled invoice: add/delete item are disabled; discount and tax stay editable. */
   isOcrMode?: boolean;
   /** When true, form inputs are locked; Cancel remains available. */
   ocrLoading?: boolean;
+  /** Re-run OCR to replace the OCR-filled items (shown only in OCR mode). */
+  onOcrRescan?: () => void;
 };
 
 export const InvoiceForm: React.FC<Props> = ({
@@ -193,6 +221,7 @@ export const InvoiceForm: React.FC<Props> = ({
   previewDisabledReason,
   isOcrMode = false,
   ocrLoading = false,
+  onOcrRescan,
 }) => {
   const storageBaseUrl = 'https://d2wayd1he5a7q1.cloudfront.net'; // Same as DetailView
   const dealerData = dealerOptions ?? [];
@@ -995,12 +1024,29 @@ export const InvoiceForm: React.FC<Props> = ({
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Add Details</Text>
-          {!isOcrMode && (
-            <TouchableOpacity style={styles.addButton} onPress={addMoreItems}>
+          <View style={styles.sectionHeaderActions}>
+            {isOcrMode && onOcrRescan && (
+              <TouchableOpacity
+                style={styles.rescanButton}
+                onPress={onOcrRescan}
+                disabled={ocrLoading}>
+                <Text style={styles.rescanButtonText}>Rescan Invoice</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[styles.addButton, isOcrMode && styles.ocrLockedAction]}
+              onPress={addMoreItems}
+              disabled={isOcrMode}>
               <Text style={styles.addButtonText}>+ Add more Items</Text>
             </TouchableOpacity>
-          )}
+          </View>
         </View>
+        {isOcrMode && items.length > 0 && (
+          <Text style={styles.ocrItemsHint}>
+            Items come from the scanned invoice, so you can't add or delete items. Use Rescan
+            Invoice if an item is missing or wrong.
+          </Text>
+        )}
 
         {items.length === 0 && (
           <>
@@ -1015,16 +1061,29 @@ export const InvoiceForm: React.FC<Props> = ({
           </>
         )}
 
-        {items.map((item, index) => (
-          <View key={index} style={styles.itemRow}>
+        {items.map((item, index) => {
+          const ocrWarnings = isOcrMode ? getOcrRowWarnings(item) : [];
+          return (
+          <View
+            key={index}
+            style={[styles.itemRow, ocrWarnings.length > 0 && styles.itemRowNeedsAttention]}>
             <View style={styles.itemHeader}>
               <Text style={styles.itemIndex}>Item {index + 1}</Text>
-              {!isOcrMode && (
-                <TouchableOpacity onPress={() => removeItem(index)} style={styles.removeButton}>
-                  <FontAwesome6 name="trash" iconStyle="solid" color="#dc3545" size={16} />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                onPress={() => removeItem(index)}
+                style={[styles.removeButton, isOcrMode && styles.ocrLockedAction]}
+                disabled={isOcrMode}>
+                <FontAwesome6
+                  name="trash"
+                  iconStyle="solid"
+                  color={isOcrMode ? '#999' : '#dc3545'}
+                  size={16}
+                />
+              </TouchableOpacity>
             </View>
+            {ocrWarnings.length > 0 && (
+              <Text style={styles.ocrRowWarning}>{ocrWarnings.join(' · ')}</Text>
+            )}
             <L label="Item Name *">
               <TextInput {...TEXT_INPUT_DEFAULTS} 
                 style={[styles.input, errors.items && errors.items.includes(`Item ${index + 1}`) && errors.items.includes('Item Name') && styles.inputError]} 
@@ -1059,7 +1118,14 @@ export const InvoiceForm: React.FC<Props> = ({
                     style={[styles.input, errors.items && errors.items.includes(`Item ${index + 1}`) && errors.items.includes('Unit') && styles.inputError]}
                     value={item.unit}
                     onChangeText={(text) => updateItem(index, 'unit', text)}
-                    placeholder="e.g. PCS, BOX"
+                    onBlur={() => {
+                      const tidied = tidyUnitInput(item.unit);
+                      if (tidied !== item.unit) {
+                        updateItem(index, 'unit', tidied);
+                      }
+                    }}
+                    placeholder="PCS, KG, BOX…"
+                    autoCapitalize="characters"
                   />
                 </L>
               </View>
@@ -1083,13 +1149,8 @@ export const InvoiceForm: React.FC<Props> = ({
             </L>
             
             {/* Item-level Discount */}
-            <View
-              style={[
-                styles.itemDiscountTaxContainer,
-                isOcrMode && styles.ocrDisabledDiscountTax,
-              ]}
-              pointerEvents={isOcrMode ? 'none' : 'auto'}>
-              <Text style={[styles.itemDiscountTaxLabelText, isOcrMode && styles.ocrDisabledLabel]}>
+            <View style={styles.itemDiscountTaxContainer}>
+              <Text style={styles.itemDiscountTaxLabelText}>
                 Discount (Optional)
               </Text>
               <View style={styles.itemDiscountTaxVertical}>
@@ -1106,18 +1167,16 @@ export const InvoiceForm: React.FC<Props> = ({
                     placeholder="Select"
                     containerStyle={styles.itemDropdownContainer}
                     showSearch={false}
-                    editable={!isOcrMode}
                   />
                 </View>
                 {item.discountType && (
                   <View style={styles.itemDiscountTaxInputsVertical}>
                     <TextInput {...TEXT_INPUT_DEFAULTS}
-                      style={[styles.itemDiscountTaxInputVertical, isOcrMode && styles.ocrDisabledInput]}
+                      style={styles.itemDiscountTaxInputVertical}
                       value={formatIndianAmountInput(item.discountValue || '')}
                       onChangeText={(text) => updateItem(index, 'discountValue', text)}
                       placeholder="Value"
                       keyboardType="decimal-pad"
-                      editable={!isOcrMode}
                     />
                     <TextInput {...TEXT_INPUT_DEFAULTS}
                       style={[styles.itemDiscountTaxInputVertical, styles.autoCalculated]}
@@ -1131,13 +1190,8 @@ export const InvoiceForm: React.FC<Props> = ({
             </View>
             
             {/* Item-level Tax (multiple) */}
-            <View
-              style={[
-                styles.itemDiscountTaxContainer,
-                isOcrMode && styles.ocrDisabledDiscountTax,
-              ]}
-              pointerEvents={isOcrMode ? 'none' : 'auto'}>
-              <Text style={[styles.itemDiscountTaxLabelText, isOcrMode && styles.ocrDisabledLabel]}>
+            <View style={styles.itemDiscountTaxContainer}>
+              <Text style={styles.itemDiscountTaxLabelText}>
                 Tax
               </Text>
               {((item.taxes && item.taxes.length > 0) ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}]).map((tax, taxIdx) => (
@@ -1152,7 +1206,6 @@ export const InvoiceForm: React.FC<Props> = ({
                         placeholder="Select"
                         containerStyle={styles.itemDropdownContainer}
                         showSearch={false}
-                        editable={!isOcrMode}
                       />
                     </View>
                     {tax.taxType && (
@@ -1170,17 +1223,13 @@ export const InvoiceForm: React.FC<Props> = ({
                             />
                           ) : (
                             <TextInput {...TEXT_INPUT_DEFAULTS}
-                              style={[
-                                styles.itemDiscountTaxInputVertical,
-                                isOcrMode && styles.ocrDisabledInput,
-                              ]}
+                              style={styles.itemDiscountTaxInputVertical}
                               value={tax.taxPercentage || ''}
                               onChangeText={(text) =>
                                 updateItemTax(index, taxIdx, 'taxPercentage', text)
                               }
                               placeholder="Value"
                               keyboardType="decimal-pad"
-                              editable={!isOcrMode}
                             />
                           )}
                           <Text style={styles.taxPercentSuffix}>%</Text>
@@ -1194,23 +1243,22 @@ export const InvoiceForm: React.FC<Props> = ({
                       </View>
                     )}
                   </View>
-                  {!isOcrMode && (
-                    <View style={styles.taxActionButtons}>
-                      <TouchableOpacity onPress={() => addItemTax(index)} style={[styles.addTaxButton, {marginRight: 8}]}>
-                        <FontAwesome6 name="plus" iconStyle="solid" size={14} color="#333" />
+                  <View style={styles.taxActionButtons}>
+                    <TouchableOpacity onPress={() => addItemTax(index)} style={[styles.addTaxButton, {marginRight: 8}]}>
+                      <FontAwesome6 name="plus" iconStyle="solid" size={14} color="#333" />
+                    </TouchableOpacity>
+                    {(((item.taxes && item.taxes.length > 0) ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}]).length > 1) && (
+                      <TouchableOpacity onPress={() => removeItemTax(index, taxIdx)} style={styles.removeTaxButton}>
+                        <FontAwesome6 name="trash" iconStyle="solid" size={14} color="#dc3545" />
                       </TouchableOpacity>
-                      {(((item.taxes && item.taxes.length > 0) ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}]).length > 1) && (
-                        <TouchableOpacity onPress={() => removeItemTax(index, taxIdx)} style={styles.removeTaxButton}>
-                          <FontAwesome6 name="trash" iconStyle="solid" size={14} color="#dc3545" />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
+                    )}
+                  </View>
                 </View>
               ))}
             </View>
           </View>
-        ))}
+          );
+        })}
 
         {/* Footer: Summary Totals */}
         {items.length > 0 && (() => {
@@ -1876,6 +1924,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 12,
   },
+  rescanButton: {
+    borderWidth: 1,
+    borderColor: '#dc3545',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  rescanButtonText: {
+    color: '#dc3545',
+    fontWeight: '600',
+    fontSize: 12,
+  },
   addFirstItem: {
     padding: 20,
     borderWidth: 2,
@@ -1982,20 +2043,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#555',
   },
-  ocrDisabledDiscountTax: {
-    opacity: 0.42,
-    backgroundColor: '#ececec',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
+  sectionHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  ocrDisabledLabel: {
-    color: '#999',
+  ocrLockedAction: {
+    opacity: 0.4,
   },
-  ocrDisabledInput: {
-    backgroundColor: '#e8e8e8',
-    color: '#888',
+  ocrItemsHint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: -4,
+    marginBottom: 12,
+  },
+  itemRowNeedsAttention: {
+    borderWidth: 1.5,
+    borderColor: '#f0ad4e',
+    backgroundColor: '#fffaf0',
+  },
+  ocrRowWarning: {
+    fontSize: 12,
+    color: '#8a5a00',
+    marginBottom: 8,
   },
   itemDiscountTaxVertical: {
     gap: 8,

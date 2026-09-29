@@ -4,6 +4,8 @@
  * These fields are NOT auto-filled by OCR - user must select manually
  */
 
+import {INVOICE_UNITS} from '@constants/invoiceUnits';
+
 // Dealer Name options (dummy enum)
 export const dealerNameOptions = [
   {label: 'Dealer 1', value: 'Dealer 1'},
@@ -53,18 +55,5 @@ export const poRefOptions = [
 ];
 
 // Unit options (common units for invoice items)
-export const unitOptions = [
-  {label: 'PCS', value: 'PCS'},
-  {label: 'KG', value: 'KG'},
-  {label: 'LTR', value: 'LTR'},
-  {label: 'MTR', value: 'MTR'},
-  {label: 'BOX', value: 'BOX'},
-  {label: 'CARTON', value: 'CARTON'},
-  {label: 'BAG', value: 'BAG'},
-  {label: 'BOTTLE', value: 'BOTTLE'},
-  {label: 'DOZEN', value: 'DOZEN'},
-  {label: 'PAIR', value: 'PAIR'},
-  {label: 'SET', value: 'SET'},
-  {label: 'PACK', value: 'PACK'},
-];
+export const unitOptions = INVOICE_UNITS.map(unit => ({label: unit, value: unit}));
 

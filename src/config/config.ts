@@ -15,6 +15,7 @@ type NativeConfigShape = Partial<{
   RK_ENCRYPTION_KEY: string;
   RK_ENCRYPTION_IV: string;
   IS_APPETIZE_BUILD: string;
+  GEMINI_API_KEY: string;
 }>;
 
 const loadNativeConfig = (): NativeConfigShape => {
@@ -70,5 +71,7 @@ export const IS_APPETIZE_BUILD =
     nativeConfig.IS_APPETIZE_BUILD,
     FALLBACK_IS_APPETIZE_BUILD,
   ) === 'true';
+// No fallback: the OCR key must come from .env / .env.prod and never be committed.
+export const GEMINI_API_KEY = resolveConfigValue(nativeConfig.GEMINI_API_KEY, '');
 
 console.log('🔧 [config.ts] Processed API_URL:', API_URL);

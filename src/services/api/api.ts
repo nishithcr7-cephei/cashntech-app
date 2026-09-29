@@ -309,18 +309,24 @@ export const logoutUser = () => {
 
 let sessionEnding = false;
 
+// Lets the navigator swap to the login stack and the timeout warning Modal close
+// first; a toast shown mid-transition lands on the old screen or behind the Modal.
+const SESSION_TOAST_DELAY_MS = 400;
+
 /** Logout with a reason toast; concurrent callers collapse into one logout. */
 export const expireSession = (reason: SessionExpiryReason) => {
   if (sessionEnding) {
     return;
   }
   sessionEnding = true;
-  Toast.show({
-    type: 'error',
-    text1: 'Session Expired',
-    text2: SESSION_EXPIRY_MESSAGES[reason],
-  });
   logoutUser();
+  setTimeout(() => {
+    Toast.show({
+      type: 'error',
+      text1: 'Session Expired',
+      text2: SESSION_EXPIRY_MESSAGES[reason],
+    });
+  }, SESSION_TOAST_DELAY_MS);
   setTimeout(() => {
     sessionEnding = false;
   }, 2000);

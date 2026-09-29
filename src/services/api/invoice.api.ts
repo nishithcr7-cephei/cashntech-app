@@ -17,23 +17,25 @@ import {
   computeInvoiceNetTotal,
   computeInvoiceSubTotalAfterTds,
 } from '@utils/invoiceTotals';
+import {
+  INVOICE_UNITS_HINT,
+  unitCodeToLabel,
+  unitLabelToCode,
+} from '@utils/unitNormalizer';
 
-// Unit mapping: PCS=1, KG=2, LTR=3, etc. (backend accepts any number)
-const UNIT_MAP: Record<string, number> = {
-  PCS: 1,
-  KG: 2,
-  LTR: 3,
-  MTR: 4,
-  BOX: 5,
-  CARTON: 6,
-  BAG: 7,
-  BOTTLE: 8,
-  DOZEN: 9,
-  PAIR: 10,
-  SET: 11,
-  PACK: 12,
-  STRIP: 13,
-};
+/**
+ * Backend stores `unit` as free text with no validation, so an unknown unit must be
+ * rejected here — sending a fallback code would silently save the wrong unit.
+ */
+function resolveItemUnitCode(unit: string | undefined, index: number): string {
+  const code = unitLabelToCode(unit);
+  if (!code) {
+    throw new Error(
+      `Item ${index + 1}: Unit "${unit?.trim() || ''}" is not valid. Use one of: ${INVOICE_UNITS_HINT}`,
+    );
+  }
+  return code;
+}
 
 export type PartyTaxRecord = {
   id?: number;
@@ -173,16 +175,13 @@ function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<str
     upfrontInterest,
   );
 
-  const items = fields.items.map((item: InvoiceLineItem) => {
-    // Map textual unit (PCS, KG...) to numeric code that DB expects,
-    // but keep it as a string so DTO (@IsString) validation passes.
-    const unitNum = UNIT_MAP[item.unit?.toUpperCase()] ?? 1;
+  const items = fields.items.map((item: InvoiceLineItem, index: number) => {
     const baseItem: Record<string, unknown> = {
       name: item.itemName?.trim() || '',
       description: (item.description?.trim() || item.itemName?.trim() || ''),
       created_by: createdBy,
       quantity: Ue(item.quantity),
-      unit: String(unitNum),
+      unit: resolveItemUnitCode(item.unit, index),
       price_per_quantity: Ue(item.pricePerQuantity),
       total: Ue(item.total),
     };
@@ -807,7 +806,7 @@ export const invoiceApi = {
         itemName: item.name,
         description: item.description,
         quantity: String(item.quantity ?? ''),
-        unit: item.unit,
+        unit: unitCodeToLabel(item.unit),
         pricePerQuantity: String(item.price_per_quantity ?? ''),
         total: String(item.total ?? ''),
         discountType: item.discount_type,
@@ -1176,7 +1175,7 @@ export const invoiceApi = {
       formData.append(`items[${index}][description]`, String(item.description || ''));
       formData.append(`items[${index}][created_by]`, String(item.created_by || ''));
       formData.append(`items[${index}][quantity]`, String(item.quantity || 0));
-      formData.append(`items[${index}][unit]`, String(item.unit || '1'));
+      formData.append(`items[${index}][unit]`, String(item.unit));
       formData.append(`items[${index}][price_per_quantity]`, String(item.price_per_quantity || 0));
       formData.append(`items[${index}][total]`, String(item.total || 0));
       
@@ -1239,14 +1238,13 @@ export const invoiceApi = {
       upfrontInterest,
     );
 
-    const items = fields.items.map((item: any) => {
-      const unitNum = UNIT_MAP[item.unit?.toUpperCase()] ?? 1;
+    const items = fields.items.map((item: any, index: number) => {
       const baseItem: any = {
         name: item.itemName?.trim() || '',
         description: (item.description?.trim() || item.itemName?.trim() || ''),
         created_by: createdBy,
         quantity: Ue(item.quantity),
-        unit: String(unitNum),
+        unit: resolveItemUnitCode(item.unit, index),
         price_per_quantity: Ue(item.pricePerQuantity),
         total: Ue(item.total),
       };

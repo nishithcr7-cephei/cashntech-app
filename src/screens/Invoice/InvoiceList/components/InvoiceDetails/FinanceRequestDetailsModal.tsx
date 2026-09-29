@@ -28,6 +28,7 @@ import {
   mapInvoiceAttachmentsWithUrls,
 } from '@utils/invoiceAttachments';
 import {decryptValue} from '@utils/decrypt';
+import {unitCodeToLabel} from '@utils/unitNormalizer';
 import {toYYYYMMDD} from '@services/api/invoice.api';
 import {
   resolveAdvanceInterestFromPreview,
@@ -272,7 +273,7 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
         id: String(it.id ?? idx),
         name: it.name || it.description || '-',
         quantity: formatAmount(it.quantity),
-        unit: dash(it.unit),
+        unit: dash(unitCodeToLabel(it.unit)),
         price: formatAmount(it.price_per_quantity),
         discount: formatAmount(it.discount_amount),
         tax: formatAmount(taxAmount),

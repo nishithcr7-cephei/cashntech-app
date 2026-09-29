@@ -32,6 +32,7 @@ import {invoiceApi} from '@services/api/invoice.api';
 import {formatStatus} from './components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
+import {unitCodeToLabel} from '@utils/unitNormalizer';
 import {mapInvoiceAttachmentsWithUrls, openInvoiceAttachment} from '@utils/invoiceAttachments';
 import {
   resolveDisbursementUsanceDaysDisplay,
@@ -401,7 +402,7 @@ export const InvoiceDetailView: React.FC = () => {
             itemName: it.name ?? '-',
             description: it.description ?? '',
             quantity: qty,
-            unit: String(it.unit ?? '-'),
+            unit: unitCodeToLabel(it.unit) || '-',
             price,
             discountAmount: lineDiscount,
             discountPercent,

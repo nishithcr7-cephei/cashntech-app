@@ -3,7 +3,7 @@ import {Provider, useSelector} from 'react-redux';
 import {MainNavigator} from '@navigation/MainNavigator';
 import {store} from '@store/app/store';
 import '@services/localStorage';
-import {SafeAreaProvider} from 'react-native-safe-area-context';
+import {SafeAreaProvider, useSafeAreaInsets} from 'react-native-safe-area-context';
 import Toast, {ErrorToast, InfoToast, ToastConfig} from 'react-native-toast-message';
 import {initializeML} from '@utils/mlInitialization';
 import {BusyOverlay} from '@components/index';
@@ -46,13 +46,14 @@ const toastConfig: ToastConfig = {
 function AppShell() {
   const leavingCreateInvoice = useSelector(selectLeavingCreateInvoice);
   const openingCreateInvoice = useSelector(selectOpeningCreateInvoice);
+  const insets = useSafeAreaInsets();
   const showCreateInvoiceTransition =
     leavingCreateInvoice || openingCreateInvoice;
 
   return (
     <>
       <MainNavigator />
-      <Toast topOffset={80} config={toastConfig} />
+      <Toast topOffset={insets.top + 80} config={toastConfig} />
       <BusyOverlay
         visible={showCreateInvoiceTransition}
         message={
