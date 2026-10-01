@@ -43,12 +43,18 @@ export const PERMISSIONS = {
   INVOICE_LIST_FINANCE_REQUEST: 'invoice_list.finance_request',
   INVOICE_LIST_UPLOAD_VERIFY: 'invoice_list.upload_verify',
   VF_INVOICE_LIST_UPLOAD_VERIFY: 'invoice_list.upload_verify',
+  /** PATCH /invoice/bulk/status (PermissionGuard). */
+  INVOICE_LIST_BULK_ACTIONS: 'invoice_list.bulk_actions',
   CREATE_INVOICE: 'invoice_list.create_invoice',
   INTEREST_ACCRUALS: 'interest_accruals.view',
   INTEREST_ACCRUALS_VIEW_DAILY: 'interest_accruals.view_daily_interest',
   DISBURSEMENT: 'disbursement.view',
   DISBURSEMENT_MARK_AS_DISBURSED: 'disbursement.mark_as_disbursed',
   DISBURSEMENT_SEND_MAIL: 'disbursement.send_mail_to_bank',
+  /** POST /invoice/bulk-disbursement */
+  DISBURSEMENT_BULK_ACTIONS: 'disbursement.bulk_actions',
+  /** POST /invoice/bulk-email */
+  DISBURSEMENT_SEND_BULK_MAIL: 'disbursement.send_bulk_mail',
   /** Not in current backend catalog — stays false until seeded. */
   DISBURSEMENT_DELETE: 'disbursement.delete',
   DISBURSEMENT_EXPORT: 'disbursement.export',

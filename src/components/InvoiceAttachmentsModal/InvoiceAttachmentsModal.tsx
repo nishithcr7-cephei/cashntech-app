@@ -28,6 +28,8 @@ import {
 } from '@utils/invoiceAttachments';
 import Toast from 'react-native-toast-message';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
+import {useHasPermission} from '@hooks/index';
+import {PERMISSIONS} from '@constants/permissions';
 
 const ALLOWED = ['jpg', 'jpeg', 'png', 'pdf'];
 
@@ -53,6 +55,8 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
   const [pendingFile, setPendingFile] = useState<DocumentPickerResponse | undefined>();
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const canUploadAttachment = useHasPermission(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
+  const canDeleteAttachment = useHasPermission(PERMISSIONS.INVOICE_LIST_EDIT);
 
   const loadAttachments = useCallback(async () => {
     if (!invoiceId) return;
@@ -96,6 +100,14 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
   }, [visible, invoiceId, loadAttachments, fallbackAttachments]);
 
   const handleBrowse = async () => {
+    if (!canUploadAttachment) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission to upload attachments.',
+      });
+      return;
+    }
     const {data, error} = await tryCatch(
       pick({
         mode: 'import',
@@ -118,6 +130,14 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
   };
 
   const handleDelete = async (row: InvoiceAttachmentItem) => {
+    if (!canDeleteAttachment) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission to delete attachments.',
+      });
+      return;
+    }
     if (row.id == null || Number.isNaN(row.id)) {
       Toast.show({type: 'error', text1: 'Invalid attachment'});
       return;
@@ -153,6 +173,14 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
   };
 
   const handleSubmit = async () => {
+    if (!canUploadAttachment) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission to upload attachments.',
+      });
+      return;
+    }
     if (!invoiceId || !pendingFile) return;
     setSubmitting(true);
     const {error} = await tryCatch(
@@ -174,7 +202,8 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
   };
 
   const totalCount = attachments.length + (pendingFile ? 1 : 0);
-  const canSubmit = !!pendingFile && !submitting && !!invoiceId;
+  const canSubmit =
+    canUploadAttachment && !!pendingFile && !submitting && !!invoiceId;
 
   if (!visible) return null;
 
@@ -199,12 +228,19 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
               </View>
 
               <TouchableOpacity
-                style={styles.uploadBox}
-                activeOpacity={0.7}
+                style={[
+                  styles.uploadBox,
+                  !canUploadAttachment && styles.uploadBoxDisabled,
+                ]}
+                activeOpacity={canUploadAttachment ? 0.7 : 1}
                 onPress={handleBrowse}
-                disabled={submitting}>
+                disabled={submitting || !canUploadAttachment}>
                 <File width={scaleWidth(40)} height={scaleHeight(40)} />
-                <Text style={styles.uploadText}>Choose your files</Text>
+                <Text style={styles.uploadText}>
+                  {canUploadAttachment
+                    ? 'Choose your files'
+                    : 'Upload not permitted'}
+                </Text>
               </TouchableOpacity>
 
               {totalCount > 0 && (
@@ -279,15 +315,20 @@ export const InvoiceAttachmentsModal: React.FC<Props> = ({
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => handleDelete(item)}
-                        disabled={deletingId === item.id}
-                        hitSlop={8}>
+                        disabled={
+                          !canDeleteAttachment || deletingId === item.id
+                        }
+                        hitSlop={8}
+                        style={!canDeleteAttachment && styles.iconDisabled}>
                         {deletingId === item.id ? (
                           <ActivityIndicator size="small" color={Colors.red} />
                         ) : (
                           <FontAwesome6
                             name="trash"
                             iconStyle="solid"
-                            color={Colors.red}
+                            color={
+                              canDeleteAttachment ? Colors.red : Colors.graybase
+                            }
                             size={16}
                           />
                         )}
@@ -395,6 +436,13 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroyMedium,
     color: '#808080',
     marginTop: scaleHeight(10),
+  },
+  uploadBoxDisabled: {
+    opacity: 0.45,
+    backgroundColor: '#F0F0F0',
+  },
+  iconDisabled: {
+    opacity: 0.45,
   },
   badgeWrap: {
     paddingHorizontal: scaleWidth(16),

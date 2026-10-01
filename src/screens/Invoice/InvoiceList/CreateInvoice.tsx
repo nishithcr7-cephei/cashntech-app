@@ -2068,6 +2068,14 @@ export const CreateInvoice: React.FC = () => {
   };
 
   const handleDeleteAttachment = async (attachmentId: number) => {
+    if (!hasEditPerm) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission to delete attachments.',
+      });
+      return;
+    }
     try {
       setOcrLoading(true);
       await invoiceApi.deleteInvoiceAttachment(attachmentId);
@@ -2089,6 +2097,14 @@ export const CreateInvoice: React.FC = () => {
   const handleDeleteItem = async (index: number) => {
     const item = fields.items[index];
     if (mode === 'edit' && item?.id) {
+      if (!hasEditPerm) {
+        Toast.show({
+          type: 'error',
+          text1: 'Permission Denied',
+          text2: 'You do not have permission to delete line items.',
+        });
+        return;
+      }
       try {
         setOcrLoading(true);
         await invoiceApi.deleteInvoiceItem(item.id);
@@ -2114,6 +2130,14 @@ export const CreateInvoice: React.FC = () => {
     
     // In edit mode, if tax has an ID, delete via API
     if (mode === 'edit' && (tax as any)?.id) {
+      if (!hasEditPerm) {
+        Toast.show({
+          type: 'error',
+          text1: 'Permission Denied',
+          text2: 'You do not have permission to delete taxes.',
+        });
+        return;
+      }
       try {
         setOcrLoading(true);
         await invoiceApi.deleteInvoiceItemTax((tax as any).id);
@@ -2678,6 +2702,7 @@ export const CreateInvoice: React.FC = () => {
             onDeleteAttachment={handleDeleteAttachment}
             onDeleteItem={handleDeleteItem}
             onDeleteItemTax={handleDeleteItemTax}
+            canDeleteInEditMode={hasEditPerm}
             canUploadFinal={canUploadFinal}
             onAddAttachment={() => setIsProofUploadModalVisible(true)}
             onClearAttachment={handleClearAttachment}

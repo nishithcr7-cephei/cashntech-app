@@ -14,6 +14,10 @@ import {
   SessionExpiryReason,
 } from '@utils/sessionActivity';
 import {transformApiResponse} from '@utils/apiTransformer';
+import {
+  markPermissionDeniedToastShown,
+  PERMISSION_DENIED_USER_MESSAGE,
+} from '@utils/apiErrorMessage';
 import axios, {
   AxiosError,
   AxiosResponse,
@@ -279,6 +283,20 @@ axiosInstance.interceptors.response.use(
         text2: msg,
       });
     }
+
+    if (
+      status === 403 &&
+      original?.authRequired &&
+      !isAuthEndpoint(url)
+    ) {
+      markPermissionDeniedToastShown(error);
+      Toast.show({
+        type: 'error',
+        text1: PERMISSION_DENIED_USER_MESSAGE,
+        visibilityTime: 3500,
+      });
+    }
+
     return Promise.reject(error);
   },
 );

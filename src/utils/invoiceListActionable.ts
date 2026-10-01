@@ -200,8 +200,15 @@ export function canShowInvoiceListEdit(
 }
 
 /**
+ * Backend `DELETE /invoice/:id` is currently a no-op (service call commented out).
+ * Set to `true` when the API deletes invoices again.
+ */
+export const INVOICE_DELETE_ENABLED = false;
+
+/**
  * 3-dots Delete — permission + backend list `deletable` when present.
  * Falls back to Disbursed/Closed hide for older API responses.
+ * Menu row stays visible when true; use {@link INVOICE_DELETE_ENABLED} for API availability.
  */
 export function canShowInvoiceListDelete(
   row: Pick<InvoiceEditRow, 'rawInvoiceStatus'>,
@@ -223,8 +230,8 @@ export function canShowInvoiceListDelete(
 
 /**
  * Bulk-select / pending eligibility.
- * CashnTech: actionable && invoice_verification (web Ze pending count).
- * Fallback to Pending Verification only when actionable is undefined.
+ * CashnTech admin bulk: actionable && upload_verify (PATCH /invoice/admin/bulk-status).
+ * Party workflow bulk: actionable && bulk_actions + functional grant.
  */
 export function isInvoiceBulkSelectable(
   row: ActionableRow,
@@ -232,17 +239,27 @@ export function isInvoiceBulkSelectable(
     isCashnTechUser: boolean;
     hasFunctionalPermission: boolean;
     canVerify: boolean;
+    /** Admin bulk verify/reject/on hold — defaults to canVerify when omitted. */
+    canAdminBulk?: boolean;
+    /** Party bulk approve/reject — PATCH /invoice/bulk/status. */
+    canBulkActions?: boolean;
   },
 ): boolean {
+  const adminBulkOk = context.canAdminBulk ?? context.canVerify;
+  const partyBulkOk =
+    context.canBulkActions !== undefined
+      ? context.canBulkActions && context.hasFunctionalPermission
+      : context.hasFunctionalPermission;
+
   if (typeof row.actionable === 'boolean') {
     if (context.isCashnTechUser) {
-      return row.actionable && context.canVerify;
+      return row.actionable && adminBulkOk;
     }
-    return row.actionable && context.hasFunctionalPermission;
+    return row.actionable && partyBulkOk;
   }
 
   if (context.isCashnTechUser) {
-    return context.canVerify && isPendingVerificationStatus(row.rawAdminStatus);
+    return adminBulkOk && isPendingVerificationStatus(row.rawAdminStatus);
   }
 
   return false;

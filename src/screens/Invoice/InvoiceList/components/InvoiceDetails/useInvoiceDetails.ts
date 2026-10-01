@@ -64,7 +64,11 @@ import {
   getInvoiceApprovalLevel,
   getInvoiceApprovalLevelForId,
 } from '@utils/getInvoiceApprovalLevel';
-import {isInvoiceBulkSelectable, isPendingInvoiceApprovalRow} from '@utils/invoiceListActionable';
+import {
+  INVOICE_DELETE_ENABLED,
+  isInvoiceBulkSelectable,
+  isPendingInvoiceApprovalRow,
+} from '@utils/invoiceListActionable';
 import type {InvoiceListFilters} from '@store/invoice/inv.types';
 import {
   selectActiveProductName,
@@ -168,6 +172,8 @@ export function useInvoiceDetails() {
   const canCreate = useHasPermission(PERMISSIONS.INVOICE_LIST_CREATE);
   const canEdit = useHasPermission(PERMISSIONS.INVOICE_LIST_EDIT);
   const canImport = useHasPermission(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY);
+  const canUploadVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY);
+  const canBulkActions = useHasPermission(PERMISSIONS.INVOICE_LIST_BULK_ACTIONS);
   const hasFunctionalPermission = canApprove || canReject || canVerify;
 
   const [menuAnchor, setMenuAnchor] = useState<{
@@ -869,6 +875,14 @@ export function useInvoiceDetails() {
         setShowCheckerApprovalModal(true);
         break;
       case 'delete':
+        if (!INVOICE_DELETE_ENABLED) {
+          Toast.show({
+            type: 'info',
+            text1: 'Delete is not available right now',
+            visibilityTime: 3000,
+          });
+          break;
+        }
         Alert.alert(
           'Delete Invoice',
           'Are you sure you want to delete this invoice? This action cannot be undone.',
@@ -1078,9 +1092,11 @@ export function useInvoiceDetails() {
           isCashnTechUser,
           hasFunctionalPermission,
           canVerify,
+          canAdminBulk: canUploadVerify,
+          canBulkActions,
         });
       }
-      return item.actionable && hasFunctionalPermission;
+      return item.actionable && hasFunctionalPermission && canBulkActions;
     }
 
     // Legacy fallback when actionable is absent from list API
@@ -1089,6 +1105,8 @@ export function useInvoiceDetails() {
         isCashnTechUser,
         hasFunctionalPermission,
         canVerify,
+        canAdminBulk: canUploadVerify,
+        canBulkActions,
       });
     }
 
@@ -1113,7 +1131,7 @@ export function useInvoiceDetails() {
     if (aStatus === 'verified') return false;
 
     // 2. Functional Permission Check (Sync with 3-dots)
-    if (!hasFunctionalPermission) return false;
+    if (!hasFunctionalPermission || !canBulkActions) return false;
 
     // For regular roles, check if approval_status contains "PENDING [ROLE]"
     const roleLabel = (storedUserRole || '').trim().toUpperCase();
@@ -1128,7 +1146,18 @@ export function useInvoiceDetails() {
     }
 
     return false;
-  }, [isCashnTechUser, storedUserRole, hasFunctionalPermission, canVerify, programSelection?.method, programSelection?.role, isAnchorAllAccess, isDealerAllAccess]);
+  }, [
+    isCashnTechUser,
+    storedUserRole,
+    hasFunctionalPermission,
+    canVerify,
+    canUploadVerify,
+    canBulkActions,
+    programSelection?.method,
+    programSelection?.role,
+    isAnchorAllAccess,
+    isDealerAllAccess,
+  ]);
 
   const toggleInvoiceSelection = (invoiceId: string) => {
     const item = filteredData.find(r => r.id === invoiceId) || invoiceData.find(r => r.id === invoiceId);
@@ -1515,12 +1544,15 @@ export function useInvoiceDetails() {
       !isCashnTechUser &&
       (payload.action === 'Approve' || payload.action === 'Reject');
 
-    const hasPermission =
-      (payload.action === 'Verify' && canVerify) ||
-      (payload.action === 'Approve' && canApprove) ||
-      (payload.action === 'Reject' &&
-        (canReject || (isWorkflowApproveRejectBulk && canApprove))) ||
-      (payload.action === 'On Hold' && (canVerify || canApprove));
+    const hasPermission = isCashnTechUser
+      ? (payload.action === 'Verify' ||
+          payload.action === 'Reject' ||
+          payload.action === 'On Hold') &&
+        canUploadVerify
+      : canBulkActions &&
+        ((payload.action === 'Approve' && canApprove) ||
+          (payload.action === 'Reject' &&
+            (canReject || (isWorkflowApproveRejectBulk && canApprove))));
 
     if (!hasPermission) {
       setBulkLoading(false);
@@ -1870,5 +1902,9 @@ export function useInvoiceDetails() {
     isAnchorAllAccess,
     isDealerAllAccess,
     isInvoiceSelectable,
+    canBulkActions,
+    canUploadVerify,
+    canApprove,
+    canReject,
   };
 }

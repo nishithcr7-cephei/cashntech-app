@@ -168,6 +168,8 @@ type Props = {
   onDeleteAttachment?: (id: number) => void;
   onDeleteItem?: (index: number) => void;
   onDeleteItemTax?: (itemIndex: number, taxIndex: number) => void;
+  /** Edit-mode server deletes (attachment / item / tax) — `invoice_list.edit`. */
+  canDeleteInEditMode?: boolean;
   canUploadFinal?: boolean;
   onAddAttachment?: () => void;
   /** Clear a locally picked file before submit (create flow — no server delete). */
@@ -212,6 +214,7 @@ export const InvoiceForm: React.FC<Props> = ({
   onDeleteAttachment,
   onDeleteItem,
   onDeleteItemTax,
+  canDeleteInEditMode = true,
   canUploadFinal = false,
   onAddAttachment,
   onClearAttachment,
@@ -699,6 +702,10 @@ export const InvoiceForm: React.FC<Props> = ({
   };
 
   const items = value.items || [];
+  const itemDeleteLocked =
+    isOcrMode || (mode === 'edit' && !canDeleteInEditMode);
+  const taxDeleteLocked = mode === 'edit' && !canDeleteInEditMode;
+  const attachmentDeleteLocked = mode === 'edit' && !canDeleteInEditMode;
 
   return (
     <View style={styles.container}>
@@ -1071,12 +1078,15 @@ export const InvoiceForm: React.FC<Props> = ({
               <Text style={styles.itemIndex}>Item {index + 1}</Text>
               <TouchableOpacity
                 onPress={() => removeItem(index)}
-                style={[styles.removeButton, isOcrMode && styles.ocrLockedAction]}
-                disabled={isOcrMode}>
+                style={[
+                  styles.removeButton,
+                  itemDeleteLocked && styles.ocrLockedAction,
+                ]}
+                disabled={itemDeleteLocked}>
                 <FontAwesome6
                   name="trash"
                   iconStyle="solid"
-                  color={isOcrMode ? '#999' : '#dc3545'}
+                  color={itemDeleteLocked ? '#999' : '#dc3545'}
                   size={16}
                 />
               </TouchableOpacity>
@@ -1248,8 +1258,19 @@ export const InvoiceForm: React.FC<Props> = ({
                       <FontAwesome6 name="plus" iconStyle="solid" size={14} color="#333" />
                     </TouchableOpacity>
                     {(((item.taxes && item.taxes.length > 0) ? item.taxes : [{taxType: item.taxType || '', taxPercentage: item.taxPercentage || '', taxAmount: item.taxAmount || ''}]).length > 1) && (
-                      <TouchableOpacity onPress={() => removeItemTax(index, taxIdx)} style={styles.removeTaxButton}>
-                        <FontAwesome6 name="trash" iconStyle="solid" size={14} color="#dc3545" />
+                      <TouchableOpacity
+                        onPress={() => removeItemTax(index, taxIdx)}
+                        style={[
+                          styles.removeTaxButton,
+                          taxDeleteLocked && styles.ocrLockedAction,
+                        ]}
+                        disabled={taxDeleteLocked}>
+                        <FontAwesome6
+                          name="trash"
+                          iconStyle="solid"
+                          size={14}
+                          color={taxDeleteLocked ? '#999' : '#dc3545'}
+                        />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1764,11 +1785,20 @@ export const InvoiceForm: React.FC<Props> = ({
                   </View>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.deleteAttachmentButton}
+                  style={[
+                    styles.deleteAttachmentButton,
+                    attachmentDeleteLocked && styles.ocrLockedAction,
+                  ]}
+                  disabled={attachmentDeleteLocked}
                   onPress={() => {
-                      onDeleteAttachment?.(att.id);
+                    onDeleteAttachment?.(att.id);
                   }}>
-                  <FontAwesome6 name="trash" iconStyle="solid" size={16} color="#DC3545" />
+                  <FontAwesome6
+                    name="trash"
+                    iconStyle="solid"
+                    size={16}
+                    color={attachmentDeleteLocked ? '#999' : '#DC3545'}
+                  />
                 </TouchableOpacity>
               </View>
             );

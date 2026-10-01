@@ -16,9 +16,45 @@ type Props = {
   onClose: () => void;
   selectedCount: number;
   onAction: (action: 'mail' | 'disburse') => void;
+  /** Bulk mark disbursed — `disbursement.bulk_actions`. */
   canMarkAsDisbursed: boolean;
+  /** Bulk email — `disbursement.send_bulk_mail`. */
   canSendMail: boolean;
 };
+
+const BulkOptionRow: React.FC<{
+  cardStyle: object;
+  iconName: 'envelope' | 'check-double';
+  iconColor: string;
+  title: string;
+  subtitle: string;
+  enabled: boolean;
+  onPress: () => void;
+}> = ({cardStyle, iconName, iconColor, title, subtitle, enabled, onPress}) => (
+  <TouchableOpacity
+    style={[styles.optionCard, cardStyle, !enabled && styles.optionDisabled]}
+    onPress={enabled ? onPress : undefined}
+    disabled={!enabled}
+    activeOpacity={enabled ? 0.7 : 1}>
+    <View style={styles.iconCircle}>
+      <FontAwesome6
+        name={iconName}
+        iconStyle="solid"
+        size={16}
+        color={enabled ? iconColor : Colors.graybase}
+      />
+    </View>
+    <View style={styles.textContainer}>
+      <Text style={[styles.optionTitle, !enabled && styles.optionTextDisabled]}>
+        {title}
+      </Text>
+      <Text
+        style={[styles.optionSubtitle, !enabled && styles.optionTextDisabled]}>
+        {subtitle}
+      </Text>
+    </View>
+  </TouchableOpacity>
+);
 
 export const DisbursementBulkActionSheet: React.FC<Props> = ({
   visible,
@@ -57,47 +93,24 @@ export const DisbursementBulkActionSheet: React.FC<Props> = ({
           <Text style={styles.subtitle}>Choose a bulk action to apply</Text>
 
           <View style={styles.optionsContainer}>
-            {canSendMail && (
-              <TouchableOpacity
-                style={[styles.optionCard, styles.mailCard]}
-                onPress={() => onAction('mail')}>
-                <View style={styles.iconCircle}>
-                  <FontAwesome6
-                    name="envelope"
-                    iconStyle="solid"
-                    size={16}
-                    color={Colors.tertiaryBlue}
-                  />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={styles.optionTitle}>Send Bulk Mail</Text>
-                  <Text style={styles.optionSubtitle}>
-                    Send email to bank for selected invoices
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
-
-            {canMarkAsDisbursed && (
-              <TouchableOpacity
-                style={[styles.optionCard, styles.disburseCard]}
-                onPress={() => onAction('disburse')}>
-                <View style={styles.iconCircle}>
-                  <FontAwesome6
-                    name="check-double"
-                    iconStyle="solid"
-                    size={16}
-                    color={Colors.primaryColor}
-                  />
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={styles.optionTitle}>Mark Bulk Disbursed</Text>
-                  <Text style={styles.optionSubtitle}>
-                    Mark selected invoices as disbursed
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
+            <BulkOptionRow
+              cardStyle={styles.mailCard}
+              iconName="envelope"
+              iconColor={Colors.tertiaryBlue}
+              title="Send Bulk Mail"
+              subtitle="Send email to bank for selected invoices"
+              enabled={canSendMail}
+              onPress={() => onAction('mail')}
+            />
+            <BulkOptionRow
+              cardStyle={styles.disburseCard}
+              iconName="check-double"
+              iconColor={Colors.primaryColor}
+              title="Mark Bulk Disbursed"
+              subtitle="Mark selected invoices as disbursed"
+              enabled={canMarkAsDisbursed}
+              onPress={() => onAction('disburse')}
+            />
           </View>
         </View>
       </View>
@@ -190,5 +203,11 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroyMedium,
     color: Colors.graybase,
     marginTop: scaleHeight(2),
+  },
+  optionDisabled: {
+    opacity: 0.45,
+  },
+  optionTextDisabled: {
+    color: Colors.graybase,
   },
 });

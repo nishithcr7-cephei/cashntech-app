@@ -24,7 +24,10 @@ import {
   ProgramBreadcrumb,
   BusyOverlay,
 } from '@components/index';
-import {getApiErrorMessage} from '@utils/apiErrorMessage';
+import {
+  getApiErrorMessage,
+  shouldSuppressUserFacingApiError,
+} from '@utils/apiErrorMessage';
 import {MarkAsDisbursedModal} from './components/MarkAsDisbursedModal';
 import {BulkMarkAsDisbursedModal, type BulkDisbursementSubmitRow} from './components/BulkMarkAsDisbursedModal';
 import {BulkInvoiceEmailModal} from './components/BulkInvoiceEmailModal';
@@ -115,9 +118,12 @@ function isEligibleForBulkEmail(row: DisbursementRow): boolean {
   );
 }
 
-function isBulkSelectableRow(row: DisbursementRow, canSendMail: boolean): boolean {
-  if (isSubmittedForBulkSelect(row)) return true;
-  if (canSendMail && isEligibleForBulkEmail(row)) return true;
+function isBulkSelectableRow(
+  row: DisbursementRow,
+  opts: {canBulkDisburse: boolean; canBulkMail: boolean},
+): boolean {
+  if (opts.canBulkDisburse && isSubmittedForBulkSelect(row)) return true;
+  if (opts.canBulkMail && isEligibleForBulkEmail(row)) return true;
   return false;
 }
 
@@ -286,9 +292,6 @@ export const DisbursementScreen: React.FC = () => {
     !!(userRole && ROLE_LABELS[userRole as AppRole] === 'CashnTech User') ||
     String(userInfo?.user_type || '').toLowerCase().trim() === 'cashntech' ||
     String(userInfo?.email || '').toLowerCase().trim().endsWith('@cashntech.com');
-  const isAnchorAllAccess = userRole === 'anchor_all_access';
-  const isDealerAllAccess = userRole === 'dealer_all_access';
-  const isHighPrivilege = isCashnTechUser || isAnchorAllAccess || isDealerAllAccess;
   const isAnchorChecker = userRole === 'anchor_checker';
   const isAnchorMaker = userRole === 'anchor_maker';
   const isDealerMaker = userRole === 'dealer_maker';
@@ -297,12 +300,18 @@ export const DisbursementScreen: React.FC = () => {
   // Permissions
   const permissionsLoading = useSelector(selectPermissionsLoading);
   const canViewDisbursement = useHasPermission(PERMISSIONS.DISBURSEMENT);
-  const canMarkAsDisbursed = isHighPrivilege || useSelector(selectCanMarkAsDisbursed);
-  const canSendMail = isHighPrivilege || useSelector(selectCanSendMailToBank);
+  const canMarkAsDisbursed = useSelector(selectCanMarkAsDisbursed);
+  const canSendMail = useSelector(selectCanSendMailToBank);
+  const canBulkDisburse = useHasPermission(PERMISSIONS.DISBURSEMENT_BULK_ACTIONS);
+  const canBulkMail = useHasPermission(PERMISSIONS.DISBURSEMENT_SEND_BULK_MAIL);
   const canDeleteDisbursement = useHasPermission(PERMISSIONS.DISBURSEMENT_DELETE);
   const canExport = useHasPermission(PERMISSIONS.DISBURSEMENT_EXPORT);
   const canFilter = useHasPermission(PERMISSIONS.DISBURSEMENT_FILTER);
-  const canShowBulkActionsBtn = canMarkAsDisbursed || canSendMail;
+  const canShowBulkActionsBtn = canBulkDisburse || canBulkMail;
+  const bulkSelectOpts = useMemo(
+    () => ({canBulkDisburse, canBulkMail}),
+    [canBulkDisburse, canBulkMail],
+  );
 
   // The 3-dots icon itself should be visible if the user can view the screen,
   // even if they don't have secondary action permissions (per requirements).
@@ -334,7 +343,7 @@ export const DisbursementScreen: React.FC = () => {
   const fetchRequestId = useRef(0);
   const prevSelectedCount = useRef(0);
 
-  const shouldAutoOpenBulkSheet = isCashnTechUser || isHighPrivilege;
+  const shouldAutoOpenBulkSheet = canBulkDisburse || canBulkMail;
 
 
   const programIds = useMemo(
@@ -589,26 +598,26 @@ export const DisbursementScreen: React.FC = () => {
   const selectableData = useMemo(() => {
     const seenIds = new Set<string>();
     return filteredData.filter(r => {
-      if (!canShowBulkActionsBtn || !r.id || !isBulkSelectableRow(r, canSendMail)) {
+      if (!canShowBulkActionsBtn || !r.id || !isBulkSelectableRow(r, bulkSelectOpts)) {
         return false;
       }
       if (seenIds.has(r.id)) return false;
       seenIds.add(r.id);
       return true;
     });
-  }, [filteredData, canShowBulkActionsBtn, canSendMail]);
+  }, [filteredData, canShowBulkActionsBtn, bulkSelectOpts]);
 
   const visibleSelectableData = useMemo(() => {
     const seenIds = new Set<string>();
     return paginatedData.filter(r => {
-      if (!canShowBulkActionsBtn || !r.id || !isBulkSelectableRow(r, canSendMail)) {
+      if (!canShowBulkActionsBtn || !r.id || !isBulkSelectableRow(r, bulkSelectOpts)) {
         return false;
       }
       if (seenIds.has(r.id)) return false;
       seenIds.add(r.id);
       return true;
     });
-  }, [paginatedData, canShowBulkActionsBtn, canSendMail]);
+  }, [paginatedData, canShowBulkActionsBtn, bulkSelectOpts]);
 
   const selectedBulkIds = useMemo(() => {
     const validIds = new Set(selectableData.map(r => r.id));
@@ -667,7 +676,7 @@ export const DisbursementScreen: React.FC = () => {
 
   const toggleSelection = (id: string) => {
     const row = disbursementRows.find(r => r.id === id);
-    if (!row || !isBulkSelectableRow(row, canSendMail)) return;
+    if (!row || !isBulkSelectableRow(row, bulkSelectOpts)) return;
 
     const next = new Set(selectedBulkIds);
     const wasSelected = next.has(id);
@@ -704,6 +713,15 @@ export const DisbursementScreen: React.FC = () => {
   }, [selectedBulkIds, disbursementRows]);
 
   const handleBulkEmailSubmit = async (invoiceIds: string[]) => {
+    if (!canBulkMail) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission to send bulk mail.',
+        visibilityTime: 3000,
+      });
+      return;
+    }
     setBulkLoading(true);
     try {
       const response = await invoiceApi.bulkEmailToBank({invoiceIds});
@@ -718,11 +736,13 @@ export const DisbursementScreen: React.FC = () => {
         visibilityTime: 3000,
       });
     } catch (err: any) {
-      Toast.show({
-        type: 'error',
-        text1: err?.response?.data?.message || err?.message || 'Failed to send bulk mail',
-        visibilityTime: 3000,
-      });
+      if (!shouldSuppressUserFacingApiError(err)) {
+        Toast.show({
+          type: 'error',
+          text1: getApiErrorMessage(err, 'Failed to send bulk mail'),
+          visibilityTime: 3000,
+        });
+      }
     } finally {
       setBulkLoading(false);
     }
@@ -730,6 +750,15 @@ export const DisbursementScreen: React.FC = () => {
 
   const handleBulkAction = (action: string) => {
     if (action === 'sendMail' || action === 'mail') {
+      if (!canBulkMail) {
+        Toast.show({
+          type: 'error',
+          text1: 'Permission Denied',
+          text2: 'You do not have permission to send bulk mail.',
+          visibilityTime: 3000,
+        });
+        return;
+      }
       const selectedRows = Array.from(selectedBulkIds)
         .map(id => disbursementRows.find(r => r.id === id))
         .filter((row): row is DisbursementRow => !!row);
@@ -753,6 +782,15 @@ export const DisbursementScreen: React.FC = () => {
       }
       setShowBulkEmailModal(true);
     } else if (action === 'markAsDisbursed' || action === 'disburse') {
+      if (!canBulkDisburse) {
+        Toast.show({
+          type: 'error',
+          text1: 'Permission Denied',
+          text2: 'You do not have permission for bulk disbursement.',
+          visibilityTime: 3000,
+        });
+        return;
+      }
       const eligibleIds = Array.from(selectedBulkIds).filter(id => {
         const row = disbursementRows.find(r => r.id === id);
         return row && isSubmittedForBulkSelect(row);
@@ -779,6 +817,15 @@ export const DisbursementScreen: React.FC = () => {
   };
 
   const handleBulkSubmit = (invoicesData: BulkDisbursementSubmitRow[]) => {
+    if (!canBulkDisburse) {
+      Toast.show({
+        type: 'error',
+        text1: 'Permission Denied',
+        text2: 'You do not have permission for bulk disbursement.',
+        visibilityTime: 3000,
+      });
+      return;
+    }
     const invoicesPayload = invoicesData.map(data => {
       const amtStr = data.disbursedAmount?.toString().replace(/[,\s₹/-]/g, '') || '0';
       const amt = parseFloat(amtStr) || 0;
@@ -860,14 +907,13 @@ export const DisbursementScreen: React.FC = () => {
                     visibilityTime: 3000,
                   });
                 } catch (err: any) {
-                  Toast.show({
-                    type: 'error',
-                    text1:
-                      err?.response?.data?.message ||
-                      err?.message ||
-                      'Failed to send mail to bank',
-                    visibilityTime: 3000,
-                  });
+                  if (!shouldSuppressUserFacingApiError(err)) {
+                    Toast.show({
+                      type: 'error',
+                      text1: getApiErrorMessage(err, 'Failed to send mail to bank'),
+                      visibilityTime: 3000,
+                    });
+                  }
                 } finally {
                   setMailLoadingId(null);
                 }
@@ -969,7 +1015,8 @@ export const DisbursementScreen: React.FC = () => {
     const isSelected = selectedBulkIds.has(row.id);
     const status = normalizeInvoiceStatus(row.invoiceStatus);
     const isClosed = status === 'closed' || status === 'close';
-    const isSelectable = isBulkSelectableRow(row, canSendMail) && canShowBulkActionsBtn;
+    const isSelectable =
+      canShowBulkActionsBtn && isBulkSelectableRow(row, bulkSelectOpts);
 
     return (
       <View style={styles.cardWrapper}>
@@ -1453,11 +1500,13 @@ export const DisbursementScreen: React.FC = () => {
             setSelectedDisbursementId(null);
             fetchDisbursementData();
           } catch (err: any) {
-            Toast.show({
-              type: 'error',
-              text1: getApiErrorMessage(err, 'Failed to mark as disbursed'),
-              visibilityTime: 4000,
-            });
+            if (!shouldSuppressUserFacingApiError(err)) {
+              Toast.show({
+                type: 'error',
+                text1: getApiErrorMessage(err, 'Failed to mark as disbursed'),
+                visibilityTime: 4000,
+              });
+            }
           } finally {
             setActionBusy(false);
           }
@@ -1478,8 +1527,8 @@ export const DisbursementScreen: React.FC = () => {
             handleBulkAction(action);
           }, 300);
         }}
-        canMarkAsDisbursed={canMarkAsDisbursed}
-        canSendMail={canSendMail}
+        canMarkAsDisbursed={canBulkDisburse}
+        canSendMail={canBulkMail}
       />
 
       <BulkInvoiceEmailModal

@@ -48,7 +48,10 @@ import {
 } from '@store/product/product.selectors';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {resolveWorkspaceProductId} from '@store/product/product.resolver';
-import {getApiErrorMessage} from '@utils/apiErrorMessage';
+import {
+  getApiErrorMessage,
+  shouldSuppressUserFacingApiError,
+} from '@utils/apiErrorMessage';
 import {getUserCapability} from '@store/user/user.selector';
 import type {InvoiceListFilters} from './inv.types';
 import type {InvoicePartyInfoRouteOptions} from '@utils/invoicePartyInfoRoute';
@@ -64,6 +67,13 @@ function showActionToast(
     ...(text2 ? {text2} : {}),
     visibilityTime: 3000,
   });
+}
+
+function showActionErrorToast(error: unknown, text1: string) {
+  if (shouldSuppressUserFacingApiError(error)) {
+    return;
+  }
+  showActionToast('error', text1);
 }
 
 function* selectPartyInfoRouteOptions(): Generator<
@@ -279,7 +289,7 @@ function* updateInvoiceStatusSaga(
       error?.response?.data?.message ||
       error?.message ||
       'Failed to update invoice status';
-    showActionToast('error', msg);
+    showActionErrorToast(error, msg);
     yield put(updateInvoiceStatusFailure(msg));
     if (action.payload.onFailure) {
       yield call(action.payload.onFailure);
@@ -318,7 +328,7 @@ function* updateInvoiceVerificationSaga(
       error?.response?.data?.message ||
       error?.message ||
       'Failed to update invoice verification';
-    showActionToast('error', msg);
+    showActionErrorToast(error, msg);
     yield put(updateInvoiceVerificationFailure(msg));
     if (action.payload.onFailure) {
       yield call(action.payload.onFailure);
@@ -385,7 +395,7 @@ function* bulkUpdateInvoiceSaga(
       error?.response?.data?.message ||
       error?.message ||
       'Failed to update bulk status';
-    showActionToast('error', msg);
+    showActionErrorToast(error, msg);
     yield put(bulkUpdateInvoiceFailure(msg));
     if (onFailure) {
       yield call(onFailure);
@@ -421,7 +431,7 @@ function* bulkDisbursementSaga(
       error?.response?.data?.message ||
       error?.message ||
       'Failed to perform bulk disbursement';
-    showActionToast('error', msg);
+    showActionErrorToast(error, msg);
     yield put(bulkDisbursementFailure(msg));
   }
 }

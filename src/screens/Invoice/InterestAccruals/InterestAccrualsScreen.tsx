@@ -37,6 +37,9 @@ import {
   usesVendorPartyLabels,
 } from '@store/product/product.resolver';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
+import {useHasPermission} from '@hooks/index';
+import {PERMISSIONS} from '@constants/permissions';
+import Toast from 'react-native-toast-message';
 
 type InterestAccrualInvoiceRow = {
   id: string;
@@ -76,6 +79,9 @@ export const InterestAccrualsScreen: React.FC = () => {
   const effectiveCode = useSelector(selectEffectiveProductCode);
   const isVendorFinance = useSelector(selectIsVendorFinanceActive);
   const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
+  const canViewDailyInterest = useHasPermission(
+    PERMISSIONS.INTEREST_ACCRUALS_VIEW_DAILY,
+  );
   const productBreadcrumbLabel =
     activeProductName ||
     PRODUCT_DISPLAY_NAMES[getEffectiveProductCode(activeProductCode)];
@@ -337,16 +343,33 @@ export const InterestAccrualsScreen: React.FC = () => {
           </View>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Invoice No.</Text>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() =>
-                (navigation as any).navigate('InvoiceDailyInterestScreen', {
-                  invoiceId: row.id,
-                  invoiceNo: row.invoiceNo,
-                })
-              }>
-              <Text style={[styles.infoValue, styles.linkText]}>{row.invoiceNo}</Text>
-            </TouchableOpacity>
+            {canViewDailyInterest ? (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() =>
+                  (navigation as any).navigate('InvoiceDailyInterestScreen', {
+                    invoiceId: row.id,
+                    invoiceNo: row.invoiceNo,
+                  })
+                }>
+                <Text style={[styles.infoValue, styles.linkText]}>
+                  {row.invoiceNo}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() =>
+                  Toast.show({
+                    type: 'info',
+                    text1: 'Daily interest detail is not permitted for your role.',
+                  })
+                }>
+                <Text style={[styles.infoValue, styles.invoiceNoDisabled]}>
+                  {row.invoiceNo}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Bank Name</Text>
@@ -805,6 +828,10 @@ const styles = StyleSheet.create({
     color: Colors.graybase,
     fontSize: scaleFont(12),
     fontFamily: Fonts.GilroyBold,
+  },
+  invoiceNoDisabled: {
+    color: Colors.graybase,
+    opacity: 0.85,
   },
   linkText: {
     color: Colors.primaryColor,

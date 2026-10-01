@@ -17,6 +17,11 @@ import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector, useDispatch} from 'react-redux';
 import {interestAccrualActions, interestAccrualSelectors} from '@store/interestAccrual';
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
+import {useHasPermission} from '@hooks/index';
+import {PERMISSIONS} from '@constants/permissions';
+import {selectPermissionsLoading} from '@store/permissions';
+import Toast from 'react-native-toast-message';
+import {PERMISSION_DENIED_USER_MESSAGE} from '@utils/apiErrorMessage';
 
 
 
@@ -32,17 +37,41 @@ export const InvoiceDailyInterestScreen: React.FC = () => {
   const dailyInterestData = useSelector(interestAccrualSelectors.selectDailyInterestList);
   const loading = useSelector(interestAccrualSelectors.selectInterestAccrualLoading);
   const apiError = useSelector(interestAccrualSelectors.selectInterestAccrualError);
-  
+  const permissionsLoading = useSelector(selectPermissionsLoading);
+  const canViewDailyInterest = useHasPermission(
+    PERMISSIONS.INTEREST_ACCRUALS_VIEW_DAILY,
+  );
+
   const [searchText, setSearchText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (permissionsLoading) {
+      return;
+    }
+    if (!canViewDailyInterest) {
+      Toast.show({
+        type: 'error',
+        text1: PERMISSION_DENIED_USER_MESSAGE,
+        visibilityTime: 3500,
+      });
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
+      return;
+    }
     if (!invoiceId) {
       setError('Missing invoice id');
       return;
     }
     dispatch(interestAccrualActions.fetchDailyInterestRequest({invoiceId}));
-  }, [invoiceId, dispatch]);
+  }, [
+    invoiceId,
+    dispatch,
+    permissionsLoading,
+    canViewDailyInterest,
+    navigation,
+  ]);
 
   const rows = useMemo(() => {
     return (dailyInterestData || []).map((item: any, index: number) => {

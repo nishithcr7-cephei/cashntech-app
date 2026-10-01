@@ -154,6 +154,10 @@ export const InvoiceDetails: React.FC = () => {
     isInvoiceSelectable,
     isAnchorAllAccess,
     isDealerAllAccess,
+    canBulkActions,
+    canUploadVerify,
+    canApprove,
+    canReject,
   } = useInvoiceDetails();
 
   const isVendorFinance =
@@ -164,25 +168,22 @@ export const InvoiceDetails: React.FC = () => {
 
   // Automatically trigger action sheet when invoices are selected
   const prevCount = React.useRef(selectedInvoiceIds.length);
+  const canOpenBulkSheet =
+    (isCashnTechUser && canUploadVerify) ||
+    ((isAnchorChecker || isDealerChecker || isVfAnchorMaker) &&
+      canBulkActions &&
+      (canApprove || canReject));
+
   React.useEffect(() => {
     if (
-      (isCashnTechUser ||
-        isAnchorChecker ||
-        isDealerChecker ||
-        isVfAnchorMaker) &&
+      canOpenBulkSheet &&
       selectedInvoiceIds.length > prevCount.current &&
       selectedInvoiceIds.length > 0
     ) {
       setShowBulkActionSheet(true);
     }
     prevCount.current = selectedInvoiceIds.length;
-  }, [
-    selectedInvoiceIds.length,
-    isCashnTechUser,
-    isAnchorChecker,
-    isDealerChecker,
-    isVfAnchorMaker,
-  ]);
+  }, [selectedInvoiceIds.length, canOpenBulkSheet]);
 
   const registerMenuRef = (id: string, ref: View | null) => {
     menuButtonRefs.current[id] = ref;
@@ -545,6 +546,11 @@ export const InvoiceDetails: React.FC = () => {
         isAnchorChecker={isAnchorChecker}
         isDealerChecker={isDealerChecker}
         isVfAnchorMaker={isVfAnchorMaker}
+        canBulkApprove={canBulkActions && canApprove}
+        canBulkReject={canBulkActions && (canReject || canApprove)}
+        canBulkVerify={canUploadVerify}
+        canBulkOnHold={canUploadVerify}
+        canBulkRejectAdmin={canUploadVerify}
       />
 
       <BulkReviewModal

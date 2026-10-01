@@ -16,7 +16,15 @@ import {PERMISSIONS} from '@constants/permissions';
 import {useSelector} from 'react-redux';
 import {selectPermissionsLoading} from '@store/permissions';
 import {userSelector} from '@store/user';
-import {canShowCashnTechInvoiceVerification, canShowFinanceRequest, canShowInvoiceListDelete, canShowInvoiceListEdit, canShowWorkflowApproveReject} from '@utils/invoiceListActionable';
+import Toast from 'react-native-toast-message';
+import {
+  canShowCashnTechInvoiceVerification,
+  canShowFinanceRequest,
+  canShowInvoiceListDelete,
+  canShowInvoiceListEdit,
+  canShowWorkflowApproveReject,
+  INVOICE_DELETE_ENABLED,
+} from '@utils/invoiceListActionable';
 
 /**
  * Visibility and Actionability Logic for "Manage Attachment"
@@ -207,6 +215,20 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
     {isCashnTechUser},
   );
 
+  const handleDeleteMenuPress = () => {
+    if (!INVOICE_DELETE_ENABLED) {
+      Toast.show({
+        type: 'info',
+        text1: 'Delete is not available right now',
+        visibilityTime: 3000,
+      });
+      return;
+    }
+    onMenuAction('delete', openMenuId);
+  };
+
+  const deleteMenuLooksDisabled = permissionsLoading || !INVOICE_DELETE_ENABLED;
+
   if (!openMenuId) return null;
 
   return (
@@ -287,14 +309,27 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
-              {/* Delete – ONLY visible if isDeletable */}
               {isDeletable && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
-                  onPress={() => onMenuAction('delete', openMenuId)}
-                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
-                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>
+                  onPress={handleDeleteMenuPress}
+                  style={[
+                    styles.menuItem,
+                    deleteMenuLooksDisabled && styles.menuItemDisabled,
+                  ]}>
+                  <FontAwesome6
+                    name="trash-can"
+                    iconStyle="regular"
+                    color={deleteMenuLooksDisabled ? Colors.graybase : '#FF5252'}
+                    size={18}
+                  />
+                  <Text
+                    style={[
+                      styles.menuText,
+                      deleteMenuLooksDisabled
+                        ? styles.menuTextDisabled
+                        : styles.deleteMenuText,
+                    ]}>
                     Delete
                   </Text>
                 </TouchableOpacity>
@@ -342,14 +377,27 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
-              {/* Delete – visible if isDeletable */}
               {isDeletable && !isAnchorAllAccess && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
-                  onPress={() => onMenuAction('delete', openMenuId)}
-                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
-                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>
+                  onPress={handleDeleteMenuPress}
+                  style={[
+                    styles.menuItem,
+                    deleteMenuLooksDisabled && styles.menuItemDisabled,
+                  ]}>
+                  <FontAwesome6
+                    name="trash-can"
+                    iconStyle="regular"
+                    color={deleteMenuLooksDisabled ? Colors.graybase : '#FF5252'}
+                    size={18}
+                  />
+                  <Text
+                    style={[
+                      styles.menuText,
+                      deleteMenuLooksDisabled
+                        ? styles.menuTextDisabled
+                        : styles.deleteMenuText,
+                    ]}>
                     Delete
                   </Text>
                 </TouchableOpacity>
@@ -395,14 +443,27 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
-              {/* Delete – visible if isDeletable */}
               {isDeletable && !isDealerAllAccess && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
-                  onPress={() => onMenuAction('delete', openMenuId)}
-                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
-                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>
+                  onPress={handleDeleteMenuPress}
+                  style={[
+                    styles.menuItem,
+                    deleteMenuLooksDisabled && styles.menuItemDisabled,
+                  ]}>
+                  <FontAwesome6
+                    name="trash-can"
+                    iconStyle="regular"
+                    color={deleteMenuLooksDisabled ? Colors.graybase : '#FF5252'}
+                    size={18}
+                  />
+                  <Text
+                    style={[
+                      styles.menuText,
+                      deleteMenuLooksDisabled
+                        ? styles.menuTextDisabled
+                        : styles.deleteMenuText,
+                    ]}>
                     Delete
                   </Text>
                 </TouchableOpacity>
@@ -452,14 +513,29 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                 </TouchableOpacity>
               )}
 
-              {/* Delete — Shown for all admin statuses */}
               {isDeletable && (
                 <TouchableOpacity
                   disabled={permissionsLoading}
-                  onPress={() => onMenuAction('delete', openMenuId)}
-                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
-                  <FontAwesome6 name="trash-can" iconStyle="regular" color="#FF5252" size={18} />
-                  <Text style={[styles.menuText, permissionsLoading && styles.menuTextDisabled]}>Delete</Text>
+                  onPress={handleDeleteMenuPress}
+                  style={[
+                    styles.menuItem,
+                    deleteMenuLooksDisabled && styles.menuItemDisabled,
+                  ]}>
+                  <FontAwesome6
+                    name="trash-can"
+                    iconStyle="regular"
+                    color={deleteMenuLooksDisabled ? Colors.graybase : '#FF5252'}
+                    size={18}
+                  />
+                  <Text
+                    style={[
+                      styles.menuText,
+                      deleteMenuLooksDisabled
+                        ? styles.menuTextDisabled
+                        : styles.deleteMenuText,
+                    ]}>
+                    Delete
+                  </Text>
                 </TouchableOpacity>
               )}
             </>

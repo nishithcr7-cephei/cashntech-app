@@ -119,18 +119,23 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   const canApprove = useHasPermission(PERMISSIONS.INVOICE_LIST_APPROVE);
   const canReject = useHasPermission(PERMISSIONS.INVOICE_LIST_REJECT);
   const canVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_ADMIN_VERIFICATION);
-  
+  const canBulkActions = useHasPermission(PERMISSIONS.INVOICE_LIST_BULK_ACTIONS);
+  const canUploadVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY);
+
   const hasFunctionalPermission = canApprove || canReject || canVerify;
   const isVendorFinance =
     effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE;
+  const isPartyBulkRole =
+    isDealerChecker ||
+    isAnchorChecker ||
+    isAnchorAllAccess ||
+    isDealerAllAccess ||
+    (isAnchorMaker && isVendorFinance);
   const showBulkSelectUi =
-    (isDealerChecker ||
-      isAnchorChecker ||
-      isCashnTechUser ||
-      isAnchorAllAccess ||
-      isDealerAllAccess ||
-      (isAnchorMaker && isVendorFinance)) &&
-    hasFunctionalPermission;
+    (isCashnTechUser && canUploadVerify) ||
+    (isPartyBulkRole &&
+      canBulkActions &&
+      (canApprove || canReject));
 
   // Composite Role-based visibility check for "Create Invoice"
   const showCreateButton = shouldShowCreateInvoice(user, canCreateInvoice);
