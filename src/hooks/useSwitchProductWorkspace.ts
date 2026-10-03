@@ -26,7 +26,7 @@ export const useSwitchProductWorkspace = () => {
   const activeProduct = useSelector(selectActiveProduct);
 
   const applyWorkspaceSwitch = useCallback(
-    (next: ResolvedProduct) => {
+    (next: ResolvedProduct, targetRoute?: string) => {
       dispatch(setActiveProduct(next));
       dispatch(setProgramScope('all'));
       dispatch(resetInvoiceOverview());
@@ -39,7 +39,7 @@ export const useSwitchProductWorkspace = () => {
       dispatch(resetDPDState());
       dispatch(resetInterestAccrualState());
       dispatch(fetchPermissionsRequest());
-      resetToProductHome();
+      resetToProductHome(targetRoute);
     },
     [dispatch],
   );
@@ -66,5 +66,5 @@ export const useSwitchProductWorkspace = () => {
     [activeProduct, applyWorkspaceSwitch],
   );
 
-  return {switchProductWorkspace, activeProduct};
+  return {switchProductWorkspace, applyWorkspaceSwitch, activeProduct};
 };

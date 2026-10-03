@@ -45,6 +45,7 @@ import {
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES, ResolvedProduct} from '@store/product/product.types';
 import {ProductIcon} from '@components/ProductSwitcher/ProductIcon';
 import {ProductBottomSheet} from '@components/ProductSwitcher/ProductBottomSheet';
+import {ProductSwitchConfirmModal} from '@components/ProductSwitcher/ProductSwitchConfirmModal';
 import {useProductSwitcherSheet} from '@hooks/useProductSwitcherSheet';
 import {useSwitchProductWorkspace} from '@hooks/useSwitchProductWorkspace';
 import {DrawerTreeMenu, DrawerMenuNode} from './DrawerTreeMenu';
@@ -156,7 +157,12 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
     hasMultipleProducts,
     activeProduct,
   } = useProductSwitcherSheet();
-  const {switchProductWorkspace} = useSwitchProductWorkspace();
+  const {applyWorkspaceSwitch} = useSwitchProductWorkspace();
+  const [pendingSwitch, setPendingSwitch] = React.useState<{
+    product: ResolvedProduct;
+    route: string;
+    label: string;
+  } | null>(null);
   // PR1 store already defaults DF-only users to a single resolved product;
   // this fallback only guards the brief window before scope/product hydration.
   // uniqueProductsByCode keeps drawer branch order DF → VF → PID.
@@ -455,12 +461,27 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       return;
     }
     if (node.productContext && node.productContext.code !== activeProductCode) {
-      navigation.closeDrawer();
-      switchProductWorkspace(node.productContext);
+      setPendingSwitch({
+        product: node.productContext,
+        route: node.route,
+        label: node.label,
+      });
       return;
     }
     navigation.closeDrawer();
     navigation.navigate(node.route as never);
+  };
+
+  const cancelPendingSwitch = () => setPendingSwitch(null);
+
+  const confirmPendingSwitch = () => {
+    if (!pendingSwitch) {
+      return;
+    }
+    const {product, route} = pendingSwitch;
+    setPendingSwitch(null);
+    navigation.closeDrawer();
+    applyWorkspaceSwitch(product, route);
   };
 
   const reportPermissionMap: Record<string, boolean> = {
@@ -612,6 +633,14 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
             {hasMultipleProducts ? (
               <ProductBottomSheet visible={sheetVisible} onClose={closeSheet} />
             ) : null}
+            <ProductSwitchConfirmModal
+              visible={!!pendingSwitch}
+              fromProduct={activeProduct}
+              toProduct={pendingSwitch?.product ?? null}
+              targetLabel={pendingSwitch?.label}
+              onCancel={cancelPendingSwitch}
+              onConfirm={confirmPendingSwitch}
+            />
           </View>
 
           <TouchableOpacity
