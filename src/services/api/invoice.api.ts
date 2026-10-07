@@ -4,6 +4,11 @@ import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 import type {DocumentPickerResponse} from '@react-native-documents/picker';
 import type {InvoiceListItemApi, UpdateInvoicePayload} from '@store/invoice/inv.types';
 import {normalizeDealerInfoResponse} from '@utils/normalizeDealerInfo';
+import type {
+  ConsolidatedInvoiceListRequest,
+  ConsolidatedInvoiceListResponse,
+} from '@store/consolidatedInvoice/consolidatedInvoice.types';
+import {normalizeConsolidatedInvoiceResponse} from '@utils/normalizeConsolidatedInvoice';
 import {
   mapInvoiceAttachmentsWithUrls,
 } from '@utils/invoiceAttachments';
@@ -515,6 +520,51 @@ export const invoiceApi = {
     }
 
     return [];
+  },
+
+  /**
+   * Read-only cross-product list (POST /invoice/consolidated-list).
+   * No productId guard: omitting productId returns every permitted product.
+   */
+  getConsolidatedInvoiceList: async (
+    request: ConsolidatedInvoiceListRequest,
+  ): Promise<ConsolidatedInvoiceListResponse> => {
+    const body: Record<string, unknown> = {
+      page: request.page,
+      limit: request.limit,
+    };
+    if (request.productId?.length) {
+      body.productId = request.productId;
+    }
+    if (request.programIds?.length) {
+      body.programIds = request.programIds;
+    }
+    if (request.byInvoiceStatus?.length) {
+      body.byInvoiceStatus = request.byInvoiceStatus;
+    }
+    if (request.byAdminStatus?.length) {
+      body.byAdminStatus = request.byAdminStatus;
+    }
+
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiConsolidatedInvoiceList,
+      body,
+      {authRequired: true} as any,
+    );
+    const data = response?.data;
+    const statusCode = Number(data?.statusCode);
+    if (Number.isFinite(statusCode) && statusCode >= 400) {
+      const rawMsg = data?.message;
+      const message = Array.isArray(rawMsg)
+        ? rawMsg.filter(Boolean).join('\n')
+        : typeof rawMsg === 'string'
+          ? rawMsg
+          : 'Failed to fetch consolidated invoices';
+      const err: any = new Error(message);
+      err.response = {status: statusCode, data};
+      throw err;
+    }
+    return normalizeConsolidatedInvoiceResponse(data);
   },
 
   /**

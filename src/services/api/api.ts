@@ -7,6 +7,7 @@ import {userActions} from '@store/user';
 import {clearProgramSelection} from '@store/programSelection/programSelection.slice';
 import {clearPermissions} from '@store/permissions';
 import {clearProductContext} from '@store/product/product.slice';
+import {resetConsolidatedState} from '@store/consolidatedInvoice/consolidatedInvoice.slice';
 import {isTokenExpired} from '@utils/Utils';
 import {
   getSessionExpiryReason,
@@ -323,6 +324,7 @@ export const logoutUser = () => {
   store.dispatch(clearProgramSelection());
   store.dispatch(clearPermissions());
   store.dispatch(clearProductContext());
+  store.dispatch(resetConsolidatedState());
 };
 
 let sessionEnding = false;

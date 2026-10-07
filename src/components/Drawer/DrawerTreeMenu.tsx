@@ -18,6 +18,8 @@ export type DrawerMenuNode = {
   /** Only rendered for expandable (parent) nodes, matching existing drawer style. */
   icon?: React.ReactNode;
   route?: string;
+  /** Params passed with `route` on navigate. */
+  routeParams?: Record<string, unknown>;
   /** Defaults to true — set false to omit the item entirely (permission gating). */
   visible?: boolean;
   /** Renders the item but greyed out / non-interactive. */
@@ -36,6 +38,10 @@ export type DrawerMenuNode = {
   isUnderActiveProduct?: boolean;
   /** Product this leaf/branch belongs to, used by DrawerContent to switch product on tap. */
   productContext?: ResolvedProduct | null;
+  /** 'consolidated' = cross-product read-only view; rendered as a distinct card-like leaf. */
+  variant?: 'consolidated';
+  /** Second line under the label (used by the consolidated variant). */
+  caption?: string;
   children?: DrawerMenuNode[];
 };
 
@@ -154,6 +160,58 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
 
           const showLeafActive = node.isActive && node.isUnderActiveProduct !== false;
 
+          if (node.variant === 'consolidated') {
+            return (
+              <TouchableOpacity
+                key={node.key}
+                disabled={node.disabled}
+                activeOpacity={node.disabled ? 1 : 0.7}
+                style={[
+                  styles.consolidatedLeaf,
+                  node.isActive && styles.consolidatedLeafActive,
+                  node.disabled && styles.disabledMenuItem,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${node.label}${node.caption ? `, ${node.caption}` : ''}`}
+                onPress={() => onNavigate(node)}>
+                <View
+                  style={[
+                    styles.consolidatedIcon,
+                    node.isActive && styles.consolidatedIconActive,
+                  ]}>
+                  <FontAwesome6
+                    name="layer-group"
+                    iconStyle="solid"
+                    size={scaleFont(12)}
+                    color={node.isActive ? Colors.white : CONSOLIDATED_ACCENT}
+                  />
+                </View>
+                <View style={styles.consolidatedTextBox}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.consolidatedLabel,
+                      node.isActive && styles.activeButtonText,
+                      node.disabled && styles.disabledMenuItemText,
+                    ]}>
+                    {node.label}
+                  </Text>
+                  {node.caption ? (
+                    <Text numberOfLines={2} style={styles.consolidatedCaption}>
+                      {node.caption}
+                    </Text>
+                  ) : null}
+                </View>
+                <FontAwesome6
+                  name="eye"
+                  iconStyle="solid"
+                  size={scaleFont(11)}
+                  color={node.isActive ? Colors.primaryColor : '#8A9BB8'}
+                />
+              </TouchableOpacity>
+            );
+          }
+
           return (
             <TouchableOpacity
               key={node.key}
@@ -186,8 +244,55 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
   );
 };
 
+const CONSOLIDATED_ACCENT = '#2F5BB7';
+
 const styles = StyleSheet.create({
   rowCenter: {flexDirection: 'row', flex: 1, alignItems: 'center', minWidth: 0},
+  consolidatedLeaf: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: scaleHeight(8),
+    paddingHorizontal: scaleWidth(10),
+    marginTop: scaleHeight(4),
+    marginBottom: scaleHeight(6),
+    borderRadius: scaleWidth(8),
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#AFC3EA',
+    backgroundColor: '#F2F6FF',
+  },
+  consolidatedLeafActive: {
+    borderStyle: 'solid',
+    borderColor: Colors.primaryColor,
+    backgroundColor: '#FFE9E9',
+  },
+  consolidatedIcon: {
+    width: scaleWidth(24),
+    height: scaleWidth(24),
+    borderRadius: scaleWidth(6),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DCE6FA',
+  },
+  consolidatedIconActive: {
+    backgroundColor: Colors.primaryColor,
+  },
+  consolidatedTextBox: {
+    flex: 1,
+    minWidth: 0,
+    marginHorizontal: scaleWidth(10),
+  },
+  consolidatedLabel: {
+    color: '#1F3B73',
+    fontFamily: Fonts.GilroySemiBold,
+    fontSize: scaleFont(13),
+  },
+  consolidatedCaption: {
+    marginTop: scaleHeight(1),
+    color: '#6B7A90',
+    fontFamily: Fonts.GilroyMedium,
+    fontSize: scaleFont(10),
+  },
   infoButton: {
     marginLeft: scaleWidth(6),
     padding: scaleWidth(2),

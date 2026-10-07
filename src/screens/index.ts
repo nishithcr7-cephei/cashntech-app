@@ -62,6 +62,7 @@ export * from './Invoice/Limits/FinancingRequestScreen';
 
 // 8. Account & SOA
 export * from './Invoice/Account/StatementOfAccount';
+export * from './Invoice/ConsolidatedInvoices/ConsolidatedInvoiceScreen';
 export * from './Invoice/Account/SOADealerList';
 export * from './Invoice/Account/AnchorsListScreen';
 export * from './Invoice/Account/ANCreditAccount';

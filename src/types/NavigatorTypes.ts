@@ -137,6 +137,8 @@ export type HomeNavigatorType = {
   RepaymentSettlementScreen: undefined;
   DPDPenalInterestNPAScreen: undefined;
   StatementOfAccount: undefined;
+  /** Read-only cross-product list; productCode omitted = all products. */
+  ConsolidatedInvoices: {productCode?: string} | undefined;
   SOADealerList: {
     programId?: string;
     programIds?: string[];

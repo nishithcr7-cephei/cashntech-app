@@ -46,6 +46,8 @@ export const PERMISSIONS = {
   /** PATCH /invoice/bulk/status (PermissionGuard). */
   INVOICE_LIST_BULK_ACTIONS: 'invoice_list.bulk_actions',
   CREATE_INVOICE: 'invoice_list.create_invoice',
+  /** POST /invoice/consolidated-list — own resource, independent of invoice_list. */
+  CONSOLIDATED_INVOICE_LIST: 'consolidated_invoice_list.view',
   INTEREST_ACCRUALS: 'interest_accruals.view',
   INTEREST_ACCRUALS_VIEW_DAILY: 'interest_accruals.view_daily_interest',
   DISBURSEMENT: 'disbursement.view',

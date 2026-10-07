@@ -150,6 +150,8 @@ const Endpoints = {
   apiBankProductList: '/master-data-management/bank-product/list',
   apiCreateInvoice: '/invoice',
   apiInvoiceList: '/invoice/list',
+  /** Read-only cross-product list; productId optional (omit = all permitted products). */
+  apiConsolidatedInvoiceList: '/invoice/consolidated-list',
   apiInvoiceKpis: '/invoice/kpis',
   apiDisbursementKpis: '/invoice/disbursement/kpis',
   apiInterestAccrualKpis: '/invoice/interest-accrual/kpis',

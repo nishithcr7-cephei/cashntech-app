@@ -4,6 +4,10 @@ import type {CheckerApprovalEntry} from '@components/CheckerApprovalModal/Checke
 import type {WorkflowStep} from '@components/InvoiceTrackingModal/InvoiceTrackingModal';
 import {decryptValue} from '@utils/decrypt';
 import {formatStatus} from '@utils/invoiceStatusDisplay';
+import {
+  formatListAmount,
+  resolveDisbursementRequestedAmount,
+} from '@utils/invoiceListAmounts';
 
 export {formatStatus};
 
@@ -180,49 +184,6 @@ export function formatDateDash(isoDate: string): string {
   } catch {
     return isoDate;
   }
-}
-
-function formatListAmount(value: number | string | null | undefined): string {
-  if (value == null || value === '') return '-';
-  const n = Number(value);
-  if (!Number.isFinite(n)) return '-';
-  return `${n.toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}/-`;
-}
-
-/**
- * DRA from API waterfall only:
- *   Invoice Amount (= sub − discount + tax) − TDS
- * Never use final_total (that is Net Disbursement).
- * List API usually omits these → returns '-'.
- */
-function resolveDisbursementRequestedAmount(
-  item: InvoiceListItemApi,
-): string {
-  const subRaw = item.sub_total;
-  const subTotal =
-    subRaw != null && subRaw !== '' ? Number(subRaw) : Number.NaN;
-  const discountTotal = Number(item.discount_total) || 0;
-  const taxTotal = Number(item.tax_total) || 0;
-  const tdsAmount = Number(item.tds_amount) || 0;
-
-  if (Number.isFinite(subTotal) && subTotal > 0) {
-    const invoiceAmount = Math.max(0, subTotal - discountTotal + taxTotal);
-    return formatListAmount(Math.max(0, invoiceAmount - tdsAmount));
-  }
-
-  // Bulk-upload rows often store amount in final_total_after_tds with sub_total=0.
-  const draRaw = item.final_total_after_tds;
-  if (draRaw != null && draRaw !== '') {
-    const dra = Number(draRaw);
-    if (Number.isFinite(dra)) {
-      return formatListAmount(dra);
-    }
-  }
-
-  return '-';
 }
 
 export type InvoiceRow = {

@@ -15,6 +15,7 @@ import {resetReportState} from '@store/report/report.slice';
 import {resetRepaymentState} from '@store/repayment/repayment.slice';
 import {resetDPDState} from '@store/dpd/dpd.slice';
 import {resetInterestAccrualState} from '@store/interestAccrual/interestAccrual.slice';
+import {resetConsolidatedState} from '@store/consolidatedInvoice/consolidatedInvoice.slice';
 import {resetToProductHome} from '@navigation/navigationRef';
 
 /**
@@ -38,6 +39,7 @@ export const useSwitchProductWorkspace = () => {
       dispatch(resetRepaymentState());
       dispatch(resetDPDState());
       dispatch(resetInterestAccrualState());
+      dispatch(resetConsolidatedState());
       dispatch(fetchPermissionsRequest());
       resetToProductHome(targetRoute);
     },

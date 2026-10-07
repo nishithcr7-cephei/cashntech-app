@@ -37,6 +37,7 @@ import {
   RepaymentSettlementScreen,
   DPDPenalInterestNPAScreen,
   StatementOfAccount,
+  ConsolidatedInvoiceScreen,
   SOADealerList,
   ProfileScreen,
   SelectProgramScreen,
@@ -108,6 +109,7 @@ export const HomeNavigator = () => {
       <Drawer.Screen name="RepaymentSettlementScreen" component={RepaymentSettlementScreen} />
       <Drawer.Screen name="DPDPenalInterestNPAScreen" component={DPDPenalInterestNPAScreen} />
       <Drawer.Screen name="StatementOfAccount" component={StatementOfAccount} />
+      <Drawer.Screen name="ConsolidatedInvoices" component={ConsolidatedInvoiceScreen} />
       <Drawer.Screen name="SOADealerList" component={SOADealerList} />
       <Drawer.Screen name="OcrInvoice" component={OcrInvoiceScreen} />
       <Drawer.Screen name="Profile" component={ProfileScreen} />

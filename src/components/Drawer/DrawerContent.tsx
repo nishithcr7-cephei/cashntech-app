@@ -29,7 +29,8 @@ import Toast from 'react-native-toast-message';
 import {AppRole} from '@constants/roles';
 import {useHasPermission} from '@hooks/index';
 import {PERMISSIONS} from '@constants/permissions';
-import {selectPermissionsLoading} from '@store/permissions';
+import {selectPermissions, selectPermissionsLoading} from '@store/permissions';
+import {evaluatePermissionKey} from '@utils/effectivePermissions';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {
   selectActiveProductCode,
@@ -213,6 +214,14 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
   const canViewSOA = useHasPermission(PERMISSIONS.SOA);
   const canViewDPD = useHasPermission(PERMISSIONS.DPD_PENAL_NPA);
   const canViewOverview = useHasPermission(PERMISSIONS.TRANSACTIONS_OVERVIEW);
+  const effectivePermissions = useSelector(selectPermissions);
+  // null = granted for any product ("All Products"); a UUID = that product only.
+  const canViewConsolidatedFor = (productId: string | null) =>
+    evaluatePermissionKey(
+      effectivePermissions,
+      PERMISSIONS.CONSOLIDATED_INVOICE_LIST,
+      productId,
+    );
   const canViewReports = useHasPermission(PERMISSIONS.REPORTING_ANALYSIS);
   const canViewAllLoansReport = useHasPermission(PERMISSIONS.REPORT_ALL_LOANS);
   const canViewDisbursementReport = useHasPermission(
@@ -443,17 +452,48 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       isInactiveProductBranch: hasMultipleProducts && !isActiveProductBranch,
       showSeparatorBefore: branchIndex > 0,
       highlighted: isActiveProductBranch,
-      children: annotateUnderActiveProduct(children, isActiveProductBranch),
+      // Added after annotation: read-only cross-product list, never styled as an inactive-product item.
+      children: [
+        {
+          key: `all-invoices-${product.code}`,
+          label: 'All Invoices',
+          caption: 'Consolidated view',
+          variant: 'consolidated',
+          route: 'ConsolidatedInvoices',
+          routeParams: {productCode: product.code},
+          disabled:
+            permissionsLoading || !canViewConsolidatedFor(product.id || null),
+          isActive:
+            currentRoute === 'ConsolidatedInvoices' &&
+            currentRouteParams?.productCode === product.code,
+        },
+        ...annotateUnderActiveProduct(children, isActiveProductBranch),
+      ],
     };
+  };
+
+  const allProductsInvoicesNode: DrawerMenuNode = {
+    key: 'all-products-invoices',
+    label: 'All Invoices',
+    caption: 'All products · Consolidated',
+    variant: 'consolidated',
+    route: 'ConsolidatedInvoices',
+    routeParams: {},
+    disabled: permissionsLoading || !canViewConsolidatedFor(null),
+    isActive:
+      currentRoute === 'ConsolidatedInvoices' && !currentRouteParams?.productCode,
   };
 
   const productsRootNode: DrawerMenuNode = {
     key: 'products',
     label: 'PRODUCTS',
     icon: <Folder height={scaleHeight(22)} width={scaleWidth(22)} />,
-    children: productBranches.map((product, index) =>
-      buildProductBranchNode(product, index),
-    ),
+    children: [
+      allProductsInvoicesNode,
+      ...productBranches.map((product, index) =>
+        buildProductBranchNode(product, index + 1),
+      ),
+    ],
   };
 
   const handleMenuNavigate = (node: DrawerMenuNode) => {
@@ -469,7 +509,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       return;
     }
     navigation.closeDrawer();
-    navigation.navigate(node.route as never);
+    navigation.navigate({name: node.route, params: node.routeParams} as never);
   };
 
   const cancelPendingSwitch = () => setPendingSwitch(null);
