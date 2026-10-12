@@ -53,6 +53,13 @@ export const getIsCashntechUserType = createSelector(_selectState, user =>
     .trim() === 'cashntech',
 );
 
+/** True when API `user_type` is Bank (case-insensitive). */
+export const getIsBankUserType = createSelector(_selectState, user =>
+  String(user.user_type || '')
+    .toLowerCase()
+    .trim() === 'bank',
+);
+
 export const getPrimaryPermissionGroupId = createSelector(
   _selectState,
   (user) => {
@@ -72,5 +79,6 @@ export default {
   getUserRoleLabel,
   getIsClient,
   getIsCashntechUserType,
+  getIsBankUserType,
   getPrimaryPermissionGroupId,
 };

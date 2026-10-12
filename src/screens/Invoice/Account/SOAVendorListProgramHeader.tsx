@@ -1,6 +1,5 @@
 import React, {useState} from 'react';
 import {
-  ActivityIndicator,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -8,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import {SkeletonList} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {formatIndianNumber} from '@utils/Utils';
@@ -121,9 +121,8 @@ export const SOAVendorListProgramHeader: React.FC<
 
   if (loading) {
     return (
-      <View style={[styles.card, styles.loadingCard]}>
-        <ActivityIndicator size="small" color={Colors.primaryColor} />
-        <Text style={styles.loadingText}>Loading loan details...</Text>
+      <View style={styles.card}>
+        <SkeletonList variant="row" count={2} />
       </View>
     );
   }
@@ -247,16 +246,6 @@ const styles = StyleSheet.create({
     marginTop: scaleHeight(8),
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E6E6E6',
-  },
-  loadingCard: {
-    alignItems: 'center',
-    paddingVertical: scaleHeight(20),
-    gap: scaleHeight(8),
-  },
-  loadingText: {
-    fontSize: scaleFont(12),
-    color: Colors.graybase,
-    fontFamily: Fonts.GilroyMedium,
   },
   titleRow: {
     flexDirection: 'row',

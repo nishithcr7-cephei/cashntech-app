@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
-import {AppBar, Container, SafeText as Text} from '@components/index';
+import {AppBar, Container, SafeText as Text, SkeletonList} from '@components/index';
 import {Colors} from '@constants/index';
 import {scaleFont} from '@utils/Scale';
 import type {ConsolidatedInvoiceRow} from '@store/consolidatedInvoice/consolidatedInvoice.types';
@@ -57,6 +57,7 @@ export const ConsolidatedInvoiceScreen: React.FC = () => {
     onRetry,
     onEndReached,
     onApplyFilters,
+    onShowAllProducts,
     onClearAllFilters,
     onApplyPrograms,
   } = useConsolidatedInvoices();
@@ -107,12 +108,7 @@ export const ConsolidatedInvoiceScreen: React.FC = () => {
 
   const renderEmpty = () => {
     if (loading) {
-      return (
-        <View style={styles.centerState}>
-          <ActivityIndicator size="large" color={Colors.primaryColor} />
-          <Text style={styles.loadingText}>Loading invoices…</Text>
-        </View>
-      );
+      return <SkeletonList variant="grid" count={4} />;
     }
     if (error) {
       return (
@@ -139,6 +135,26 @@ export const ConsolidatedInvoiceScreen: React.FC = () => {
           </Text>
           <TouchableOpacity style={styles.primaryButton} onPress={onClearSearch}>
             <Text style={styles.primaryButtonText}>Clear search</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    const onlyProductFilter =
+      filters.productIds.length > 0 &&
+      !filters.invoiceStatuses.length &&
+      !filters.adminStatuses.length &&
+      !filters.programIds.length;
+    if (onlyProductFilter) {
+      return (
+        <View style={styles.centerState}>
+          <Text style={styles.emptyTitle}>No invoices in {productScopeLabel}</Text>
+          <Text style={styles.emptyText}>
+            Invoices of other products may still be available.
+          </Text>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={onShowAllProducts}>
+            <Text style={styles.primaryButtonText}>View all products</Text>
           </TouchableOpacity>
         </View>
       );

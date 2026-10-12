@@ -17,6 +17,7 @@ import {
   ProgramBreadcrumb,
   BulkReviewModal,
   BusyOverlay,
+  SkeletonList,
 } from '@components/index';
 import {BulkActionSheet} from './BulkActionSheet';
 import {Colors} from '@constants/index';
@@ -294,9 +295,8 @@ export const InvoiceDetails: React.FC = () => {
               </View>
             </ScrollView>
           ) : invoiceListLoading && invoiceData.length === 0 ? (
-            <View style={styles.fullScreenLoading}>
-              <ActivityIndicator size="large" color={Colors.primaryColor} />
-              <Text style={styles.loadingText}>Loading Invoices...</Text>
+            <View style={styles.skeletonContainer}>
+              <SkeletonList variant="grid" count={4} />
             </View>
           ) : (
             <>
@@ -338,13 +338,7 @@ export const InvoiceDetails: React.FC = () => {
                 )}
                 ListEmptyComponent={
                   invoiceListLoading ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator
-                        size="large"
-                        color={Colors.primaryColor}
-                      />
-                      <Text style={styles.loadingText}>Loading Invoices...</Text>
-                    </View>
+                    <SkeletonList variant="grid" count={4} />
                   ) : filteredData.length === 0 ? (
                     <View style={styles.loadingContainer}>
                       <Text style={styles.loadingText}>{listEmptyMessage}</Text>

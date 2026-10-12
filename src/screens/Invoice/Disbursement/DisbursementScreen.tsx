@@ -23,6 +23,7 @@ import {
   FilterModal,
   ProgramBreadcrumb,
   BusyOverlay,
+  SkeletonList,
 } from '@components/index';
 import {
   getApiErrorMessage,
@@ -1224,13 +1225,13 @@ export const DisbursementScreen: React.FC = () => {
                 </View>
               ))}
             </View>
-            {loading || permissionsLoading ? (
+            {permissionsLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={Colors.primaryColor} />
-                <Text style={styles.loadingText}>
-                  {permissionsLoading ? 'Fetching permissions...' : 'Loading disbursement data...'}
-                </Text>
+                <Text style={styles.loadingText}>Fetching permissions...</Text>
               </View>
+            ) : loading ? (
+              <SkeletonList variant="grid" count={4} />
             ) : error ? (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>

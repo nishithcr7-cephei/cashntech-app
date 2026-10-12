@@ -114,6 +114,16 @@ const REPORT_MENU_ITEMS = [
   },
 ] as const;
 
+const DASHBOARD_MANAGEMENT_KEY = 'dashboard-management';
+
+/** Ecosystem Risk Profile also owns its drilldowns for active-leaf highlighting. */
+const ECOSYSTEM_RISK_ROUTES = ['EcosystemRiskProfile', 'BankRiskDetail', 'PartyRiskProfile'];
+const DASHBOARD_MANAGEMENT_ROUTES = [
+  ...ECOSYSTEM_RISK_ROUTES,
+  'AlertDashboard',
+  'BorrowerRiskDashboard',
+];
+
 /** Expand only the active product path: PRODUCTS → product → Transactions (+ route-specific submenus). */
 const buildActiveProductExpandedKeys = (
   productCode: string,
@@ -222,6 +232,22 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       PERMISSIONS.CONSOLIDATED_INVOICE_LIST,
       productId,
     );
+  // Dashboard Management is product-independent: evaluate with productId null.
+  const canViewEcosystemRisk = evaluatePermissionKey(
+    effectivePermissions,
+    PERMISSIONS.RISK_ECOSYSTEM,
+    null,
+  );
+  const canViewAlertDashboard = evaluatePermissionKey(
+    effectivePermissions,
+    PERMISSIONS.RISK_ALERTS,
+    null,
+  );
+  const canViewBorrowerRisk = evaluatePermissionKey(
+    effectivePermissions,
+    PERMISSIONS.RISK_BORROWER,
+    null,
+  );
   const canViewReports = useHasPermission(PERMISSIONS.REPORTING_ANALYSIS);
   const canViewAllLoansReport = useHasPermission(PERMISSIONS.REPORT_ALL_LOANS);
   const canViewDisbursementReport = useHasPermission(
@@ -284,14 +310,26 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
 
   const drawerStatus = useDrawerStatus();
 
+  const isDashboardManagementRoute =
+    !!currentRoute && DASHBOARD_MANAGEMENT_ROUTES.includes(currentRoute);
+
   const getSyncedExpandedKeys = React.useCallback(() => {
-    return buildActiveProductExpandedKeys(effectiveProductCode, {
+    const keys = buildActiveProductExpandedKeys(effectiveProductCode, {
       expandFundPlanner:
         isFundPlannerRoute && effectiveProductCode === PRODUCT_CODES.DEALER_FINANCE,
       expandLoanAccounts:
         isLoanAccountsRoute && effectiveProductCode === PRODUCT_CODES.DEALER_FINANCE,
     });
-  }, [effectiveProductCode, isFundPlannerRoute, isLoanAccountsRoute]);
+    if (isDashboardManagementRoute) {
+      keys[DASHBOARD_MANAGEMENT_KEY] = true;
+    }
+    return keys;
+  }, [
+    effectiveProductCode,
+    isFundPlannerRoute,
+    isLoanAccountsRoute,
+    isDashboardManagementRoute,
+  ]);
 
   // Re-sync tree when active product changes — collapse all inactive branches.
   React.useEffect(() => {
@@ -452,36 +490,57 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       isInactiveProductBranch: hasMultipleProducts && !isActiveProductBranch,
       showSeparatorBefore: branchIndex > 0,
       highlighted: isActiveProductBranch,
-      // Added after annotation: read-only cross-product list, never styled as an inactive-product item.
-      children: [
-        {
-          key: `all-invoices-${product.code}`,
-          label: 'All Invoices',
-          caption: 'Consolidated view',
-          variant: 'consolidated',
-          route: 'ConsolidatedInvoices',
-          routeParams: {productCode: product.code},
-          disabled:
-            permissionsLoading || !canViewConsolidatedFor(product.id || null),
-          isActive:
-            currentRoute === 'ConsolidatedInvoices' &&
-            currentRouteParams?.productCode === product.code,
-        },
-        ...annotateUnderActiveProduct(children, isActiveProductBranch),
-      ],
+      children: annotateUnderActiveProduct(children, isActiveProductBranch),
     };
   };
 
+  // Cross-product view: lives only under PRODUCTS and never switches the active product.
   const allProductsInvoicesNode: DrawerMenuNode = {
     key: 'all-products-invoices',
     label: 'All Invoices',
-    caption: 'All products · Consolidated',
+    caption: 'Consolidated · View only',
     variant: 'consolidated',
     route: 'ConsolidatedInvoices',
-    routeParams: {},
     disabled: permissionsLoading || !canViewConsolidatedFor(null),
-    isActive:
-      currentRoute === 'ConsolidatedInvoices' && !currentRouteParams?.productCode,
+    isActive: currentRoute === 'ConsolidatedInvoices',
+  };
+
+  // Cross-product, cross-bank risk views — no productContext, so tapping never switches product.
+  const dashboardManagementRootNode: DrawerMenuNode = {
+    key: DASHBOARD_MANAGEMENT_KEY,
+    label: 'DASHBOARD',
+    icon: (
+      <FontAwesome6
+        name="gauge-high"
+        iconStyle="solid"
+        size={scaleHeight(18)}
+        color={isDashboardManagementRoute ? Colors.primaryColor : '#84919A'}
+      />
+    ),
+    highlighted: isDashboardManagementRoute,
+    children: [
+      {
+        key: 'risk-ecosystem',
+        label: 'Ecosystem Risk Profile',
+        route: 'EcosystemRiskProfile',
+        disabled: permissionsLoading || !canViewEcosystemRisk,
+        isActive: !!currentRoute && ECOSYSTEM_RISK_ROUTES.includes(currentRoute),
+      },
+      {
+        key: 'risk-alerts',
+        label: 'Alert Dashboard',
+        route: 'AlertDashboard',
+        disabled: permissionsLoading || !canViewAlertDashboard,
+        isActive: currentRoute === 'AlertDashboard',
+      },
+      {
+        key: 'risk-borrower',
+        label: 'Borrower Risk Dashboard',
+        route: 'BorrowerRiskDashboard',
+        disabled: permissionsLoading || !canViewBorrowerRisk,
+        isActive: currentRoute === 'BorrowerRiskDashboard',
+      },
+    ],
   };
 
   const productsRootNode: DrawerMenuNode = {
@@ -696,7 +755,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
           style={styles.menuScroll}
           contentContainerStyle={styles.menuScrollContent}>
             <DrawerTreeMenu
-              nodes={[productsRootNode]}
+              nodes={[dashboardManagementRootNode, productsRootNode]}
               expandedKeys={expandedKeys}
               onToggle={toggleExpandedKey}
               onNavigate={handleMenuNavigate}

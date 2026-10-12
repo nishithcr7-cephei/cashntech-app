@@ -12,7 +12,15 @@
  */
 export const PERMISSIONS = {
   LMS: 'module:lms',
+  /**
+   * `dashboard_management` is a permission group, not a resource, so this key
+   * never matches. Gate the section with the three RISK_* keys below.
+   */
   DASHBOARD_MANAGEMENT: 'any:dashboard_management',
+  /** Product-independent: evaluate with productId `null`, not useHasPermission. */
+  RISK_ECOSYSTEM: 'bank_risk_dashboard.view',
+  RISK_ALERTS: 'alert_dashboard.view',
+  RISK_BORROWER: 'distributor_risk_dashboard.view',
   MASTER_DATA_MANAGEMENT: 'module:lms',
   SCF_MASTER: 'any:supply_chain_finance',
   LMS_ID_CREATION: 'any:lms_id_creation',

@@ -15,7 +15,7 @@ import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
-import {AppBar, Container, ReportFilterModal} from '@components/index';
+import {AppBar, Container, ReportFilterModal, SkeletonList} from '@components/index';
 import {useReportApiFilter} from '@hooks/useReportApiFilter';
 import {useReportColumns} from '@hooks/useReportColumns';
 import {useReportExport} from '@hooks/useReportExport';
@@ -230,11 +230,7 @@ export const MonthlyInterestReportScreen: React.FC = () => {
         }
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator
-              size="large"
-              color={Colors.primaryColor}
-              style={styles.loader}
-            />
+            <SkeletonList variant="grid" count={4} style={styles.loader} />
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>

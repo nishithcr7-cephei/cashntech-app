@@ -69,6 +69,13 @@ export * from './Invoice/Account/ANCreditAccount';
 export * from './Invoice/Account/CreditAccountInvoiceNumber';
 export {CreditAccountDetails} from '../store/soa/creditAccountDetails';
 
+// Dashboard Management
+export * from './DashboardManagement/EcosystemRiskProfile/EcosystemRiskProfileScreen';
+export * from './DashboardManagement/BankRiskDetail/BankRiskDetailScreen';
+export * from './DashboardManagement/PartyRiskProfile/PartyRiskProfileScreen';
+export * from './DashboardManagement/AlertDashboard/AlertDashboardScreen';
+export * from './DashboardManagement/BorrowerRiskDashboard/BorrowerRiskDashboardScreen';
+
 // Profile exports
 export * from './Profile/ProfileScreen';
 

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   View,
   TextInput,
-  ActivityIndicator,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {CompositeNavigationProp} from '@react-navigation/native';
@@ -19,6 +18,7 @@ import {
   Container,
   FilterModal,
   ProgramBreadcrumb,
+  SkeletonList,
 } from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
@@ -368,9 +368,7 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
 
         <View style={styles.verticalList}>
           {loading ? (
-            <View style={styles.emptyState}>
-              <ActivityIndicator size="large" color={Colors.primaryColor} />
-            </View>
+            <SkeletonList variant="grid" count={4} />
           ) : filteredData.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>NO DATA</Text>
@@ -385,7 +383,13 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
                 <View style={styles.infoGrid}>
                   {vendorPartyLabels ? (
                     <>
-                      {/* VF DPD web labels: Invoice No → Bank → Product → Vendor → Anchor → Invoice Date → GRN Date → Due Date → Disbursement Date → Invoice Amount → Disbursed Amount → DPD Days → O/S Principal → O/S Interest Accrued → O/S Penal → O/S Total → NPA Status */}
+                      {/* VF/PID DPD web labels: Loan Ref No → Invoice No → Bank → Product → Vendor → Anchor → Invoice Date → GRN Date → Due Date → Disbursement Date → Invoice Amount → Disbursed Amount → DPD Days → O/S Principal → O/S Interest Accrued → O/S Penal → O/S Total → NPA Status */}
+                      <View style={styles.infoColumn}>
+                        <Text style={styles.infoLabel}>Loan Ref No.</Text>
+                        <Text style={styles.infoValue}>
+                          {row.loan_ref_no ?? '-'}
+                        </Text>
+                      </View>
                       <View style={styles.infoColumn}>
                         <Text style={styles.infoLabel}>Invoice No</Text>
                         <TouchableOpacity

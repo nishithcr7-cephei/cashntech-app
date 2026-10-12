@@ -154,11 +154,10 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fullScreenLoading: {
+  skeletonContainer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: scaleHeight(40),
+    paddingHorizontal: scaleWidth(16),
+    paddingTop: scaleHeight(12),
   },
   loadingText: {
     marginTop: scaleHeight(12),

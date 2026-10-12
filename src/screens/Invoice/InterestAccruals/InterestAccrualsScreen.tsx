@@ -13,7 +13,7 @@ import {CompositeNavigationProp} from '@react-navigation/native';
 import {DrawerNavigationProp} from '@react-navigation/drawer';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import {AppBar, Container, ProgramBreadcrumb, FilterModal} from '@components/index';
+import {AppBar, Container, ProgramBreadcrumb, FilterModal, SkeletonList} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {HomeNavigatorType} from '@type/NavigatorTypes';
@@ -33,6 +33,7 @@ import {
 } from '@store/product/product.selectors';
 import {
   getEffectiveProductCode,
+  isPid,
   resolveWorkspaceProductId,
   usesVendorPartyLabels,
 } from '@store/product/product.resolver';
@@ -58,6 +59,7 @@ type InterestAccrualInvoiceRow = {
   disburseAmount: string;
   advanceInterest: string;
   totalAccInterest: string;
+  accruedInterest: string;
   totalInterestPaid: string;
   // raw numeric fields for summary calculations
   finalTotalRaw: number;
@@ -79,6 +81,7 @@ export const InterestAccrualsScreen: React.FC = () => {
   const effectiveCode = useSelector(selectEffectiveProductCode);
   const isVendorFinance = useSelector(selectIsVendorFinanceActive);
   const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
+  const isPidActive = isPid(effectiveCode);
   const canViewDailyInterest = useHasPermission(
     PERMISSIONS.INTEREST_ACCRUALS_VIEW_DAILY,
   );
@@ -251,6 +254,7 @@ export const InterestAccrualsScreen: React.FC = () => {
         disburseAmount: fmtMoney(item.disbursed_amount),
         advanceInterest: fmtMoney(upfrontInterestRaw),
         totalAccInterest: fmtMoney(displayAccrualRaw),
+        accruedInterest: fmtMoney(Number(item.interest_accrued ?? 0) || 0),
         totalInterestPaid: fmtMoney(item.total_paid_interest),
         finalTotalRaw,
         disbursedAmountRaw,
@@ -429,6 +433,12 @@ export const InterestAccrualsScreen: React.FC = () => {
             </Text>
             <Text style={styles.infoValue}>{row.totalAccInterest}</Text>
           </View>
+          {isPidActive ? (
+            <View style={styles.infoColumn}>
+              <Text style={styles.infoLabel}>Accrued Interest (₹)</Text>
+              <Text style={styles.infoValue}>{row.accruedInterest}</Text>
+            </View>
+          ) : null}
           <View style={styles.infoColumn}>
             <Text style={styles.infoLabel}>Total Interest Paid Amount (₹)</Text>
             <Text style={styles.infoValue}>{row.totalInterestPaid}</Text>
@@ -496,10 +506,7 @@ export const InterestAccrualsScreen: React.FC = () => {
               ))}
             </View>
             {listLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.primaryColor} />
-                <Text style={styles.loadingText}>Loading interest accruals...</Text>
-              </View>
+              <SkeletonList variant="grid" count={4} />
             ) : listError ? (
               <View style={styles.loadingContainer}>
                 <Text style={styles.errorText}>{listError}</Text>

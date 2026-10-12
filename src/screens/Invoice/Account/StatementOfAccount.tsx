@@ -5,11 +5,10 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
-import {AppBar, Container} from '@components/index';
+import {AppBar, Container, SkeletonList} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import Toast from 'react-native-toast-message';
@@ -200,12 +199,7 @@ export const StatementOfAccount: React.FC = () => {
           </View>
         </View>
 
-        {loading && (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color={Colors.primaryColor} />
-            <Text style={styles.loadingText}>Fetching programs...</Text>
-          </View>
-        )}
+        {loading && <SkeletonList variant="row" count={6} />}
 
         {!loading && programList.length === 0 && (
           <View style={styles.emptyContainer}>
@@ -386,18 +380,6 @@ const styles = StyleSheet.create({
   linkText: {
     color: Colors.tertiaryColor,
     textDecorationLine: 'underline',
-  },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: scaleHeight(40),
-  },
-  loadingText: {
-    marginTop: scaleHeight(12),
-    fontSize: scaleFont(14),
-    color: Colors.graybase,
-    fontFamily: Fonts.GilroyMedium,
   },
   navPathContainer: {
     paddingHorizontal: scaleWidth(16),

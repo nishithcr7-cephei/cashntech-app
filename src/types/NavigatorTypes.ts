@@ -138,7 +138,19 @@ export type HomeNavigatorType = {
   DPDPenalInterestNPAScreen: undefined;
   StatementOfAccount: undefined;
   /** Read-only cross-product list; productCode omitted = all products. */
-  ConsolidatedInvoices: {productCode?: string} | undefined;
+  ConsolidatedInvoices: undefined;
+  /** Dashboard Management — product-independent. */
+  EcosystemRiskProfile: undefined;
+  BankRiskDetail: {bankId: string; bankName?: string};
+  /** `bankId`/`bankName` = the Bank Risk Detail to return to on back. */
+  PartyRiskProfile: {
+    partyId: string;
+    partyName?: string;
+    bankId?: string;
+    bankName?: string;
+  };
+  AlertDashboard: undefined;
+  BorrowerRiskDashboard: undefined;
   SOADealerList: {
     programId?: string;
     programIds?: string[];

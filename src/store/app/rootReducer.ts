@@ -16,6 +16,7 @@ import soaDealerReducer from '@store/soa/dealer/dealer.slice';
 import {creditAccountDetailsReducer} from '@store/soa/creditAccountDetails/slice';
 import {uiReducer} from '@store/ui';
 import {consolidatedInvoiceReducer} from '@store/consolidatedInvoice';
+import {riskDashboardReducer} from '@store/riskDashboard';
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -34,6 +35,7 @@ const rootReducer = combineReducers({
   creditAccountDetails: creditAccountDetailsReducer,
   ui: uiReducer,
   consolidatedInvoice: consolidatedInvoiceReducer,
+  riskDashboard: riskDashboardReducer,
   ...registerwebReducer,
 });
 

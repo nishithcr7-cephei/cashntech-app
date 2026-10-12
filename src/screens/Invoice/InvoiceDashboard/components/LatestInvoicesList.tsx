@@ -1,6 +1,6 @@
 import React from 'react';
-import {View, TouchableOpacity, ActivityIndicator} from 'react-native';
-import {SafeText as Text} from '@components/index';
+import {View, TouchableOpacity} from 'react-native';
+import {SafeText as Text, SkeletonList} from '@components/index';
 import {Colors} from '@constants/index';
 import {styles} from '../InvoiceDashboard.styles';
 import {scaleHeight, scaleWidth} from '@utils/Scale';
@@ -45,8 +45,8 @@ export const LatestInvoicesList: React.FC<LatestInvoicesListProps> = ({
 
   if (loading) {
     return (
-      <View style={[styles.verticalList, {justifyContent: 'center', alignItems: 'center', paddingVertical: scaleHeight(40)}]}>
-        <ActivityIndicator size="large" color={Colors.primaryColor} />
+      <View style={styles.verticalList}>
+        <SkeletonList variant="grid" count={3} />
       </View>
     );
   }

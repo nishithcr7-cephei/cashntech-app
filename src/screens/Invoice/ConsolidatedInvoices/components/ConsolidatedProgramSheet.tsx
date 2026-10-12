@@ -1,6 +1,5 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -10,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
-import {SafeText as Text} from '@components/index';
+import {SafeText as Text, SkeletonList} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import type {ConsolidatedProgramGroup} from '@utils/consolidatedProgramOptions';
@@ -114,11 +113,7 @@ export const ConsolidatedProgramSheet: React.FC<Props> = ({
             </TouchableOpacity>
 
             {loading && !groups.length ? (
-              <ActivityIndicator
-                style={styles.loader}
-                size="small"
-                color={Colors.primaryColor}
-              />
+              <SkeletonList variant="row" count={5} style={styles.loader} />
             ) : null}
 
             {!loading && !visibleGroups.length ? (

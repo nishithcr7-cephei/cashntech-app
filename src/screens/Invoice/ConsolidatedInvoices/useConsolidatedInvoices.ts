@@ -1,11 +1,13 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
-import {RouteProp, useNavigation, useRoute} from '@react-navigation/native';
-import {selectAvailableProducts} from '@store/product/product.selectors';
+import {useNavigation} from '@react-navigation/native';
+import {
+  selectActiveProductCode,
+  selectAvailableProducts,
+} from '@store/product/product.selectors';
 import {
   getProductFullDisplayName,
   getProductNavLabel,
-  resolveProductCodeFromProductCode,
   uniqueProductsByCode,
 } from '@store/product/product.resolver';
 import {ProductCode} from '@store/product/product.types';
@@ -44,13 +46,7 @@ import {
   buildConsolidatedProgramGroups,
   collectProgramIds,
 } from '@utils/consolidatedProgramOptions';
-
-export type ConsolidatedInvoicesRouteParams = {
-  /** Product code from the drawer leaf; omitted = "All Products". */
-  productCode?: string;
-};
-
-type RouteParams = {ConsolidatedInvoices: ConsolidatedInvoicesRouteParams | undefined};
+import {resolveDefaultConsolidatedFilters} from '@utils/consolidatedDefaultFilters';
 
 export type ConsolidatedProductOption = {
   code: ProductCode;
@@ -93,11 +89,7 @@ export const SEARCH_FIELD_OPTIONS: {
 export const useConsolidatedInvoices = () => {
   const dispatch = useDispatch();
   const navigation = useNavigation();
-  const route = useRoute<RouteProp<RouteParams, 'ConsolidatedInvoices'>>();
-  const routeProductCode = resolveProductCodeFromProductCode(
-    route.params?.productCode,
-  );
-
+  const activeProductCode = useSelector(selectActiveProductCode);
   const availableProducts = useSelector(selectAvailableProducts);
   const scopeData = useSelector(selectScopeData);
   const scopeLoading = useSelector(selectScopeLoading);
@@ -195,17 +187,21 @@ export const useConsolidatedInvoices = () => {
     [dispatch, productOptions, scopeData],
   );
 
-  // Drawer leaf decides the initial product; re-applies when a different leaf is tapped.
+  // First open in a workspace defaults to the active product. Product switch and
+  // logout reset the slice (hasLoaded=false), so the new active product applies;
+  // returning to the screen keeps whatever the user picked.
+  const productsReady = productOptions.length > 0 || !activeProductCode;
   useEffect(() => {
-    applyFilters(
-      {
-        ...filters,
-        productIds: routeProductCode ? codesToIds([routeProductCode]) : [],
-      },
-      filters.programIds,
+    if (hasLoaded || fetching || error || !productsReady) {
+      return;
+    }
+    dispatch(
+      setConsolidatedFilters(
+        resolveDefaultConsolidatedFilters(activeProductCode, productOptions),
+      ),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeProductCode, productOptions.length]);
+  }, [hasLoaded, productsReady, activeProductCode]);
 
   const onChangeSearch = useCallback(
     (text: string) => {
@@ -259,6 +255,10 @@ export const useConsolidatedInvoices = () => {
     },
     [applyFilters, codesToIds, filters.programIds],
   );
+
+  const onShowAllProducts = useCallback(() => {
+    applyFilters({...filters, productIds: []}, filters.programIds);
+  }, [applyFilters, filters]);
 
   const onClearAllFilters = useCallback(() => {
     setShowFilterSheet(false);
@@ -338,6 +338,7 @@ export const useConsolidatedInvoices = () => {
     onRetry,
     onEndReached,
     onApplyFilters,
+    onShowAllProducts,
     onClearAllFilters,
     onApplyPrograms,
   };

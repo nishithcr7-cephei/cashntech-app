@@ -13,6 +13,7 @@ import {soaSaga} from '@store/soa/soa.saga';
 import {dealerSaga} from '@store/soa/dealer/dealer.saga';
 import {creditAccountDetailsSaga} from '@store/soa/creditAccountDetails/saga';
 import {consolidatedInvoiceSaga} from '@store/consolidatedInvoice';
+import {riskDashboardSaga} from '@store/riskDashboard';
 
 import {reportSaga} from '@store/report';
 
@@ -36,5 +37,6 @@ export default function* rootSaga() {
     dealerSaga(),
     creditAccountDetailsSaga(),
     consolidatedInvoiceSaga(),
+    riskDashboardSaga(),
   ]);
 }

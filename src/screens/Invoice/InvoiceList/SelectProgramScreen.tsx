@@ -5,12 +5,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
-  ActivityIndicator,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useDispatch, useSelector} from 'react-redux';
-import {AppBar, Container} from '@components/index';
+import {AppBar, Container, SkeletonList} from '@components/index';
 import {Colors, Fonts, StorageKeys} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {RightChevron, UpChevron, File, BankBuilding} from '@assets/Icons';
@@ -311,8 +310,7 @@ export const SelectProgramScreen: React.FC = () => {
       <Container>
         <AppBar title="Select Program" navigation={navigation as any} hideHamburger={true} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primaryColor} />
-          <Text style={styles.loadingText}>Loading programs...</Text>
+          <SkeletonList variant="row" count={8} />
         </View>
       </Container>
     );
@@ -377,13 +375,8 @@ export const SelectProgramScreen: React.FC = () => {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: scaleHeight(12),
-  },
-  loadingText: {
-    fontSize: scaleFont(14),
-    color: Colors.graybase,
+    paddingHorizontal: scaleWidth(16),
+    paddingTop: scaleHeight(12),
   },
   errorContainer: {
     flex: 1,

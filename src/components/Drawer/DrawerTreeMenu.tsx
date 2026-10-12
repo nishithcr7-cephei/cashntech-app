@@ -116,7 +116,7 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
                   <View style={styles.rowCenter}>
                     {node.icon ? <View style={styles.iconBox}>{node.icon}</View> : null}
                     <Text
-                      numberOfLines={1}
+                      numberOfLines={2}
                       ellipsizeMode="tail"
                       accessibilityLabel={node.fullLabel ?? node.label}
                       style={getParentTextStyle(node, isOpen)}>

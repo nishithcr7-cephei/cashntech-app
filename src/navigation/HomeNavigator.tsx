@@ -51,6 +51,11 @@ import {
   LoanStatusReportScreen,
   AllProductOutstandingReportScreen,
   UtilizationReportScreen,
+  EcosystemRiskProfileScreen,
+  BankRiskDetailScreen,
+  PartyRiskProfileScreen,
+  AlertDashboardScreen,
+  BorrowerRiskDashboardScreen,
 } from '@screens/index';
 
 const Drawer = createDrawerNavigator<HomeNavigatorType>();
@@ -110,6 +115,11 @@ export const HomeNavigator = () => {
       <Drawer.Screen name="DPDPenalInterestNPAScreen" component={DPDPenalInterestNPAScreen} />
       <Drawer.Screen name="StatementOfAccount" component={StatementOfAccount} />
       <Drawer.Screen name="ConsolidatedInvoices" component={ConsolidatedInvoiceScreen} />
+      <Drawer.Screen name="EcosystemRiskProfile" component={EcosystemRiskProfileScreen} />
+      <Drawer.Screen name="BankRiskDetail" component={BankRiskDetailScreen} />
+      <Drawer.Screen name="PartyRiskProfile" component={PartyRiskProfileScreen} />
+      <Drawer.Screen name="AlertDashboard" component={AlertDashboardScreen} />
+      <Drawer.Screen name="BorrowerRiskDashboard" component={BorrowerRiskDashboardScreen} />
       <Drawer.Screen name="SOADealerList" component={SOADealerList} />
       <Drawer.Screen name="OcrInvoice" component={OcrInvoiceScreen} />
       <Drawer.Screen name="Profile" component={ProfileScreen} />

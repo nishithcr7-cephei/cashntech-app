@@ -1,5 +1,6 @@
 import React from 'react';
-import {View, Text, TouchableOpacity, ActivityIndicator} from 'react-native';
+import {View, Text, TouchableOpacity} from 'react-native';
+import {SkeletonList} from '@components/index';
 import {Colors} from '@constants/index';
 import {styles} from '../InvoiceDashboard.styles';
 import {scaleHeight} from '@utils/Scale';
@@ -51,16 +52,8 @@ export const DealerSummaryList: React.FC<DealerSummaryListProps> = ({
 
   if (loading) {
     return (
-      <View
-        style={[
-          styles.verticalList,
-          {
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingVertical: scaleHeight(40),
-          },
-        ]}>
-        <ActivityIndicator size="large" color={Colors.primaryColor} />
+      <View style={styles.verticalList}>
+        <SkeletonList variant="grid" count={3} />
       </View>
     );
   }

@@ -1,7 +1,7 @@
 import React from 'react';
-import {View, ActivityIndicator} from 'react-native';
-import {SafeText as Text} from '@components/index';
-import {Colors} from '@constants/index';
+import {View} from 'react-native';
+import {SafeText as Text, SkeletonBlock} from '@components/index';
+import {scaleHeight} from '@utils/Scale';
 import {styles} from '../InvoiceDashboard.styles';
 import type {MetricItem} from '../types';
 
@@ -24,9 +24,9 @@ export const MetricsCard: React.FC<MetricsCardProps> = ({metrics, loading}) => {
           ]}>
           <Text style={styles.cardLabel}>{metric.label}</Text>
           {loading ? (
-            <ActivityIndicator
-              size="small"
-              color={Colors.primaryColor}
+            <SkeletonBlock
+              width="70%"
+              height={scaleHeight(18)}
               style={styles.cardLoader}
             />
           ) : (

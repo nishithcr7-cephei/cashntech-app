@@ -7,9 +7,9 @@ import {
   Modal,
   Pressable,
   FlatList,
-  ActivityIndicator,
 } from 'react-native';
 import {useDispatch, useSelector} from 'react-redux';
+import {SkeletonList} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {RightChevron, UpChevron, File, BankBuilding} from '@assets/Icons';
@@ -240,8 +240,7 @@ export const SelectProgramModal: React.FC<SelectProgramModalProps> = ({
     if (scopeLoading) {
       return (
         <View style={modalStyles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primaryColor} />
-          <Text style={modalStyles.loadingText}>Loading programs...</Text>
+          <SkeletonList variant="row" count={6} />
         </View>
       );
     }
@@ -354,14 +353,8 @@ const modalStyles = StyleSheet.create({
     color: Colors.darkblack,
   },
   loadingContainer: {
-    padding: scaleHeight(32),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    fontSize: scaleFont(14),
-    color: Colors.graybase,
-    marginTop: scaleHeight(8),
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
   },
   errorContainer: {
     padding: scaleHeight(24),

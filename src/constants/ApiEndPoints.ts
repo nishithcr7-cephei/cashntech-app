@@ -148,6 +148,17 @@ const Endpoints = {
   /** VF / CWF backends — unified party bootstrap (product/method dispatch server-side) */
   apiPartyInfo: (programId: string) => `/invoice/party-info/${programId}`,
   apiBankProductList: '/master-data-management/bank-product/list',
+  /** All programs `[{id, program_name}]` — not scoped by product or bank. */
+  apiMasterProgramDropdown: '/master-data-management/program/list',
+
+  // Dashboard Management — product-independent, never send productId.
+  apiEcosystemRisk: '/alert-cases/bank-risk-dashboard',
+  apiBankRiskDetail: (bankId: string) => `/alert-cases/bank-risk-dashboard/${bankId}`,
+  apiPartyRiskProfile: (partyId: string) =>
+    `/alert-cases/bank-risk-dashboard/party/${partyId}`,
+  apiAlertDispatches: '/alert-dispatches',
+  apiBorrowerRisk: '/alert-cases/distributor-risk-dashboard',
+
   apiCreateInvoice: '/invoice',
   apiInvoiceList: '/invoice/list',
   /** Read-only cross-product list; productId optional (omit = all permitted products). */

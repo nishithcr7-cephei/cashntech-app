@@ -5,11 +5,10 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {useDispatch, useSelector} from 'react-redux';
-import {AppBar, Container} from '@components/index';
+import {AppBar, Container, SkeletonList} from '@components/index';
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {LeftChevron} from '@assets/Icons';
@@ -337,12 +336,7 @@ export const SOADealerList: React.FC = () => {
       </View>
 
       <View style={styles.content}>
-        {loading && (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color={Colors.primaryColor} />
-            <Text style={styles.loadingText}>Fetching {partyLabelPlural.toLowerCase()}...</Text>
-          </View>
-        )}
+        {loading && <SkeletonList variant="card" count={4} />}
 
         {!loading && dealerList.length === 0 && (
           <View style={styles.emptyContainer}>
@@ -545,17 +539,5 @@ const styles = StyleSheet.create({
   linkText: {
     color: Colors.tertiaryColor,
     textDecorationLine: 'underline',
-  },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: scaleHeight(40),
-  },
-  loadingText: {
-    marginTop: scaleHeight(12),
-    fontSize: scaleFont(14),
-    color: Colors.graybase,
-    fontFamily: Fonts.GilroyMedium,
   },
 });
