@@ -53,7 +53,7 @@ import {
   computeCreateInvoiceTotals,
   computeInvoiceAmountForLimitCheck,
   getOcrPartyLabels,
-  isPidProductType,
+  isStandaloneProductType,
   shouldWarnVfZeroAdvanceInterest,
 } from '@utils/invoiceCreateCalc';
 import {convertOcrLineItems, getOcrLineItemIssues} from '@utils/ocrLineItemMapper';
@@ -371,7 +371,7 @@ export const CreateInvoice: React.FC = () => {
   const activeProductId = useSelector(selectActiveProductId);
   const invoiceNo: string | undefined = route?.params?.invoiceNo;
   const mode: 'edit' | 'recreate' | undefined = route?.params?.mode;
-  // Product-aware labels (Dealer vs Vendor vs PID): prefer the selected program's
+  // Product-aware labels (Dealer vs Vendor vs Debtor): prefer the selected program's
   // own product name, falling back to the active product context.
   const productType = useMemo<InvoiceProductType>(() => {
     const fromProgram = resolveProductCodeFromName(programSelection?.productName);
@@ -382,11 +382,15 @@ export const CreateInvoice: React.FC = () => {
     if (code === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING) {
       return 'purchase_invoice_discounting';
     }
+    if (code === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING) {
+      return 'sales_invoice_discounting';
+    }
     return 'dealer_finance';
   }, [programSelection?.productName, effectiveProductCode]);
 
   const isVendorFinance = productType === 'vendor_finance';
-  const isPid = isPidProductType(productType);
+  // PID + SID: program-level limit, vendorMappingId, program loan account.
+  const isStandalone = isStandaloneProductType(productType);
 
   const creditToOptions = useMemo<CreditToOption[]>(() => {
     // PID: prefer the selected vendor's bank accounts (ProgramVendorBankAccount).
@@ -1023,9 +1027,9 @@ export const CreateInvoice: React.FC = () => {
         );
         const isPidInvoice =
           !!pvd?.id ||
-          /purchase\s*invoice\s*discounting/i.test(productName);
+          /(purchase|sales)\s*invoice\s*discounting/i.test(productName);
 
-        // Edit/recreate: PID uses programVendorDetails; DF/VF use APM.
+        // Edit/recreate: PID/SID use programVendorDetails; DF/VF use APM.
         const rawDealerEntityName = isPidInvoice
           ? pvd?.vendor_name ||
             data.counter_party_name ||
@@ -1445,8 +1449,8 @@ export const CreateInvoice: React.FC = () => {
           decryptValue(participant.od_account_no ?? '') ||
           participant.od_account_no ||
           String((dealerInfo?.basic_parameters as any)?.loan_account_no || '');
-        if (isPid && mode !== 'edit' && mode !== 'recreate') {
-          // Vendor banks differ per PID vendor — clear prior Credit To.
+        if (isStandalone && mode !== 'edit' && mode !== 'recreate') {
+          // Vendor banks differ per PID vendor / SID debtor — clear prior Credit To.
           patch.creditTo = '';
           patch.creditToAccountId = undefined;
         }
@@ -1606,9 +1610,11 @@ export const CreateInvoice: React.FC = () => {
 
   const previewDisabledReasonInternal = useMemo(() => {
     if (!fields.dealer?.trim()) {
-      return isPid || productType === 'vendor_finance'
-        ? 'Please select Party (Anchor/Vendor) to preview'
-        : 'Please select Dealer / Party to preview';
+      return productType === 'sales_invoice_discounting'
+        ? 'Please select Debtor to preview'
+        : isStandalone || productType === 'vendor_finance'
+          ? 'Please select Party (Anchor/Vendor) to preview'
+          : 'Please select Dealer / Party to preview';
     }
     if (!fields.invoiceDate?.trim()) {
       return 'Please enter Invoice Date to preview';
@@ -1617,7 +1623,7 @@ export const CreateInvoice: React.FC = () => {
       return 'Please add at least one item to preview';
     }
     return undefined;
-  }, [fields.dealer, fields.invoiceDate, fields.items, productType]);
+  }, [fields.dealer, fields.invoiceDate, fields.items, productType, isStandalone]);
 
   const handleProofUploadFile = async (
     file: DocumentPickerResponse | undefined,
@@ -1992,9 +1998,9 @@ export const CreateInvoice: React.FC = () => {
       ).trim();
       const counterPartyOdAccount = String(
         decryptValue(
-          (isPid ? programLoanOd : selectedParticipant?.od_account_no) || '',
+          (isStandalone ? programLoanOd : selectedParticipant?.od_account_no) || '',
         ) ||
-          (isPid ? programLoanOd : selectedParticipant?.od_account_no) ||
+          (isStandalone ? programLoanOd : selectedParticipant?.od_account_no) ||
           '',
       );
 
@@ -2003,7 +2009,7 @@ export const CreateInvoice: React.FC = () => {
         programId: programSelection?.programId,
         productId: programSelection?.productId || activeProductId,
         participantId: participantMappingId,
-        isPid,
+        isStandalone,
         partyId: anchorPartyId,
         scopePartyId: programSelection?.partyId,
         partyInfoAnchorId: (dealerInfo as any)?.party?.id,
@@ -2021,9 +2027,9 @@ export const CreateInvoice: React.FC = () => {
             // Active product context from PR1/PR2: prefer the program's own
             // productId; fall back to the globally active product.
             product: String(programSelection?.productId || activeProductId || ''),
-            // DF/VF: APM id. PID: leave empty; vendorMappingId sent instead.
-            anchorParticipantMapping: isPid ? '' : participantMappingId,
-            vendorMappingId: isPid ? participantMappingId : undefined,
+            // DF/VF: APM id. PID/SID: leave empty; vendorMappingId sent instead.
+            anchorParticipantMapping: isStandalone ? '' : participantMappingId,
+            vendorMappingId: isStandalone ? participantMappingId : undefined,
             party: anchorPartyId,
             // Pull (VF vendor / DF dealer maker): party-info row entityName is
             // the Anchor; counterparty is the logged-in party. Push / PID:
@@ -2414,11 +2420,11 @@ export const CreateInvoice: React.FC = () => {
     if (limitCheckParticipant) {
       return limitCheckParticipant;
     }
-    if (isPid && dealerInfo?.participants?.length) {
+    if (isStandalone && dealerInfo?.participants?.length) {
       return dealerInfo.participants[0];
     }
     return null;
-  }, [limitCheckParticipant, isPid, dealerInfo?.participants]);
+  }, [limitCheckParticipant, isStandalone, dealerInfo?.participants]);
 
   const availableProgramLimit = useMemo(() => {
     if (mode === 'edit' && apmAvailableLimit !== null) {
@@ -2672,9 +2678,9 @@ export const CreateInvoice: React.FC = () => {
                 limitDisplayParticipant?.pipeline_requests,
               )}
               showLiveStatus={!!limitCheckParticipant}
-              isProgramLevel={isPid}
+              isProgramLevel={isStandalone}
               counterpartyLabel={ocrPartyLabels.party}
-              vendorNotSelectedYet={isPid && !limitCheckParticipant}
+              vendorNotSelectedYet={isStandalone && !limitCheckParticipant}
             />
           ) : null}
           <InvoiceForm

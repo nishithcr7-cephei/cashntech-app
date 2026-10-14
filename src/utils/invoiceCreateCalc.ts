@@ -169,6 +169,13 @@ export function getOcrPartyLabels(productType: InvoiceProductType): {
   code: string;
   od: string;
 } {
+  if (productType === 'sales_invoice_discounting') {
+    return {
+      party: 'Debtor',
+      code: 'Debtor Code',
+      od: 'Escrow Account No.',
+    };
+  }
   if (
     productType === 'vendor_finance' ||
     productType === 'purchase_invoice_discounting'
@@ -187,10 +194,13 @@ export function getOcrPartyLabels(productType: InvoiceProductType): {
 }
 
 /** True when create payload must send vendorMappingId (PID/SID standalone). */
-export function isPidProductType(
+export function isStandaloneProductType(
   productType: InvoiceProductType | string | null | undefined,
 ): boolean {
-  return productType === 'purchase_invoice_discounting';
+  return (
+    productType === 'purchase_invoice_discounting' ||
+    productType === 'sales_invoice_discounting'
+  );
 }
 
 /** VF Upfront submit guard — AI expected but calculated as zero. */

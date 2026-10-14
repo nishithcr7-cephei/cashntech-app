@@ -13,6 +13,7 @@ const PRODUCT_TABS: {id: ProductTabType; label: string}[] = [
   {id: 'dealer_finance', label: 'Dealer Finance'},
   {id: 'vendor_finance', label: 'Vendor Finance'},
   {id: 'pid', label: 'PID'},
+  {id: 'sid', label: 'SID'},
 ];
 
 export const ProductTabs: React.FC<ProductTabsProps> = ({activeTab, onTabChange}) => {

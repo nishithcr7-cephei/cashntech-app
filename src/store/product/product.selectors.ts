@@ -9,6 +9,7 @@ import {
   getEffectiveProductCode,
   isDealerFinance,
   isPid,
+  isSid,
   isStandaloneProduct,
   isVendorFinance,
 } from './product.resolver';
@@ -62,6 +63,11 @@ export const selectIsVendorFinanceActive = createSelector(
 export const selectIsPidActive = createSelector(
   selectActiveProductCode,
   code => isPid(code),
+);
+
+export const selectIsSidActive = createSelector(
+  selectActiveProductCode,
+  code => isSid(code),
 );
 
 export const selectIsStandaloneProductActive = createSelector(

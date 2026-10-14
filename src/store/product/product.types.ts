@@ -1,5 +1,5 @@
 /**
- * Product context types for multi-product (DF + VF + PID) support.
+ * Product context types for multi-product (DF + VF + PID + SID) support.
  * productId / product-aware fields stay optional; absent context = current DF behavior.
  */
 
@@ -7,6 +7,7 @@ export const PRODUCT_CODES = {
   DEALER_FINANCE: 'dealer_finance',
   VENDOR_FINANCE: 'vendor_finance',
   PURCHASE_INVOICE_DISCOUNTING: 'purchase_invoice_discounting',
+  SALES_INVOICE_DISCOUNTING: 'sales_invoice_discounting',
 } as const;
 
 export type ProductCode = (typeof PRODUCT_CODES)[keyof typeof PRODUCT_CODES];
@@ -16,6 +17,7 @@ export const PRODUCT_DISPLAY_NAMES: Record<ProductCode, string> = {
   [PRODUCT_CODES.VENDOR_FINANCE]: 'Vendor Finance',
   [PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING]:
     'Purchase Invoice Discounting',
+  [PRODUCT_CODES.SALES_INVOICE_DISCOUNTING]: 'Sales Invoice Discounting',
 };
 
 /** Compact labels for drawer / header chips where full names truncate. */
@@ -23,6 +25,7 @@ export const PRODUCT_NAV_LABELS: Record<ProductCode, string> = {
   [PRODUCT_CODES.DEALER_FINANCE]: 'Dealer Finance',
   [PRODUCT_CODES.VENDOR_FINANCE]: 'Vendor Finance',
   [PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING]: 'PID',
+  [PRODUCT_CODES.SALES_INVOICE_DISCOUNTING]: 'SID',
 };
 
 /** Canonical default when no product context is set (preserves DF production behavior). */

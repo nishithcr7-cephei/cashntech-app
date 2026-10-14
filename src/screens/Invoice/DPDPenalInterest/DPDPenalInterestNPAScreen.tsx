@@ -34,8 +34,9 @@ import {
 } from '@store/product/product.selectors';
 import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 import {
+  getPartyLabels,
   resolveWorkspaceProductId,
-  usesVendorPartyLabels,
+  usesVendorPartyLayout,
 } from '@store/product/product.resolver';
 import {FetchDPDListRequest} from '@store/dpd/dpd.types';
 import {invoiceApi, DpdKpisResponse} from '@services/api/invoice.api';
@@ -89,10 +90,12 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
   const effectiveCode = useSelector(selectEffectiveProductCode);
   const activeProductId = useSelector(selectActiveProductId);
   const activeProductName = useSelector(selectActiveProductName);
-  const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
+  const vendorPartyLabels = usesVendorPartyLayout(effectiveCode);
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
-  const primaryPartyLabel = vendorPartyLabels ? 'Vendor' : 'Primary Party';
+  const primaryPartyLabel = vendorPartyLabels
+    ? getPartyLabels(effectiveCode).singular
+    : 'Primary Party';
   const counterPartyLabel = vendorPartyLabels ? 'Anchor' : 'Counter Party';
 
   const [searchText, setSearchText] = useState('');
@@ -383,7 +386,7 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
                 <View style={styles.infoGrid}>
                   {vendorPartyLabels ? (
                     <>
-                      {/* VF/PID DPD web labels: Loan Ref No → Invoice No → Bank → Product → Vendor → Anchor → Invoice Date → GRN Date → Due Date → Disbursement Date → Invoice Amount → Disbursed Amount → DPD Days → O/S Principal → O/S Interest Accrued → O/S Penal → O/S Total → NPA Status */}
+                      {/* VF/PID/SID DPD web labels: Loan Ref No → Invoice No → Bank → Product → Vendor/Debtor → Anchor → Invoice Date → GRN Date → Due Date → Disbursement Date → Invoice Amount → Disbursed Amount → DPD Days → O/S Principal → O/S Interest Accrued → O/S Penal → O/S Total → NPA Status */}
                       <View style={styles.infoColumn}>
                         <Text style={styles.infoLabel}>Loan Ref No.</Text>
                         <Text style={styles.infoValue}>

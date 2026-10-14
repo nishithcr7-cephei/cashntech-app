@@ -34,8 +34,9 @@ import {
 } from './selector';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
 import {
-  isPid,
+  isStandaloneProduct,
   usesVendorPartyLabels,
+  usesVendorPartyLayout,
 } from '@store/product/product.resolver';
 import {SOAVendorListProgramHeader} from '@screens/Invoice/Account/SOAVendorListProgramHeader';
 
@@ -73,8 +74,10 @@ export const CreditAccountDetails: React.FC = () => {
   const id = (route.params as any)?.id;
   const programId = (route.params as any)?.programId;
   const effectiveProductCode = useSelector(selectEffectiveProductCode);
-  const isPidProduct = isPid(effectiveProductCode);
-  const vendorPartyLabels = usesVendorPartyLabels(effectiveProductCode);
+  // StatementOfAccount routes PID + SID here at program/anchor level.
+  const isPidProduct = isStandaloneProduct(effectiveProductCode);
+  const vendorPartyLabels = usesVendorPartyLayout(effectiveProductCode);
+  const anchorRepaysVendor = usesVendorPartyLabels(effectiveProductCode);
   const dealerName =
     (route.params as any)?.dealerName ||
     (isPidProduct ? 'Anchor' : vendorPartyLabels ? 'Vendor' : 'Dealer');
@@ -114,7 +117,7 @@ export const CreditAccountDetails: React.FC = () => {
 
   const formatParticulars = (particulars?: string) => {
     if (!particulars) return '-';
-    if (vendorPartyLabels && particulars === 'Repayment Received') {
+    if (anchorRepaysVendor && particulars === 'Repayment Received') {
       return 'Repayment from Anchor';
     }
     return particulars;

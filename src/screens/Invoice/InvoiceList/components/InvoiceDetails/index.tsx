@@ -32,6 +32,7 @@ import {InvoiceActionMenuModal} from './InvoiceActionMenuModal';
 import {FinanceRequestDetailsModal} from './FinanceRequestDetailsModal';
 import {styles} from './InvoiceDetails.styles';
 import {PRODUCT_CODES} from '@store/product/product.types';
+import {getPartyLabels} from '@store/product/product.resolver';
 
 export const InvoiceDetails: React.FC = () => {
   const {
@@ -403,11 +404,7 @@ export const InvoiceDetails: React.FC = () => {
         }}
         steps={approvalHistoryEntries}
         loading={approvalHistoryLoading}
-        productInvoiceLabel={
-          effectiveProductCode === PRODUCT_CODES.VENDOR_FINANCE
-            ? 'Vendor Invoice'
-            : 'Dealer Invoice'
-        }
+        productInvoiceLabel={`${getPartyLabels(effectiveProductCode).singular} Invoice`}
         invoiceNo={selectedInvoiceNo || undefined}
         invoiceAmount={approvalHistorySummary.invoiceAmount}
         counterParty={approvalHistorySummary.counterParty}

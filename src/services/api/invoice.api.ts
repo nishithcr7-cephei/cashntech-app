@@ -142,7 +142,7 @@ function parseTenorDays(raw: string | undefined): number {
   return Number.isFinite(n) ? n : NaN;
 }
 
-function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<string, unknown> {
+export function buildCreateInvoicePayload(input: CreateInvoicePayloadInput): Record<string, unknown> {
   const {
     fields,
     createdBy,

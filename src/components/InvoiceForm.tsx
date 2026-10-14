@@ -24,6 +24,7 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {getOcrLineItemIssues} from '@utils/ocrLineItemMapper';
 import {tidyUnitInput} from '@utils/unitNormalizer';
+import type {InvoiceProductType} from '@utils/ocrPatchNormalizer';
 import moment from 'moment';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {useSelector} from 'react-redux';
@@ -140,7 +141,7 @@ type Props = {
   loading?: boolean;
   errors?: ValidationErrors;
   isFormValid?: boolean;
-  productType?: 'dealer_finance' | 'vendor_finance' | 'purchase_invoice_discounting';
+  productType?: InvoiceProductType;
   entityType?: 'dealer' | 'anchor'; // Role-based: 'dealer' for Anchor Maker/Checker, 'anchor' for Dealer Maker
   dealerOptions?: DropdownOption[];
   creditToOptions?: CreditToOption[];
@@ -266,40 +267,23 @@ export const InvoiceForm: React.FC<Props> = ({
   const effectiveEntityType = entityType ?? (isDealerMaker ? 'anchor' : 'dealer');
   const isVendorFinance = productType === 'vendor_finance';
   const isPid = productType === 'purchase_invoice_discounting';
-  const isDealerFinance = !isVendorFinance && !isPid;
-  const useVendorPartyLabels = isVendorFinance || isPid;
+  const isSid = productType === 'sales_invoice_discounting';
+  const isDealerFinance = !isVendorFinance && !isPid && !isSid;
+  const counterpartyWord = isSid
+    ? 'Debtor'
+    : isVendorFinance || isPid
+      ? 'Vendor'
+      : 'Dealer';
 
-  // Determine labels based on entityType (role-based) + product (PID/VF → Vendor)
-  const entityLabel =
-    effectiveEntityType === 'anchor'
-      ? 'Anchor'
-      : useVendorPartyLabels
-        ? 'Vendor'
-        : 'Dealer';
-  const entityCodeLabel =
-    effectiveEntityType === 'anchor'
-      ? 'Anchor Code'
-      : useVendorPartyLabels
-        ? 'Vendor Code'
-        : 'Dealer Code';
-  const entityNameLabel =
-    effectiveEntityType === 'anchor'
-      ? 'Anchor Name'
-      : useVendorPartyLabels
-        ? 'Vendor Name'
-        : 'Dealer Name';
+  // Determine labels based on entityType (role-based) + product (PID/VF → Vendor, SID → Debtor)
+  const isAnchorEntity = effectiveEntityType === 'anchor';
+  const entityLabel = isAnchorEntity ? 'Anchor' : counterpartyWord;
+  const entityCodeLabel = `${entityLabel} Code`;
+  const entityNameLabel = `${entityLabel} Name`;
+  // SID web labels the program loan account "Escrow Account No." (read-only).
   const entityODLabel =
-    effectiveEntityType === 'anchor'
-      ? 'Anchor OD Account'
-      : useVendorPartyLabels
-        ? 'Vendor OD Account'
-        : 'Dealer OD Account';
-  const entityInvoiceLabel =
-    effectiveEntityType === 'anchor'
-      ? 'Anchor Invoice'
-      : useVendorPartyLabels
-        ? 'Vendor Invoice'
-        : 'Dealer Invoice';
+    isSid && !isAnchorEntity ? 'Escrow Account No.' : `${entityLabel} OD Account`;
+  const entityInvoiceLabel = `${entityLabel} Invoice`;
 
   const TENURE_DAYS = defaultPaymentTermsDays;
   const isHistoricalInvoiceMode = mode === 'edit' || mode === 'recreate';
@@ -715,7 +699,9 @@ export const InvoiceForm: React.FC<Props> = ({
       {/* Party Information Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
-          {isDealerFinance ? entityInvoiceLabel : 'Vendor Invoice'}
+          {isDealerFinance
+            ? entityInvoiceLabel
+            : `${counterpartyWord} Invoice`}
         </Text>
         <View style={styles.row}>
           <View style={styles.dealerNameWidth}>

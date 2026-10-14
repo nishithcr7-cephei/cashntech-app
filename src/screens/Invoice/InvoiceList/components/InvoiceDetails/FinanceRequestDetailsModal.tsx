@@ -40,7 +40,10 @@ import {
   PRODUCT_DISPLAY_NAMES,
   ProductCode,
 } from '@store/product/product.types';
-import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {
+  getEffectiveProductCode,
+  getPartyLabels,
+} from '@store/product/product.resolver';
 
 export type FinanceRequestPreview = {
   vendor_name?: string | null;
@@ -221,11 +224,14 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
   const effectiveCode = getEffectiveProductCode(productCode);
   const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
   const isPid = effectiveCode === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING;
-  const partyLabel = isVendorFinance || isPid ? 'Vendor' : 'Dealer';
+  const isSid = effectiveCode === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING;
+  const partyLabel = getPartyLabels(effectiveCode).singular;
   const productDisplayName = PRODUCT_DISPLAY_NAMES[effectiveCode];
   const modalTitle = isPid
     ? 'Purchase Invoice Discounting Request'
-    : isVendorFinance
+    : isSid
+      ? 'Sales Invoice Discounting Request'
+      : isVendorFinance
       ? 'Vendor Finance Request'
       : 'Dealer Finance Request';
   const [preferredDisbursementDateInput, setPreferredDisbursementDateInput] =

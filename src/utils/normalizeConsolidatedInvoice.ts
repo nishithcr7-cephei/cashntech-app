@@ -51,6 +51,9 @@ export function getConsolidatedPartyLabels(code: ProductCode | null): {
   ) {
     return {primary: 'Anchor', counter: 'Vendor'};
   }
+  if (code === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING) {
+    return {primary: 'Anchor', counter: 'Debtor'};
+  }
   return {primary: 'Primary Party', counter: 'Counter Party'};
 }
 

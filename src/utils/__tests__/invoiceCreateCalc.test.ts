@@ -5,6 +5,7 @@ import {
   computeHeaderGstTotal,
   computeInvoiceAmountForLimitCheck,
   getOcrPartyLabels,
+  isStandaloneProductType,
   isTaxEligibleForTds,
   itemsHaveSelectedTax,
   shouldWarnVfZeroAdvanceInterest,
@@ -244,6 +245,21 @@ describe('invoiceCreateCalc — 4-flow regression (Sprint 0)', () => {
         code: 'Vendor Code',
         od: 'Vendor OD Account',
       });
+    });
+
+    it('SID OCR party labels use Debtor + Escrow Account No.', () => {
+      expect(getOcrPartyLabels('sales_invoice_discounting')).toEqual({
+        party: 'Debtor',
+        code: 'Debtor Code',
+        od: 'Escrow Account No.',
+      });
+    });
+
+    it('PID and SID are standalone (vendorMappingId); DF / VF are not', () => {
+      expect(isStandaloneProductType('purchase_invoice_discounting')).toBe(true);
+      expect(isStandaloneProductType('sales_invoice_discounting')).toBe(true);
+      expect(isStandaloneProductType('vendor_finance')).toBe(false);
+      expect(isStandaloneProductType('dealer_finance')).toBe(false);
     });
 
     it('DF OCR party labels unchanged', () => {

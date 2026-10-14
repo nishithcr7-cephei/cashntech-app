@@ -33,9 +33,10 @@ import {
 } from '@store/product/product.selectors';
 import {
   getEffectiveProductCode,
-  isPid,
+  getPartyLabels,
+  isStandaloneProduct,
   resolveWorkspaceProductId,
-  usesVendorPartyLabels,
+  usesVendorPartyLayout,
 } from '@store/product/product.resolver';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 import {useHasPermission} from '@hooks/index';
@@ -80,15 +81,17 @@ export const InterestAccrualsScreen: React.FC = () => {
   const activeProductId = useSelector(selectActiveProductId);
   const effectiveCode = useSelector(selectEffectiveProductCode);
   const isVendorFinance = useSelector(selectIsVendorFinanceActive);
-  const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
-  const isPidActive = isPid(effectiveCode);
+  const vendorPartyLabels = usesVendorPartyLayout(effectiveCode);
+  const isStandaloneActive = isStandaloneProduct(effectiveCode);
   const canViewDailyInterest = useHasPermission(
     PERMISSIONS.INTEREST_ACCRUALS_VIEW_DAILY,
   );
   const productBreadcrumbLabel =
     activeProductName ||
     PRODUCT_DISPLAY_NAMES[getEffectiveProductCode(activeProductCode)];
-  const primaryPartyLabel = vendorPartyLabels ? 'Vendor' : 'Primary Party';
+  const primaryPartyLabel = vendorPartyLabels
+    ? getPartyLabels(effectiveCode).singular
+    : 'Primary Party';
   const counterPartyLabel = vendorPartyLabels ? 'Anchor' : 'Counter Party';
   const programName = programSelection?.programName ?? '';
   const isDealerMaker = userRole === 'dealer_maker';
@@ -101,7 +104,7 @@ export const InterestAccrualsScreen: React.FC = () => {
 
   useEffect(() => {
     setAppliedFilters({});
-  }, [vendorPartyLabels]);
+  }, [primaryPartyLabel]);
   const programIds = useMemo(
     () =>
       programSelection?.programScope === 'all' && allProgramIds?.length
@@ -433,7 +436,7 @@ export const InterestAccrualsScreen: React.FC = () => {
             </Text>
             <Text style={styles.infoValue}>{row.totalAccInterest}</Text>
           </View>
-          {isPidActive ? (
+          {isStandaloneActive ? (
             <View style={styles.infoColumn}>
               <Text style={styles.infoLabel}>Accrued Interest (₹)</Text>
               <Text style={styles.infoValue}>{row.accruedInterest}</Text>

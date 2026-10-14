@@ -271,18 +271,21 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
             programBankDetails.length > 0
               ? programBankDetails[0]?.account_number ?? programBankDetails[0]?.accountNumber ?? ''
               : '';
-          if (programAcc) {
+          const creditAcc = (invoiceData.creditToBankAccount ??
+            invoiceData.credit_to_bank_account) as
+            | {accountNumber?: string; account_number?: string}
+            | undefined;
+          const invoiceCreditAcc =
+            creditAcc?.accountNumber ?? creditAcc?.account_number ?? '';
+          // PID / SID credit the vendor / debtor bank account picked at create
+          // (ProgramVendorBankAccount); program bank_details is the repayment account.
+          const preferInvoiceCredit = !!pvd && !!invoiceCreditAcc;
+          if (programAcc && !preferInvoiceCredit) {
             creditTo = decryptValue(String(programAcc));
           }
-          if (!creditTo) {
-            const creditAcc = (invoiceData.creditToBankAccount ??
-              invoiceData.credit_to_bank_account) as
-              | {accountNumber?: string; account_number?: string}
-              | undefined;
-            const accNo = creditAcc?.accountNumber ?? creditAcc?.account_number ?? '';
-            if (accNo) {
-              creditTo = decryptValue(String(accNo)) || String(accNo);
-            }
+          if (!creditTo && invoiceCreditAcc) {
+            creditTo =
+              decryptValue(String(invoiceCreditAcc)) || String(invoiceCreditAcc);
           }
 
           const preview = buildInvoicePreview(invoiceData, d);

@@ -161,6 +161,41 @@ export function getParticipantAvailableLimit(
 }
 
 /**
+ * Create Invoice picks the participant by name, so duplicate names would map to the
+ * wrong mapping id. SID party-info currently returns the anchor name on every row;
+ * suffix colliding names with the participant code so each option stays unique.
+ */
+function disambiguateDuplicateNames(
+  participants: DealerInfoParticipant[],
+): DealerInfoParticipant[] {
+  if (participants.length < 2) {
+    return participants;
+  }
+  const displayName = (p: DealerInfoParticipant) => {
+    const raw = p.party?.entity_name ?? '';
+    return (decryptValue(raw) || raw).trim();
+  };
+  const counts = new Map<string, number>();
+  for (const p of participants) {
+    const name = displayName(p);
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return participants.map(p => {
+    const name = displayName(p);
+    if ((counts.get(name) ?? 0) < 2) {
+      return p;
+    }
+    const code = (
+      p.company_code_given_by_party ||
+      p.company_code ||
+      p.id
+    ).trim();
+    const label = name ? `${name} (${code})` : code;
+    return {...p, party: {...p.party, entity_name: label}};
+  });
+}
+
+/**
  * Maps flat SQL rows from the unified party-info endpoint to nested
  * DealerInfoResponse. Accepts `bankAccounts` aggregates with UUID ids
  * (DF + VF alike).
@@ -197,7 +232,7 @@ export function normalizeDealerInfoResponse(
   );
   const bankMap = new Map<string, PartyBankDetail>();
 
-  const participants: DealerInfoParticipant[] = rows.map((row, index) => {
+  const rawParticipants: DealerInfoParticipant[] = rows.map((row, index) => {
     const r = row as Record<string, unknown>;
     const rowBanks = parseBankAccounts(
       pick(r, 'bankAccounts', 'bank_accounts'),
@@ -246,6 +281,7 @@ export function normalizeDealerInfoResponse(
       bank_details: rowBanks.length > 0 ? rowBanks : undefined,
     };
   });
+  const participants = disambiguateDuplicateNames(rawParticipants);
 
   const party_bank_details = Array.from(bankMap.values());
   const interestChargeTypeRaw = pick(

@@ -34,8 +34,9 @@ import {
 } from '@store/product/product.selectors';
 import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 import {
+  getPartyLabels,
   resolveWorkspaceProductId,
-  usesVendorPartyLabels,
+  usesVendorPartyLayout,
 } from '@store/product/product.resolver';
 import {FetchRepaymentListRequest} from '@store/repayment/repayment.types';
 import {decryptValue} from '@utils/decrypt';
@@ -44,14 +45,9 @@ import {invoiceApi, RepaymentKpisResponse} from '@services/api/invoice.api';
 
 // Summary metrics for Repayment & Settlement will be dynamically built inside the component
 
-const repaymentFilterDataDf = {
-  'Primary Party': ['Sun Pharma', 'Hero Finanace', 'ABC Finance'],
-  'Bank Name': ['UGRO', 'TCL'],
-  'Loan Ref No.': ['125423', '125424', '125425'],
-};
+const repaymentPartyFilterOptions = ['Sun Pharma', 'Hero Finanace', 'ABC Finance'];
 
-const repaymentFilterDataVf = {
-  Vendor: ['Sun Pharma', 'Hero Finanace', 'ABC Finance'],
+const repaymentFilterDataCommon = {
   'Bank Name': ['UGRO', 'TCL'],
   'Loan Ref No.': ['125423', '125424', '125425'],
 };
@@ -66,11 +62,20 @@ export const RepaymentSettlementScreen: React.FC = () => {
   const effectiveCode = useSelector(selectEffectiveProductCode);
   const activeProductId = useSelector(selectActiveProductId);
   const activeProductName = useSelector(selectActiveProductName);
-  const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
+  const vendorPartyLabels = usesVendorPartyLayout(effectiveCode);
   const isDealerMaker = userRole === 'dealer_maker';
   const isDealerChecker = userRole === 'dealer_checker';
-  const primaryPartyLabel = vendorPartyLabels ? 'Vendor' : 'Primary Party';
+  const primaryPartyLabel = vendorPartyLabels
+    ? getPartyLabels(effectiveCode).singular
+    : 'Primary Party';
   const counterPartyLabel = vendorPartyLabels ? 'Anchor' : 'Counter Party';
+  const repaymentFilterData = useMemo(
+    () => ({
+      [primaryPartyLabel]: repaymentPartyFilterOptions,
+      ...repaymentFilterDataCommon,
+    }),
+    [primaryPartyLabel],
+  );
 
   const [searchText, setSearchText] = useState('');
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -78,7 +83,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
 
   useEffect(() => {
     setAppliedFilters({});
-  }, [vendorPartyLabels]);
+  }, [primaryPartyLabel]);
   
   const dispatch = useDispatch();
   const repaymentData = useSelector(repaymentSelectors.selectRepaymentList);
@@ -624,7 +629,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
           setAppliedFilters(filters);
           setShowFilterModal(false);
         }}
-        filterData={vendorPartyLabels ? repaymentFilterDataVf : repaymentFilterDataDf}
+        filterData={repaymentFilterData}
         appliedFilters={appliedFilters}
       />
     </Container>

@@ -26,6 +26,7 @@ import {decryptValue} from '@utils/decrypt';
 import {computeCreateInvoiceSummaryFromFields} from '@utils/invoiceCreateCalc';
 import type {AdvanceInterestBreakdown} from '@utils/invoiceTotals';
 import type {InvoiceFields} from '@type/Invoice';
+import type {InvoiceProductType} from '@utils/ocrPatchNormalizer';
 
 const fmtAmount = (n: number) =>
   n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
@@ -213,21 +214,25 @@ export const InvoiceUploadPreview: React.FC = () => {
     | string
     | undefined;
   const productType =
-    (route?.params?.productType as
-      | 'dealer_finance'
-      | 'vendor_finance'
-      | 'purchase_invoice_discounting'
-      | undefined) || 'dealer_finance';
+    (route?.params?.productType as InvoiceProductType | undefined) ||
+    'dealer_finance';
   const isVendorFinance = productType === 'vendor_finance';
   const isPid = productType === 'purchase_invoice_discounting';
+  const isSid = productType === 'sales_invoice_discounting';
   const previewInvoiceStatus =
     (route?.params?.previewInvoiceStatus as string | undefined) || 'Draft';
   const previewApprovalStatus =
     (route?.params?.previewApprovalStatus as string | undefined) || '';
-  const counterPartyLabel =
-    isVendorFinance || isPid ? 'Counter Party' : 'Dealer Name';
-  const counterPartyCodeLabel =
-    isVendorFinance || isPid ? 'Counter Party Code' : 'Dealer Code';
+  const counterPartyLabel = isSid
+    ? 'Debtor Name'
+    : isVendorFinance || isPid
+      ? 'Counter Party'
+      : 'Dealer Name';
+  const counterPartyCodeLabel = isSid
+    ? 'Debtor Code'
+    : isVendorFinance || isPid
+      ? 'Counter Party Code'
+      : 'Dealer Code';
   const advanceInterestBreakdown = route?.params?.advanceInterestBreakdown as
     | AdvanceInterestBreakdown
     | null
@@ -332,7 +337,7 @@ export const InvoiceUploadPreview: React.FC = () => {
             value={displayOrDash(invoiceData.anchorName)}
           />
           <KeyValueRow
-            label="Loan OD Account Number"
+            label={isSid ? 'Escrow Account No.' : 'Loan OD Account Number'}
             value={displayOrDash(invoiceData.odAccountNumber)}
           />
           <KeyValueRow

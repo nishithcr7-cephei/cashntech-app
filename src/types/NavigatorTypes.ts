@@ -123,7 +123,7 @@ export type HomeNavigatorType = {
     previewFields?: import('./Invoice').InvoiceFields;
     previewAttachment?: import('@react-native-documents/picker').DocumentPickerResponse;
     previewAnchorName?: string;
-    productType?: 'dealer_finance' | 'vendor_finance' | 'purchase_invoice_discounting';
+    productType?: import('@utils/ocrPatchNormalizer').InvoiceProductType;
   };
   DealerInvoiceDetailsScreen: {
     dealerName?: string;

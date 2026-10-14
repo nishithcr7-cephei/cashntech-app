@@ -35,7 +35,7 @@ import SOAVendorsCombinedSummary from './SOAVendorsCombinedSummary';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
-import {usesVendorPartyLabels} from '@store/product/product.resolver';
+import {getPartyLabels} from '@store/product/product.resolver';
 import {formatIndianNumber} from '@utils/Utils';
 
 const formatTotalInr = (n: number) =>
@@ -54,10 +54,11 @@ export const SOADealerList: React.FC = () => {
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isDealerChecker = userRole === 'dealer_checker';
   const effectiveCode = useSelector(selectEffectiveProductCode);
-  const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
-  const partyLabel = vendorPartyLabels ? 'Vendor' : 'Dealer';
-  const partyLabelPlural = vendorPartyLabels ? 'Vendors' : 'Dealers';
-  const partyNameLabel = vendorPartyLabels ? 'Vendor Name' : 'Dealer Name';
+  const {
+    singular: partyLabel,
+    plural: partyLabelPlural,
+    nameLabel: partyNameLabel,
+  } = getPartyLabels(effectiveCode);
 
   const selectedProgramIds = useMemo(
     () =>

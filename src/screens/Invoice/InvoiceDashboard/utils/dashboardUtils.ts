@@ -49,8 +49,11 @@ export const getProgramIdsForTab = (
         const isPidProduct =
           scopeCode === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING ||
           product.name.toLowerCase().includes('purchase invoice discounting');
+        const isSidProduct =
+          scopeCode === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING ||
+          product.name.toLowerCase().includes('sales invoice discounting');
         // all_product intentionally does not dump every program — treat as DF
-        // default so DF+VF+PID never mix via this helper alone.
+        // default so DF+VF+PID+SID never mix via this helper alone.
         const includeInAll =
           tab === 'all_product' && (isDFProduct || isDFProgram);
         const includeInDF =
@@ -58,7 +61,14 @@ export const getProgramIdsForTab = (
         const includeInVF =
           tab === 'vendor_finance' && isVFProduct;
         const includeInPid = tab === 'pid' && isPidProduct;
-        if (includeInAll || includeInDF || includeInVF || includeInPid) {
+        const includeInSid = tab === 'sid' && isSidProduct;
+        if (
+          includeInAll ||
+          includeInDF ||
+          includeInVF ||
+          includeInPid ||
+          includeInSid
+        ) {
           ids.push(program.id);
         }
       });
@@ -76,10 +86,16 @@ export function productTabFromCode(
   if (code === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING) {
     return 'pid';
   }
+  if (code === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING) {
+    return 'sid';
+  }
   return 'dealer_finance';
 }
 
 export function partyNameLabelForTab(tab: ProductTabType): string {
+  if (tab === 'sid') {
+    return 'Debtor Name';
+  }
   return tab === 'vendor_finance' || tab === 'pid'
     ? 'Vendor Name'
     : 'Dealer Name';
@@ -142,9 +158,11 @@ export const getCardMetrics = (
   const penalOverdueVal = formatCurrency(finalPenalOverdue);
 
   const activeRatioLabel =
-    productTab === 'vendor_finance' || productTab === 'pid'
-      ? 'Active Vendor Ratio(%)'
-      : 'Active Dealer Ratio(%)';
+    productTab === 'sid'
+      ? 'Active Debtor Ratio(%)'
+      : productTab === 'vendor_finance' || productTab === 'pid'
+        ? 'Active Vendor Ratio(%)'
+        : 'Active Dealer Ratio(%)';
 
   const metrics: MetricItem[] = [
     {label: 'Total Program Limit', value: totalLimitVal},

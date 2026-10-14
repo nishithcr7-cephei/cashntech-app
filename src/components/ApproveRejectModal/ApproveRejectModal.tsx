@@ -21,7 +21,12 @@ import {
   PRODUCT_DISPLAY_NAMES,
   ProductCode,
 } from '@store/product/product.types';
-import {getEffectiveProductCode} from '@store/product/product.resolver';
+import {
+  getEffectiveProductCode,
+  getPartyLabels,
+  isSid as isSidProduct,
+  isStandaloneProduct,
+} from '@store/product/product.resolver';
 import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/AttachmentPreviewModal';
 import {
   AdvanceInterestFormulaModal,
@@ -277,10 +282,16 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
 
   const effectiveCode = getEffectiveProductCode(productCode);
   const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
-  const partyLabel = isVendorFinance ? 'Vendor' : 'Dealer';
+  const isSid = isSidProduct(effectiveCode);
+  const partyLabel = getPartyLabels(effectiveCode).singular;
   const productDisplayName = PRODUCT_DISPLAY_NAMES[effectiveCode];
 
   const isCashnTechVerification = variant === 'cashntech_verification';
+  const odAccountLabel = isSid
+    ? 'Escrow Account No.'
+    : isCashnTechVerification || isVendorFinance || isStandaloneProduct(effectiveCode)
+      ? 'Loan OD Account Number'
+      : 'OD Account';
   /** VF Anchor Maker: editable GRN picker before Remark. */
   const showVfGrnDatePicker =
     isVendorFinance && !isCashnTechVerification && allowGrnDateEdit;
@@ -525,11 +536,7 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                         value={dash(details.dealerName)}
                       />
                       <DetailRow
-                        label={
-                          isCashnTechVerification || isVendorFinance
-                            ? 'Loan OD Account Number'
-                            : 'OD Account'
-                        }
+                        label={odAccountLabel}
                         value={dash(details.odAccountNumber)}
                       />
                       <DetailRow

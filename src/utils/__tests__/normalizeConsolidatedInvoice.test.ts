@@ -88,6 +88,21 @@ describe('normalizeConsolidatedInvoiceRow', () => {
     expect(row.counterPartyName).toBe('Balaji Wafers Pvt. Ltd');
   });
 
+  it('maps a SID row with Anchor / Debtor labels from programVendorDetails', () => {
+    const row = normalizeConsolidatedInvoiceRow({
+      ...baseRow,
+      product: {id: 'sid-id', name: 'Sales Invoice Discounting'},
+      party: {entity_name: 'Polmor Steel'},
+      anchorParticipantMapping: null,
+      programVendorDetails: {id: 'pvd-2', vendor_name: 'Debtor One Pvt. Ltd'},
+    });
+
+    expect(row.productCode).toBe('sales_invoice_discounting');
+    expect(row.primaryPartyLabel).toBe('Anchor');
+    expect(row.counterPartyLabel).toBe('Debtor');
+    expect(row.counterPartyName).toBe('Debtor One Pvt. Ltd');
+  });
+
   it('falls back to "-" and generic labels for missing data / unknown product', () => {
     const row = normalizeConsolidatedInvoiceRow({id: 'inv-2'});
 

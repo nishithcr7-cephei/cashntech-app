@@ -67,8 +67,9 @@ import {
 } from '@store/product/product.selectors';
 import {
   getEffectiveProductCode,
+  getPartyLabels,
   resolveWorkspaceProductId,
-  usesVendorPartyLabels,
+  usesVendorPartyLayout,
 } from '@store/product/product.resolver';
 import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 
@@ -363,12 +364,13 @@ export const DisbursementScreen: React.FC = () => {
 
   const activeProductId = useSelector(selectActiveProductId);
   const effectiveCode = useSelector(selectEffectiveProductCode);
-  const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
+  const vendorPartyLabels = usesVendorPartyLayout(effectiveCode);
+  const partyLabels = getPartyLabels(effectiveCode);
   const counterPartyColumnLabel = vendorPartyLabels
-    ? 'Vendor Name'
+    ? partyLabels.nameLabel
     : 'Counter Party';
   const disbursementListTitle = vendorPartyLabels
-    ? 'Vendor Wise Invoice Details'
+    ? `${partyLabels.singular} Wise Invoice Details`
     : isCashnTechUser
       ? 'Invoice'
       : isDealerMaker || isDealerChecker

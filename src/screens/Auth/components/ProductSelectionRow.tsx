@@ -31,7 +31,8 @@ const renderProductIcon = (code: string) => {
 
   if (
     code === PRODUCT_CODES.VENDOR_FINANCE ||
-    code === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING
+    code === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING ||
+    code === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING
   ) {
     return (
       <ProductIcon

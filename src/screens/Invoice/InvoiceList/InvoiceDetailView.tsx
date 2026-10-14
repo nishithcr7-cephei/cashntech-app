@@ -13,7 +13,10 @@ import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native'
 import {useSelector} from 'react-redux';
 import {selectProgramSelection} from '@store/programSelection/programSelection.selector';
 import {selectInvoiceList} from '@store/invoice/inv.selector';
-import {selectIsVendorFinanceActive} from '@store/product/product.selectors';
+import {
+  selectIsSidActive,
+  selectIsVendorFinanceActive,
+} from '@store/product/product.selectors';
 import {AppBar, Container, UploadModal} from '@components/index';
 import {
   AdvanceInterestFormulaModal,
@@ -99,7 +102,9 @@ type InvoiceDetailData = {
   advanceInterest: number;
   showAdvanceInterest: boolean;
   isVendorFinance: boolean;
+  /** PID or SID — counterparty comes from programVendorDetails. */
   isPid: boolean;
+  isSid: boolean;
   roiPercent: number;
   total: number;
   attachments: AttachmentItem[];
@@ -136,6 +141,7 @@ const defaultInvoiceData: InvoiceDetailData = {
   showAdvanceInterest: false,
   isVendorFinance: false,
   isPid: false,
+  isSid: false,
   roiPercent: 0,
   total: 0,
   attachments: [],
@@ -205,6 +211,7 @@ export const InvoiceDetailView: React.FC = () => {
   const route = useRoute<any>();
   const programSelection = useSelector(selectProgramSelection);
   const isVendorFinanceActive = useSelector(selectIsVendorFinanceActive);
+  const isSidActive = useSelector(selectIsSidActive);
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isAnchorChecker = userRole === 'anchor_checker';
   const isDealerChecker = userRole === 'dealer_checker';
@@ -330,8 +337,12 @@ export const InvoiceDetailView: React.FC = () => {
             listRowForInvoice?.product_name ||
             '',
         );
+        const isSidInvoice = productName
+          ? /sales\s*invoice\s*discounting/i.test(productName)
+          : isSidActive && !!pvd?.id;
         const isPidInvoice =
           !!pvd?.id ||
+          isSidInvoice ||
           /purchase\s*invoice\s*discounting/i.test(productName);
 
         const dealerName = isPidInvoice
@@ -461,6 +472,7 @@ export const InvoiceDetailView: React.FC = () => {
           showAdvanceInterest,
           isVendorFinance: isVendorFinanceInvoice,
           isPid: isPidInvoice,
+          isSid: isSidInvoice,
           roiPercent: resolveInvoiceRoiPercent(data),
           total: netDisbursementAmount || finalTotal,
           attachments,
@@ -490,7 +502,7 @@ export const InvoiceDetailView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [invoiceId, invoiceNo, listInvoiceStatus, listApprovalStatus, listAdminStatus, listRowForInvoice]);
+  }, [invoiceId, invoiceNo, listInvoiceStatus, listApprovalStatus, listAdminStatus, listRowForInvoice, isSidActive]);
 
   const handleAttachmentUpload = (_file?: DocumentPickerResponse) => {
     setShowUploadModal(false);
@@ -506,13 +518,21 @@ export const InvoiceDetailView: React.FC = () => {
 
   const headerTitle = invoiceData.invoiceRefNo || invoiceNo || invoiceId || 'N/A';
   const subtitle = invoiceData.anchorName || invoiceData.dealerName || '';
-  /** VF / PID party labels are Vendor. AI row stays VF-only via isVendorFinance. */
+  /** VF / PID party labels are Vendor, SID is Debtor. AI row stays VF-only via isVendorFinance. */
   const isVendorFinance =
     isVendorFinanceActive || invoiceData.isVendorFinance;
   const useVendorPartyLabels = isVendorFinance || invoiceData.isPid;
-  const productInvoiceLabel = useVendorPartyLabels
-    ? 'Vendor Invoice'
-    : 'Dealer Invoice';
+  const partyWord = invoiceData.isSid
+    ? 'Debtor'
+    : useVendorPartyLabels
+      ? 'Vendor'
+      : 'Dealer';
+  const productInvoiceLabel = `${partyWord} Invoice`;
+  const odAccountLabel = invoiceData.isSid
+    ? 'Escrow Account No.'
+    : useVendorPartyLabels
+      ? 'Loan OD Account Number'
+      : 'OD Account';
 
   if (loading) {
     return (
@@ -660,17 +680,15 @@ export const InvoiceDetailView: React.FC = () => {
               value={displayOrDash(invoiceData.anchorName)}
             />
             <DetailRow
-              label={useVendorPartyLabels ? 'Vendor Name' : 'Dealer Name'}
+              label={`${partyWord} Name`}
               value={displayOrDash(invoiceData.dealerName)}
             />
             <DetailRow
-              label={
-                useVendorPartyLabels ? 'Loan OD Account Number' : 'OD Account'
-              }
+              label={odAccountLabel}
               value={displayOrDash(invoiceData.odAccountNumber)}
             />
             <DetailRow
-              label={useVendorPartyLabels ? 'Vendor Code' : 'Dealer Code'}
+              label={`${partyWord} Code`}
               value={displayOrDash(invoiceData.dealerCode)}
             />
             <DetailRow

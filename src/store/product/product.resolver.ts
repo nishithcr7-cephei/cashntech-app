@@ -14,6 +14,10 @@ const PID_NAME_HINTS = [
   'purchase invoice discounting',
   'purchase_invoice_discounting',
 ];
+const SID_NAME_HINTS = [
+  'sales invoice discounting',
+  'sales_invoice_discounting',
+];
 
 function normalizeToken(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -47,6 +51,10 @@ export function resolveProductCodeFromProductCode(
     return PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING;
   }
 
+  if (token === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING || token === 'sid') {
+    return PRODUCT_CODES.SALES_INVOICE_DISCOUNTING;
+  }
+
   if (
     token === PRODUCT_CODES.VENDOR_FINANCE ||
     token === 'vf' ||
@@ -71,9 +79,12 @@ export function resolveProductCodeFromName(
     return null;
   }
 
-  // PID before VF — names must not be confused with generic "vendor".
+  // PID/SID before VF — names must not be confused with generic "vendor".
   if (PID_NAME_HINTS.some(hint => token.includes(hint))) {
     return PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING;
+  }
+  if (SID_NAME_HINTS.some(hint => token.includes(hint))) {
+    return PRODUCT_CODES.SALES_INVOICE_DISCOUNTING;
   }
   if (VF_NAME_HINTS.some(hint => token.includes(hint))) {
     return PRODUCT_CODES.VENDOR_FINANCE;
@@ -195,18 +206,65 @@ export function isPid(code: ProductCode | null | undefined): boolean {
   return code === PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING;
 }
 
-/** PID (+ future SID) — standalone program/vendor mapping products. */
+export function isSid(code: ProductCode | null | undefined): boolean {
+  return code === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING;
+}
+
+/** PID + SID — standalone program/vendor mapping products. */
 export function isStandaloneProduct(
   code: ProductCode | null | undefined,
 ): boolean {
-  return isPid(code);
+  return isPid(code) || isSid(code);
 }
 
-/** VF + PID party labels are Vendor (not Dealer). */
+/** VF + PID party labels are Vendor (not Dealer). SID uses Debtor — see getPartyLabels. */
 export function usesVendorPartyLabels(
   code: ProductCode | null | undefined,
 ): boolean {
   return isVendorFinance(code) || isPid(code);
+}
+
+/**
+ * VF + PID + SID: transaction rows put the counterparty (vendor / debtor) in the
+ * party column and the anchor in the counter column. Use for layout, not text.
+ */
+export function usesVendorPartyLayout(
+  code: ProductCode | null | undefined,
+): boolean {
+  return usesVendorPartyLabels(code) || isSid(code);
+}
+
+export type PartyLabels = {
+  singular: string;
+  plural: string;
+  nameLabel: string;
+  codeLabel: string;
+};
+
+/** Counterparty wording per product: DF = Dealer, VF/PID = Vendor, SID = Debtor. */
+export function getPartyLabels(code: ProductCode | null | undefined): PartyLabels {
+  if (isSid(code)) {
+    return {
+      singular: 'Debtor',
+      plural: 'Debtors',
+      nameLabel: 'Debtor Name',
+      codeLabel: 'Debtor Code',
+    };
+  }
+  if (usesVendorPartyLabels(code)) {
+    return {
+      singular: 'Vendor',
+      plural: 'Vendors',
+      nameLabel: 'Vendor Name',
+      codeLabel: 'Vendor Code',
+    };
+  }
+  return {
+    singular: 'Dealer',
+    plural: 'Dealers',
+    nameLabel: 'Dealer Name',
+    codeLabel: 'Dealer Code',
+  };
 }
 
 /**
@@ -246,7 +304,7 @@ export function resolveWorkspaceProductId(
 }
 
 /**
- * One entry per ProductCode for selection UI — DF → VF → PID.
+ * One entry per ProductCode for selection UI — DF → VF → PID → SID.
  * Prefer the first occurrence's backend id/name.
  */
 export function uniqueProductsByCode(
@@ -263,6 +321,7 @@ export function uniqueProductsByCode(
     PRODUCT_CODES.DEALER_FINANCE,
     PRODUCT_CODES.VENDOR_FINANCE,
     PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING,
+    PRODUCT_CODES.SALES_INVOICE_DISCOUNTING,
   ];
   const result: ResolvedProduct[] = [];
   for (const code of ordered) {

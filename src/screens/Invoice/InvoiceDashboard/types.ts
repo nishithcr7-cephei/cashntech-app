@@ -1,7 +1,12 @@
 import type {InvoiceOverviewSummaryItem} from '@store/invoiceOverview';
 import type {Bank} from '@constants/programSelection';
 
-export type ProductTabType = 'all_product' | 'dealer_finance' | 'vendor_finance' | 'pid';
+export type ProductTabType =
+  | 'all_product'
+  | 'dealer_finance'
+  | 'vendor_finance'
+  | 'pid'
+  | 'sid';
 
 export type MetricSubValue = {
   label: string;

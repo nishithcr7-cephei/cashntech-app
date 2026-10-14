@@ -30,7 +30,11 @@ import {
   PRODUCT_DISPLAY_NAMES,
   type ProductCode,
 } from '@store/product/product.types';
-import {getEffectiveProductCode, usesVendorPartyLabels} from '@store/product/product.resolver';
+import {
+  getEffectiveProductCode,
+  getPartyLabels,
+  usesVendorPartyLayout,
+} from '@store/product/product.resolver';
 import {
   computeDisbursedAmountLikeWeb,
   isVfUpfrontChargeType,
@@ -141,6 +145,9 @@ function resolveProductCode(
   const name = (previewProductName || '').toLowerCase();
   if (name.includes('purchase invoice discounting')) {
     return PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING;
+  }
+  if (name.includes('sales invoice discounting')) {
+    return PRODUCT_CODES.SALES_INVOICE_DISCOUNTING;
   }
   if (name.includes('vendor')) return PRODUCT_CODES.VENDOR_FINANCE;
   if (name.includes('dealer')) return PRODUCT_CODES.DEALER_FINANCE;
@@ -340,7 +347,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   const modalSubtitle = `${invoiceLabel} · ${productDisplayName}`;
 
   const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
-  const vendorPartyLabels = usesVendorPartyLabels(effectiveCode);
+  const vendorPartyLabels = usesVendorPartyLayout(effectiveCode);
   const isVfUpfront =
     isVendorFinance && isVfUpfrontChargeType(preview?.interest_charge_type);
 
@@ -574,7 +581,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       isVf,
       anchor: dash(decryptValue(anchorRaw) || anchorRaw),
       vendor: dash(decryptValue(vendorRaw) || vendorRaw),
-      dealerLabel: vendorPartyLabels ? 'Vendor' : 'Dealer',
+      dealerLabel: getPartyLabels(effectiveCode).singular,
       loanOdAccount: dash(decryptValue(String(odRaw)) || odRaw),
       vendorCode: dash(decryptValue(String(vendorCodeRaw)) || vendorCodeRaw),
       creditToAccount: creditDisplay,
@@ -616,6 +623,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     };
   }, [
     preview,
+    effectiveCode,
     isVendorFinance,
     vendorPartyLabels,
     isVfUpfront,
@@ -842,7 +850,11 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                         value={display.vendor}
                       />
                       <DetailRow
-                        label="Loan OD Account Number"
+                        label={
+                          effectiveCode === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING
+                            ? 'Escrow Account No.'
+                            : 'Loan OD Account Number'
+                        }
                         value={display.loanOdAccount}
                       />
                       <DetailRow

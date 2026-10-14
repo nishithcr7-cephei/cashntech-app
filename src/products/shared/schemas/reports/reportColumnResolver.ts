@@ -2,6 +2,7 @@ import type {GenericExcelExportColumn} from '@services/api/export.api';
 import {
   getEffectiveProductCode,
   isPid,
+  isSid,
   isVendorFinance,
 } from '@store/product/product.resolver';
 import type {ProductCode} from '@store/product/product.types';
@@ -45,6 +46,7 @@ import {INVOICE_OUTSTANDING_PID_OVERRIDES} from '@products/pid/schemas/reports/i
 import {LOAN_STATUS_PID_OVERRIDES} from '@products/pid/schemas/reports/loanStatus.columns';
 import {ALL_PRODUCT_OUTSTANDING_PID_OVERRIDES} from '@products/pid/schemas/reports/allProductOutstanding.columns';
 import {UTILIZATION_PID_OVERRIDES} from '@products/pid/schemas/reports/utilization.columns';
+import {toSidOverrides} from '@products/sid/schemas/reports/sidOverrides';
 import type {
   ReportColumnOverride,
   ReportColumnProductInput,
@@ -106,7 +108,9 @@ const PID_OVERRIDES: Record<ReportId, ReportColumnOverride[]> = {
   utilization: UTILIZATION_PID_OVERRIDES,
 };
 
-type ReportProductBranch = 'df' | 'vf' | 'pid';
+const SID_OVERRIDES = toSidOverrides(PID_OVERRIDES);
+
+type ReportProductBranch = 'df' | 'vf' | 'pid' | 'sid';
 
 function resolveReportProductBranch(
   activeProduct: ReportColumnProductInput,
@@ -117,6 +121,9 @@ function resolveReportProductBranch(
   }
   if (isPid(code)) {
     return 'pid';
+  }
+  if (isSid(code)) {
+    return 'sid';
   }
   return 'df';
 }
@@ -130,6 +137,9 @@ function overridesForBranch(
   }
   if (branch === 'pid') {
     return PID_OVERRIDES[reportId];
+  }
+  if (branch === 'sid') {
+    return SID_OVERRIDES[reportId];
   }
   return DF_OVERRIDES[reportId];
 }
@@ -149,7 +159,7 @@ function resolveColumnList(
     }
 
     const override = overrides.get(key);
-    // hideForVf: omit for VF and PID (vendor-party products; same guarded cols).
+    // hideForVf: omit for VF, PID and SID (vendor-party products; same guarded cols).
     if (branch !== 'df' && override?.hideForVf) {
       continue;
     }
@@ -173,6 +183,7 @@ function resolveColumnList(
  * Resolve on-screen and export column definitions for a report + active product.
  * DF: identical labels/order/visibility to pre-PR8 hardcoded columns.
  * VF / PID: Vendor label overrides + guarded columns hidden per implementation plan.
+ * SID: PID columns with Debtor labels.
  */
 export function resolveReportColumns(
   reportId: ReportId,

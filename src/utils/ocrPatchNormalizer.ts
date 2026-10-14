@@ -4,7 +4,8 @@ import type {InvoiceFields, InvoiceLineItem} from '@type/Invoice';
 export type InvoiceProductType =
   | 'dealer_finance'
   | 'vendor_finance'
-  | 'purchase_invoice_discounting';
+  | 'purchase_invoice_discounting'
+  | 'sales_invoice_discounting';
 
 /**
  * OCR patch normalizer — product-guarded.
