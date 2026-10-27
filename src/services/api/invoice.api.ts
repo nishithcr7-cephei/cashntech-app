@@ -954,6 +954,55 @@ export const invoiceApi = {
   },
 
   /**
+   * SID Notice of Assignment: POST /invoice/notice-of-assignment/:invoiceId
+   * Do not use PATCH /invoice/status for this step — backend requires consent here.
+   */
+  serveNoticeOfAssignment: async (payload: {
+    invoiceId: string;
+    consentAccepted: true;
+    consentText: string;
+    /** YYYY-MM-DD or DD-MM-YYYY (normalized via toYYYYMMDD). */
+    noticeDate: string;
+    remark?: string;
+  }): Promise<any> => {
+    const consentText = payload.consentText.trim();
+    const noticeDate = toYYYYMMDD(payload.noticeDate.trim());
+    if (!consentText) {
+      throw new Error('Consent text is required');
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(noticeDate)) {
+      throw new Error('notice_date must be YYYY-MM-DD');
+    }
+    const body: Record<string, unknown> = {
+      consent_accepted: true,
+      consent_text: consentText,
+      notice_date: noticeDate,
+    };
+    const remark = payload.remark?.trim();
+    if (remark) {
+      body.remark = remark;
+    }
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiNoticeOfAssignment(payload.invoiceId),
+      body,
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
+  /**
+   * GET /invoice/assignment-consent/:invoiceId
+   * Returns { has_assignment_consent, assignment_consent } in data (or body).
+   */
+  getAssignmentConsent: async (invoiceId: string): Promise<any> => {
+    const response = await axiosInstance.get(
+      ApiEndPoints.apiAssignmentConsent(invoiceId),
+      {authRequired: true} as any,
+    );
+    return response.data;
+  },
+
+  /**
    * Submit Finance Request (or other workflow action): PATCH /invoice/status/:invoiceId
    * Body: { action, remark } — server derives step from current_step (no approval_level).
    */

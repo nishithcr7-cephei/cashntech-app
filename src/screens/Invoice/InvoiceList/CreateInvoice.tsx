@@ -89,6 +89,10 @@ import {userSelector} from '@store/user';
 import {PERMISSIONS} from '@constants/permissions';
 import {AppRole, ROLE_LABELS} from '@constants/roles';
 import {
+  canCreateInvoiceForMethod,
+  toProgramAppRole,
+} from '@utils/permissionHelpers';
+import {
   fetchPermissionsRequest,
   selectPermissionsLoading,
   selectPermissionsError,
@@ -858,15 +862,11 @@ export const CreateInvoice: React.FC = () => {
     }
   }, [isAnchorChecker, isDealerChecker, navigation]);
 
-  // Program-level role normalization (e.g., "Anchor Maker" -> "anchor_maker")
-  const programRoleKey = useMemo(() => {
-    const rawRole = programSelection?.role;
-    if (!rawRole) return null;
-    const normalizedRole = rawRole.toLowerCase().trim().replace(/\s+/g, '_');
-    if (normalizedRole === 'vendor_maker') return 'dealer_maker';
-    if (normalizedRole === 'vendor_checker') return 'dealer_checker';
-    return normalizedRole as AppRole;
-  }, [programSelection?.role]);
+  // Program-level role normalization (e.g., "Anchor All Access" -> "anchor_all_access")
+  const programRoleKey = useMemo(
+    () => toProgramAppRole(programSelection?.role),
+    [programSelection?.role],
+  );
 
   // Method-based access control: Push-Pull logic
   const programMethod = programSelection?.method;
@@ -881,11 +881,10 @@ export const CreateInvoice: React.FC = () => {
     // Checkers are never allowed to create
     if (effectiveRole === 'anchor_checker' || effectiveRole === 'dealer_checker') return false;
 
-    // Push -> Only Anchor Maker
-    if (programMethod === 'Push') return effectiveRole === 'anchor_maker';
-    // Pull -> Only Dealer Maker
-    if (programMethod === 'Pull') return effectiveRole === 'dealer_maker';
-    
+    if (programMethod === 'Push' || programMethod === 'Pull') {
+      return canCreateInvoiceForMethod(programMethod, effectiveRole);
+    }
+
     return true;
   }, [programMethod, userRole, programRoleKey, mode]);
 

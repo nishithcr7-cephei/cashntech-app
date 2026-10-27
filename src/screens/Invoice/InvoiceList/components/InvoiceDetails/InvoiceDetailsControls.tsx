@@ -24,12 +24,23 @@ import {selectPermissionsLoading} from '@store/permissions';
 import {navigateToCreateInvoice} from '@store/ui';
 import {shouldShowCreateInvoice} from '@utils/permissionHelpers';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
-import {PRODUCT_CODES} from '@store/product/product.types';
+import {
+  PRODUCT_CODES,
+  PRODUCT_DISPLAY_NAMES,
+  PRODUCT_SHORT_LABELS,
+} from '@store/product/product.types';
 
-type SummaryFocus = 'all' | 'pending' | 'draft' | 'actionRequired';
+type SummaryFocus =
+  | 'all'
+  | 'pending'
+  | 'pendingNoa'
+  | 'draft'
+  | 'actionRequired';
 
 type Props = {
   dealerListTitle: string;
+  /** Selected program name (or "All Program"), shown above the list title. */
+  programTitle?: string;
   invoiceCount: number;
   listHeaderTitle?: string;
   isDealerMaker: boolean;
@@ -54,6 +65,8 @@ type Props = {
   user?: any;
   actionRequiredCount?: number;
   pendingCount?: number;
+  /** SID Notice of Assignment turn count */
+  pendingNoaCount?: number;
   draftCount?: number;
   summaryFocus?: SummaryFocus;
   onSummaryFocusChange?: (focus: SummaryFocus) => void;
@@ -61,14 +74,33 @@ type Props = {
   onBulkAction?: (action: 'Verify' | 'Reject' | 'On Hold') => void;
   canEdit?: boolean;
   canImport?: boolean;
+  /** Show Pending NOA chip when count > 0 (maker + permission). */
+  canNoticeOfAssignment?: boolean;
   onRefresh?: () => void;
   listRefreshing?: boolean;
   /** Search + Filters only when the list has at least one invoice. */
   showSearchAndFilter?: boolean;
+  /** Program title + list heading rendered elsewhere (scrolling list header). */
+  hideListTitle?: boolean;
 };
+
+type ListTitleProps = {
+  title: string;
+  count: number;
+};
+
+export const InvoiceListTitle: React.FC<ListTitleProps> = ({title, count}) => (
+  <View style={styles.listHeader}>
+    <Text style={styles.listHeaderLabel}>{title}</Text>
+    <View style={styles.countBadge}>
+      <Text style={styles.countBadgeText}>{count}</Text>
+    </View>
+  </View>
+);
 
 export const InvoiceDetailsControls: React.FC<Props> = ({
   dealerListTitle,
+  programTitle,
   invoiceCount,
   listHeaderTitle,
   isDealerMaker,
@@ -93,6 +125,7 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   user,
   actionRequiredCount = 0,
   pendingCount = 0,
+  pendingNoaCount = 0,
   draftCount = 0,
   summaryFocus = 'all',
   onSummaryFocusChange,
@@ -100,9 +133,11 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
   onBulkAction,
   canEdit = false,
   canImport = false,
+  canNoticeOfAssignment = false,
   onRefresh,
   listRefreshing = false,
   showSearchAndFilter = true,
+  hideListTitle = false,
 }) => {
   const dispatch = useDispatch();
   const [showSearchHelp, setShowSearchHelp] = React.useState(false);
@@ -139,14 +174,31 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
 
   // Composite Role-based visibility check for "Create Invoice"
   const showCreateButton = shouldShowCreateInvoice(user, canCreateInvoice);
-  const showDraftChip =
-    draftCount > 0 &&
-    (isAnchorMaker || isDealerMaker || isAnchorAllAccess || isDealerAllAccess) &&
-    canImport;
-  const showActionChip =
-    actionRequiredCount > 0 &&
-    (isAnchorMaker || isDealerMaker || isAnchorAllAccess || isDealerAllAccess) &&
-    canEdit;
+  const isSidProduct =
+    effectiveProductCode === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING;
+  const isMakerChipRole =
+    isAnchorMaker ||
+    isDealerMaker ||
+    isAnchorAllAccess ||
+    isDealerAllAccess;
+  /** SID maker strip matches web: Draft · Pending NOA · Action Required (incl. zeros). */
+  const isSidMakerSummary = isSidProduct && !isCashnTechUser && isMakerChipRole;
+
+  const showDraftChip = isSidMakerSummary
+    ? canImport
+    : draftCount > 0 && isMakerChipRole && canImport;
+  const showActionChip = isSidMakerSummary
+    ? canEdit
+    : actionRequiredCount > 0 && isMakerChipRole && canEdit;
+  const showPendingNoaChip = isSidMakerSummary
+    ? canNoticeOfAssignment
+    : pendingNoaCount > 0 &&
+      !isCashnTechUser &&
+      isMakerChipRole &&
+      canNoticeOfAssignment;
+  /** Generic "Pending" = approval queue; web SID maker bar has no such chip (NOA replaces it). */
+  const showPendingApprovalChip =
+    pendingCount > 0 && !(isSidMakerSummary && canNoticeOfAssignment);
 
   const onPressCreateInvoice = () => {
     if (!isCreateInvoiceEnabled) {
@@ -162,15 +214,6 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
         navigateToCreateInvoice(dispatch, navigation, {freshCreate: true}));
     handler();
   };
-
-  const renderInfoChip = (label: string, count: number) => (
-    <View key={label} style={[styles.statChip, styles.infoChip]}>
-      <Text style={styles.infoChipCount}>{count}</Text>
-      <Text style={styles.infoChipLabel} numberOfLines={1}>
-        {label}
-      </Text>
-    </View>
-  );
 
   const renderActionChip = (
     key: SummaryFocus,
@@ -225,26 +268,76 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
 
   return (
     <View style={styles.controlsSection}>
+      <View
+        style={styles.contextStrip}
+        accessibilityLabel={`${PRODUCT_DISPLAY_NAMES[effectiveProductCode]}${
+          programTitle ? `, ${programTitle}` : ''
+        }`}>
+        <View style={styles.productChip}>
+          <Text style={styles.productChipText}>
+            {PRODUCT_SHORT_LABELS[effectiveProductCode]}
+          </Text>
+        </View>
+        {!!programTitle && (
+          <Text style={styles.contextProgramText} numberOfLines={1}>
+            {programTitle}
+          </Text>
+        )}
+      </View>
       {/* Row 1: chips (scroll) + Create */}
       <View style={styles.topControlsRow}>
         <View style={styles.chipsScrollWrap}>
           <ScrollView
             horizontal
-            showsHorizontalScrollIndicator={false}
+            showsHorizontalScrollIndicator
             contentContainerStyle={styles.summaryChipRow}
             style={styles.chipsScroll}>
-            {pendingCount > 0
-              ? renderActionChip('pending', 'Pending', pendingCount, 'pending')
-              : renderInfoChip('Pending', pendingCount)}
-            {showDraftChip &&
-              renderActionChip('draft', 'Draft', draftCount, 'draft')}
-            {showActionChip &&
-              renderActionChip(
-                'actionRequired',
-                'Action Required',
-                actionRequiredCount,
-                'action',
-              )}
+            {isSidMakerSummary ? (
+              <>
+                {showDraftChip &&
+                  renderActionChip('draft', 'Draft', draftCount, 'draft')}
+                {showPendingNoaChip &&
+                  renderActionChip(
+                    'pendingNoa',
+                    'Pending Notice of Assignment',
+                    pendingNoaCount,
+                    'pending',
+                  )}
+                {showActionChip &&
+                  renderActionChip(
+                    'actionRequired',
+                    'Action Required',
+                    actionRequiredCount,
+                    'action',
+                  )}
+              </>
+            ) : (
+              <>
+                {showPendingApprovalChip &&
+                  renderActionChip(
+                    'pending',
+                    'Pending',
+                    pendingCount,
+                    'pending',
+                  )}
+                {showPendingNoaChip &&
+                  renderActionChip(
+                    'pendingNoa',
+                    'Pending Notice of Assignment',
+                    pendingNoaCount,
+                    'pending',
+                  )}
+                {showDraftChip &&
+                  renderActionChip('draft', 'Draft', draftCount, 'draft')}
+                {showActionChip &&
+                  renderActionChip(
+                    'actionRequired',
+                    'Action Required',
+                    actionRequiredCount,
+                    'action',
+                  )}
+              </>
+            )}
           </ScrollView>
         </View>
         {showCreate && (
@@ -431,14 +524,12 @@ export const InvoiceDetailsControls: React.FC<Props> = ({
         </TouchableWithoutFeedback>
       </Modal>
 
-      <View style={styles.listHeader}>
-        <Text style={styles.listHeaderLabel}>
-          {listHeaderTitle || dealerListTitle}
-        </Text>
-        <View style={styles.countBadge}>
-          <Text style={styles.countBadgeText}>{invoiceCount}</Text>
-        </View>
-      </View>
+      {!hideListTitle && (
+        <InvoiceListTitle
+          title={listHeaderTitle || dealerListTitle}
+          count={invoiceCount}
+        />
+      )}
 
       {showBulkSelectUi && selectedInvoiceIdsLength > 0 && (
         <TouchableOpacity
@@ -680,20 +771,7 @@ const styles = StyleSheet.create({
     borderRadius: scaleWidth(18),
     borderWidth: 1,
     gap: scaleWidth(6),
-  },
-  infoChip: {
-    backgroundColor: '#F1F5F9',
-    borderColor: '#E2E8F0',
-  },
-  infoChipCount: {
-    fontSize: scaleFont(13),
-    fontFamily: Fonts.GilroyBold,
-    color: '#334155',
-  },
-  infoChipLabel: {
-    fontSize: scaleFont(12),
-    fontFamily: Fonts.GilroyMedium,
-    color: '#64748B',
+    flexShrink: 0,
   },
   actionChipPending: {
     backgroundColor: '#EFF6FF',
@@ -722,10 +800,12 @@ const styles = StyleSheet.create({
   actionChipCount: {
     fontSize: scaleFont(13),
     fontFamily: Fonts.GilroyBold,
+    flexShrink: 0,
   },
   actionChipLabel: {
     fontSize: scaleFont(12),
     fontFamily: Fonts.GilroySemiBold,
+    flexShrink: 0,
   },
   actionCountPending: {
     color: Colors.tertiaryBlue,
@@ -735,6 +815,31 @@ const styles = StyleSheet.create({
   },
   actionCountRequired: {
     color: Colors.red,
+  },
+  contextStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(8),
+    paddingTop: scaleHeight(6),
+  },
+  productChip: {
+    backgroundColor: Colors.primaryColor,
+    paddingHorizontal: scaleWidth(8),
+    paddingVertical: scaleHeight(2),
+    borderRadius: scaleWidth(6),
+    flexShrink: 0,
+  },
+  productChipText: {
+    color: Colors.white,
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyBold,
+  },
+  contextProgramText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: scaleFont(13),
+    fontFamily: Fonts.GilroySemiBold,
+    color: Colors.darkblack,
   },
   listHeader: {
     flexDirection: 'row',

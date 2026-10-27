@@ -13,6 +13,7 @@ import {
 type ProductSelectionRowProps = {
   product: ResolvedProduct;
   selected: boolean;
+  disabled?: boolean;
   onPress: () => void;
 };
 
@@ -56,20 +57,37 @@ const renderProductIcon = (code: string) => {
 export const ProductSelectionRow: React.FC<ProductSelectionRowProps> = ({
   product,
   selected,
+  disabled = false,
   onPress,
 }) => (
   <TouchableOpacity
-    style={[styles.row, selected && styles.rowSelected]}
-    activeOpacity={0.7}
+    style={[
+      styles.row,
+      selected && !disabled && styles.rowSelected,
+      disabled && styles.rowDisabled,
+    ]}
+    activeOpacity={disabled ? 1 : 0.7}
+    disabled={disabled}
+    accessibilityState={{disabled}}
     onPress={onPress}>
-    <View style={styles.iconCircle}>{renderProductIcon(product.code)}</View>
+    <View style={[styles.iconCircle, disabled && styles.iconCircleDisabled]}>
+      {renderProductIcon(product.code)}
+    </View>
 
-    <Text style={styles.label} numberOfLines={1} ellipsizeMode="tail">
+    <Text
+      style={[styles.label, disabled && styles.labelDisabled]}
+      numberOfLines={1}
+      ellipsizeMode="tail">
       {product.name}
     </Text>
 
-    <View style={[styles.radio, selected && styles.radioSelected]}>
-      {selected ? (
+    <View
+      style={[
+        styles.radio,
+        selected && !disabled && styles.radioSelected,
+        disabled && styles.radioDisabled,
+      ]}>
+      {selected && !disabled ? (
         <RightCheckmarkWhite
           width={scaleWidth(10)}
           height={scaleHeight(10)}
@@ -98,6 +116,11 @@ const styles = StyleSheet.create({
     borderLeftWidth: scaleWidth(3),
     borderLeftColor: Colors.primaryColor,
   },
+  rowDisabled: {
+    opacity: 0.5,
+    backgroundColor: '#F5F5F5',
+    borderColor: '#E8E8E8',
+  },
   iconCircle: {
     width: scaleWidth(40),
     height: scaleWidth(40),
@@ -107,12 +130,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: scaleWidth(12),
   },
+  iconCircleDisabled: {
+    backgroundColor: '#EEEEEE',
+  },
   label: {
     flex: 1,
     fontSize: scaleFont(15),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.darkblack,
     marginRight: scaleWidth(8),
+  },
+  labelDisabled: {
+    color: '#9E9E9E',
   },
   radio: {
     width: scaleWidth(22),
@@ -126,5 +155,9 @@ const styles = StyleSheet.create({
   radioSelected: {
     borderColor: Colors.primaryColor,
     backgroundColor: Colors.primaryColor,
+  },
+  radioDisabled: {
+    borderColor: '#D0D0D0',
+    backgroundColor: '#EEEEEE',
   },
 });

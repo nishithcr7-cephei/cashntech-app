@@ -113,7 +113,7 @@ export const SignupScreen: React.FC<Props> = ({
       const payload = {
         country_code: country.callingCode[0],
         mobile_number: mobileNumber.trim(),
-        email: email.trim().toLowerCase(),
+        email: email.trim(),
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         is_client: userType === 'client',

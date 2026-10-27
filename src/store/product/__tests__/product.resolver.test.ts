@@ -1,6 +1,7 @@
 import {
   getPartyLabels,
   isPid,
+  isProductNavLocked,
   isSid,
   isStandaloneProduct,
   resolveAvailableProducts,
@@ -50,6 +51,17 @@ describe('resolveProductCode — SID', () => {
 });
 
 describe('product helpers — SID', () => {
+  it('does not lock SID (or other products) in nav after unlock', () => {
+    expect(isProductNavLocked(PRODUCT_CODES.SALES_INVOICE_DISCOUNTING)).toBe(
+      false,
+    );
+    expect(isProductNavLocked(PRODUCT_CODES.DEALER_FINANCE)).toBe(false);
+    expect(isProductNavLocked(PRODUCT_CODES.VENDOR_FINANCE)).toBe(false);
+    expect(isProductNavLocked(PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING)).toBe(
+      false,
+    );
+  });
+
   it('treats SID as standalone but not PID', () => {
     expect(isSid(PRODUCT_CODES.SALES_INVOICE_DISCOUNTING)).toBe(true);
     expect(isPid(PRODUCT_CODES.SALES_INVOICE_DISCOUNTING)).toBe(false);

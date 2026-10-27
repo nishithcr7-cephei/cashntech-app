@@ -210,6 +210,17 @@ export function isSid(code: ProductCode | null | undefined): boolean {
   return code === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING;
 }
 
+/**
+ * Products locked in drawer / product switcher / login picker (grey + non-selectable).
+ * SID unlocked 2026-10-27 for device QA + Notice of Assignment.
+ * Return `true` for a code to lock it again.
+ */
+export function isProductNavLocked(
+  _code: ProductCode | null | undefined,
+): boolean {
+  return false;
+}
+
 /** PID + SID — standalone program/vendor mapping products. */
 export function isStandaloneProduct(
   code: ProductCode | null | undefined,

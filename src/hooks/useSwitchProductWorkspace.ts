@@ -4,6 +4,7 @@ import {useDispatch, useSelector} from 'react-redux';
 import {selectActiveProduct} from '@store/product/product.selectors';
 import {setActiveProduct} from '@store/product/product.slice';
 import type {ResolvedProduct} from '@store/product/product.types';
+import {isProductNavLocked} from '@store/product/product.resolver';
 import {setProgramScope} from '@store/programSelection/programSelection.slice';
 import {fetchPermissionsRequest} from '@store/permissions/permissions.slice';
 import {resetInvoiceOverview} from '@store/invoiceOverview/invOverview.slice';
@@ -28,6 +29,9 @@ export const useSwitchProductWorkspace = () => {
 
   const applyWorkspaceSwitch = useCallback(
     (next: ResolvedProduct, targetRoute?: string) => {
+      if (isProductNavLocked(next.code)) {
+        return;
+      }
       dispatch(setActiveProduct(next));
       dispatch(setProgramScope('all'));
       dispatch(resetInvoiceOverview());
@@ -48,7 +52,11 @@ export const useSwitchProductWorkspace = () => {
 
   const switchProductWorkspace = useCallback(
     (next: ResolvedProduct) => {
-      if (!next?.code || next.code === activeProduct?.code) {
+      if (
+        !next?.code ||
+        next.code === activeProduct?.code ||
+        isProductNavLocked(next.code)
+      ) {
         return false;
       }
       const fromName = activeProduct?.name || 'the current product';

@@ -92,6 +92,7 @@ export type HomeNavigatorType = {
     dealerName?: string;
     creditAccount?: string;
     anchor?: string;
+    partyName?: string;
     bankName?: string;
     status?: string;
   };

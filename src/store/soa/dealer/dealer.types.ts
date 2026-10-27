@@ -28,6 +28,11 @@ export interface DealerListItem {
 export interface FetchDealerListRequest {
   programIds: string[];
   isInitialLoad?: boolean;
+  /**
+   * SID SOA: dealers API may 500 while counter-party-summary still works.
+   * Treat non-auth failures as empty list so the summary card can show.
+   */
+  treatErrorAsEmpty?: boolean;
 }
 
 export interface FetchProgramSummaryRequest {

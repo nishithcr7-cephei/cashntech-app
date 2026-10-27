@@ -40,6 +40,7 @@ import {selectEffectiveProductCode} from '@store/product/product.selectors';
 import {PRODUCT_CODES} from '@store/product/product.types';
 import {
   getPartyLabels,
+  isSid,
   usesVendorPartyLayout,
 } from '@store/product/product.resolver';
 import { mapApiToRow, formatDateDash, mapApprovalLogToTimelineStep, formatStatus } from './types';
@@ -70,6 +71,7 @@ import {
 import {
   INVOICE_DELETE_ENABLED,
   isInvoiceBulkSelectable,
+  isNoticeOfAssignmentStep,
   isPendingInvoiceApprovalRow,
 } from '@utils/invoiceListActionable';
 import type {InvoiceListFilters} from '@store/invoice/inv.types';
@@ -81,6 +83,15 @@ import {
 import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
 import {getEffectiveProductCode} from '@store/product/product.resolver';
 import {readDueDateCalculatedFrom} from '@utils/invoiceDueDate';
+import {
+  canCreateInvoiceForMethod,
+  toProgramAppRole,
+} from '@utils/permissionHelpers';
+import {
+  extractAssignmentConsent,
+  mapNoaPreviewFromDetails,
+  type NoaPreviewModel,
+} from './noticeOfAssignmentMap';
 
 export function useInvoiceDetails() {
   const navigation = useNavigation();
@@ -145,11 +156,16 @@ export function useInvoiceDetails() {
   
   const storedUserRole = userRole ? ROLE_LABELS[userRole] : '';
 
+  // Web shows "Vendor Wise" for SID here; other SID labels stay Debtor.
+  const listPartyWord = isSid(effectiveProductCode)
+    ? 'Vendor'
+    : getPartyLabels(effectiveProductCode).singular;
+
   const dealerListTitle =
     isCashnTechUser
       ? 'Invoice'
       : usesVendorPartyLayout(effectiveProductCode)
-        ? `${getPartyLabels(effectiveProductCode).singular} Wise Invoice Details`
+        ? `${listPartyWord} Wise Invoice Details`
       : isDealerMaker || isDealerChecker
         ? 'Anchor Wise Invoice Details'
         : 'Dealer Wise Invoice Details';
@@ -163,9 +179,9 @@ export function useInvoiceDetails() {
   const [selectedInvoiceNo, setSelectedInvoiceNo] = useState<string | null>(null);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const [attachmentFallback, setAttachmentFallback] = useState<InvoiceAttachmentItem[]>([]);
-  /** Compact summary chip focus: pending / draft / actionRequired filters the list. */
+  /** Compact summary chip focus: pending / pendingNoa / draft / actionRequired. */
   const [summaryFocus, setSummaryFocus] = useState<
-    'all' | 'pending' | 'draft' | 'actionRequired'
+    'all' | 'pending' | 'pendingNoa' | 'draft' | 'actionRequired'
   >('all');
   
   // Permission Checks
@@ -177,6 +193,9 @@ export function useInvoiceDetails() {
   const canImport = useHasPermission(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY);
   const canUploadVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_UPLOAD_VERIFY);
   const canBulkActions = useHasPermission(PERMISSIONS.INVOICE_LIST_BULK_ACTIONS);
+  const canNoticeOfAssignment = useHasPermission(
+    PERMISSIONS.INVOICE_LIST_NOTICE_OF_ASSIGNMENT,
+  );
   const hasFunctionalPermission = canApprove || canReject || canVerify;
 
   const [menuAnchor, setMenuAnchor] = useState<{
@@ -220,20 +239,26 @@ export function useInvoiceDetails() {
   }
 
   if (summaryFocus === 'pending') {
-    filteredData = filteredData.filter(row =>
-      isPendingInvoiceApprovalRow(row, {
-        isCashnTechUser,
-        canVerify,
-        isAnchorMaker,
-        isDealerMaker,
-        isAnchorChecker,
-        isDealerChecker,
-        isAnchorAllAccess,
-        isDealerAllAccess,
-        canApprove,
-        canReject,
-        roleLabel: storedUserRole,
-      }),
+    filteredData = filteredData.filter(
+      row =>
+        !isNoticeOfAssignmentStep(row) &&
+        isPendingInvoiceApprovalRow(row, {
+          isCashnTechUser,
+          canVerify,
+          isAnchorMaker,
+          isDealerMaker,
+          isAnchorChecker,
+          isDealerChecker,
+          isAnchorAllAccess,
+          isDealerAllAccess,
+          canApprove,
+          canReject,
+          roleLabel: storedUserRole,
+        }),
+    );
+  } else if (summaryFocus === 'pendingNoa') {
+    filteredData = filteredData.filter(
+      row => row.actionable === true && isNoticeOfAssignmentStep(row),
     );
   } else if (summaryFocus === 'draft') {
     filteredData = filteredData.filter(row => {
@@ -273,7 +298,7 @@ export function useInvoiceDetails() {
   }
 
   const onSummaryFocusChange = useCallback(
-    (focus: 'all' | 'pending' | 'draft' | 'actionRequired') => {
+    (focus: 'all' | 'pending' | 'pendingNoa' | 'draft' | 'actionRequired') => {
       setSummaryFocus(prev => (prev === focus ? 'all' : focus));
     },
     [],
@@ -287,22 +312,26 @@ export function useInvoiceDetails() {
   const listEmptyMessage =
     summaryFocus === 'pending'
       ? 'No pending invoices for approval'
-      : summaryFocus === 'draft'
-        ? 'No draft invoices'
-        : summaryFocus === 'actionRequired'
-          ? 'No action-required invoices'
-          : selectedDealerName
-            ? `No invoices found for ${selectedDealerName}`
-            : 'No invoices found';
+      : summaryFocus === 'pendingNoa'
+        ? 'No invoices pending Notice of Assignment'
+        : summaryFocus === 'draft'
+          ? 'No draft invoices'
+          : summaryFocus === 'actionRequired'
+            ? 'No action-required invoices'
+            : selectedDealerName
+              ? `No invoices found for ${selectedDealerName}`
+              : 'No invoices found';
 
   const summaryFocusHint =
     summaryFocus === 'pending'
       ? 'Showing pending only · Tap Pending again to clear'
-      : summaryFocus === 'draft'
-        ? 'Showing drafts only · Tap Draft again to clear'
-        : summaryFocus === 'actionRequired'
-          ? 'Showing action required · Tap chip again to clear'
-          : null;
+      : summaryFocus === 'pendingNoa'
+        ? 'Showing pending Notice of Assignment · Tap chip again to clear'
+        : summaryFocus === 'draft'
+          ? 'Showing drafts only · Tap Draft again to clear'
+          : summaryFocus === 'actionRequired'
+            ? 'Showing action required · Tap chip again to clear'
+            : null;
 
   const selectedRowForMenu = openMenuId 
     ? filteredData.find(r => r.id === openMenuId) || invoiceData.find(r => r.id === openMenuId)
@@ -329,6 +358,12 @@ export function useInvoiceDetails() {
   const [financeRequestLoading, setFinanceRequestLoading] = useState(false);
   const [financeRequestSubmitting, setFinanceRequestSubmitting] = useState(false);
   const [financeRequestInvoiceId, setFinanceRequestInvoiceId] = useState<string | null>(null);
+  const [showNoaModal, setShowNoaModal] = useState(false);
+  const [noaInvoiceId, setNoaInvoiceId] = useState<string | null>(null);
+  const [noaPreview, setNoaPreview] = useState<NoaPreviewModel | null>(null);
+  const [noaLoading, setNoaLoading] = useState(false);
+  const [noaSubmitting, setNoaSubmitting] = useState(false);
+  const [noaReadOnly, setNoaReadOnly] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionBusyMessage, setActionBusyMessage] = useState('Please wait…');
 
@@ -761,11 +796,13 @@ export function useInvoiceDetails() {
     const message =
       summaryFocus === 'pending'
         ? 'Showing pending invoices...'
-        : summaryFocus === 'draft'
-          ? 'Showing draft invoices...'
-          : summaryFocus === 'actionRequired'
-            ? 'Showing action-required invoices...'
-            : 'Showing all invoices...';
+        : summaryFocus === 'pendingNoa'
+          ? 'Showing pending Notice of Assignment...'
+          : summaryFocus === 'draft'
+            ? 'Showing draft invoices...'
+            : summaryFocus === 'actionRequired'
+              ? 'Showing action-required invoices...'
+              : 'Showing all invoices...';
     setSummaryFocusSwitchMessage(message);
     setSummaryFocusSwitching(true);
     const timer = setTimeout(() => setSummaryFocusSwitching(false), 450);
@@ -1018,6 +1055,105 @@ export function useInvoiceDetails() {
         runFinanceRequestPreview();
         break;
       }
+      case 'noticeOfAssignment': {
+        if (isCashnTechUser) {
+          break;
+        }
+        const runNoaPreview = async () => {
+          setNoaInvoiceId(invoiceId);
+          setSelectedInvoiceId(invoiceId);
+          setSelectedInvoiceNo(invoiceNo);
+          setNoaPreview(null);
+          setNoaReadOnly(false);
+          setNoaLoading(true);
+          setShowNoaModal(true);
+          try {
+            const details = await invoiceApi.getInvoiceDetails(invoiceId);
+            if (!details || typeof details !== 'object') {
+              throw new Error('Empty invoice details');
+            }
+            const mapped = mapNoaPreviewFromDetails(details);
+            setNoaPreview(mapped);
+            // Already served → open read-only instead of serve form
+            if (mapped.servedConsent) {
+              setNoaReadOnly(true);
+            }
+          } catch (e: any) {
+            setShowNoaModal(false);
+            setNoaPreview(null);
+            setNoaInvoiceId(null);
+            setNoaReadOnly(false);
+            Toast.show({
+              type: 'error',
+              text1: 'Preview Failed',
+              text2:
+                e?.response?.data?.message ||
+                e?.message ||
+                'Could not load Notice of Assignment details',
+            });
+          } finally {
+            setNoaLoading(false);
+          }
+        };
+        runNoaPreview();
+        break;
+      }
+      case 'viewNoticeOfAssignment': {
+        if (isCashnTechUser) {
+          break;
+        }
+        const runViewNoa = async () => {
+          setNoaInvoiceId(invoiceId);
+          setSelectedInvoiceId(invoiceId);
+          setSelectedInvoiceNo(invoiceNo);
+          setNoaPreview(null);
+          setNoaReadOnly(true);
+          setNoaLoading(true);
+          setShowNoaModal(true);
+          try {
+            const [details, consentRes] = await Promise.all([
+              invoiceApi.getInvoiceDetails(invoiceId),
+              invoiceApi.getAssignmentConsent(invoiceId),
+            ]);
+            if (!details || typeof details !== 'object') {
+              throw new Error('Empty invoice details');
+            }
+            const consent =
+              extractAssignmentConsent(consentRes) ||
+              extractAssignmentConsent(details);
+            if (!consent) {
+              setShowNoaModal(false);
+              setNoaPreview(null);
+              setNoaInvoiceId(null);
+              setNoaReadOnly(false);
+              Toast.show({
+                type: 'info',
+                text1: 'Notice of Assignment',
+                text2: 'No recorded consent found for this invoice yet',
+              });
+              return;
+            }
+            setNoaPreview(mapNoaPreviewFromDetails(details, consentRes));
+          } catch (e: any) {
+            setShowNoaModal(false);
+            setNoaPreview(null);
+            setNoaInvoiceId(null);
+            setNoaReadOnly(false);
+            Toast.show({
+              type: 'error',
+              text1: 'Preview Failed',
+              text2:
+                e?.response?.data?.message ||
+                e?.message ||
+                'Could not load Notice of Assignment',
+            });
+          } finally {
+            setNoaLoading(false);
+          }
+        };
+        runViewNoa();
+        break;
+      }
       case 'attachment': {        const listItem = invoiceListRaw.find(inv => inv.id === invoiceId);
         setAttachmentFallback(mapInvoiceAttachmentsWithUrls(listItem ?? {}));
         setSelectedInvoiceId(invoiceId);
@@ -1038,6 +1174,66 @@ export function useInvoiceDetails() {
     setFinanceRequestLoading(false);
     setFinanceRequestInvoiceId(null);
   }, [financeRequestSubmitting]);
+
+  const closeNoaModal = useCallback(() => {
+    if (noaSubmitting) return;
+    setShowNoaModal(false);
+    setNoaPreview(null);
+    setNoaLoading(false);
+    setNoaInvoiceId(null);
+    setNoaReadOnly(false);
+  }, [noaSubmitting]);
+
+  const submitNoticeOfAssignment = useCallback(
+    async (payload: {
+      noticeDate: string;
+      remark?: string;
+      consentText: string;
+    }) => {
+      if (!noaInvoiceId || noaSubmitting || noaLoading || noaReadOnly) {
+        return;
+      }
+      setNoaSubmitting(true);
+      try {
+        const res = await invoiceApi.serveNoticeOfAssignment({
+          invoiceId: noaInvoiceId,
+          consentAccepted: true,
+          consentText: payload.consentText,
+          noticeDate: payload.noticeDate,
+          remark: payload.remark,
+        });
+        if (res?.statusCode === 200 || res?.status === 200) {
+          Toast.show({
+            type: 'success',
+            text1: 'Success',
+            text2: 'Notice of Assignment served successfully',
+          });
+          setShowNoaModal(false);
+          setNoaPreview(null);
+          setNoaInvoiceId(null);
+          refreshInvoiceList();
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'Notice of Assignment Failed',
+            text2: res?.message || 'Failed to serve Notice of Assignment',
+          });
+        }
+      } catch (e: any) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2:
+            e?.response?.data?.message ||
+            e?.message ||
+            'Failed to serve Notice of Assignment',
+        });
+      } finally {
+        setNoaSubmitting(false);
+      }
+    },
+    [noaInvoiceId, noaSubmitting, noaLoading, noaReadOnly, refreshInvoiceList],
+  );
 
   const submitFinanceRequest = useCallback(
     async (payload: {preferredDisbursementDate: string}) => {
@@ -1647,10 +1843,8 @@ export function useInvoiceDetails() {
 
 
   const programMethod = programSelection?.method;
-  const userRoleInternal = programSelection?.role?.toLowerCase().replace(' ', '_');
-  // vendor_maker maps to the same counterparty-maker category as dealer_maker
-  const normalizedRoleInternal =
-    userRoleInternal === 'vendor_maker' ? 'dealer_maker' : userRoleInternal;
+  const programCreateRole =
+    toProgramAppRole(programSelection?.role) ?? userRole;
 
   let createInvoiceDisabledReason: string | null = null;
 
@@ -1659,10 +1853,7 @@ export function useInvoiceDetails() {
   } else if (programSelection?.status === "Inactive") {
     createInvoiceDisabledReason = "Program is inactive please contact admin";
   } else {
-    const isAllowedByMethod =
-      (programMethod === "Pull" && normalizedRoleInternal === "dealer_maker") ||
-      (programMethod === "Push" && normalizedRoleInternal === "anchor_maker");
-    if (!isAllowedByMethod) {
+    if (!canCreateInvoiceForMethod(programMethod, programCreateRole)) {
       createInvoiceDisabledReason =
         'You are not allowed to create invoice for this method';
     }
@@ -1694,86 +1885,106 @@ export function useInvoiceDetails() {
 
   const userPartyType = isCashnTechUser ? 'cashntech' : (isAnchorMaker || isAnchorChecker) ? 'anchor' : 'dealer';
 
-  const { pendingCount, draftCount, actionRequiredCount } = React.useMemo(() => {
-    let pending = 0;
-    let draft = 0;
-    let actionRequired = 0;
+  const {pendingCount, pendingNoaCount, draftCount, actionRequiredCount} =
+    React.useMemo(() => {
+      let pending = 0;
+      let pendingNoa = 0;
+      let draft = 0;
+      let actionRequired = 0;
 
-    const myApprovalLevel = String(approvalLevel);
+      const myApprovalLevel = String(approvalLevel);
 
-    invoiceData.forEach(row => {
-      const iStatusRaw = (row.rawInvoiceStatus || '').trim();
-      const approvalStatus = (row.rawApprovalStatus || '').trim();
+      invoiceData.forEach(row => {
+        const iStatusRaw = (row.rawInvoiceStatus || '').trim();
+        const approvalStatus = (row.rawApprovalStatus || '').trim();
 
-      // Fix 1 — Draft badge logic
-      const isDraftState =
-        canImport &&
-        (isAnchorMaker || isDealerMaker) &&
-        iStatusRaw === 'Draft' &&
-        approvalStatus === 'Pending Attachment';
-      if (isDraftState) {
-        draft++;
-      }
+        if (row.actionable === true && isNoticeOfAssignmentStep(row)) {
+          pendingNoa++;
+        }
 
-      // Fix 3 — Action Required logic
-      const isActionRequired =
-        canEdit &&
-        (isAnchorMaker || isDealerMaker) &&
-        iStatusRaw === 'Rejected';
-      if (isActionRequired) {
-        actionRequired++;
-      }
+        // Fix 1 — Draft badge logic
+        const isDraftState =
+          canImport &&
+          (isAnchorMaker || isDealerMaker) &&
+          iStatusRaw === 'Draft' &&
+          approvalStatus === 'Pending Attachment';
+        if (isDraftState) {
+          draft++;
+        }
 
-      // Fix 2 — Pending Invoice Approval logic (web Ze parity) — same as blue-dot
-      if (
-        isPendingInvoiceApprovalRow(row, {
-          isCashnTechUser: userPartyType === 'cashntech',
-          canVerify,
-          isAnchorMaker,
-          isDealerMaker,
-          isAnchorChecker,
-          isDealerChecker,
-          isAnchorAllAccess,
-          isDealerAllAccess,
-          canApprove,
-          canReject,
-          roleLabel: storedUserRole,
-          approvalLevel: myApprovalLevel,
-        })
-      ) {
-        pending++;
-      }
-    });
+        // Fix 3 — Action Required logic
+        const isActionRequired =
+          canEdit &&
+          (isAnchorMaker || isDealerMaker) &&
+          iStatusRaw === 'Rejected';
+        if (isActionRequired) {
+          actionRequired++;
+        }
 
-    return { pendingCount: pending, draftCount: draft, actionRequiredCount: actionRequired };
-  }, [
-    invoiceData,
-    userPartyType,
-    isAnchorMaker,
-    isAnchorChecker,
-    isDealerMaker,
-    isDealerChecker,
-    isAnchorAllAccess,
-    isDealerAllAccess,
-    canImport,
-    canEdit,
-    canApprove,
-    canReject,
-    canVerify,
-    approvalLevel,
-    storedUserRole,
-  ]);
+        // Pending approval — exclude NOA steps (own chip)
+        if (
+          !isNoticeOfAssignmentStep(row) &&
+          isPendingInvoiceApprovalRow(row, {
+            isCashnTechUser: userPartyType === 'cashntech',
+            canVerify,
+            isAnchorMaker,
+            isDealerMaker,
+            isAnchorChecker,
+            isDealerChecker,
+            isAnchorAllAccess,
+            isDealerAllAccess,
+            canApprove,
+            canReject,
+            roleLabel: storedUserRole,
+            approvalLevel: myApprovalLevel,
+          })
+        ) {
+          pending++;
+        }
+      });
+
+      return {
+        pendingCount: pending,
+        pendingNoaCount: pendingNoa,
+        draftCount: draft,
+        actionRequiredCount: actionRequired,
+      };
+    }, [
+      invoiceData,
+      userPartyType,
+      isAnchorMaker,
+      isAnchorChecker,
+      isDealerMaker,
+      isDealerChecker,
+      isAnchorAllAccess,
+      isDealerAllAccess,
+      canImport,
+      canEdit,
+      canApprove,
+      canReject,
+      canVerify,
+      approvalLevel,
+      storedUserRole,
+    ]);
 
   // Clear stale chip filter when that bucket becomes empty (e.g. after approve).
   useEffect(() => {
     if (summaryFocus === 'pending' && pendingCount === 0) {
+      setSummaryFocus('all');
+    } else if (summaryFocus === 'pendingNoa' && pendingNoaCount === 0) {
       setSummaryFocus('all');
     } else if (summaryFocus === 'draft' && draftCount === 0) {
       setSummaryFocus('all');
     } else if (summaryFocus === 'actionRequired' && actionRequiredCount === 0) {
       setSummaryFocus('all');
     }
-  }, [summaryFocus, pendingCount, draftCount, actionRequiredCount]);
+  }, [
+    summaryFocus,
+    pendingCount,
+    pendingNoaCount,
+    draftCount,
+    actionRequiredCount,
+  ]);
 
   return {
     programId,
@@ -1823,6 +2034,14 @@ export function useInvoiceDetails() {
     financeRequestSubmitting,
     closeFinanceRequestModal,
     submitFinanceRequest,
+    showNoaModal,
+    noaInvoiceId,
+    noaPreview,
+    noaLoading,
+    noaSubmitting,
+    noaReadOnly,
+    closeNoaModal,
+    submitNoticeOfAssignment,
     showApproveRejectModal,
     setShowApproveRejectModal,
     selectedInvoiceId,
@@ -1883,8 +2102,10 @@ export function useInvoiceDetails() {
     storedUserRole,
     userInfoFull,
     pendingCount,
+    pendingNoaCount,
     draftCount,
     actionRequiredCount,
+    canNoticeOfAssignment,
     summaryFocus,
     onSummaryFocusChange,
     listEmptyMessage,

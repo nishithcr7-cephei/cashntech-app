@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
   listCard: {
     backgroundColor: Colors.white,
     borderRadius: scaleWidth(12),
-    padding: scaleWidth(16),
+    padding: scaleWidth(12),
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E6E6E6',
     shadowColor: '#00000035',
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   cardHeaderArea: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: scaleHeight(12),
+    marginBottom: scaleHeight(8),
   },
   cardHeaderContainer: {
     flex: 1,
@@ -615,21 +615,23 @@ const styles = StyleSheet.create({
   infoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scaleWidth(12),
+    justifyContent: 'space-between',
+    rowGap: scaleHeight(8),
   },
   infoColumn: {
-    width: '47%',
+    width: '48.5%',
     backgroundColor: '#F7F8FB',
-    borderRadius: scaleWidth(10),
-    padding: scaleWidth(12),
+    borderRadius: scaleWidth(8),
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: scaleHeight(8),
   },
   infoLabel: {
-    fontSize: scaleFont(11),
+    fontSize: scaleFont(10),
     color: Colors.graybase,
-    marginBottom: scaleHeight(4),
+    marginBottom: scaleHeight(2),
   },
   infoValue: {
-    fontSize: scaleFont(13),
+    fontSize: scaleFont(12),
     color: Colors.darkblack,
     fontFamily: Fonts.GilroyMedium,
   },

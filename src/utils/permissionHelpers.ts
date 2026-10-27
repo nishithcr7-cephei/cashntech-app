@@ -1,8 +1,39 @@
+import type {AppRole} from '@constants/roles';
 import {
   deriveCapabilityFromUser,
   isMakerCapability,
+  normalizeRoleString,
+  toLegacyAppRole,
   type RoleNormalizeInput,
 } from '@utils/roleNormalizer';
+
+/**
+ * Program role from /user/scope ("Anchor All Access", "Vendor Maker", ...)
+ * → AppRole. Vendor maps to dealer_*. Null when the label is unrecognised.
+ */
+export function toProgramAppRole(
+  rawRole: string | null | undefined,
+): AppRole | null {
+  const capability = normalizeRoleString(rawRole);
+  return capability ? toLegacyAppRole(capability) : null;
+}
+
+/**
+ * Push → anchor maker / anchor all access; Pull → counterparty maker /
+ * counterparty all access. Checkers never create.
+ */
+export function canCreateInvoiceForMethod(
+  programMethod: string | null | undefined,
+  role: AppRole | null | undefined,
+): boolean {
+  if (programMethod === 'Push') {
+    return role === 'anchor_maker' || role === 'anchor_all_access';
+  }
+  if (programMethod === 'Pull') {
+    return role === 'dealer_maker' || role === 'dealer_all_access';
+  }
+  return false;
+}
 
 /**
  * Helper to determine if the "Create Invoice" button should be visible.

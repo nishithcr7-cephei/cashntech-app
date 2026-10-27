@@ -35,7 +35,7 @@ import SOAVendorsCombinedSummary from './SOAVendorsCombinedSummary';
 import {userSelector} from '@store/user';
 import {AppRole} from '@constants/roles';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
-import {getPartyLabels} from '@store/product/product.resolver';
+import {getPartyLabels, isSid} from '@store/product/product.resolver';
 import {formatIndianNumber} from '@utils/Utils';
 
 const formatTotalInr = (n: number) =>
@@ -49,8 +49,11 @@ export const SOADealerList: React.FC = () => {
   const routeProgramId = (route.params as any)?.programId || '';
   const routeProgramIds = (route.params as any)?.programIds;
   const programName = (route.params as any)?.programName || 'Program name';
+  const routePartyName = (route.params as any)?.partyName;
   const routeBankName = (route.params as any)?.bankName;
   const routeStatus = (route.params as any)?.status;
+  // Web SID: "Debtor List of {anchor party}"; fall back to program name.
+  const listOfName = routePartyName || programName;
   const userRole = useSelector(userSelector.getUserRole) as AppRole | null;
   const isDealerChecker = userRole === 'dealer_checker';
   const effectiveCode = useSelector(selectEffectiveProductCode);
@@ -59,6 +62,9 @@ export const SOADealerList: React.FC = () => {
     plural: partyLabelPlural,
     nameLabel: partyNameLabel,
   } = getPartyLabels(effectiveCode);
+  const isSidProduct = isSid(effectiveCode);
+  // SID web: Escrow Account; DF/VF/PID: Loan/OD Account
+  const odAccountLabel = isSidProduct ? 'Escrow Account' : 'Loan/OD Account';
 
   const selectedProgramIds = useMemo(
     () =>
@@ -104,21 +110,29 @@ export const SOADealerList: React.FC = () => {
   }, [dealerList]);
 
   useEffect(() => {
-    if (dealerError && (dealerError.toLowerCase().includes('token expired') || dealerError.toLowerCase().includes('unauthorized'))) {
+    if (!dealerError) {
+      return;
+    }
+    const lower = dealerError.toLowerCase();
+    if (lower.includes('token expired') || lower.includes('unauthorized')) {
       Toast.show({
         type: 'error',
         text1: 'Session Expired',
         text2: 'Your token has expired. Please log in again.',
         visibilityTime: 4000,
       });
-    } else if (dealerError) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: dealerError,
-      });
+      return;
     }
-  }, [dealerError]);
+    // SID: dealers 500 → empty list + summary card (no error toast; web parity).
+    if (isSidProduct) {
+      return;
+    }
+    Toast.show({
+      type: 'error',
+      text1: 'Error',
+      text2: dealerError,
+    });
+  }, [dealerError, isSidProduct]);
 
   useEffect(() => {
     if (
@@ -148,6 +162,7 @@ export const SOADealerList: React.FC = () => {
         fetchDealerListRequest({
           programIds: selectedProgramIds,
           isInitialLoad: true,
+          treatErrorAsEmpty: isSidProduct,
         }),
       );
       if (SHOW_SOA_VENDOR_LIST_PROGRAM_HEADER) {
@@ -161,7 +176,7 @@ export const SOADealerList: React.FC = () => {
     return () => {
       dispatch(resetDealerState());
     };
-  }, [dispatch, selectedProgramIds]);
+  }, [dispatch, selectedProgramIds, isSidProduct]);
 
   const renderDealerItem = ({item, index}: {item: any; index: number}) => {
     const isStatusActive = item.status?.toLowerCase() === 'active';
@@ -186,7 +201,7 @@ export const SOADealerList: React.FC = () => {
               <Text style={styles.infoValue}>{item.counterPartyName}</Text>
             </View>
             <View style={styles.infoColumn}>
-              <Text style={styles.infoLabel}>Loan/OD Account</Text>
+              <Text style={styles.infoLabel}>{odAccountLabel}</Text>
               <TouchableOpacity
                 disabled={!programId}
                 onPress={() =>
@@ -196,6 +211,7 @@ export const SOADealerList: React.FC = () => {
                     dealerName: item.counterPartyName,
                     creditAccount: item.odAccount,
                     anchor: programName,
+                    partyName: routePartyName,
                     bankName: routeBankName,
                     status: item.status || routeStatus,
                   })
@@ -332,17 +348,34 @@ export const SOADealerList: React.FC = () => {
       
       <View style={styles.pageTitleBar}>
         <Text style={styles.pageTitleText}>
-          {partyLabel} list of {programName}
+          {partyLabel} List of {listOfName}
         </Text>
       </View>
 
       <View style={styles.content}>
         {loading && <SkeletonList variant="card" count={4} />}
 
-        {!loading && dealerList.length === 0 && (
+        {!loading && dealerList.length === 0 && isSidProduct && (
+          <FlatList
+            style={styles.list}
+            data={[]}
+            renderItem={() => null}
+            keyExtractor={(_, index) => `sid-empty-${index}`}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContent}
+            ListHeaderComponent={renderListHeader}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No data</Text>
+              </View>
+            }
+          />
+        )}
+
+        {!loading && dealerList.length === 0 && !isSidProduct && (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              No {partyLabelPlural.toLowerCase()} found for {programName}
+              No {partyLabelPlural.toLowerCase()} found for {listOfName}
             </Text>
           </View>
         )}

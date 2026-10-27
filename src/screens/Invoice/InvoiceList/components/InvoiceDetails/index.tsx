@@ -25,11 +25,15 @@ import {LeftChevron} from '@assets/Icons';
 import {scaleWidth, scaleHeight} from '@utils/Scale';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {useInvoiceDetails} from './useInvoiceDetails';
-import {InvoiceDetailsControls} from './InvoiceDetailsControls';
+import {
+  InvoiceDetailsControls,
+  InvoiceListTitle,
+} from './InvoiceDetailsControls';
 import {InvoiceDetailsCard} from './InvoiceDetailsCard';
 import {SendForApprovalModal} from './SendForApprovalModal';
 import {InvoiceActionMenuModal} from './InvoiceActionMenuModal';
 import {FinanceRequestDetailsModal} from './FinanceRequestDetailsModal';
+import {NoticeOfAssignmentModal} from './NoticeOfAssignmentModal';
 import {styles} from './InvoiceDetails.styles';
 import {PRODUCT_CODES} from '@store/product/product.types';
 import {getPartyLabels} from '@store/product/product.resolver';
@@ -77,6 +81,13 @@ export const InvoiceDetails: React.FC = () => {
     financeRequestSubmitting,
     closeFinanceRequestModal,
     submitFinanceRequest,
+    showNoaModal,
+    noaPreview,
+    noaLoading,
+    noaSubmitting,
+    noaReadOnly,
+    closeNoaModal,
+    submitNoticeOfAssignment,
     showApproveRejectModal,
     setShowApproveRejectModal,
     selectedInvoiceId,
@@ -133,8 +144,10 @@ export const InvoiceDetails: React.FC = () => {
     storedUserRole,
     userInfoFull,
     pendingCount,
+    pendingNoaCount,
     draftCount,
     actionRequiredCount,
+    canNoticeOfAssignment,
     summaryFocus,
     onSummaryFocusChange,
     listEmptyMessage,
@@ -191,46 +204,36 @@ export const InvoiceDetails: React.FC = () => {
     menuButtonRefs.current[id] = ref;
   };
 
-  return (
-    <Container>
-      <AppBar
-        title="Transactions > Invoice List & Approval"
-        navigation={navigation as any}
-        hideHamburger={(isAnchorMaker || isAnchorChecker || isDealerMaker || isCashnTechUser) && fromInvoiceDashboard}
-        renderLeftIcon={fromInvoiceDashboard ? <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} /> : undefined}
-        onPressLeftIcon={fromInvoiceDashboard ? () => navigation.goBack() : undefined}
-        style={{zIndex: 10}}
-      />
+  const breadcrumbHeader = (
+    <>
       <ProgramBreadcrumb />
       <View style={styles.navPathContainer}>
         <Text style={styles.navPathText} numberOfLines={1} ellipsizeMode="tail">
           Products {'>'} {productBreadcrumbLabel} {'>'} Transactions
         </Text>
       </View>
-      {/* Removed Selected Program Row as requested */}
-      {!hasAnyProgramContext ? (
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>
-              Select a program first to view invoice list.
-            </Text>
-          </View>
-        </ScrollView>
-      ) : (
-        <>
-          <View style={styles.controlsOutsideList}>
+    </>
+  );
+
+  const listHeaderTitle =
+    summaryFocus === 'pending'
+      ? 'Pending Invoices'
+      : summaryFocus === 'pendingNoa'
+        ? 'Pending Notice of Assignment'
+        : summaryFocus === 'draft'
+          ? 'Draft Invoices'
+          : summaryFocus === 'actionRequired'
+            ? 'Action Required'
+            : dealerListTitle;
+
+  const renderControls = (hideListTitle: boolean) => (
+    <View style={styles.controlsOutsideList}>
             <InvoiceDetailsControls
               dealerListTitle={dealerListTitle}
+              programTitle={programName}
               invoiceCount={filteredData.length}
-              listHeaderTitle={
-                summaryFocus === 'pending'
-                  ? 'Pending Invoices'
-                  : summaryFocus === 'draft'
-                    ? 'Draft Invoices'
-                    : summaryFocus === 'actionRequired'
-                      ? 'Action Required'
-                      : dealerListTitle
-              }
+              listHeaderTitle={listHeaderTitle}
+              hideListTitle={hideListTitle}
               isDealerMaker={isDealerMaker}
               isAnchorMaker={isAnchorMaker}
               isAnchorChecker={isAnchorChecker}
@@ -253,6 +256,7 @@ export const InvoiceDetails: React.FC = () => {
               user={userInfoFull}
               actionRequiredCount={actionRequiredCount}
               pendingCount={pendingCount}
+              pendingNoaCount={pendingNoaCount}
               draftCount={draftCount}
               summaryFocus={summaryFocus}
               onSummaryFocusChange={onSummaryFocusChange}
@@ -260,14 +264,57 @@ export const InvoiceDetails: React.FC = () => {
               onBulkAction={handleBulkAction}
               canEdit={canEdit}
               canImport={canImport}
+              canNoticeOfAssignment={canNoticeOfAssignment}
               onRefresh={refreshInvoiceList}
               listRefreshing={invoiceListLoading}
               showSearchAndFilter={invoiceData.length > 0 && !invoiceListError}
             />
             <View style={styles.listTopSeparator} />
-          </View>
+    </View>
+  );
 
+  type ListEntry =
+    | {kind: 'controls'; id: string}
+    | {kind: 'title'; id: string}
+    | {kind: 'empty'; id: string}
+    | {kind: 'row'; id: string; row: (typeof paginatedData)[number]};
+
+  // Index 0 is ListHeaderComponent (breadcrumb), so controls sit at sticky index 1.
+  const listEntries: ListEntry[] = [
+    {kind: 'controls', id: '__controls__'},
+    {kind: 'title', id: '__title__'},
+    ...(paginatedData.length > 0
+      ? paginatedData.map(row => ({kind: 'row' as const, id: row.id, row}))
+      : [{kind: 'empty' as const, id: '__empty__'}]),
+  ];
+
+  return (
+    <Container>
+      <AppBar
+        title="Transactions > Invoice List & Approval"
+        navigation={navigation as any}
+        hideHamburger={(isAnchorMaker || isAnchorChecker || isDealerMaker || isCashnTechUser) && fromInvoiceDashboard}
+        renderLeftIcon={fromInvoiceDashboard ? <LeftChevron width={scaleWidth(18)} height={scaleHeight(18)} /> : undefined}
+        onPressLeftIcon={fromInvoiceDashboard ? () => navigation.goBack() : undefined}
+        style={{zIndex: 10}}
+      />
+      {!hasAnyProgramContext ? (
+        <>
+          {breadcrumbHeader}
+          <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                Select a program first to view invoice list.
+              </Text>
+            </View>
+          </ScrollView>
+        </>
+      ) : (
+        <>
           {invoiceListError ? (
+            <>
+            {breadcrumbHeader}
+            {renderControls(false)}
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={styles.content}>
@@ -295,24 +342,64 @@ export const InvoiceDetails: React.FC = () => {
                 </TouchableOpacity>
               </View>
             </ScrollView>
+            </>
           ) : invoiceListLoading && invoiceData.length === 0 ? (
-            <View style={styles.skeletonContainer}>
-              <SkeletonList variant="grid" count={4} />
-            </View>
+            <>
+              {breadcrumbHeader}
+              {renderControls(false)}
+              <View style={styles.skeletonContainer}>
+                <SkeletonList variant="grid" count={4} />
+              </View>
+            </>
           ) : (
             <>
               <FlatList
                 style={styles.scroll}
-                contentContainerStyle={styles.content}
-                data={paginatedData}
-                keyExtractor={row => row.id}
-                ItemSeparatorComponent={() => (
-                  <View style={{height: scaleHeight(12)}} />
-                )}
-                renderItem={({item: row, index}) => (
+                contentContainerStyle={styles.listContent}
+                data={listEntries}
+                keyExtractor={entry => entry.id}
+                ListHeaderComponent={breadcrumbHeader}
+                stickyHeaderIndices={[1]}
+                keyboardShouldPersistTaps="handled"
+                ItemSeparatorComponent={({leadingItem}: {leadingItem?: ListEntry}) =>
+                  leadingItem?.kind === 'row' ? (
+                    <View style={{height: scaleHeight(10)}} />
+                  ) : null
+                }
+                renderItem={({item: entry, index}) => {
+                  if (entry.kind === 'controls') {
+                    return renderControls(true);
+                  }
+                  if (entry.kind === 'title') {
+                    return (
+                      <View style={styles.listTitleItem}>
+                        <InvoiceListTitle
+                          title={listHeaderTitle}
+                          count={filteredData.length}
+                        />
+                      </View>
+                    );
+                  }
+                  if (entry.kind === 'empty') {
+                    if (invoiceListLoading) {
+                      return (
+                        <View style={styles.listItem}>
+                          <SkeletonList variant="grid" count={4} />
+                        </View>
+                      );
+                    }
+                    return filteredData.length === 0 ? (
+                      <View style={styles.loadingContainer}>
+                        <Text style={styles.loadingText}>{listEmptyMessage}</Text>
+                      </View>
+                    ) : null;
+                  }
+                  const row = entry.row;
+                  return (
+                  <View style={styles.listItem}>
                   <InvoiceDetailsCard
                     row={row}
-                    index={index}
+                    index={index - 2}
                     isAnchorMaker={isAnchorMaker}
                     isDealerMaker={isDealerMaker}
                     isDealerChecker={isDealerChecker}
@@ -336,16 +423,9 @@ export const InvoiceDetails: React.FC = () => {
                     isSelectable={isInvoiceSelectable(row)}
                     showBulkCheckbox={isVfAnchorMaker}
                   />
-                )}
-                ListEmptyComponent={
-                  invoiceListLoading ? (
-                    <SkeletonList variant="grid" count={4} />
-                  ) : filteredData.length === 0 ? (
-                    <View style={styles.loadingContainer}>
-                      <Text style={styles.loadingText}>{listEmptyMessage}</Text>
-                    </View>
-                  ) : null
-                }
+                  </View>
+                  );
+                }}
                 onEndReached={hasMore ? loadMore : undefined}
                 onEndReachedThreshold={0.3}
                 onScrollBeginDrag={() => {
@@ -422,6 +502,17 @@ export const InvoiceDetails: React.FC = () => {
         preview={financeRequestPreview}
         productCode={effectiveProductCode}
         onSubmit={submitFinanceRequest}
+      />
+
+      <NoticeOfAssignmentModal
+        visible={showNoaModal}
+        onClose={closeNoaModal}
+        loading={noaLoading}
+        submitting={noaSubmitting}
+        readOnly={noaReadOnly}
+        preview={noaPreview}
+        productCode={effectiveProductCode}
+        onSubmit={submitNoticeOfAssignment}
       />
 
       <ApproveRejectModal
@@ -559,7 +650,12 @@ export const InvoiceDetails: React.FC = () => {
       />
 
       <BusyOverlay
-        visible={actionBusy || bulkLoading || financeRequestSubmitting}
+        visible={
+          actionBusy ||
+          bulkLoading ||
+          financeRequestSubmitting ||
+          noaSubmitting
+        }
         message={
           actionBusy
             ? actionBusyMessage
@@ -567,7 +663,9 @@ export const InvoiceDetails: React.FC = () => {
               ? 'Updating invoices…'
               : financeRequestSubmitting
                 ? 'Submitting finance request…'
-                : 'Please wait…'
+                : noaSubmitting
+                  ? 'Serving notice of assignment…'
+                  : 'Please wait…'
         }
       />
     </Container>

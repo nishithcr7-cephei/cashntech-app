@@ -41,6 +41,7 @@ import {
   getProductFullDisplayName,
   getProductNavLabel,
   hasCompactNavLabel,
+  isProductNavLocked,
   uniqueProductsByCode,
 } from '@store/product/product.resolver';
 import {PRODUCT_CODES, PRODUCT_DISPLAY_NAMES, ResolvedProduct} from '@store/product/product.types';
@@ -368,6 +369,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
     branchIndex: number,
   ): DrawerMenuNode => {
     const isActiveProductBranch = product.code === effectiveProductCode;
+    const navLocked = isProductNavLocked(product.code);
 
     const transactionsChildren: DrawerMenuNode[] = [
       {
@@ -375,6 +377,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
         label: 'Invoice Overview',
         route: 'InvoiceDashboard',
         visible: canViewTransactionsSection && canViewOverview,
+        disabled: navLocked,
         productContext: product,
         isActive:
           isActiveProductBranch &&
@@ -385,7 +388,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
         label: 'Invoice List & Approvals',
         route: 'InvoiceDetails',
         visible: canViewTransactionsSection && canViewInvoices,
-        disabled: permissionsLoading,
+        disabled: permissionsLoading || navLocked,
         productContext: product,
         isActive:
           isActiveProductBranch &&
@@ -398,7 +401,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
         label: 'Disbursement',
         route: 'DisbursementScreen',
         visible: canViewTransactionsSection && canViewDisbursement,
-        disabled: permissionsLoading,
+        disabled: permissionsLoading || navLocked,
         productContext: product,
         isActive: isActiveProductBranch && currentRoute === 'DisbursementScreen',
       },
@@ -407,7 +410,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
         label: 'Interest Accruals',
         visible: canViewTransactionsSection,
         route: 'InterestAccrualsScreen',
-        disabled: permissionsLoading || !canViewInterestAccruals,
+        disabled: permissionsLoading || !canViewInterestAccruals || navLocked,
         productContext: product,
         isActive: isActiveProductBranch && currentRoute === 'InterestAccrualsScreen',
       },
@@ -416,7 +419,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
         label: 'Repayment & Settlement',
         visible: canViewTransactionsSection,
         route: 'RepaymentSettlementScreen',
-        disabled: permissionsLoading || !canViewRepayment,
+        disabled: permissionsLoading || !canViewRepayment || navLocked,
         productContext: product,
         isActive: isActiveProductBranch && currentRoute === 'RepaymentSettlementScreen',
       },
@@ -425,7 +428,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
         label: 'DPD / Penal Interest / NPA',
         visible: canViewTransactionsSection,
         route: 'DPDPenalInterestNPAScreen',
-        disabled: !canViewDPD,
+        disabled: !canViewDPD || navLocked,
         productContext: product,
         isActive: isActiveProductBranch && currentRoute === 'DPDPenalInterestNPAScreen',
       },
@@ -434,7 +437,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
         label: 'Statement of Account (SOA)',
         visible: canViewTransactionsSection,
         route: 'StatementOfAccount',
-        disabled: !canViewSOA,
+        disabled: !canViewSOA || navLocked,
         productContext: product,
         isActive: isActiveProductBranch && currentRoute === 'StatementOfAccount',
       },
@@ -444,6 +447,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       {
         key: `transactions-${product.code}`,
         label: 'Transactions',
+        disabled: navLocked,
         icon: (
           <File
             height={scaleHeight(22)}
@@ -486,6 +490,7 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
       label: getProductNavLabel(product.code),
       fullLabel: hasCompactNavLabel(product.code) ? fullName : undefined,
       icon: getProductBranchIcon(product.code, isActiveProductBranch),
+      disabled: navLocked,
       isActiveProductBranch,
       isInactiveProductBranch: hasMultipleProducts && !isActiveProductBranch,
       showSeparatorBefore: branchIndex > 0,
@@ -557,6 +562,9 @@ export const DrawerContent = ({navigation}: DrawerContentComponentProps) => {
 
   const handleMenuNavigate = (node: DrawerMenuNode) => {
     if (node.disabled || !node.route) {
+      return;
+    }
+    if (isProductNavLocked(node.productContext?.code)) {
       return;
     }
     if (node.productContext && node.productContext.code !== activeProductCode) {

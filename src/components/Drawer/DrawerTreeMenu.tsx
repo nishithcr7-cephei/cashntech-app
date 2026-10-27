@@ -104,25 +104,37 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
           const hasChildren = !!node.children && node.children.length > 0;
 
           if (hasChildren) {
-            const isOpen = !!expandedKeys[node.key];
+            const isOpen = !!expandedKeys[node.key] && !node.disabled;
             return (
               <View
                 key={node.key}
                 style={node.showSeparatorBefore ? styles.productBranchWrapper : undefined}>
                 {node.showSeparatorBefore ? <View style={styles.productSeparator} /> : null}
                 <TouchableOpacity
-                  style={getParentRowStyle(node, isOpen)}
-                  onPress={() => onToggle(node.key)}>
+                  style={[
+                    getParentRowStyle(node, isOpen),
+                    node.disabled && styles.disabledMenuItem,
+                  ]}
+                  disabled={node.disabled}
+                  activeOpacity={node.disabled ? 1 : 0.7}
+                  onPress={() => {
+                    if (!node.disabled) {
+                      onToggle(node.key);
+                    }
+                  }}>
                   <View style={styles.rowCenter}>
                     {node.icon ? <View style={styles.iconBox}>{node.icon}</View> : null}
                     <Text
                       numberOfLines={2}
                       ellipsizeMode="tail"
                       accessibilityLabel={node.fullLabel ?? node.label}
-                      style={getParentTextStyle(node, isOpen)}>
+                      style={[
+                        getParentTextStyle(node, isOpen),
+                        node.disabled && styles.disabledMenuItemText,
+                      ]}>
                       {node.label}
                     </Text>
-                    {node.fullLabel ? (
+                    {node.fullLabel && !node.disabled ? (
                       <TouchableOpacity
                         style={styles.infoButton}
                         hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
@@ -138,9 +150,11 @@ export const DrawerTreeMenu: React.FC<DrawerTreeMenuProps> = ({
                       </TouchableOpacity>
                     ) : null}
                   </View>
-                  <View style={styles.arrowContainer}>
-                    <UpChevron rotation={isOpen ? 0 : 180} />
-                  </View>
+                  {!node.disabled ? (
+                    <View style={styles.arrowContainer}>
+                      <UpChevron rotation={isOpen ? 0 : 180} />
+                    </View>
+                  ) : null}
                 </TouchableOpacity>
 
                 {isOpen && (

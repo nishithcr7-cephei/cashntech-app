@@ -5,7 +5,7 @@ type ActionableRow = {
   rawApprovalStatus?: string | null;
   rawAdminStatus?: string | null;
   rawInvoiceStatus?: string | null;
-  /** Workflow step action — Approve | Finance Request | Verify | Upload */
+  /** Workflow step action — Approve | Finance Request | Notice of Assignment | Verify | Upload */
   currentStepActionType?: string | null;
 };
 
@@ -27,6 +27,15 @@ function isFinanceRequestStep(row: ActionableRow): boolean {
     return false;
   }
   return normalizeStepActionType(actionType) === 'finance request';
+}
+
+/** SID workflow step that replaces Finance Request for serving NOA. */
+export function isNoticeOfAssignmentStep(row: ActionableRow): boolean {
+  const actionType = row.currentStepActionType;
+  if (!actionType?.trim()) {
+    return false;
+  }
+  return normalizeStepActionType(actionType) === 'notice of assignment';
 }
 
 export type InvoiceEditRow = ActionableRow & {
@@ -109,6 +118,7 @@ export function canShowCashnTechInvoiceVerification(
 /**
  * Finance Request menu — actionable && finance_request permission.
  * Not shown to CashnTech admin (Vendor/Dealer makers raise finance request).
+ * Hidden when current step is Notice of Assignment (mutual exclusion with NOA).
  */
 export function canShowFinanceRequest(
   row: ActionableRow,
@@ -118,9 +128,60 @@ export function canShowFinanceRequest(
   if (options?.isCashnTechUser) {
     return false;
   }
+  if (isNoticeOfAssignmentStep(row)) {
+    return false;
+  }
   return (
     canFinanceRequest && row.actionable === true && isFinanceRequestStep(row)
   );
+}
+
+/**
+ * Notice of Assignment menu (SID) — actionable && notice_of_assignment permission.
+ * Not shown to CashnTech admin (maker action). Mutually exclusive with Finance Request.
+ */
+export function canShowNoticeOfAssignment(
+  row: ActionableRow,
+  canNoticeOfAssignment: boolean,
+  options?: {isCashnTechUser?: boolean},
+): boolean {
+  if (options?.isCashnTechUser) {
+    return false;
+  }
+  return (
+    canNoticeOfAssignment &&
+    row.actionable === true &&
+    isNoticeOfAssignmentStep(row)
+  );
+}
+
+/**
+ * View Notice of Assignment (read-only) — SID makers with permission when not
+ * currently on the serve step. Tap fetches consent; toast if none yet.
+ */
+export function canShowViewNoticeOfAssignment(
+  row: ActionableRow,
+  canNoticeOfAssignment: boolean,
+  options?: {isCashnTechUser?: boolean; isSidWorkspace?: boolean},
+): boolean {
+  if (!canNoticeOfAssignment || options?.isCashnTechUser) {
+    return false;
+  }
+  if (!options?.isSidWorkspace) {
+    return false;
+  }
+  if (canShowNoticeOfAssignment(row, canNoticeOfAssignment, options)) {
+    return false;
+  }
+  const status = (row.rawInvoiceStatus || '').trim().toLowerCase();
+  if (
+    ['draft', 'pending attachment', 'attachment pending', 'rejected'].includes(
+      status,
+    )
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -245,6 +306,11 @@ export function isInvoiceBulkSelectable(
     canBulkActions?: boolean;
   },
 ): boolean {
+  // Generic bulk status cannot complete Notice of Assignment (needs consent API).
+  if (isNoticeOfAssignmentStep(row)) {
+    return false;
+  }
+
   const adminBulkOk = context.canAdminBulk ?? context.canVerify;
   const partyBulkOk =
     context.canBulkActions !== undefined
@@ -301,11 +367,17 @@ type PendingApprovalDotContext = {
 /**
  * Same rules as invoice-list "Pending Invoice Approval" badge count.
  * Count only invoices waiting on this user's turn (actionable / pending role).
+ * Notice of Assignment has its own chip — do not treat as approval-pending
+ * (avoids pending-first sort jumping NOA rows above Sr. 1 after chip clear).
  */
 export function isPendingInvoiceApprovalRow(
   row: ActionableRow,
   context: PendingApprovalDotContext,
 ): boolean {
+  if (isNoticeOfAssignmentStep(row)) {
+    return false;
+  }
+
   if (context.isCashnTechUser) {
     return isCashnTechPendingRow(row, !!context.canVerify);
   }

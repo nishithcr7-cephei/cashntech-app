@@ -34,7 +34,9 @@ import {
 } from './selector';
 import {selectEffectiveProductCode} from '@store/product/product.selectors';
 import {
-  isStandaloneProduct,
+  getPartyLabels,
+  isPid,
+  isSid,
   usesVendorPartyLabels,
   usesVendorPartyLayout,
 } from '@store/product/product.resolver';
@@ -74,25 +76,23 @@ export const CreditAccountDetails: React.FC = () => {
   const id = (route.params as any)?.id;
   const programId = (route.params as any)?.programId;
   const effectiveProductCode = useSelector(selectEffectiveProductCode);
-  // StatementOfAccount routes PID + SID here at program/anchor level.
-  const isPidProduct = isStandaloneProduct(effectiveProductCode);
+  // PID only: StatementOfAccount opens this at program/anchor level.
+  // SID opens via Debtor list (SOADealerList) — same as DF/VF counterparty path.
+  const isPidProduct = isPid(effectiveProductCode);
+  const isSidProduct = isSid(effectiveProductCode);
+  const partyLabels = getPartyLabels(effectiveProductCode);
   const vendorPartyLabels = usesVendorPartyLayout(effectiveProductCode);
-  const anchorRepaysVendor = usesVendorPartyLabels(effectiveProductCode);
+  const anchorRepaysVendor =
+    usesVendorPartyLabels(effectiveProductCode) || isSidProduct;
   const dealerName =
     (route.params as any)?.dealerName ||
-    (isPidProduct ? 'Anchor' : vendorPartyLabels ? 'Vendor' : 'Dealer');
+    (isPidProduct ? 'Anchor' : partyLabels.singular);
   const programName = (route.params as any)?.anchor || 'Program';
-  // PID SOA is program/anchor level (web parity); VF/DF use counterparty labels.
-  const partyLabel = isPidProduct
-    ? 'Anchor'
-    : vendorPartyLabels
-      ? 'Vendor Name'
-      : 'Dealer Name';
+  // PID: Anchor; SID/VF/DF: getPartyLabels (Debtor / Vendor Name / Dealer Name).
+  const partyLabel = isPidProduct ? 'Anchor' : partyLabels.nameLabel;
   const emptyPartyLabel = isPidProduct
     ? 'OD accounts'
-    : vendorPartyLabels
-      ? 'vendors'
-      : 'dealers';
+    : partyLabels.plural.toLowerCase();
   const invoiceRefLabel = vendorPartyLabels ? 'Invoice Ref. No' : 'Invoice Number';
   const disbursementDateLabel = 'Disbursement Date';
   const sanctionedAmountLabel = vendorPartyLabels
@@ -110,6 +110,7 @@ export const CreditAccountDetails: React.FC = () => {
     (navigation as any).navigate('SOADealerList', {
       programId,
       programName,
+      partyName: (route.params as any)?.partyName,
       bankName: (route.params as any)?.bankName,
       status: (route.params as any)?.status,
     });

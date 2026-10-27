@@ -28,6 +28,14 @@ export const PRODUCT_NAV_LABELS: Record<ProductCode, string> = {
   [PRODUCT_CODES.SALES_INVOICE_DISCOUNTING]: 'SID',
 };
 
+/** Short codes for the sticky product chip on transaction lists. */
+export const PRODUCT_SHORT_LABELS: Record<ProductCode, string> = {
+  [PRODUCT_CODES.DEALER_FINANCE]: 'DF',
+  [PRODUCT_CODES.VENDOR_FINANCE]: 'VF',
+  [PRODUCT_CODES.PURCHASE_INVOICE_DISCOUNTING]: 'PID',
+  [PRODUCT_CODES.SALES_INVOICE_DISCOUNTING]: 'SID',
+};
+
 /** Canonical default when no product context is set (preserves DF production behavior). */
 export const DEFAULT_PRODUCT_CODE: ProductCode = PRODUCT_CODES.DEALER_FINANCE;
 

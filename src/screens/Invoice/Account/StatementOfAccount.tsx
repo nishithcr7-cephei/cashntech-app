@@ -26,7 +26,7 @@ import {
   selectEffectiveProductCode,
 } from '@store/product/product.selectors';
 import {PRODUCT_DISPLAY_NAMES} from '@store/product/product.types';
-import {isStandaloneProduct} from '@store/product/product.resolver';
+import {isPid} from '@store/product/product.resolver';
 
 export const StatementOfAccount: React.FC = () => {
   const navigation = useNavigation();
@@ -35,7 +35,8 @@ export const StatementOfAccount: React.FC = () => {
   const activeProductName = useSelector(selectActiveProductName);
   const activeProductId = useSelector(selectActiveProductId);
   const effectiveProductCode = useSelector(selectEffectiveProductCode);
-  const isPidSoa = isStandaloneProduct(effectiveProductCode);
+  // PID only: program-level SOA (skip counterparty list). SID uses Debtor list like web.
+  const isPidSoa = isPid(effectiveProductCode);
   const primaryPartyLabel = 'Primary Party';
   const productBreadcrumbLabel =
     activeProductName || PRODUCT_DISPLAY_NAMES[effectiveProductCode];
@@ -91,7 +92,8 @@ export const StatementOfAccount: React.FC = () => {
               <Text style={styles.infoLabel}>Bank Name</Text>
               <TouchableOpacity
                 onPress={() => {
-                  // PID/standalone: program-level SOA tabs (web parity) — skip vendor list.
+                  // PID only: program-level SOA tabs (web parity) — skip vendor list.
+                  // SID goes to Debtor list (SOADealerList), same as DF/VF counterparty list.
                   if (isPidSoa && item.programId) {
                     (navigation as any).navigate('CreditAccountDetails', {
                       id: item.programId,

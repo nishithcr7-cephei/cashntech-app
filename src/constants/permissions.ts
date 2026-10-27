@@ -49,6 +49,8 @@ export const PERMISSIONS = {
   VF_CREATE_INVOICE: 'invoice_list.create_invoice',
   INVOICE_LIST_ADMIN_VERIFICATION: 'invoice_list.invoice_verification',
   INVOICE_LIST_FINANCE_REQUEST: 'invoice_list.finance_request',
+  /** SID workflow — POST /invoice/notice-of-assignment/:id (not generic status). */
+  INVOICE_LIST_NOTICE_OF_ASSIGNMENT: 'invoice_list.notice_of_assignment',
   INVOICE_LIST_UPLOAD_VERIFY: 'invoice_list.upload_verify',
   VF_INVOICE_LIST_UPLOAD_VERIFY: 'invoice_list.upload_verify',
   /** PATCH /invoice/bulk/status (PermissionGuard). */

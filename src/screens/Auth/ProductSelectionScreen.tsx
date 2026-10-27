@@ -16,7 +16,10 @@ import {useDispatch, useSelector} from 'react-redux';
 import {selectAvailableProducts} from '@store/product/product.selectors';
 import {setActiveProduct} from '@store/product/product.slice';
 import type {ResolvedProduct} from '@store/product/product.types';
-import {uniqueProductsByCode} from '@store/product/product.resolver';
+import {
+  isProductNavLocked,
+  uniqueProductsByCode,
+} from '@store/product/product.resolver';
 import {ProductSelectionRow} from './components/ProductSelectionRow';
 
 type ProductSelectionScreenProps = NativeStackScreenProps<
@@ -44,25 +47,36 @@ export const ProductSelectionScreen = ({
   );
 
   const completeSignIn = (product: ResolvedProduct) => {
+    if (isProductNavLocked(product.code)) {
+      return;
+    }
     dispatch(setActiveProduct(product));
     // Stay in auth stack — Select Program comes next, then login completes there.
     navigation.replace('SelectProgramScreen');
   };
 
   const onConfirm = () => {
-    if (!selected) {
+    if (!selected || isProductNavLocked(selected.code)) {
       return;
     }
     completeSignIn(selected);
   };
 
-  const renderProductRow = ({item}: {item: ResolvedProduct}) => (
-    <ProductSelectionRow
-      product={item}
-      selected={selected?.code === item.code}
-      onPress={() => setSelected(item)}
-    />
-  );
+  const renderProductRow = ({item}: {item: ResolvedProduct}) => {
+    const locked = isProductNavLocked(item.code);
+    return (
+      <ProductSelectionRow
+        product={item}
+        selected={selected?.code === item.code}
+        disabled={locked}
+        onPress={() => {
+          if (!locked) {
+            setSelected(item);
+          }
+        }}
+      />
+    );
+  };
 
   return (
     <Container>

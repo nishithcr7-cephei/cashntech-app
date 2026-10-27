@@ -52,8 +52,8 @@ function mapSummaryAmounts(raw: any): ProgramSummaryAmounts {
 function* fetchDealerListWorker(
   action: PayloadAction<FetchDealerListRequest>,
 ): Generator<any, void, any> {
+  const {programIds, treatErrorAsEmpty} = action.payload;
   try {
-    const {programIds} = action.payload;
     const url = `${API_URL}/${Endpoints.apiProgramDealersList}`;
     const response = yield call(
       axiosInstance.post as any,
@@ -114,6 +114,8 @@ function* fetchDealerListWorker(
           total,
         }),
       );
+    } else if (treatErrorAsEmpty) {
+      yield put(fetchDealerListSuccess({data: [], total: 0}));
     } else {
       yield put(
         fetchDealerListFailure(
@@ -122,7 +124,16 @@ function* fetchDealerListWorker(
       );
     }
   } catch (error: any) {
-    yield put(fetchDealerListFailure(error?.message || 'Something went wrong'));
+    const message = error?.message || 'Something went wrong';
+    const isSessionError =
+      message.toLowerCase().includes('token expired') ||
+      message.toLowerCase().includes('unauthorized') ||
+      message.toLowerCase().includes('session expired');
+    if (treatErrorAsEmpty && !isSessionError) {
+      yield put(fetchDealerListSuccess({data: [], total: 0}));
+      return;
+    }
+    yield put(fetchDealerListFailure(message));
   }
 }
 

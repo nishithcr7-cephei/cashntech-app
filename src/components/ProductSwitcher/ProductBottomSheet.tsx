@@ -17,7 +17,10 @@ import {
   selectAvailableProducts,
 } from '@store/product/product.selectors';
 import {ResolvedProduct} from '@store/product/product.types';
-import {uniqueProductsByCode} from '@store/product/product.resolver';
+import {
+  isProductNavLocked,
+  uniqueProductsByCode,
+} from '@store/product/product.resolver';
 import {useSwitchProductWorkspace} from '@hooks/useSwitchProductWorkspace';
 import {ProductIcon} from './ProductIcon';
 
@@ -36,6 +39,9 @@ export const ProductBottomSheet: React.FC<ProductBottomSheetProps> = ({
   const products = uniqueProductsByCode(availableProducts);
 
   const handleSelect = (product: ResolvedProduct) => {
+    if (isProductNavLocked(product.code)) {
+      return;
+    }
     if (product.code !== activeProductCode) {
       switchProductWorkspace(product);
     }
@@ -44,27 +50,38 @@ export const ProductBottomSheet: React.FC<ProductBottomSheetProps> = ({
 
   const renderRow = ({item}: {item: ResolvedProduct}) => {
     const isActive = item.code === activeProductCode;
+    const locked = isProductNavLocked(item.code);
     return (
       <TouchableOpacity
-        style={[styles.row, isActive && styles.rowActive]}
+        style={[
+          styles.row,
+          isActive && !locked && styles.rowActive,
+          locked && styles.rowDisabled,
+        ]}
         onPress={() => handleSelect(item)}
-        activeOpacity={0.7}>
+        disabled={locked}
+        activeOpacity={locked ? 1 : 0.7}
+        accessibilityState={{disabled: locked}}>
         <View style={styles.rowIcon}>
           <ProductIcon
             code={item.code}
             size={scaleHeight(18)}
-            color={isActive ? Colors.primaryColor : '#7A7C82'}
+            color={locked ? '#B0B0B0' : isActive ? Colors.primaryColor : '#7A7C82'}
           />
         </View>
         <Text
-          style={[styles.rowTitle, isActive && styles.rowTitleActive]}
+          style={[
+            styles.rowTitle,
+            isActive && !locked && styles.rowTitleActive,
+            locked && styles.rowTitleDisabled,
+          ]}
           numberOfLines={1}
           ellipsizeMode="tail">
           {item.name}
         </Text>
-        {isActive && (
+        {isActive && !locked ? (
           <RightCheckmark height={scaleHeight(12)} width={scaleWidth(12)} color={Colors.primaryColor} />
-        )}
+        ) : null}
       </TouchableOpacity>
     );
   };
@@ -136,6 +153,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF5F5',
     borderColor: '#FFD9D9',
   },
+  rowDisabled: {
+    opacity: 0.5,
+    backgroundColor: '#F5F5F5',
+    borderColor: '#E8E8E8',
+  },
   rowIcon: {
     width: scaleWidth(24),
     marginRight: scaleWidth(12),
@@ -150,5 +172,8 @@ const styles = StyleSheet.create({
   },
   rowTitleActive: {
     color: Colors.primaryColor,
+  },
+  rowTitleDisabled: {
+    color: '#9E9E9E',
   },
 });

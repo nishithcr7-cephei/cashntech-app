@@ -22,9 +22,13 @@ import {
   canShowFinanceRequest,
   canShowInvoiceListDelete,
   canShowInvoiceListEdit,
+  canShowNoticeOfAssignment,
+  canShowViewNoticeOfAssignment,
   canShowWorkflowApproveReject,
   INVOICE_DELETE_ENABLED,
 } from '@utils/invoiceListActionable';
+import {isSid} from '@store/product/product.resolver';
+import {selectEffectiveProductCode} from '@store/product/product.selectors';
 
 /**
  * Visibility and Actionability Logic for "Manage Attachment"
@@ -143,6 +147,11 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
   const canAttachment = useHasPermission(PERMISSIONS.INVOICE_LIST_ATTACHMENT);
   const canVerify = useHasPermission(PERMISSIONS.INVOICE_LIST_ADMIN_VERIFICATION);
   const canFinanceRequest = useHasPermission(PERMISSIONS.INVOICE_LIST_FINANCE_REQUEST);
+  const canNoticeOfAssignment = useHasPermission(
+    PERMISSIONS.INVOICE_LIST_NOTICE_OF_ASSIGNMENT,
+  );
+  const effectiveProductCode = useSelector(selectEffectiveProductCode);
+  const isSidWorkspace = isSid(effectiveProductCode);
 
   const userInfo = useSelector(userSelector.getUserInfo);
 
@@ -213,6 +222,18 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
     actionRow,
     canFinanceRequest,
     {isCashnTechUser},
+  );
+
+  const showNoticeOfAssignment = canShowNoticeOfAssignment(
+    actionRow,
+    canNoticeOfAssignment,
+    {isCashnTechUser},
+  );
+
+  const showViewNoticeOfAssignment = canShowViewNoticeOfAssignment(
+    actionRow,
+    canNoticeOfAssignment,
+    {isCashnTechUser, isSidWorkspace},
   );
 
   const handleDeleteMenuPress = () => {
@@ -294,6 +315,58 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                       Finance Request
                     </Text>
                     <Text style={styles.menuSubText}>Raise disbursement request</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+
+              {/* SID: Anchor Maker serves Notice of Assignment (replaces Finance Request on that step) */}
+              {(isAnchorMaker || isDealerMaker) && showNoticeOfAssignment && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() => onMenuAction('noticeOfAssignment', openMenuId)}
+                  style={[styles.menuItem, permissionsLoading && styles.menuItemDisabled]}>
+                  <FontAwesome6 name="file-lines" iconStyle="regular" color="#0085FF" size={16} />
+                  <View style={styles.menuItemTextBlock}>
+                    <Text
+                      style={[
+                        styles.menuText,
+                        styles.menuTextAction,
+                        permissionsLoading && styles.menuTextDisabled,
+                      ]}>
+                      Notice of Assignment
+                    </Text>
+                    <Text style={styles.menuSubText}>Serve notice to debtor</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+
+              {/* SID: view recorded consent after NOA was served */}
+              {(isAnchorMaker || isDealerMaker) && showViewNoticeOfAssignment && (
+                <TouchableOpacity
+                  disabled={permissionsLoading}
+                  onPress={() =>
+                    onMenuAction('viewNoticeOfAssignment', openMenuId)
+                  }
+                  style={[
+                    styles.menuItem,
+                    permissionsLoading && styles.menuItemDisabled,
+                  ]}>
+                  <FontAwesome6
+                    name="eye"
+                    iconStyle="regular"
+                    color="#0085FF"
+                    size={16}
+                  />
+                  <View style={styles.menuItemTextBlock}>
+                    <Text
+                      style={[
+                        styles.menuText,
+                        styles.menuTextAction,
+                        permissionsLoading && styles.menuTextDisabled,
+                      ]}>
+                      Notice of Assignment
+                    </Text>
+                    <Text style={styles.menuSubText}>View served notice</Text>
                   </View>
                 </TouchableOpacity>
               )}

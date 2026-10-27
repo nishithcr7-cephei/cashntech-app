@@ -173,6 +173,12 @@ const Endpoints = {
   apiUpdateInvoiceStatus: (invoiceId: string) => `/invoice/status/${invoiceId}`,
   apiFinanceRequestPreview: (invoiceId: string) =>
     `/invoice/finance-request/preview/${invoiceId}`,
+  /** SID Notice of Assignment serve (consent + notice_date). */
+  apiNoticeOfAssignment: (invoiceId: string) =>
+    `/invoice/notice-of-assignment/${invoiceId}`,
+  /** Read whether assignment consent already exists for an invoice. */
+  apiAssignmentConsent: (invoiceId: string) =>
+    `/invoice/assignment-consent/${invoiceId}`,
   apiUpdateInvoiceVerification: (invoiceId: string) => `/invoice/admin/${invoiceId}`,
   apiBulkUpdateInvoiceVerification: '/invoice/admin/bulk-status',
   apiBulkUpdateInvoiceStatus: '/invoice/bulk/status',
@@ -211,6 +217,8 @@ const Endpoints = {
   apiUserScope: '/user/scope',
   // User Permissions (feature/action access)
   apiUserPermissions: '/user/permissions',
+  /** Profile header + roles (web parity) */
+  apiUserProfile: (id: string | number) => `/user/profile/${id}`,
   apiProgramList: 'transactions/program/list',
   apiProgramDealersList: 'transactions/program/dealers',
   apiProgramCounterPartySummary: 'transactions/program/counter-party-summary',

@@ -143,7 +143,17 @@ export const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: '#E6E6E6',
     marginTop: scaleHeight(4),
-    marginBottom: scaleHeight(12),
+    marginBottom: scaleHeight(10),
+  },
+  listContent: {
+    paddingBottom: scaleHeight(24),
+  },
+  listItem: {
+    paddingHorizontal: scaleWidth(16),
+  },
+  listTitleItem: {
+    paddingHorizontal: scaleWidth(16),
+    paddingBottom: scaleHeight(10),
   },
   verticalList: {
     marginTop: scaleHeight(8),
@@ -184,6 +194,7 @@ export const styles = StyleSheet.create({
   },
   controlsOutsideList: {
     paddingHorizontal: scaleWidth(16),
+    backgroundColor: Colors.white,
   },
   emptyStateText: {
     fontSize: scaleFont(14),
