@@ -383,8 +383,11 @@ export const InvoiceDetailView: React.FC = () => {
         const tdsAmount = Number(data?.tds_amount) || 0;
         const advanceInterest = Number(data?.upfront_interest) || 0;
         const isVendorFinanceInvoice = /vendor\s*finance/i.test(productName);
+        const isSidInvoice =
+          /sales\s*invoice\s*discounting/i.test(productName) ||
+          /\bsid\b/i.test(productName);
         const showAdvanceInterest =
-          isVendorFinanceInvoice || advanceInterest > 0;
+          isVendorFinanceInvoice || isSidInvoice || advanceInterest > 0;
 
         const items: InvoiceItemRow[] = (data?.invoiceItems || []).map((it: any, idx: number) => {
           const lineTotal = Number(it.total) || 0;

@@ -19,6 +19,7 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker} from '@components/index';
 import {
   invoiceApi,
+  type DisbursementFinancingPreview,
   type DueDateImpactFigure,
   type DueDateImpactPreviewResponse,
 } from '@services/api/invoice.api';
@@ -36,16 +37,14 @@ import {
   usesVendorPartyLayout,
 } from '@store/product/product.resolver';
 import {
-  computeDisbursedAmountLikeWeb,
   isVfUpfrontChargeType,
   resolveAdvanceInterestFromPreview,
   resolveDisbursementUsanceDaysDisplay,
-  resolveInvoiceRoiPercent,
   resolveNetInvoiceAmountFromPreview,
-  resolveVfDisbursementModalAmounts,
 } from '@utils/invoiceTotals';
 import {computeUsanceDays} from '@utils/usanceDays';
 import {dismissKeyboardOrClose} from './dismissKeyboardOrClose';
+import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 
 type MarkAsDisbursedModalProps = {
   visible: boolean;
@@ -211,6 +210,12 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   const [impactData, setImpactData] =
     useState<DueDateImpactPreviewResponse | null>(null);
   const [pendingOverrideDate, setPendingOverrideDate] = useState('');
+  const [financingPreview, setFinancingPreview] =
+    useState<DisbursementFinancingPreview | null>(null);
+  const [financingPreviewLoading, setFinancingPreviewLoading] = useState(false);
+  const [financingPreviewError, setFinancingPreviewError] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -233,6 +238,9 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     setImpactLoading(false);
     setImpactData(null);
     setPendingOverrideDate('');
+    setFinancingPreview(null);
+    setFinancingPreviewLoading(false);
+    setFinancingPreviewError(null);
   }, [visible, invoiceId]);
 
   useEffect(() => {
@@ -347,9 +355,15 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
   const modalSubtitle = `${invoiceLabel} · ${productDisplayName}`;
 
   const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
+  const isSid =
+    effectiveCode === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING;
   const vendorPartyLabels = usesVendorPartyLayout(effectiveCode);
-  const isVfUpfront =
-    isVendorFinance && isVfUpfrontChargeType(preview?.interest_charge_type);
+  /** Prefer server is_upfront (VF + SID); fall back to VF|SID + Upfront charge. */
+  const isUpfrontInterest =
+    financingPreview?.is_upfront ??
+    ((isVendorFinance || isSid) &&
+      isVfUpfrontChargeType(preview?.interest_charge_type));
+  const amountLocked = !!financingPreview || isUpfrontInterest;
 
   const canModifyDueDate = preview?.can_modify_due_date === true;
   const effectiveDueDateDisplay =
@@ -425,12 +439,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     if (!pendingOverrideDate || impactData?.is_holiday) return;
     setDueDateOverride(pendingOverrideDate);
     setConfirmedImpact(impactData?.proposed ?? null);
-    if (impactData?.proposed?.net_disbursement_amount != null) {
-      setDisbursedAmount(
-        formatAmount(impactData.proposed.net_disbursement_amount),
-      );
-      setAmountError(null);
-    }
+    // Amounts refresh from POST /invoice/disbursement/preview with the override.
     setImpactModalVisible(false);
     setImpactData(null);
   };
@@ -441,69 +450,73 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     setPendingOverrideDate('');
   };
 
+  /** Server financing figures for Disbursed + date (optional due override). */
   useEffect(() => {
-    if (disbursementAction !== 'Disbursed' || !preview || !date) {
+    if (!visible || !invoiceId) {
       return;
     }
-    if (confirmedImpact?.net_disbursement_amount != null) {
-      return;
-    }
-
-    const netInvoice = Number(preview.final_total) || 0;
-    if (netInvoice <= 0) {
-      return;
-    }
-
-    const dueForCalc =
-      effectiveDueDateDisplay ||
-      preview.invoice_due_date ||
-      preview.due_date ||
-      null;
-    const usanceDays =
-      computeUsanceDays({
-        dueDate: dueForCalc,
-        disbursementDate: date,
-      }) ?? 0;
-    const roi = resolveInvoiceRoiPercent(preview);
-    const computed = computeDisbursedAmountLikeWeb({
-      netInvoice,
-      eligibilityPercent:
-        preview.eligibility_percent ??
-        preview.anchorParticipantMapping?.eligibility ??
-        100,
-      roiPercent: roi,
-      usanceDays,
-      tdsAmount: preview.tds_amount ?? 0,
-      applyUpfrontInterest: isVfUpfront,
-    });
-
-    if (computed.disbursedAmount <= 0) {
+    if (disbursementAction !== 'Disbursed' || !date) {
+      setFinancingPreview(null);
+      setFinancingPreviewError(null);
+      setFinancingPreviewLoading(false);
       return;
     }
 
-    setDisbursedAmount(formatAmount(computed.disbursedAmount));
-    setAmountError(null);
-  }, [
-    disbursementAction,
-    preview,
-    date,
-    isVfUpfront,
-    effectiveDueDateDisplay,
-    confirmedImpact,
-  ]);
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setFinancingPreviewLoading(true);
+      setFinancingPreviewError(null);
+      const body: {
+        disbursement_date: string;
+        invoice_due_date?: string;
+      } = {
+        disbursement_date: toApiDateFromDisplay(date),
+      };
+      if (dueDateOverride) {
+        body.invoice_due_date = toApiDateFromDisplay(dueDateOverride);
+      }
+      invoiceApi
+        .previewSingleDisbursementFinancing(invoiceId, body)
+        .then(data => {
+          if (cancelled) return;
+          setFinancingPreview(data);
+          setFinancingPreviewError(null);
+          const net = Number(data.max_disbursable_amount ?? data.net_disbursement_amount);
+          if (Number.isFinite(net) && net > 0) {
+            setDisbursedAmount(formatAmount(net));
+            setAmountError(null);
+          }
+        })
+        .catch((err: any) => {
+          if (cancelled) return;
+          setFinancingPreview(null);
+          setFinancingPreviewError(
+            err?.response?.data?.message ||
+              err?.message ||
+              'Failed to load financing preview',
+          );
+        })
+        .finally(() => {
+          if (!cancelled) setFinancingPreviewLoading(false);
+        });
+    }, 250);
 
-  const vfAmounts = useMemo(() => {
-    if (!isVfUpfront || !preview) return null;
-    const disbursementDate =
-      disbursementAction === 'Disbursed' && date ? date : todayDisplay;
-    return resolveVfDisbursementModalAmounts(preview, {disbursementDate});
-  }, [isVfUpfront, preview, date, disbursementAction, todayDisplay]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [visible, invoiceId, disbursementAction, date, dueDateOverride]);
 
   const invoiceAmountCap = useMemo(() => {
+    if (financingPreview) {
+      return Number(financingPreview.max_disbursable_amount) || 0;
+    }
+    if (confirmedImpact?.net_disbursement_amount != null) {
+      return Number(confirmedImpact.net_disbursement_amount) || 0;
+    }
     if (!preview) return 0;
-    if (vfAmounts) return vfAmounts.netInvoiceAmount;
     return resolveNetInvoiceAmountFromPreview(preview, {isVendorFinance});
-  }, [preview, isVendorFinance, vfAmounts]);
+  }, [financingPreview, confirmedImpact, preview, isVendorFinance]);
 
   const display = useMemo(() => {
     const p = preview ?? {};
@@ -564,18 +577,25 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       p.eligibility_percent ?? apm.eligibility ?? p.program?.eligibility ?? null;
 
     const advanceInterestValue =
-      confirmedImpact?.upfront_interest != null
-        ? Number(confirmedImpact.upfront_interest)
-        : vfAmounts
-          ? vfAmounts.advanceInterest
+      financingPreview != null
+        ? Number(financingPreview.upfront_interest)
+        : confirmedImpact?.upfront_interest != null
+          ? Number(confirmedImpact.upfront_interest)
           : resolveAdvanceInterestFromPreview(p, {isVendorFinance: isVf});
     const advanceInterestDisplay =
       Number.isFinite(advanceInterestValue) && advanceInterestValue > 0
         ? formatAmount(advanceInterestValue)
         : '-';
-    const netInvoiceValue = vfAmounts
-      ? vfAmounts.netInvoiceAmount
-      : resolveNetInvoiceAmountFromPreview(p, {isVendorFinance: isVf});
+    const financedValue =
+      financingPreview != null
+        ? Number(financingPreview.financed_amount)
+        : Number(p.financedAmount ?? p.financed_amount ?? 0);
+    const netDisbursementValue =
+      financingPreview != null
+        ? Number(financingPreview.net_disbursement_amount)
+        : confirmedImpact?.net_disbursement_amount != null
+          ? Number(confirmedImpact.net_disbursement_amount)
+          : resolveNetInvoiceAmountFromPreview(p, {isVendorFinance: isVf});
 
     return {
       isVf,
@@ -602,18 +622,24 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
           ? `${formatPercent(eligibilityRaw)}%`
           : '-',
       advanceInterest: advanceInterestDisplay,
+      financedAmount:
+        Number.isFinite(financedValue) && financedValue > 0
+          ? formatAmount(financedValue)
+          : '-',
       usanceDays:
-        confirmedImpact?.usance_days != null
-          ? String(confirmedImpact.usance_days)
-          : resolveDisbursementUsanceDaysDisplay(
-              p.usance_days ?? p.usanceDays ?? null,
-              dueDateRaw,
-              disbursementDateForUsance,
-              tenorRaw,
-            ),
+        financingPreview != null
+          ? String(financingPreview.usance_days)
+          : confirmedImpact?.usance_days != null
+            ? String(confirmedImpact.usance_days)
+            : resolveDisbursementUsanceDaysDisplay(
+                p.usance_days ?? p.usanceDays ?? null,
+                dueDateRaw,
+                disbursementDateForUsance,
+                tenorRaw,
+              ),
       netInvoiceAmount: formatAmount(
-        netInvoiceValue > 0
-          ? netInvoiceValue
+        netDisbursementValue > 0
+          ? netDisbursementValue
           : p.final_total ?? p.invoice_amount,
       ),
       requestedDisbursementDate: formatDateDDMMYYYY(
@@ -626,9 +652,8 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     effectiveCode,
     isVendorFinance,
     vendorPartyLabels,
-    isVfUpfront,
     debitFrom,
-    vfAmounts,
+    financingPreview,
     date,
     disbursementAction,
     todayDisplay,
@@ -660,7 +685,9 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       return null;
     }
     if (invoiceAmountCap > 0 && amountNum > invoiceAmountCap) {
-      return 'Disbursed amount cannot exceed invoice amount';
+      return financingPreview
+        ? 'Disbursed amount cannot exceed max disbursable'
+        : 'Disbursed amount cannot exceed invoice amount';
     }
     return null;
   };
@@ -714,15 +741,6 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       return;
     }
 
-    const submitAmounts = vfAmounts ?? {
-      advanceInterest: resolveAdvanceInterestFromPreview(preview, {
-        isVendorFinance,
-      }),
-      netInvoiceAmount: resolveNetInvoiceAmountFromPreview(preview, {
-        isVendorFinance,
-      }),
-    };
-
     const dueRaw =
       effectiveDueDateDisplay ||
       preview?.invoice_due_date ||
@@ -731,6 +749,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     const disbForUsance =
       disbursementAction === 'Disbursed' ? todayDisplay : '';
     const computedUsance =
+      financingPreview?.usance_days ??
       confirmedImpact?.usance_days ??
       computeUsanceDays({
         dueDate: dueRaw,
@@ -739,9 +758,16 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
       undefined;
 
     const submitUpfrontInterest =
-      confirmedImpact?.upfront_interest != null
-        ? Number(confirmedImpact.upfront_interest)
-        : submitAmounts.advanceInterest;
+      financingPreview != null
+        ? Number(financingPreview.upfront_interest)
+        : confirmedImpact?.upfront_interest != null
+          ? Number(confirmedImpact.upfront_interest)
+          : resolveAdvanceInterestFromPreview(preview, {isVendorFinance});
+
+    const submitNet =
+      financingPreview != null
+        ? Number(financingPreview.net_disbursement_amount)
+        : resolveNetInvoiceAmountFromPreview(preview, {isVendorFinance});
 
     if (onSubmit) {
       await onSubmit({
@@ -754,10 +780,7 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
         remark: remark.trim(),
         transactionNo: disbursementAction === 'Disbursed' ? transactionNo.trim() : '',
         rejectionReason: disbursementAction === 'Reject' ? remark.trim() : '',
-        finalTotal:
-          submitAmounts.netInvoiceAmount > 0
-            ? submitAmounts.netInvoiceAmount
-            : undefined,
+        finalTotal: submitNet > 0 ? submitNet : undefined,
         upfrontInterest: submitUpfrontInterest,
         usanceDays:
           disbursementAction === 'Disbursed' ? computedUsance : undefined,
@@ -774,7 +797,9 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
     !disbursementAction ||
     !!amountError ||
     (disbursementAction === 'Disbursed' &&
-      (!date ||
+      (!!financingPreviewError ||
+        financingPreviewLoading ||
+        !date ||
         !utrNo.trim() ||
         !transactionNo.trim() ||
         !disbursedAmount ||
@@ -884,6 +909,10 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                         emphasize
                       />
                       <DetailRow
+                        label={INVOICE_SUMMARY_LABELS.financedAmount}
+                        value={display.financedAmount}
+                      />
+                      <DetailRow
                         label="Advance Interest"
                         value={display.advanceInterest}
                       />
@@ -892,10 +921,20 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                         value={display.usanceDays}
                       />
                       <DetailRow
-                        label="Net Invoice Amount"
+                        label={INVOICE_SUMMARY_LABELS.netDisbursementAmount}
                         value={display.netInvoiceAmount}
                         emphasize
                       />
+                      {financingPreviewLoading ? (
+                        <Text style={styles.financingHint}>
+                          Updating financing figures…
+                        </Text>
+                      ) : null}
+                      {financingPreviewError ? (
+                        <Text style={styles.fieldError}>
+                          {financingPreviewError}
+                        </Text>
+                      ) : null}
                     </View>
 
                     <Text style={styles.sectionTitle}>
@@ -966,15 +1005,15 @@ export const MarkAsDisbursedModal: React.FC<MarkAsDisbursedModalProps> = ({
                             <TextInput
                               style={[
                                 styles.input,
-                                isVendorFinance && styles.inputLocked,
+                                amountLocked && styles.inputLocked,
                               ]}
                               value={disbursedAmount}
                               onChangeText={text => {
-                                if (isVendorFinance) return;
+                                if (amountLocked) return;
                                 setDisbursedAmount(text);
                                 setAmountError(validateDisbursedAmount(text));
                               }}
-                              editable={!isVendorFinance}
+                              editable={!amountLocked}
                               keyboardType="numeric"
                               placeholder="0.00"
                               placeholderTextColor={Colors.graybase}
@@ -1363,6 +1402,12 @@ const styles = StyleSheet.create({
     fontSize: scaleFont(12),
     fontFamily: Fonts.GilroyMedium,
     color: Colors.red,
+  },
+  financingHint: {
+    marginTop: scaleHeight(6),
+    fontSize: scaleFont(11),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
   },
   remarkContainer: {
     marginBottom: scaleHeight(8),

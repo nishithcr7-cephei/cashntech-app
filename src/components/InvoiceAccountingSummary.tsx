@@ -1,7 +1,10 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {AdvanceInterestInfoButton} from '@components/AdvanceInterestFormulaModal';
-import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
+import {
+  formatMarginDeductionLabel,
+  INVOICE_SUMMARY_LABELS,
+} from '@constants/invoiceSummaryLabels';
 import {
   computeInvoiceSubTotalAfterTds,
   computeInvoiceTaxableBase,
@@ -19,6 +22,11 @@ export type InvoiceAccountingSummaryProps = {
   advanceInterest?: number;
   netDisbursementAmount: number;
   showAdvanceInterest?: boolean;
+  /** When set (from financing-preview), show Margin Deduction + Financed Amount. */
+  showMarginFinancing?: boolean;
+  marginPercent?: number;
+  marginDeduction?: number;
+  financedAmount?: number;
   onInvoiceAmountInfoPress?: () => void;
   onDisbursementRequestedInfoPress?: () => void;
   onAdvanceInterestInfoPress?: () => void;
@@ -83,10 +91,11 @@ const AccountingRow: React.FC<{
 };
 
 /**
- * Option 1 (accounting convention) waterfall:
+ * Web-parity waterfall:
  * Invoice Amount = Basic − Discount + GST
- * Requested = Invoice Amount − TDS
- * Net = Requested − Advance Interest
+ * Requested (A) = Invoice Amount − TDS
+ * [optional] − Margin → Financed (F)
+ * Net = (F or A) − Advance Interest
  */
 export const InvoiceAccountingSummary: React.FC<
   InvoiceAccountingSummaryProps
@@ -98,6 +107,10 @@ export const InvoiceAccountingSummary: React.FC<
   advanceInterest = 0,
   netDisbursementAmount,
   showAdvanceInterest = false,
+  showMarginFinancing = false,
+  marginPercent = 0,
+  marginDeduction = 0,
+  financedAmount,
   onInvoiceAmountInfoPress,
   onDisbursementRequestedInfoPress,
   onAdvanceInterestInfoPress,
@@ -117,6 +130,10 @@ export const InvoiceAccountingSummary: React.FC<
     tdsAmount,
   );
   const money = (n: number) => fmt(n, amountPrefix, amountSuffix);
+  const financed =
+    financedAmount != null && Number.isFinite(financedAmount)
+      ? financedAmount
+      : requestedAmount - marginDeduction;
 
   return (
     <View style={styles.card}>
@@ -163,6 +180,21 @@ export const InvoiceAccountingSummary: React.FC<
           ) : null
         }
       />
+      {showMarginFinancing ? (
+        <>
+          <AccountingRow
+            sign={MINUS}
+            label={formatMarginDeductionLabel(marginPercent)}
+            value={money(marginDeduction)}
+          />
+          <View style={styles.rule} />
+          <AccountingRow
+            label={SUMMARY.financedAmount}
+            value={money(financed)}
+            kind="subtotal"
+          />
+        </>
+      ) : null}
       {showAdvanceInterest ? (
         <AccountingRow
           sign={MINUS}

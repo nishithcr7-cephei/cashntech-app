@@ -173,6 +173,13 @@ const Endpoints = {
   apiUpdateInvoiceStatus: (invoiceId: string) => `/invoice/status/${invoiceId}`,
   apiFinanceRequestPreview: (invoiceId: string) =>
     `/invoice/finance-request/preview/${invoiceId}`,
+  /** Create/Edit form — margin, financed, AI, net, limit headroom (server maths). */
+  apiInvoiceFinancingPreview: '/invoice/financing-preview',
+  /** Single Mark-as-Disbursed financing figures. */
+  apiDisbursementFinancingPreviewOne: (invoiceId: string) =>
+    `/invoice/disbursement/preview/${invoiceId}`,
+  /** Bulk disbursement financing figures. */
+  apiDisbursementFinancingPreview: '/invoice/disbursement/preview',
   /** SID Notice of Assignment serve (consent + notice_date). */
   apiNoticeOfAssignment: (invoiceId: string) =>
     `/invoice/notice-of-assignment/${invoiceId}`,

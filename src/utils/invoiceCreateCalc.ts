@@ -204,6 +204,10 @@ export function isStandaloneProductType(
 }
 
 /** VF Upfront submit guard — AI expected but calculated as zero. */
+/**
+ * Warn when Upfront AI (VF|SID) is ₹0 but ROI/tenor/base look like interest should apply.
+ * `isVendorFinanceUpfront` means "upfront product + charge" (name kept for callers).
+ */
 export function shouldWarnVfZeroAdvanceInterest(input: {
   isVendorFinanceUpfront: boolean;
   chargeApplies: boolean;

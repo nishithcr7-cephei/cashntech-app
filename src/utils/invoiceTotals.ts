@@ -183,7 +183,7 @@ export function isTdsPartyTaxName(name: string | undefined | null): boolean {
 }
 
 export type AdvanceInterestBreakdown = {
-  /** VF + Interest Charge Type Upfront. */
+  /** VF|SID + Interest Charge Type Upfront. */
   chargeApplies: boolean;
   /** Show AI row on create (web shows even at ₹0.00). */
   applicable: boolean;
@@ -191,13 +191,59 @@ export type AdvanceInterestBreakdown = {
 };
 
 /**
- * VF + Upfront Advance Interest on Disbursement Requested Amount:
- *   AI = (Invoice Amount − TDS) × ROI% × (Usance Days ÷ 365)
- *   Invoice Amount = Basic − Discount + Tax
+ * Products that can take Upfront Advance Interest (backend `hasUpfrontInterest`).
+ * Prefer server `is_upfront` from financing-preview when available.
+ */
+export function productAllowsUpfrontInterest(
+  productTypeOrCode?: string | null,
+): boolean {
+  const s = String(productTypeOrCode || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  return (
+    s === 'vendor_finance' ||
+    s === 'vf' ||
+    s.includes('vendor_finance') ||
+    s === 'sales_invoice_discounting' ||
+    s === 'sid' ||
+    s.includes('sales_invoice_discounting')
+  );
+}
+
+/** Charge type is Upfront (case-insensitive). */
+export function isUpfrontInterestChargeType(
+  interestChargeType?: string | null,
+): boolean {
+  return (
+    String(interestChargeType || '')
+      .trim()
+      .toLowerCase() === 'upfront'
+  );
+}
+
+/**
+ * Local Advance Interest fallback only — Create/Edit before financing-preview,
+ * or display helpers when DB AI is missing.
+ * Authoritative figures: POST /invoice/financing-preview (create) and
+ * POST /invoice/disbursement/preview (disburse).
+ *
+ * Applies when product allows upfront (VF or SID) AND charge type is Upfront.
+ * Principal: `financedAmount` (F) when provided; else DRA (Invoice − TDS).
  */
 export function computeVendorFinanceAdvanceInterest(input: {
-  isVendorFinance: boolean;
+  /** @deprecated Prefer `allowsUpfrontInterest` or productType. */
+  isVendorFinance?: boolean;
+  /** Explicit gate — true for VF or SID when charge may apply. */
+  allowsUpfrontInterest?: boolean;
+  /** Product code / type string (VF | SID). */
+  productType?: string | null;
   interestChargeType?: string | null;
+  /**
+   * Financed amount F — preferred AI principal (margin already applied).
+   * When omitted, falls back to Invoice Amount − TDS (legacy DRA).
+   */
+  financedAmount?: number | string | null;
   /** Basic (line subtotal). */
   subTotal: number;
   discountTotal?: number | string | null;
@@ -208,21 +254,29 @@ export function computeVendorFinanceAdvanceInterest(input: {
   usanceDays?: number | string | null;
   tenorDays?: number | string | null;
 }): AdvanceInterestBreakdown {
+  const allows =
+    input.allowsUpfrontInterest === true ||
+    input.isVendorFinance === true ||
+    productAllowsUpfrontInterest(input.productType);
   const chargeType = String(input.interestChargeType || '')
     .trim()
     .toLowerCase();
-  if (!input.isVendorFinance || chargeType !== 'upfront') {
+  if (!allows || chargeType !== 'upfront') {
     return {chargeApplies: false, applicable: false, advanceInterest: 0};
   }
 
+  const financed = Number(input.financedAmount);
   const subTotal = Number(input.subTotal) || 0;
   const discountTotal = Number(input.discountTotal) || 0;
   const taxTotal = Number(input.taxTotal) || 0;
   const tdsAmount = Number(input.tdsAmount) || 0;
-  const aiBase = Math.max(
-    0,
-    round2(subTotal - discountTotal + taxTotal - tdsAmount),
-  );
+  const aiBase =
+    Number.isFinite(financed) && financed > 0
+      ? round2(financed)
+      : Math.max(
+          0,
+          round2(subTotal - discountTotal + taxTotal - tdsAmount),
+        );
   const roiPercent = Number(input.roiPercent) || 0;
   const usanceFromInput = Number(input.usanceDays);
   const interestDays =
@@ -319,11 +373,12 @@ export type VfDisbursementModalOptions = {
 };
 
 /**
- * Web disbursement auto-fill when Disbursement Date is selected (VF Upfront):
+ * @deprecated Fallback only — prefer POST /invoice/disbursement/preview.
+ * Legacy web auto-fill when Disbursement Date is selected (Upfront):
  *   Eligible = final_total × Eligibility%
  *   AI       = Eligible × ROI% × (Usance ÷ 365)
  *   Disbursed = Eligible − AI − TDS
- * DF / non-upfront: Disbursed = Eligible (no extra AI/TDS cut).
+ * Prefer financed principal via server preview (F − AI).
  */
 export function computeDisbursedAmountLikeWeb(input: {
   netInvoice: number;
@@ -358,17 +413,16 @@ export function computeDisbursedAmountLikeWeb(input: {
   };
 }
 
+/** @deprecated Use `isUpfrontInterestChargeType`. */
 export function isVfUpfrontChargeType(
   interestChargeType?: string | null,
 ): boolean {
-  return String(interestChargeType || '')
-    .trim()
-    .toLowerCase() === 'upfront';
+  return isUpfrontInterestChargeType(interestChargeType);
 }
 
 /**
- * Web VF disbursement modal (details + transaction-account APIs).
- * Recalculates advance interest at modal time — not DB upfront_interest.
+ * @deprecated Fallback only — prefer POST /invoice/disbursement/preview.
+ * Local VF/SID disbursement modal recalculation (not DB upfront_interest).
  */
 export function resolveVfDisbursementModalAmounts(
   details: InvoiceAmountPreview | null | undefined,
@@ -435,10 +489,18 @@ export function resolveDisbursementUsanceDaysDisplay(
   });
 }
 
-/** Finance preview: prefer stored AI, else VF Upfront formula, else eligible − net. */
+/**
+ * Display helper: prefer stored AI, else local VF|SID Upfront on F (or DRA),
+ * else eligible − net. Prefer financing / disbursement preview when live.
+ */
 export function resolveAdvanceInterestFromPreview(
   preview: InvoiceAmountPreview | null | undefined,
-  opts?: {isVendorFinance?: boolean},
+  opts?: {
+    isVendorFinance?: boolean;
+    allowsUpfrontInterest?: boolean;
+    productType?: string | null;
+    financedAmount?: number | string | null;
+  },
 ): number {
   if (!preview) return 0;
   const db = Number(preview.upfront_interest_amount ?? preview.upfront_interest);
@@ -446,9 +508,22 @@ export function resolveAdvanceInterestFromPreview(
     return round2(db);
   }
 
+  const financedFromPreview = Number(
+    opts?.financedAmount ??
+      (preview as {financed_amount?: number; financedAmount?: number})
+        .financed_amount ??
+      (preview as {financedAmount?: number}).financedAmount,
+  );
+
   const computed = computeVendorFinanceAdvanceInterest({
     isVendorFinance: opts?.isVendorFinance === true,
+    allowsUpfrontInterest: opts?.allowsUpfrontInterest,
+    productType: opts?.productType,
     interestChargeType: preview.interest_charge_type,
+    financedAmount:
+      Number.isFinite(financedFromPreview) && financedFromPreview > 0
+        ? financedFromPreview
+        : undefined,
     subTotal: Number(preview.sub_total) || 0,
     discountTotal: preview.discount_total,
     taxTotal: preview.tax_total,
@@ -521,13 +596,19 @@ export type DisbursementPreviewAmounts = {
   netInvoiceAmount: number;
 };
 
-/** Single/bulk disbursement: usance from due − disb, amounts from VF Upfront rules. */
+/**
+ * @deprecated Fallback only — prefer POST /invoice/disbursement/preview.
+ * Local single/bulk disbursement: usance from due − disb; Upfront on VF|SID.
+ */
 export function computeDisbursementPreviewAmounts(
   preview: InvoiceAmountPreview | null | undefined,
   options?: {
     disbursementDate?: string | null;
     isVendorFinance?: boolean;
+    /** True when VF or SID + Upfront (or pass isVfUpfront for legacy callers). */
     isVfUpfront?: boolean;
+    allowsUpfrontInterest?: boolean;
+    productType?: string | null;
   },
 ): DisbursementPreviewAmounts {
   const empty: DisbursementPreviewAmounts = {
@@ -541,9 +622,13 @@ export function computeDisbursementPreviewAmounts(
   }
 
   const chargeType = preview.interest_charge_type;
+  const allowsProduct =
+    options?.allowsUpfrontInterest === true ||
+    options?.isVendorFinance === true ||
+    productAllowsUpfrontInterest(options?.productType);
   const isVfUpfront =
     options?.isVfUpfront ??
-    (options?.isVendorFinance === true && isVfUpfrontChargeType(chargeType));
+    (allowsProduct && isUpfrontInterestChargeType(chargeType));
 
   const dueRaw = preview.invoice_due_date ?? preview.due_date ?? null;
   const usanceFromDue =

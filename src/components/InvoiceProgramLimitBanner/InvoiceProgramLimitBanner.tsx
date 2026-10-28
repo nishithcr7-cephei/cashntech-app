@@ -5,14 +5,23 @@ import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {formatIndianNumber} from '@utils/Utils';
 
 export type InvoiceProgramLimitBannerProps = {
+  /** Usable headroom (prefer financing-preview `available_limit` — eligibility applied). */
   availableLimit: number;
+  /** Amount compared to available — financed (F) when preview is live, else invoice total. */
   invoiceAmount: number;
+  /** Live-row label for the compared amount. */
+  amountLabel?: string;
   sanctionedLimit?: number;
   utilizedAmount?: number;
   pipelineRequests?: number;
   /** When false, only the summary card is shown (no live exceed/remaining row). */
   showLiveStatus?: boolean;
   isProgramLevel?: boolean;
+  /**
+   * True when `availableLimit` comes from financing-preview (includes eligibility %).
+   * Party-info sanctioned/utilized/pipeline stay as reference only.
+   */
+  headroomFromServer?: boolean;
   counterpartyLabel?: string;
   vendorNotSelectedYet?: boolean;
 };
@@ -29,11 +38,13 @@ export const InvoiceProgramLimitBanner: React.FC<
 > = ({
   availableLimit,
   invoiceAmount,
+  amountLabel = 'Invoice amount',
   sanctionedLimit,
   utilizedAmount,
   pipelineRequests,
   showLiveStatus = true,
   isProgramLevel = false,
+  headroomFromServer = false,
   counterpartyLabel = 'Dealer',
   vendorNotSelectedYet = false,
 }) => {
@@ -45,20 +56,29 @@ export const InvoiceProgramLimitBanner: React.FC<
     utilizedAmount != null &&
     pipelineRequests != null;
 
+  const title = isProgramLevel
+    ? 'Program available limit'
+    : `Available limit (${counterpartyLabel})`;
+
   return (
     <View
       style={[
         styles.card,
         isExceeded ? styles.cardExceeded : styles.cardOk,
       ]}>
-      <Text style={styles.title}>
-        {isProgramLevel ? 'Program available limit' : `Available limit (${counterpartyLabel})`}
-      </Text>
+      <Text style={styles.title}>{title}</Text>
       <Text style={[styles.availableValue, isExceeded && styles.exceededValue]}>
         {formatInr(availableLimit)}
       </Text>
 
-      {hasBreakdown ? (
+      {headroomFromServer ? (
+        <Text style={styles.breakdown}>
+          After eligibility % (server headroom)
+          {hasBreakdown
+            ? ` · Reference: Sanctioned ${formatInr(sanctionedLimit!)} − Utilized ${formatInr(utilizedAmount!)} − Pipeline ${formatInr(pipelineRequests!)}`
+            : ''}
+        </Text>
+      ) : hasBreakdown ? (
         <Text style={styles.breakdown}>
           Sanctioned {formatInr(sanctionedLimit!)} − Utilized{' '}
           {formatInr(utilizedAmount!)} − Pipeline {formatInr(pipelineRequests!)}
@@ -69,26 +89,29 @@ export const InvoiceProgramLimitBanner: React.FC<
         <Text style={styles.hint}>
           {vendorNotSelectedYet
             ? `Select ${counterpartyLabel.toLowerCase()} to create invoice. Pending invoices from all ${counterpartyLabel.toLowerCase()}s on this program count toward pipeline.`
-            : 'Pending invoices from all vendors on this program count toward pipeline.'}
+            : `Pending invoices from all ${counterpartyLabel.toLowerCase()}s on this program count toward pipeline.`}
         </Text>
       ) : null}
 
       {showLiveStatus && invoiceAmount > 0 ? (
         isExceeded ? (
           <Text style={styles.liveExceeded}>
-            Invoice amount {formatInr(invoiceAmount)} exceeds available limit by{' '}
+            {amountLabel} {formatInr(invoiceAmount)} exceeds available limit by{' '}
             {formatInr(invoiceAmount - availableLimit)}. Reduce line items or
-            discount/tax so the total is ≤ {formatInr(availableLimit)}.
+            discount/tax so {amountLabel.toLowerCase()} is ≤{' '}
+            {formatInr(availableLimit)}.
           </Text>
         ) : (
           <Text style={styles.liveOk}>
-            Invoice amount {formatInr(invoiceAmount)} —{' '}
+            {amountLabel} {formatInr(invoiceAmount)} —{' '}
             {formatInr(Math.max(0, remaining))} remaining within limit.
           </Text>
         )
       ) : showLiveStatus ? (
         <Text style={styles.liveNeutral}>
-          Enter line items to compare invoice amount with available limit.
+          {headroomFromServer
+            ? `Enter line items to compare ${amountLabel.toLowerCase()} with available limit.`
+            : 'Enter line items to compare invoice amount with available limit.'}
         </Text>
       ) : null}
     </View>

@@ -64,6 +64,13 @@ export type AdvanceInterestFormulaAmounts = {
 
   tenorDays?: number | string | null;
 
+  /** When set, AI principal is Financed Amount (F), not DRA. */
+  marginPercent?: number | string | null;
+
+  marginDeduction?: number | string | null;
+
+  financedAmount?: number | string | null;
+
 };
 
 
@@ -161,155 +168,119 @@ export const AdvanceInterestFormulaModal: React.FC<Props> = ({
 }) => {
 
   const invoiceAmount = computeInvoiceTaxableBase(
-
     amounts.basicAmount,
-
     amounts.discount,
-
     amounts.gstAmount,
-
   );
 
   const requestedAmount = computeInvoiceSubTotalAfterTds(
-
     amounts.basicAmount,
-
     amounts.discount,
-
     amounts.gstAmount,
-
     amounts.tdsAmount,
-
   );
 
   const roiPercent = Number(amounts.roiPercent) || 0;
-
   const tenorDays = Number(amounts.tenorDays) || 0;
+  const financedRaw = Number(amounts.financedAmount);
+  const marginPct = Number(amounts.marginPercent) || 0;
+  const marginDeductionRaw = Number(amounts.marginDeduction);
+  const hasFinanced =
+    Number.isFinite(financedRaw) && financedRaw > 0;
+  const financedAmount = hasFinanced
+    ? round2(financedRaw)
+    : requestedAmount;
+  const marginDeduction = hasFinanced
+    ? Number.isFinite(marginDeductionRaw) && marginDeductionRaw >= 0
+      ? round2(marginDeductionRaw)
+      : round2(Math.max(0, requestedAmount - financedAmount))
+    : 0;
 
-  // Formula popup always uses current rule:
-  // AI = Disbursement Requested Amount × ROI% × (Tenor ÷ 365)
-  // Summary rows still show API `upfront_interest` as-is (older invoices).
+  // Prefer F-based rule (VF|SID Upfront): AI = F × ROI% × (Tenor ÷ 365).
+  // Without F, fall back to DRA principal (legacy / screens without preview).
+  const aiPrincipal = financedAmount;
   const calculatedAi =
-    requestedAmount > 0 && roiPercent > 0 && tenorDays > 0
-      ? round2(requestedAmount * (roiPercent / 100) * (tenorDays / 365))
+    aiPrincipal > 0 && roiPercent > 0 && tenorDays > 0
+      ? round2(aiPrincipal * (roiPercent / 100) * (tenorDays / 365))
       : 0;
-
-  const nda = round2(Math.max(0, requestedAmount - calculatedAi));
+  const nda = round2(Math.max(0, aiPrincipal - calculatedAi));
+  const principalLabel = hasFinanced ? 'F' : 'DRA';
 
   return (
-
     <Modal
-
       transparent
-
       visible={visible}
-
       animationType="fade"
-
       onRequestClose={onClose}>
-
       <TouchableWithoutFeedback onPress={onClose}>
-
         <View style={styles.overlay}>
-
           <TouchableWithoutFeedback onPress={() => {}}>
-
             <View style={styles.container}>
-
               <View style={styles.header}>
-
                 <Text style={styles.title}>Advance Interest</Text>
-
                 <TouchableOpacity
-
                   onPress={onClose}
-
                   style={styles.closeButton}
-
                   hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-
                   <Text style={styles.closeText}>{'\u00d7'}</Text>
-
                 </TouchableOpacity>
-
               </View>
-
               <ScrollView
-
                 style={styles.scroll}
-
                 contentContainerStyle={styles.content}
-
                 showsVerticalScrollIndicator={false}>
-
                 <FormulaBlock
-
                   lines={[
-
                     `Invoice Amount = Basic ${MINUS} Discount + GST`,
-
                     `          = ${fmtMoney(amounts.basicAmount)} ${MINUS} ${fmtMoney(amounts.discount)} + ${fmtMoney(amounts.gstAmount)}`,
-
                     `          = ${fmtMoney(invoiceAmount)}`,
-
                     `DRA = Invoice Amount ${MINUS} TDS`,
-
                     `    = ${fmtMoney(invoiceAmount)} ${MINUS} ${fmtMoney(amounts.tdsAmount)}`,
-
                     `    = ${fmtMoney(requestedAmount)}`,
-
                   ]}
-
                 />
-
+                {hasFinanced ? (
+                  <FormulaBlock
+                    lines={[
+                      marginPct > 0
+                        ? `Margin Deduction (${marginPct}%) = DRA ${MINUS} F`
+                        : `Margin Deduction = DRA ${MINUS} F`,
+                      `                 = ${fmtMoney(requestedAmount)} ${MINUS} ${fmtMoney(financedAmount)}`,
+                      `                 = ${fmtMoney(marginDeduction)}`,
+                      `F = Financed Amount = ${fmtMoney(financedAmount)}`,
+                    ]}
+                  />
+                ) : null}
                 <FormulaBlock
-
                   lines={[
-
-                    `AI = DRA ${TIMES} ROI% ${TIMES} (Tenor ${DIVIDE} 365)`,
-
-                    `   = ${fmtMoney(requestedAmount)} ${TIMES} ${fmtRoi(roiPercent)} ${TIMES} (${fmtTenor(tenorDays)} ${DIVIDE} 365)`,
-
+                    `AI = ${principalLabel} ${TIMES} ROI% ${TIMES} (Tenor ${DIVIDE} 365)`,
+                    `   = ${fmtMoney(aiPrincipal)} ${TIMES} ${fmtRoi(roiPercent)} ${TIMES} (${fmtTenor(tenorDays)} ${DIVIDE} 365)`,
                     `   = ${fmtMoney(calculatedAi)}`,
-
                   ]}
-
                 />
-
                 <FormulaBlock
-
                   last
-
                   lines={[
-
-                    `NDA = DRA ${MINUS} AI`,
-
-                    `    = ${fmtMoney(requestedAmount)} ${MINUS} ${fmtMoney(calculatedAi)}`,
-
+                    `NDA = ${principalLabel} ${MINUS} AI`,
+                    `    = ${fmtMoney(aiPrincipal)} ${MINUS} ${fmtMoney(calculatedAi)}`,
                     `    = ${fmtMoney(nda)}`,
-
                   ]}
-
                 />
-
-                <Text style={styles.legendFirst}>DRA = Disbursement Requested Amount</Text>
+                <Text style={styles.legendFirst}>
+                  DRA = Disbursement Requested Amount
+                </Text>
+                {hasFinanced ? (
+                  <Text style={styles.legend}>F = Financed Amount</Text>
+                ) : null}
                 <Text style={styles.legend}>AI = Advance Interest</Text>
                 <Text style={styles.legend}>NDA = Net Disbursement Amount</Text>
-
               </ScrollView>
-
             </View>
-
           </TouchableWithoutFeedback>
-
         </View>
-
       </TouchableWithoutFeedback>
-
     </Modal>
-
   );
-
 };
 
 
@@ -320,6 +291,7 @@ export type InvoiceSummaryFormulaAmounts = {
   gstAmount: number;
   tdsAmount?: number;
   advanceInterest?: number;
+  financedAmount?: number;
 };
 
 type SummaryFormulaModalProps = {
@@ -437,24 +409,37 @@ export const NetDisbursementFormulaModal: React.FC<{
     amounts.tdsAmount ?? 0,
   );
   const advanceInterest = amounts.advanceInterest ?? 0;
-  const netAmount = computeInvoiceNetTotal(
-    amounts.basicAmount,
-    amounts.discount,
-    amounts.gstAmount,
-    amounts.tdsAmount ?? 0,
-    advanceInterest,
-  );
+  const financedRaw = Number(amounts.financedAmount);
+  const hasFinanced = Number.isFinite(financedRaw) && financedRaw > 0;
+  const principal = hasFinanced ? round2(financedRaw) : requestedAmount;
+  const netAmount = hasFinanced
+    ? round2(Math.max(0, principal - advanceInterest))
+    : computeInvoiceNetTotal(
+        amounts.basicAmount,
+        amounts.discount,
+        amounts.gstAmount,
+        amounts.tdsAmount ?? 0,
+        advanceInterest,
+      );
 
   return (
     <SummaryFormulaModal
       visible={visible}
       onClose={onClose}
       title="Net Disbursement Amount"
-      lines={[
-        `NDA = Disbursement Requested Amount ${MINUS} Advance Interest`,
-        `    = ${fmtMoney(requestedAmount)} ${MINUS} ${fmtMoney(advanceInterest)}`,
-        `    = ${fmtMoney(netAmount)}`,
-      ]}
+      lines={
+        hasFinanced
+          ? [
+              `NDA = Financed Amount ${MINUS} Advance Interest`,
+              `    = ${fmtMoney(principal)} ${MINUS} ${fmtMoney(advanceInterest)}`,
+              `    = ${fmtMoney(netAmount)}`,
+            ]
+          : [
+              `NDA = Disbursement Requested Amount ${MINUS} Advance Interest`,
+              `    = ${fmtMoney(requestedAmount)} ${MINUS} ${fmtMoney(advanceInterest)}`,
+              `    = ${fmtMoney(netAmount)}`,
+            ]
+      }
     />
   );
 };

@@ -13,6 +13,7 @@ import {
 import {
   computeInvoiceNetTotal,
   computeVendorFinanceAdvanceInterest,
+  productAllowsUpfrontInterest,
 } from '@utils/invoiceTotals';
 
 const sampleItemWithTax = {
@@ -138,6 +139,60 @@ describe('invoiceCreateCalc — 4-flow regression (Sprint 0)', () => {
         tenorDays: 90,
       });
       expect(ai.chargeApplies).toBe(false);
+    });
+  });
+
+  describe('SID Upfront — Advance Interest on Financed Amount (F)', () => {
+    it('productAllowsUpfrontInterest includes SID and VF only', () => {
+      expect(productAllowsUpfrontInterest('sales_invoice_discounting')).toBe(
+        true,
+      );
+      expect(productAllowsUpfrontInterest('vendor_finance')).toBe(true);
+      expect(productAllowsUpfrontInterest('dealer_finance')).toBe(false);
+      expect(
+        productAllowsUpfrontInterest('purchase_invoice_discounting'),
+      ).toBe(false);
+    });
+
+    it('SID + Upfront applies; AI principal = F when financedAmount set', () => {
+      const dra = 113000 - 1900; // Invoice − TDS
+      const financed = 105645; // e.g. 5% margin off DRA
+      const ai = computeVendorFinanceAdvanceInterest({
+        productType: 'sales_invoice_discounting',
+        interestChargeType: 'Upfront',
+        financedAmount: financed,
+        subTotal: 100000,
+        discountTotal: 5000,
+        taxTotal: 18000,
+        tdsAmount: 1900,
+        roiPercent: 12,
+        tenorDays: 90,
+      });
+      expect(ai.chargeApplies).toBe(true);
+      // F × 12% × (90/365)
+      expect(ai.advanceInterest).toBe(
+        Number(((financed * 0.12 * 90) / 365).toFixed(2)),
+      );
+      expect(ai.advanceInterest).toBeLessThan(
+        Number(((dra * 0.12 * 90) / 365).toFixed(2)),
+      );
+    });
+
+    it('SID without Upfront — chargeApplies false', () => {
+      const ai = computeVendorFinanceAdvanceInterest({
+        allowsUpfrontInterest: true,
+        productType: 'sales_invoice_discounting',
+        interestChargeType: 'rear_end',
+        financedAmount: 100000,
+        subTotal: 100000,
+        discountTotal: 0,
+        taxTotal: 0,
+        tdsAmount: 0,
+        roiPercent: 12,
+        tenorDays: 90,
+      });
+      expect(ai.chargeApplies).toBe(false);
+      expect(ai.advanceInterest).toBe(0);
     });
   });
 

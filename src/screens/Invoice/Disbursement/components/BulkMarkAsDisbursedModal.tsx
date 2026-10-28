@@ -16,15 +16,15 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
 import Toast from 'react-native-toast-message';
-import {invoiceApi} from '@services/api/invoice.api';
+import {
+  invoiceApi,
+  type DisbursementFinancingPreview,
+} from '@services/api/invoice.api';
 import {decryptValue} from '@utils/decrypt';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
-import {
-  computeDisbursementPreviewAmounts,
-  isVfUpfrontChargeType,
-  resolveDisbursementUsanceDaysDisplay,
-} from '@utils/invoiceTotals';
+import {isVfUpfrontChargeType} from '@utils/invoiceTotals';
 import {dismissKeyboardOrClose} from './dismissKeyboardOrClose';
+import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 
 const WINDOW_HEIGHT = Dimensions.get('window').height;
 const SHEET_HEIGHT = WINDOW_HEIGHT * 0.96;
@@ -138,10 +138,23 @@ type InvoiceRowData = BulkDisbursementSubmitRow & {
   invoicePreview?: Record<string, unknown> | null;
   isVendorFinance?: boolean;
   isVfUpfront?: boolean;
+  financingPreview?: DisbursementFinancingPreview | null;
+  financingPreviewLoading?: boolean;
+  financingPreviewError?: string | null;
+  financedAmount?: number;
 };
 
 function isVendorFinanceProduct(productName?: string): boolean {
   return String(productName || '').toLowerCase().includes('vendor');
+}
+
+function isSidProduct(productName?: string): boolean {
+  const s = String(productName || '').toLowerCase();
+  return s.includes('sales invoice discounting') || s.includes('sid');
+}
+
+function productAllowsUpfrontFromName(productName?: string): boolean {
+  return isVendorFinanceProduct(productName) || isSidProduct(productName);
 }
 
 function buildInvoicePreview(invoiceData: Record<string, unknown>, bankData: Record<string, unknown>) {
@@ -161,23 +174,37 @@ function buildInvoicePreview(invoiceData: Record<string, unknown>, bankData: Rec
   };
 }
 
-function applyDisbursementCalc(
-  row: InvoiceRowData,
-  disbursementDate: string,
-): Pick<InvoiceRowData, 'disbursedAmount' | 'usanceDays' | 'upfrontInterest'> {
-  if (row.status !== 'Disbursed' || !disbursementDate.trim()) {
-    return {disbursedAmount: '', usanceDays: undefined, upfrontInterest: undefined};
+function toApiDateFromDisplay(ddMmYyyy: string): string {
+  const parts = ddMmYyyy.trim().split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
   }
-  const amounts = computeDisbursementPreviewAmounts(row.invoicePreview, {
-    disbursementDate,
-    isVendorFinance: row.isVendorFinance,
-    isVfUpfront: row.isVfUpfront,
-  });
+  return ddMmYyyy;
+}
+
+function applyFinancingPreviewToRow(
+  preview: DisbursementFinancingPreview,
+): Pick<
+  InvoiceRowData,
+  | 'disbursedAmount'
+  | 'usanceDays'
+  | 'upfrontInterest'
+  | 'financedAmount'
+  | 'isVfUpfront'
+  | 'financingPreview'
+  | 'financingPreviewError'
+  | 'financingPreviewLoading'
+> {
+  const net = Number(preview.max_disbursable_amount ?? preview.net_disbursement_amount);
   return {
-    disbursedAmount:
-      amounts.disbursedAmount > 0 ? formatAmount(amounts.disbursedAmount) : '',
-    usanceDays: amounts.usanceDays,
-    upfrontInterest: amounts.advanceInterest,
+    disbursedAmount: net > 0 ? formatAmount(net) : '',
+    usanceDays: preview.usance_days,
+    upfrontInterest: preview.upfront_interest,
+    financedAmount: preview.financed_amount,
+    isVfUpfront: preview.is_upfront,
+    financingPreview: preview,
+    financingPreviewError: null,
+    financingPreviewLoading: false,
   };
 }
 
@@ -291,15 +318,21 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
           const preview = buildInvoicePreview(invoiceData, d);
           const programConfig = (invoiceData.program as {productConfig?: {interest_charge_type?: string}} | undefined)
             ?.productConfig;
-          const isVendorFinance =
+          const resolvedProductName =
             inv.productName != null
-              ? isVendorFinanceProduct(inv.productName)
-              : isVendorFinanceProduct(
-                  String((programConfig as {product?: {name?: string}} | undefined)?.product?.name ?? ''),
+              ? inv.productName
+              : String(
+                  (programConfig as {product?: {name?: string}} | undefined)
+                    ?.product?.name ?? '',
                 );
+          const isVendorFinance = isVendorFinanceProduct(resolvedProductName);
+          const allowsUpfront = productAllowsUpfrontFromName(resolvedProductName);
           const isVfUpfront =
-            isVendorFinance &&
-            isVfUpfrontChargeType(programConfig?.interest_charge_type ?? preview.interest_charge_type as string);
+            allowsUpfront &&
+            isVfUpfrontChargeType(
+              programConfig?.interest_charge_type ??
+                (preview.interest_charge_type as string),
+            );
 
           return {
             id: inv.id,
@@ -340,32 +373,129 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
     });
   }, [visible, selectedInvoices]);
 
-  const updateRow = useCallback((id: string, field: keyof InvoiceRowData, value: string) => {
-    setRows(prev =>
-      prev.map(r => {
-        if (r.id !== id) return r;
-        let next: InvoiceRowData = {...r, [field]: value} as InvoiceRowData;
-        if (field === 'status') {
-          if (value !== 'Disbursed') {
-            next.utrNo = '';
-            next.transactionNo = '';
-            next.date = '';
-            next.disbursedAmount = '';
-            next.usanceDays = undefined;
-            next.upfrontInterest = undefined;
+  const fetchBulkFinancingPreview = useCallback(
+    async (snapshot: InvoiceRowData[]) => {
+      const targets = snapshot.filter(
+        r => r.status === 'Disbursed' && !!r.date.trim(),
+      );
+      if (targets.length === 0) return;
+
+      const targetIds = new Set(targets.map(r => r.id));
+      setRows(prev =>
+        prev.map(r =>
+          targetIds.has(r.id)
+            ? {
+                ...r,
+                financingPreviewLoading: true,
+                financingPreviewError: null,
+              }
+            : r,
+        ),
+      );
+
+      try {
+        const results = await invoiceApi.previewBulkDisbursementFinancing({
+          invoices: targets.map(r => ({
+            invoiceId: r.id,
+            disbursement_date: toApiDateFromDisplay(r.date),
+          })),
+        });
+        const byId = new Map(results.map(item => [item.invoice_id, item]));
+        setRows(prev =>
+          prev.map(r => {
+            if (!targetIds.has(r.id)) {
+              return r;
+            }
+            if (r.status !== 'Disbursed' || !r.date.trim()) {
+              return {...r, financingPreviewLoading: false};
+            }
+            const data = byId.get(r.id);
+            if (!data) {
+              return {
+                ...r,
+                financingPreviewLoading: false,
+                financingPreviewError: 'No financing preview returned',
+              };
+            }
+            return {...r, ...applyFinancingPreviewToRow(data)};
+          }),
+        );
+      } catch (err: any) {
+        const message =
+          err?.response?.data?.message ||
+          err?.message ||
+          'Failed to load financing preview';
+        setRows(prev =>
+          prev.map(r =>
+            targetIds.has(r.id)
+              ? {
+                  ...r,
+                  financingPreview: null,
+                  financingPreviewLoading: false,
+                  financingPreviewError: message,
+                  disbursedAmount: '',
+                  usanceDays: undefined,
+                  upfrontInterest: undefined,
+                  financedAmount: undefined,
+                }
+              : r,
+          ),
+        );
+      }
+    },
+    [],
+  );
+
+  const updateRow = useCallback(
+    (id: string, field: keyof InvoiceRowData, value: string) => {
+      let nextSnapshot: InvoiceRowData[] | null = null;
+      setRows(prev => {
+        const next = prev.map(r => {
+          if (r.id !== id) return r;
+          let row: InvoiceRowData = {...r, [field]: value} as InvoiceRowData;
+          if (field === 'status') {
+            if (value !== 'Disbursed') {
+              row.utrNo = '';
+              row.transactionNo = '';
+              row.date = '';
+              row.disbursedAmount = '';
+              row.usanceDays = undefined;
+              row.upfrontInterest = undefined;
+              row.financedAmount = undefined;
+              row.financingPreview = null;
+              row.financingPreviewError = null;
+              row.financingPreviewLoading = false;
+            }
+            if (value !== 'Hold') {
+              row.holdCategory = '';
+              row.expectedReleaseDate = '';
+            }
           }
-          if (value !== 'Hold') {
-            next.holdCategory = '';
-            next.expectedReleaseDate = '';
+          if (field === 'date' && row.status === 'Disbursed') {
+            row = {
+              ...row,
+              disbursedAmount: '',
+              usanceDays: undefined,
+              upfrontInterest: undefined,
+              financedAmount: undefined,
+              financingPreview: null,
+              financingPreviewError: null,
+              financingPreviewLoading: true,
+            };
           }
-        }
-        if (field === 'date' && next.status === 'Disbursed') {
-          next = {...next, ...applyDisbursementCalc(next, value)};
+          return row;
+        });
+        if (field === 'date' && value.trim()) {
+          nextSnapshot = next;
         }
         return next;
-      }),
-    );
-  }, []);
+      });
+      if (nextSnapshot) {
+        void fetchBulkFinancingPreview(nextSnapshot);
+      }
+    },
+    [fetchBulkFinancingPreview],
+  );
 
   const toggleChecked = (id: string) => {
     setCheckedIds(prev => {
@@ -427,6 +557,21 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
         }
         if (!row.transactionNo.trim()) {
           Toast.show({type: 'error', text1: `Transaction No is required for ${row.invoiceNo}`});
+          return;
+        }
+        if (row.financingPreviewLoading) {
+          Toast.show({
+            type: 'info',
+            text1: `Financing preview still loading for ${row.invoiceNo}`,
+          });
+          return;
+        }
+        if (row.financingPreviewError) {
+          Toast.show({
+            type: 'error',
+            text1: `Financing preview failed for ${row.invoiceNo}`,
+            text2: row.financingPreviewError,
+          });
           return;
         }
         if (!row.disbursedAmount.trim()) {
@@ -580,25 +725,52 @@ export const BulkMarkAsDisbursedModal: React.FC<BulkMarkAsDisbursedModalProps> =
 
                 {row.status === 'Disbursed' && (
                   <>
-                    {row.isVfUpfront && row.date ? (
-                      renderReadOnlyField(
-                        'Usance Days',
-                        resolveDisbursementUsanceDaysDisplay(
-                          row.usanceDays ?? null,
-                          String(row.invoicePreview?.invoice_due_date ?? row.invoicePreview?.due_date ?? ''),
-                          row.date,
-                          row.invoicePreview?.tenor ?? row.invoicePreview?.tenor_days ?? null,
-                        ),
-                      )
+                    {row.financingPreview && row.financedAmount != null && row.financedAmount > 0
+                      ? renderReadOnlyField(
+                          INVOICE_SUMMARY_LABELS.financedAmount,
+                          formatAmount(row.financedAmount),
+                        )
+                      : null}
+                    {row.isVfUpfront && row.date && row.usanceDays != null
+                      ? renderReadOnlyField('Usance Days', String(row.usanceDays))
+                      : null}
+                    {row.isVfUpfront &&
+                    row.upfrontInterest != null &&
+                    row.upfrontInterest > 0
+                      ? renderReadOnlyField(
+                          'Advance Interest',
+                          formatAmount(row.upfrontInterest),
+                        )
+                      : null}
+                    {row.financingPreviewLoading ? (
+                      <View style={styles.financingLoadingRow}>
+                        <ActivityIndicator size="small" color="#666" />
+                        <Text style={styles.financingHint}>
+                          Updating financing figures…
+                        </Text>
+                      </View>
+                    ) : null}
+                    {row.financingPreviewError ? (
+                      <Text style={styles.financingError}>
+                        {row.financingPreviewError}
+                      </Text>
                     ) : null}
                     <View style={styles.fieldBlock}>
                       <Text style={styles.fieldLabel}>
                         Disbursed Amount <Text style={styles.required}>*</Text>
                       </Text>
                       <TextInput
-                        style={styles.input}
+                        style={[
+                          styles.input,
+                          (!!row.financingPreview || row.isVfUpfront) &&
+                            styles.inputLocked,
+                        ]}
                         value={row.disbursedAmount}
-                        onChangeText={val => updateRow(row.id, 'disbursedAmount', val)}
+                        onChangeText={val => {
+                          if (row.financingPreview || row.isVfUpfront) return;
+                          updateRow(row.id, 'disbursedAmount', val);
+                        }}
+                        editable={!row.financingPreview && !row.isVfUpfront}
                         placeholder="Amount"
                         keyboardType="numeric"
                         placeholderTextColor={Colors.graybase}
@@ -986,6 +1158,27 @@ const styles = StyleSheet.create({
     color: Colors.darkblack,
     backgroundColor: Colors.white,
     minHeight: scaleHeight(44),
+  },
+  inputLocked: {
+    backgroundColor: '#F4F5F7',
+    color: Colors.darkblack,
+  },
+  financingLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(8),
+    marginBottom: scaleHeight(8),
+  },
+  financingHint: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.graybase,
+  },
+  financingError: {
+    fontSize: scaleFont(12),
+    fontFamily: Fonts.GilroyMedium,
+    color: Colors.red,
+    marginBottom: scaleHeight(8),
   },
   remarkInput: {
     minHeight: scaleHeight(72),

@@ -314,6 +314,52 @@ export type UpdateInvoiceStatusPayload = {
   grnDate?: string;
 };
 
+/** POST /invoice/financing-preview request (Create/Edit form). */
+export type InvoiceFinancingPreviewRequest = {
+  program: string;
+  final_total_after_tds: number;
+  tenor: number;
+  /** Required for DF/VF; omit for PID/SID. */
+  anchorParticipantMappingId?: string;
+  /** Edit: exclude this invoice from pipeline headroom. */
+  invoiceId?: string;
+};
+
+/** POST /invoice/financing-preview data payload. */
+export type InvoiceFinancingPreview = {
+  margin_percent: number;
+  margin_deduction: number;
+  financed_amount: number;
+  interest_rate_percent: number;
+  is_upfront: boolean;
+  upfront_interest: number;
+  net_disbursement_amount: number;
+  available_limit: number;
+  limit_level: 'program' | 'participant';
+  exceeds_limit: boolean;
+};
+
+/** POST /invoice/disbursement/preview/:id (and bulk item) data. */
+export type DisbursementFinancingPreview = {
+  invoice_id: string;
+  is_upfront: boolean;
+  usance_days: number;
+  financed_amount: number;
+  upfront_interest: number;
+  net_disbursement_amount: number;
+  max_disbursable_amount: number;
+};
+
+export type DisbursementFinancingPreviewRequest = {
+  disbursement_date?: string;
+  invoice_due_date?: string;
+};
+
+export type BulkDisbursementFinancingPreviewItem =
+  DisbursementFinancingPreviewRequest & {
+    invoiceId: string;
+  };
+
 export type UpdateInvoiceVerificationPayload = {
   invoiceId: string;
   action: 'Verify' | 'Reject' | 'On Hold';
@@ -1003,6 +1049,53 @@ export const invoiceApi = {
   },
 
   /**
+   * POST /invoice/financing-preview — Create/Edit totals (margin, F, AI, net, limit).
+   * Server owns maths; client must not invent margin/eligibility.
+   */
+  previewInvoiceFinancing: async (
+    body: InvoiceFinancingPreviewRequest,
+  ): Promise<InvoiceFinancingPreview> => {
+    const payload: Record<string, unknown> = {
+      program: body.program,
+      final_total_after_tds: Number(body.final_total_after_tds),
+      tenor: Number(body.tenor),
+    };
+    const apm = body.anchorParticipantMappingId?.trim();
+    if (apm) {
+      payload.anchorParticipantMappingId = apm;
+    }
+    const invoiceId = body.invoiceId?.trim();
+    if (invoiceId) {
+      payload.invoiceId = invoiceId;
+    }
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiInvoiceFinancingPreview,
+      payload,
+      {authRequired: true} as any,
+    );
+    const raw = response?.data;
+    const data =
+      raw?.data && typeof raw.data === 'object' ? raw.data : raw;
+    if (!data || typeof data !== 'object') {
+      throw new Error(
+        raw?.message || 'Invoice financing preview returned no data',
+      );
+    }
+    return {
+      margin_percent: Number(data.margin_percent ?? 0),
+      margin_deduction: Number(data.margin_deduction ?? 0),
+      financed_amount: Number(data.financed_amount ?? 0),
+      interest_rate_percent: Number(data.interest_rate_percent ?? 0),
+      is_upfront: !!data.is_upfront,
+      upfront_interest: Number(data.upfront_interest ?? 0),
+      net_disbursement_amount: Number(data.net_disbursement_amount ?? 0),
+      available_limit: Number(data.available_limit ?? 0),
+      limit_level: data.limit_level === 'participant' ? 'participant' : 'program',
+      exceeds_limit: !!data.exceeds_limit,
+    };
+  },
+
+  /**
    * Submit Finance Request (or other workflow action): PATCH /invoice/status/:invoiceId
    * Body: { action, remark } — server derives step from current_step (no approval_level).
    */
@@ -1228,6 +1321,89 @@ export const invoiceApi = {
     );
     const body = response?.data;
     return (body?.data ?? body) as DueDateImpactPreviewResponse;
+  },
+
+  /**
+   * POST /invoice/disbursement/preview/:invoiceId — single Mark-as-Disbursed figures.
+   * Server owns F / AI / net / usance for the chosen disburse (+ optional due) dates.
+   */
+  previewSingleDisbursementFinancing: async (
+    invoiceId: string,
+    body: DisbursementFinancingPreviewRequest = {},
+  ): Promise<DisbursementFinancingPreview> => {
+    const payload: Record<string, string> = {};
+    const disb = body.disbursement_date?.trim();
+    if (disb) payload.disbursement_date = disb;
+    const due = body.invoice_due_date?.trim();
+    if (due) payload.invoice_due_date = due;
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiDisbursementFinancingPreviewOne(invoiceId),
+      payload,
+      {authRequired: true} as any,
+    );
+    const raw = response?.data;
+    const data =
+      raw?.data && typeof raw.data === 'object' && !Array.isArray(raw.data)
+        ? raw.data
+        : raw;
+    if (!data || typeof data !== 'object') {
+      throw new Error(
+        raw?.message || 'Disbursement financing preview returned no data',
+      );
+    }
+    return {
+      invoice_id: String(data.invoice_id ?? invoiceId),
+      is_upfront: !!data.is_upfront,
+      usance_days: Number(data.usance_days ?? 0),
+      financed_amount: Number(data.financed_amount ?? 0),
+      upfront_interest: Number(data.upfront_interest ?? 0),
+      net_disbursement_amount: Number(data.net_disbursement_amount ?? 0),
+      max_disbursable_amount: Number(
+        data.max_disbursable_amount ?? data.net_disbursement_amount ?? 0,
+      ),
+    };
+  },
+
+  /**
+   * POST /invoice/disbursement/preview — bulk Mark-as-Disbursed figures (1–200).
+   */
+  previewBulkDisbursementFinancing: async (items: {
+    invoices: BulkDisbursementFinancingPreviewItem[];
+  }): Promise<DisbursementFinancingPreview[]> => {
+    const invoices = (items.invoices ?? [])
+      .map(row => {
+        const invoiceId = row.invoiceId?.trim();
+        if (!invoiceId) return null;
+        const entry: Record<string, string> = {invoiceId};
+        const disb = row.disbursement_date?.trim();
+        if (disb) entry.disbursement_date = disb;
+        const due = row.invoice_due_date?.trim();
+        if (due) entry.invoice_due_date = due;
+        return entry;
+      })
+      .filter(Boolean);
+    const response = await axiosInstance.post(
+      ApiEndPoints.apiDisbursementFinancingPreview,
+      {invoices},
+      {authRequired: true} as any,
+    );
+    const raw = response?.data;
+    const list = Array.isArray(raw?.data)
+      ? raw.data
+      : Array.isArray(raw)
+        ? raw
+        : [];
+    return list.map((data: any) => ({
+      invoice_id: String(data.invoice_id ?? ''),
+      is_upfront: !!data.is_upfront,
+      usance_days: Number(data.usance_days ?? 0),
+      financed_amount: Number(data.financed_amount ?? 0),
+      upfront_interest: Number(data.upfront_interest ?? 0),
+      net_disbursement_amount: Number(data.net_disbursement_amount ?? 0),
+      max_disbursable_amount: Number(
+        data.max_disbursable_amount ?? data.net_disbursement_amount ?? 0,
+      ),
+    }));
   },
 
   /** Mark multiple invoices as disbursed (BulkInvoiceDisbursementDto) */

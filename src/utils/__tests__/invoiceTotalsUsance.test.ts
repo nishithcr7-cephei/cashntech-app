@@ -2,6 +2,8 @@ import {
   resolveDisbursementUsanceDaysDisplay,
   resolveVfDisbursementModalAmounts,
   computeDisbursementPreviewAmounts,
+  computeVendorFinanceAdvanceInterest,
+  productAllowsUpfrontInterest,
 } from '../invoiceTotals';
 
 describe('invoiceTotals — usance-based VF disbursement', () => {
@@ -76,5 +78,52 @@ describe('invoiceTotals — usance-based VF disbursement', () => {
     expect(
       resolveDisbursementUsanceDaysDisplay(58, '2026-09-11', '2026-07-01', 60),
     ).toBe('58');
+  });
+
+  it('computeDisbursementPreviewAmounts supports SID productType + Upfront', () => {
+    const amounts = computeDisbursementPreviewAmounts(
+      {
+        ...preview,
+        interest_charge_type: 'Upfront',
+        final_total: 2133072,
+      },
+      {
+        disbursementDate: '15-07-2026',
+        productType: 'sales_invoice_discounting',
+      },
+    );
+    expect(productAllowsUpfrontInterest('sales_invoice_discounting')).toBe(
+      true,
+    );
+    expect(amounts.usanceDays).toBe(58);
+    expect(amounts.advanceInterest).toBeGreaterThan(0);
+  });
+});
+
+describe('invoiceTotals — Advance Interest on Financed Amount (F)', () => {
+  it('AI uses financedAmount when provided (VF Upfront)', () => {
+    const onDra = computeVendorFinanceAdvanceInterest({
+      isVendorFinance: true,
+      interestChargeType: 'upfront',
+      subTotal: 100000,
+      discountTotal: 0,
+      taxTotal: 0,
+      tdsAmount: 0,
+      roiPercent: 10,
+      tenorDays: 365,
+    });
+    const onF = computeVendorFinanceAdvanceInterest({
+      isVendorFinance: true,
+      interestChargeType: 'upfront',
+      financedAmount: 80000,
+      subTotal: 100000,
+      discountTotal: 0,
+      taxTotal: 0,
+      tdsAmount: 0,
+      roiPercent: 10,
+      tenorDays: 365,
+    });
+    expect(onDra.advanceInterest).toBe(10000);
+    expect(onF.advanceInterest).toBe(8000);
   });
 });

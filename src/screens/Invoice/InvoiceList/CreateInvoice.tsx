@@ -44,6 +44,7 @@ import Toast from 'react-native-toast-message';
 import {
   computeInvoiceLineAggregates,
   computeInvoiceNetTotal,
+  computeInvoiceSubTotalAfterTds,
   computeVendorFinanceAdvanceInterest,
   extractRoiPercent,
   isTdsPartyTaxName,
@@ -63,7 +64,10 @@ import {
   type InvoiceProductType,
 } from '@utils/ocrPatchNormalizer';
 import {expectedNextApprovalAfterCreate} from '@utils/invoiceStatusDisplay';
-import {invoiceApi} from '@services/api/invoice.api';
+import {
+  invoiceApi,
+  type InvoiceFinancingPreview,
+} from '@services/api/invoice.api';
 import {
   fetchDealerInfoRequest,
   createInvoiceRequest,
@@ -366,6 +370,13 @@ export const CreateInvoice: React.FC = () => {
   // Stores the available limit for the specific participant in edit mode.
   // Fetched fresh when invoice details load, matching Web Portal behavior.
   const [apmAvailableLimit, setApmAvailableLimit] = useState<number | null>(null);
+  /** Server financing-preview (margin / F / AI / net / exceeds_limit). */
+  const [financingPreview, setFinancingPreview] =
+    useState<InvoiceFinancingPreview | null>(null);
+  const [financingPreviewError, setFinancingPreviewError] = useState<
+    string | null
+  >(null);
+  const financingPreviewSeqRef = useRef(0);
   const [selectedParticipant, setSelectedParticipant] =
     useState<DealerInfoParticipant | null>(null);
   const selectedParticipantRef = useRef(selectedParticipant);
@@ -767,12 +778,16 @@ export const CreateInvoice: React.FC = () => {
     ],
   );
 
-  // VF Upfront AI = (Invoice Amount − TDS) × ROI% × (Tenor/365).
+  // Local AI fallback (VF|SID + Upfront) until financing-preview returns.
+  // When preview is live, UI uses server F / AI / net — not this helper.
   const advanceInterestInfo = useMemo(
     () =>
       computeVendorFinanceAdvanceInterest({
-        isVendorFinance,
+        allowsUpfrontInterest:
+          isVendorFinance || productType === 'sales_invoice_discounting',
+        productType,
         interestChargeType: dealerInfo?.interest_charge_type,
+        financedAmount: financingPreview?.financed_amount,
         subTotal: invoiceTotals.subTotal,
         discountTotal: invoiceTotals.discountTotal,
         taxTotal: invoiceTotals.taxTotal,
@@ -782,7 +797,9 @@ export const CreateInvoice: React.FC = () => {
       }),
     [
       isVendorFinance,
+      productType,
       dealerInfo?.interest_charge_type,
+      financingPreview?.financed_amount,
       invoiceTotals.subTotal,
       invoiceTotals.discountTotal,
       invoiceTotals.taxTotal,
@@ -792,26 +809,113 @@ export const CreateInvoice: React.FC = () => {
     ],
   );
 
-  const showAdvanceInterest = advanceInterestInfo.chargeApplies;
-
-  useEffect(() => {
-    const nextTds = invoiceTotals.tds.toFixed(2);
-    const nextAdvanceInterest = advanceInterestInfo.chargeApplies
-      ? advanceInterestInfo.advanceInterest
-      : 0;
-    const nextNet = computeInvoiceNetTotal(
+  const finalTotalAfterTds = useMemo(
+    () =>
+      computeInvoiceSubTotalAfterTds(
+        invoiceTotals.subTotal,
+        invoiceTotals.discountTotal,
+        invoiceTotals.taxTotal,
+        invoiceTotals.tds,
+      ),
+    [
       invoiceTotals.subTotal,
       invoiceTotals.discountTotal,
       invoiceTotals.taxTotal,
       invoiceTotals.tds,
-      nextAdvanceInterest,
-    ).toFixed(2);
+    ],
+  );
 
+  // Debounced POST /invoice/financing-preview — server owns margin / F / AI / limit.
+  useEffect(() => {
+    const programId = String(programSelection?.programId || '').trim();
+    const tenorDays = parseInt(String(fields.tenor ?? '').trim(), 10);
+    const apmId = String(selectedParticipant?.id || '').trim();
+    const editInvoiceId =
+      mode === 'edit'
+        ? String(route?.params?.invoiceId || '').trim()
+        : '';
+
+    const canPreview =
+      !!programId &&
+      Number.isFinite(tenorDays) &&
+      tenorDays > 0 &&
+      finalTotalAfterTds >= 0 &&
+      (isStandalone || !!apmId);
+
+    if (!canPreview) {
+      setFinancingPreview(null);
+      setFinancingPreviewError(null);
+      return;
+    }
+
+    const seq = ++financingPreviewSeqRef.current;
+    const timer = setTimeout(() => {
+      (async () => {
+        try {
+          const data = await invoiceApi.previewInvoiceFinancing({
+            program: programId,
+            final_total_after_tds: finalTotalAfterTds,
+            tenor: tenorDays,
+            ...(isStandalone ? {} : {anchorParticipantMappingId: apmId}),
+            ...(editInvoiceId ? {invoiceId: editInvoiceId} : {}),
+          });
+          if (financingPreviewSeqRef.current !== seq) return;
+          setFinancingPreview(data);
+          setFinancingPreviewError(null);
+        } catch (e: any) {
+          if (financingPreviewSeqRef.current !== seq) return;
+          setFinancingPreview(null);
+          setFinancingPreviewError(
+            e?.response?.data?.message ||
+              e?.message ||
+              'Could not calculate financing',
+          );
+        }
+      })();
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [
+    programSelection?.programId,
+    fields.tenor,
+    finalTotalAfterTds,
+    selectedParticipant?.id,
+    isStandalone,
+    mode,
+    route?.params?.invoiceId,
+  ]);
+
+  const showAdvanceInterest = financingPreview
+    ? financingPreview.is_upfront
+    : advanceInterestInfo.chargeApplies;
+  const displayAdvanceInterest = financingPreview
+    ? financingPreview.upfront_interest
+    : advanceInterestInfo.chargeApplies
+      ? advanceInterestInfo.advanceInterest
+      : 0;
+  const displayRoiPercent = financingPreview
+    ? financingPreview.interest_rate_percent
+    : extractRoiPercent(selectedParticipant?.interest_parameters);
+
+  useEffect(() => {
+    const nextTds = invoiceTotals.tds.toFixed(2);
+    const nextAdvanceInterest = displayAdvanceInterest;
+    const nextNet = financingPreview
+      ? financingPreview.net_disbursement_amount
+      : computeInvoiceNetTotal(
+          invoiceTotals.subTotal,
+          invoiceTotals.discountTotal,
+          invoiceTotals.taxTotal,
+          invoiceTotals.tds,
+          nextAdvanceInterest,
+        );
+
+    const nextNetStr = round2(nextNet).toFixed(2);
     const currentAdvanceInterest = parseFloat(fields.upfrontInterest || '0') || 0;
 
     if (
       fields.tdsAmount === nextTds &&
-      fields.grandTotal === nextNet &&
+      fields.grandTotal === nextNetStr &&
       currentAdvanceInterest === nextAdvanceInterest
     ) {
       return;
@@ -820,12 +924,13 @@ export const CreateInvoice: React.FC = () => {
     setFields(prev => ({
       ...prev,
       tdsAmount: nextTds,
-      upfrontInterest: nextAdvanceInterest.toFixed(2),
-      grandTotal: nextNet,
+      upfrontInterest: round2(nextAdvanceInterest).toFixed(2),
+      grandTotal: nextNetStr,
     }));
   }, [
     invoiceTotals,
-    advanceInterestInfo,
+    displayAdvanceInterest,
+    financingPreview,
     fields.tdsAmount,
     fields.upfrontInterest,
     fields.grandTotal,
@@ -1576,10 +1681,14 @@ export const CreateInvoice: React.FC = () => {
           isVendorFinance: productType === 'vendor_finance',
           userRole,
         }),
-        advanceInterestBreakdown: advanceInterestInfo.chargeApplies
-          ? advanceInterestInfo
+        advanceInterestBreakdown: showAdvanceInterest
+          ? {
+              chargeApplies: true,
+              applicable: true,
+              advanceInterest: displayAdvanceInterest,
+            }
           : null,
-        roiPercent: extractRoiPercent(selectedParticipant?.interest_parameters),
+        roiPercent: displayRoiPercent,
       });
     },
     [
@@ -1587,7 +1696,9 @@ export const CreateInvoice: React.FC = () => {
       dealerInfo?.party?.entity_name,
       productType,
       userRole,
-      advanceInterestInfo,
+      showAdvanceInterest,
+      displayAdvanceInterest,
+      displayRoiPercent,
       programSelection?.method,
       userPartyName,
       selectedParticipant,
@@ -1827,32 +1938,39 @@ export const CreateInvoice: React.FC = () => {
     
   const handleSubmit = async () => {
     // Priority 1: Available Limit Check (Matching Web Portal Logic)
-    // In edit mode, use the pre-fetched available limit (loaded when screen opened, like Web Portal).
-    // In create mode, calculate from selected participant.
+    // Prefer financing-preview exceeds_limit / financed vs available.
+
+    if (financingPreviewError) {
+      Alert.alert('Financing', financingPreviewError, [{text: 'OK'}]);
+      return;
+    }
 
     if (isLimitExceeded && availableProgramLimit !== null) {
-      const overBy = invoiceAmountForLimit - availableProgramLimit;
+      const overBy = Math.max(0, invoiceAmountForLimit - availableProgramLimit);
+      const amountLabel = financingPreview ? 'Financed amount' : 'Invoice amount';
       Alert.alert(
         'Limit Exceeded',
-        `Invoice amount ${formatLimitInr(invoiceAmountForLimit)} exceeds available limit ${formatLimitInr(availableProgramLimit)}. Reduce by at least ${formatLimitInr(overBy)}.`,
+        `${amountLabel} ${formatLimitInr(invoiceAmountForLimit)} exceeds available limit ${formatLimitInr(availableProgramLimit)}. Reduce by at least ${formatLimitInr(overBy)}.`,
         [{text: 'OK'}],
       );
       return;
     }
 
     // Final Total Integrity Check (0.01 precision)
-    // Web Create: Sub − Disc + Tax − TDS − Advance Interest
+    // With financing-preview: Net = F − AI (server). Without: legacy Sub−Disc+Tax−TDS−AI.
     const {subTotal: subTotalCalc, discountTotal: discCalc, taxTotal: taxCalc} =
       computeInvoiceLineAggregates(fields.items, fields);
     const tdsCalc = parseFloat(fields.tdsAmount || '0') || 0;
     const aiCalc = parseFloat(fields.upfrontInterest || '0') || 0;
-    const calculatedGrandTotal = computeInvoiceNetTotal(
-      subTotalCalc,
-      discCalc,
-      taxCalc,
-      tdsCalc,
-      aiCalc,
-    );
+    const calculatedGrandTotal = financingPreview
+      ? financingPreview.net_disbursement_amount
+      : computeInvoiceNetTotal(
+          subTotalCalc,
+          discCalc,
+          taxCalc,
+          tdsCalc,
+          aiCalc,
+        );
     const reportedGrandTotal =
       parseFloat(fields.grandTotal || '0') || calculatedGrandTotal;
     
@@ -1881,13 +1999,18 @@ export const CreateInvoice: React.FC = () => {
       }
     }
 
+    const upfrontProductForWarn =
+      isVendorFinance || productType === 'sales_invoice_discounting';
     if (
       mode !== 'edit' &&
       shouldWarnVfZeroAdvanceInterest({
-        isVendorFinanceUpfront,
-        chargeApplies: advanceInterestInfo.chargeApplies,
+        isVendorFinanceUpfront:
+          (isVendorFinanceUpfront ||
+            !!(financingPreview?.is_upfront && upfrontProductForWarn)) &&
+          upfrontProductForWarn,
+        chargeApplies: showAdvanceInterest,
         advanceInterest: aiCalc,
-        roiPercent: extractRoiPercent(selectedParticipant?.interest_parameters),
+        roiPercent: displayRoiPercent,
         tenorDays: fields.tenor,
         subTotal: subTotalCalc,
         discountTotal: discCalc,
@@ -1898,7 +2021,7 @@ export const CreateInvoice: React.FC = () => {
       const shouldContinue = await new Promise<boolean>(resolve => {
         Alert.alert(
           'Advance Interest is ₹0.00',
-          'VF Upfront: verify Tenor and program ROI before creating this invoice.',
+          'Upfront interest: verify Tenor and program ROI before creating this invoice.',
           [
             {text: 'Review', style: 'cancel', onPress: () => resolve(false)},
             {text: 'Continue', onPress: () => resolve(true)},
@@ -2426,6 +2549,9 @@ export const CreateInvoice: React.FC = () => {
   }, [limitCheckParticipant, isStandalone, dealerInfo?.participants]);
 
   const availableProgramLimit = useMemo(() => {
+    if (financingPreview) {
+      return financingPreview.available_limit;
+    }
     if (mode === 'edit' && apmAvailableLimit !== null) {
       return apmAvailableLimit;
     }
@@ -2433,19 +2559,34 @@ export const CreateInvoice: React.FC = () => {
       return getParticipantAvailableLimit(limitDisplayParticipant);
     }
     return null;
-  }, [mode, apmAvailableLimit, limitDisplayParticipant]);
+  }, [
+    financingPreview,
+    mode,
+    apmAvailableLimit,
+    limitDisplayParticipant,
+  ]);
 
-  const invoiceAmountForLimit = useMemo(
-    () =>
-      computeInvoiceAmountForLimitCheck(fields.items, {
-        cgst: fields.cgst,
-        sgst: fields.sgst,
-        taxTotal: fields.taxTotal,
-      }),
-    [fields.items, fields.cgst, fields.sgst, fields.taxTotal],
-  );
+  const invoiceAmountForLimit = useMemo(() => {
+    if (financingPreview) {
+      return financingPreview.financed_amount;
+    }
+    return computeInvoiceAmountForLimitCheck(fields.items, {
+      cgst: fields.cgst,
+      sgst: fields.sgst,
+      taxTotal: fields.taxTotal,
+    });
+  }, [
+    financingPreview,
+    fields.items,
+    fields.cgst,
+    fields.sgst,
+    fields.taxTotal,
+  ]);
 
   const isLimitExceeded = useMemo(() => {
+    if (financingPreview) {
+      return financingPreview.exceeds_limit;
+    }
     if (availableProgramLimit === null || !limitCheckParticipant) {
       return false;
     }
@@ -2454,18 +2595,36 @@ export const CreateInvoice: React.FC = () => {
     }
     return invoiceAmountForLimit > availableProgramLimit;
   }, [
+    financingPreview,
     availableProgramLimit,
     limitCheckParticipant,
     invoiceAmountForLimit,
   ]);
 
+  const financingBlocksSubmit = !!financingPreviewError;
+
+  /** Banner when party-info loaded, or as soon as financing-preview has headroom. */
   const showProgramLimitBanner =
-    availableProgramLimit !== null && !!limitDisplayParticipant && !!dealerInfo;
+    availableProgramLimit !== null &&
+    !!dealerInfo &&
+    (!!limitDisplayParticipant || !!financingPreview);
+
+  const bannerIsProgramLevel = financingPreview
+    ? financingPreview.limit_level === 'program'
+    : isStandalone;
+
+  const bannerAmountLabel = financingPreview
+    ? 'Financed amount'
+    : 'Invoice amount';
+
+  const bannerShowLiveStatus =
+    !!financingPreview || !!limitCheckParticipant;
 
   const submitButtonAppearsDisabledInternal =
     (canUploadFinal && !hasAnyAttachment) ||
     !isFormValid ||
-    isLimitExceeded;
+    isLimitExceeded ||
+    financingBlocksSubmit;
 
   const submitDisabledReasonInternal = useMemo(() => {
     // In Edit mode, we skip field-level mandatory checks for the button state
@@ -2504,13 +2663,17 @@ export const CreateInvoice: React.FC = () => {
     if (canUploadFinal && !hasAnyAttachment) {
       return 'Please upload the invoice file';
     }
+    if (financingPreviewError) {
+      return financingPreviewError;
+    }
     if (
       isLimitExceeded &&
       availableProgramLimit !== null &&
       invoiceAmountForLimit > 0
     ) {
-      const overBy = invoiceAmountForLimit - availableProgramLimit;
-      return `Invoice amount ${formatLimitInr(invoiceAmountForLimit)} exceeds available limit ${formatLimitInr(availableProgramLimit)}. Reduce by at least ${formatLimitInr(overBy)}.`;
+      const overBy = Math.max(0, invoiceAmountForLimit - availableProgramLimit);
+      const amountLabel = financingPreview ? 'Financed amount' : 'Invoice amount';
+      return `${amountLabel} ${formatLimitInr(invoiceAmountForLimit)} exceeds available limit ${formatLimitInr(availableProgramLimit)}. Reduce by at least ${formatLimitInr(overBy)}.`;
     }
     return undefined;
   }, [
@@ -2524,6 +2687,8 @@ export const CreateInvoice: React.FC = () => {
     isLimitExceeded,
     availableProgramLimit,
     invoiceAmountForLimit,
+    financingPreviewError,
+    financingPreview,
   ]);
 
   const dealerOptions = useMemo(
@@ -2667,6 +2832,7 @@ export const CreateInvoice: React.FC = () => {
             <InvoiceProgramLimitBanner
               availableLimit={availableProgramLimit}
               invoiceAmount={invoiceAmountForLimit}
+              amountLabel={bannerAmountLabel}
               sanctionedLimit={parseLimitNumber(
                 limitDisplayParticipant?.sanctioned_limit,
               )}
@@ -2676,8 +2842,9 @@ export const CreateInvoice: React.FC = () => {
               pipelineRequests={parseLimitNumber(
                 limitDisplayParticipant?.pipeline_requests,
               )}
-              showLiveStatus={!!limitCheckParticipant}
-              isProgramLevel={isStandalone}
+              showLiveStatus={bannerShowLiveStatus}
+              isProgramLevel={bannerIsProgramLevel}
+              headroomFromServer={!!financingPreview}
               counterpartyLabel={ocrPartyLabels.party}
               vendorNotSelectedYet={isStandalone && !limitCheckParticipant}
             />
@@ -2699,8 +2866,15 @@ export const CreateInvoice: React.FC = () => {
             partyTaxOptions={partyTaxOptions.length > 0 ? partyTaxOptions : undefined}
             onLoadPartyTaxes={loadPartyTaxes}
             showAdvanceInterest={showAdvanceInterest}
-            advanceInterest={advanceInterestInfo.advanceInterest}
-            roiPercent={extractRoiPercent(selectedParticipant?.interest_parameters)}
+            advanceInterest={displayAdvanceInterest}
+            roiPercent={displayRoiPercent}
+            showMarginFinancing={!!financingPreview}
+            marginPercent={financingPreview?.margin_percent ?? 0}
+            marginDeduction={financingPreview?.margin_deduction ?? 0}
+            financedAmount={financingPreview?.financed_amount}
+            netDisbursementOverride={
+              financingPreview?.net_disbursement_amount
+            }
             staleInvoicePeriodDays={dealerInfo?.basic_parameters?.stale_invoice_period_days != null ? Number(dealerInfo.basic_parameters.stale_invoice_period_days) : undefined}
             defaultPaymentTermsDays={dealerInfo?.basic_parameters?.default_payment_terms_days != null ? Number(dealerInfo.basic_parameters.default_payment_terms_days) : undefined}
             mode={mode}

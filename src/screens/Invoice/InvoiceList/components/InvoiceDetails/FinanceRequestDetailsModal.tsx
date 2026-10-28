@@ -542,7 +542,11 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
                         netDisbursementAmount={
                           display.formula.netDisbursementAmount
                         }
-                        showAdvanceInterest={isVendorFinance}
+                        showAdvanceInterest={
+                          isVendorFinance ||
+                          isSid ||
+                          Number(display.formula.advanceInterest) > 0
+                        }
                         onInvoiceAmountInfoPress={() =>
                           setShowInvoiceAmountFormula(true)
                         }

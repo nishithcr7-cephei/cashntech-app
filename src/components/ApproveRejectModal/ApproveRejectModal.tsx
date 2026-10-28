@@ -450,7 +450,12 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
 
   const items = details.items || [];
   const attachments = details.attachments || [];
-  const showAdvanceInterest = isVendorFinance;
+  const isSidProduct =
+    effectiveCode === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING;
+  const showAdvanceInterest =
+    isVendorFinance ||
+    isSidProduct ||
+    Number(details.advanceInterest ?? 0) > 0;
 
   const creditToValue =
     details.creditTo || details.creditAccountNumber || undefined;

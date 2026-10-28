@@ -149,11 +149,18 @@ type Props = {
   /** Active party taxes — GST dropdown only (TDS filtered out by parent). */
   partyTaxOptions?: PartyTaxOption[];
   onLoadPartyTaxes?: () => void;
-  /** Show Advance Interest row (VF + Upfront) — web Create parity. */
+  /** Show Advance Interest row (VF/SID + Upfront) — prefer financing-preview. */
   showAdvanceInterest?: boolean;
   advanceInterest?: number;
-  /** ROI used in VF Upfront Advance Interest formula tooltip. */
+  /** ROI used in Advance Interest formula tooltip. */
   roiPercent?: number;
+  /** Server financing-preview: show Margin Deduction + Financed Amount. */
+  showMarginFinancing?: boolean;
+  marginPercent?: number;
+  marginDeduction?: number;
+  financedAmount?: number;
+  /** When set (preview net), overrides local Basic−…−AI net. */
+  netDisbursementOverride?: number;
   bankOptions?: DropdownOption[];
   selectedBankId?: string;
   onBankSelect?: (bankId: string) => void;
@@ -207,6 +214,11 @@ export const InvoiceForm: React.FC<Props> = ({
   showAdvanceInterest = false,
   advanceInterest = 0,
   roiPercent = 0,
+  showMarginFinancing = false,
+  marginPercent = 0,
+  marginDeduction = 0,
+  financedAmount,
+  netDisbursementOverride,
   staleInvoicePeriodDays = 30,
   defaultPaymentTermsDays = 60,
   submitButtonAppearsDisabled = false,
@@ -307,6 +319,12 @@ export const InvoiceForm: React.FC<Props> = ({
       advanceInterest: showAdvanceInterest ? advanceInterest : 0,
       roiPercent,
       tenorDays: selectedTenorDays ?? value.tenor,
+      marginPercent: showMarginFinancing ? marginPercent : undefined,
+      marginDeduction: showMarginFinancing ? marginDeduction : undefined,
+      financedAmount:
+        showMarginFinancing && financedAmount != null && financedAmount > 0
+          ? financedAmount
+          : undefined,
     };
   }, [
     value.items,
@@ -319,6 +337,10 @@ export const InvoiceForm: React.FC<Props> = ({
     showAdvanceInterest,
     advanceInterest,
     roiPercent,
+    showMarginFinancing,
+    marginPercent,
+    marginDeduction,
+    financedAmount,
   ]);
 
   const tenureDaysForDueDate = selectedTenorDays ?? TENURE_DAYS;
@@ -1294,13 +1316,18 @@ export const InvoiceForm: React.FC<Props> = ({
           
           const tdsAmount = parseFloat(value.tdsAmount || '0') || 0;
           const aiAmount = showAdvanceInterest ? advanceInterest : 0;
-          const total = computeInvoiceNetTotal(
+          const localNet = computeInvoiceNetTotal(
             subTotal,
             discountTotal,
             taxTotal,
             tdsAmount,
             aiAmount,
           );
+          const total =
+            netDisbursementOverride != null &&
+            Number.isFinite(netDisbursementOverride)
+              ? netDisbursementOverride
+              : localNet;
 
           return (
             <View style={styles.summaryWrap}>
@@ -1312,6 +1339,10 @@ export const InvoiceForm: React.FC<Props> = ({
                 advanceInterest={aiAmount}
                 netDisbursementAmount={total}
                 showAdvanceInterest={showAdvanceInterest}
+                showMarginFinancing={showMarginFinancing}
+                marginPercent={marginPercent}
+                marginDeduction={marginDeduction}
+                financedAmount={financedAmount}
                 onInvoiceAmountInfoPress={() =>
                   setShowInvoiceAmountFormula(true)
                 }
