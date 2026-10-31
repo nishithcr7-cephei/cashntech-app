@@ -1,4 +1,3 @@
-import {Platform} from 'react-native';
 import {getEnvironmentVariable} from '@utils/Utils';
 
 // Fallbacks when react-native-config has no .env at native build time (match .env.prod).
@@ -19,11 +18,6 @@ type NativeConfigShape = Partial<{
 }>;
 
 const loadNativeConfig = (): NativeConfigShape => {
-  if (Platform.OS === 'ios') {
-    // Avoid iOS launch-time native config initialization until the crashy path is resolved.
-    return {};
-  }
-
   try {
     const nativeConfigModule = require('react-native-config');
     const nativeConfig =
@@ -75,3 +69,4 @@ export const IS_APPETIZE_BUILD =
 export const GEMINI_API_KEY = resolveConfigValue(nativeConfig.GEMINI_API_KEY, '');
 
 console.log('🔧 [config.ts] Processed API_URL:', API_URL);
+console.log('🔧 [config.ts] IS_APPETIZE_BUILD:', IS_APPETIZE_BUILD);
