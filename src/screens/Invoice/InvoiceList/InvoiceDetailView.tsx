@@ -21,6 +21,7 @@ import {AppBar, Container, UploadModal} from '@components/index';
 import {
   AdvanceInterestFormulaModal,
   DisbursementRequestedFormulaModal,
+  FinancedAmountFormulaModal,
   InvoiceAmountFormulaModal,
   NetDisbursementFormulaModal,
 } from '@components/AdvanceInterestFormulaModal';
@@ -38,9 +39,11 @@ import {formatApiInvoiceDate} from '@utils/invoiceDateFormat';
 import {unitCodeToLabel} from '@utils/unitNormalizer';
 import {mapInvoiceAttachmentsWithUrls, openInvoiceAttachment} from '@utils/invoiceAttachments';
 import {
+  readStoredMarginFinancing,
   resolveDisbursementUsanceDaysDisplay,
   resolveInvoiceRoiPercent,
   resolveNetDisbursementAmountFromInvoice,
+  shouldShowMarginFinancing,
 } from '@utils/invoiceTotals';
 import {DocumentPickerResponse} from '@react-native-documents/picker';
 
@@ -101,6 +104,9 @@ type InvoiceDetailData = {
   tdsAmount: number;
   advanceInterest: number;
   showAdvanceInterest: boolean;
+  marginPercent: number;
+  marginDeduction: number;
+  financedAmount?: number;
   isVendorFinance: boolean;
   /** PID or SID — counterparty comes from programVendorDetails. */
   isPid: boolean;
@@ -139,6 +145,8 @@ const defaultInvoiceData: InvoiceDetailData = {
   tdsAmount: 0,
   advanceInterest: 0,
   showAdvanceInterest: false,
+  marginPercent: 0,
+  marginDeduction: 0,
   isVendorFinance: false,
   isPid: false,
   isSid: false,
@@ -227,6 +235,8 @@ export const InvoiceDetailView: React.FC = () => {
   const [showDisbursementRequestedFormula, setShowDisbursementRequestedFormula] =
     useState(false);
   const [showNetDisbursementFormula, setShowNetDisbursementFormula] =
+    useState(false);
+  const [showFinancedAmountFormula, setShowFinancedAmountFormula] =
     useState(false);
 
   const rawInvoiceId = route?.params?.invoiceId || '';
@@ -338,7 +348,8 @@ export const InvoiceDetailView: React.FC = () => {
             '',
         );
         const isSidInvoice = productName
-          ? /sales\s*invoice\s*discounting/i.test(productName)
+          ? /sales\s*invoice\s*discounting/i.test(productName) ||
+            /\bsid\b/i.test(productName)
           : isSidActive && !!pvd?.id;
         const isPidInvoice =
           !!pvd?.id ||
@@ -382,10 +393,8 @@ export const InvoiceDetailView: React.FC = () => {
         const netDisbursementAmount = resolveNetDisbursementAmountFromInvoice(data);
         const tdsAmount = Number(data?.tds_amount) || 0;
         const advanceInterest = Number(data?.upfront_interest) || 0;
+        const marginFinancing = readStoredMarginFinancing(data);
         const isVendorFinanceInvoice = /vendor\s*finance/i.test(productName);
-        const isSidInvoice =
-          /sales\s*invoice\s*discounting/i.test(productName) ||
-          /\bsid\b/i.test(productName);
         const showAdvanceInterest =
           isVendorFinanceInvoice || isSidInvoice || advanceInterest > 0;
 
@@ -473,6 +482,9 @@ export const InvoiceDetailView: React.FC = () => {
           tdsAmount,
           advanceInterest,
           showAdvanceInterest,
+          marginPercent: marginFinancing.marginPercent,
+          marginDeduction: marginFinancing.marginDeduction,
+          financedAmount: marginFinancing.financedAmount,
           isVendorFinance: isVendorFinanceInvoice,
           isPid: isPidInvoice,
           isSid: isSidInvoice,
@@ -799,10 +811,16 @@ export const InvoiceDetailView: React.FC = () => {
             advanceInterest={invoiceData.advanceInterest}
             netDisbursementAmount={invoiceData.total}
             showAdvanceInterest={invoiceData.showAdvanceInterest}
+            showMarginFinancing={shouldShowMarginFinancing(invoiceData)}
+            marginPercent={invoiceData.marginPercent}
+            marginDeduction={invoiceData.marginDeduction}
+            financedAmount={invoiceData.financedAmount}
             onInvoiceAmountInfoPress={() => setShowInvoiceAmountFormula(true)}
             onDisbursementRequestedInfoPress={() =>
               setShowDisbursementRequestedFormula(true)
             }
+            onMarginInfoPress={() => setShowFinancedAmountFormula(true)}
+            onFinancedAmountInfoPress={() => setShowFinancedAmountFormula(true)}
             onAdvanceInterestInfoPress={() =>
               setShowAdvanceInterestFormula(true)
             }
@@ -878,6 +896,9 @@ export const InvoiceDetailView: React.FC = () => {
           advanceInterest: invoiceData.advanceInterest,
           roiPercent: invoiceData.roiPercent,
           tenorDays: invoiceData.tenorDays,
+          marginPercent: invoiceData.marginPercent,
+          marginDeduction: invoiceData.marginDeduction,
+          financedAmount: invoiceData.financedAmount,
         }}
       />
       <InvoiceAmountFormulaModal
@@ -899,6 +920,19 @@ export const InvoiceDetailView: React.FC = () => {
           tdsAmount: invoiceData.tdsAmount,
         }}
       />
+      <FinancedAmountFormulaModal
+        visible={showFinancedAmountFormula}
+        onClose={() => setShowFinancedAmountFormula(false)}
+        amounts={{
+          basicAmount: invoiceData.subTotal,
+          discount: invoiceData.discount.amount,
+          gstAmount: invoiceData.tax.amount,
+          tdsAmount: invoiceData.tdsAmount,
+          marginPercent: invoiceData.marginPercent,
+          marginDeduction: invoiceData.marginDeduction,
+          financedAmount: invoiceData.financedAmount,
+        }}
+      />
       <NetDisbursementFormulaModal
         visible={showNetDisbursementFormula}
         onClose={() => setShowNetDisbursementFormula(false)}
@@ -908,6 +942,7 @@ export const InvoiceDetailView: React.FC = () => {
           gstAmount: invoiceData.tax.amount,
           tdsAmount: invoiceData.tdsAmount,
           advanceInterest: invoiceData.advanceInterest,
+          financedAmount: invoiceData.financedAmount,
         }}
       />
     </Container>

@@ -51,6 +51,7 @@ import { PERMISSIONS } from '@constants/permissions';
 import { decryptValue } from '@utils/decrypt';
 import {
   computeInvoiceTaxableBase,
+  readStoredMarginFinancing,
   resolveInvoiceRoiPercent,
   resolveNetDisbursementAmountFromInvoice,
 } from '@utils/invoiceTotals';
@@ -565,6 +566,7 @@ export function useInvoiceDetails() {
         const advanceInterest = Number(data?.upfront_interest) || 0;
         const tdsAmount = Number(data?.tds_amount) || 0;
         const netDisbursementAmount = resolveNetDisbursementAmountFromInvoice(data);
+        const marginFinancing = readStoredMarginFinancing(data);
         const invoiceAmountValue = computeInvoiceTaxableBase(
           subTotalAmount,
           discountAmount,
@@ -689,6 +691,9 @@ export function useInvoiceDetails() {
           advanceInterest,
           tdsAmount,
           netDisbursementAmount,
+          marginPercent: marginFinancing.marginPercent,
+          marginDeduction: marginFinancing.marginDeduction,
+          financedAmount: marginFinancing.financedAmount,
           roiPercent: resolveInvoiceRoiPercent(data),
           finalPayableAmount: invoiceAmount,
           finalDueDate: invoiceDueDate,
@@ -1111,29 +1116,27 @@ export function useInvoiceDetails() {
           setNoaLoading(true);
           setShowNoaModal(true);
           try {
-            const [details, consentRes] = await Promise.all([
-              invoiceApi.getInvoiceDetails(invoiceId),
-              invoiceApi.getAssignmentConsent(invoiceId),
-            ]);
+            const details = await invoiceApi.getInvoiceDetails(invoiceId);
             if (!details || typeof details !== 'object') {
               throw new Error('Empty invoice details');
+            }
+            let consentRes: any = null;
+            try {
+              consentRes = await invoiceApi.getAssignmentConsent(invoiceId);
+            } catch {
+              // Not served yet — open the same editable form as web.
+              consentRes = null;
             }
             const consent =
               extractAssignmentConsent(consentRes) ||
               extractAssignmentConsent(details);
             if (!consent) {
-              setShowNoaModal(false);
-              setNoaPreview(null);
-              setNoaInvoiceId(null);
               setNoaReadOnly(false);
-              Toast.show({
-                type: 'info',
-                text1: 'Notice of Assignment',
-                text2: 'No recorded consent found for this invoice yet',
-              });
+              setNoaPreview(mapNoaPreviewFromDetails(details));
               return;
             }
-            setNoaPreview(mapNoaPreviewFromDetails(details, consentRes));
+            setNoaReadOnly(true);
+            setNoaPreview(mapNoaPreviewFromDetails(details, consentRes ?? details));
           } catch (e: any) {
             setShowNoaModal(false);
             setNoaPreview(null);
@@ -1194,6 +1197,23 @@ export function useInvoiceDetails() {
         return;
       }
       setNoaSubmitting(true);
+      const closeNoaAfterError = () => {
+        setShowNoaModal(false);
+        setNoaPreview(null);
+        setNoaInvoiceId(null);
+        setNoaReadOnly(false);
+      };
+      const showNoaError = (raw?: unknown) => {
+        // Toast sits under RN Modal — use Alert so the user sees the API message.
+        const message = Array.isArray(raw)
+          ? raw.filter(Boolean).join('\n')
+          : typeof raw === 'string' && raw.trim()
+            ? raw.trim()
+            : 'Failed to serve Notice of Assignment';
+        Alert.alert('Notice of Assignment Failed', message, [
+          {text: 'OK', onPress: closeNoaAfterError},
+        ]);
+      };
       try {
         const res = await invoiceApi.serveNoticeOfAssignment({
           invoiceId: noaInvoiceId,
@@ -1203,31 +1223,25 @@ export function useInvoiceDetails() {
           remark: payload.remark,
         });
         if (res?.statusCode === 200 || res?.status === 200) {
+          setShowNoaModal(false);
+          setNoaPreview(null);
+          setNoaInvoiceId(null);
+          setNoaReadOnly(false);
+          refreshInvoiceList();
           Toast.show({
             type: 'success',
             text1: 'Success',
             text2: 'Notice of Assignment served successfully',
           });
-          setShowNoaModal(false);
-          setNoaPreview(null);
-          setNoaInvoiceId(null);
-          refreshInvoiceList();
         } else {
-          Toast.show({
-            type: 'error',
-            text1: 'Notice of Assignment Failed',
-            text2: res?.message || 'Failed to serve Notice of Assignment',
-          });
+          showNoaError(res?.message);
         }
       } catch (e: any) {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2:
-            e?.response?.data?.message ||
+        showNoaError(
+          e?.response?.data?.message ||
             e?.message ||
             'Failed to serve Notice of Assignment',
-        });
+        );
       } finally {
         setNoaSubmitting(false);
       }

@@ -156,8 +156,9 @@ export function canShowNoticeOfAssignment(
 }
 
 /**
- * View Notice of Assignment (read-only) — SID makers with permission when not
- * currently on the serve step. Tap fetches consent; toast if none yet.
+ * Notice of Assignment when the list row is not on the serve step.
+ * Opens the recorded notice when consent exists; otherwise the serve form
+ * (Notice Date, Remark) — same as web for All Access.
  */
 export function canShowViewNoticeOfAssignment(
   row: ActionableRow,

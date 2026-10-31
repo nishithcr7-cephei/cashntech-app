@@ -292,6 +292,8 @@ export type InvoiceSummaryFormulaAmounts = {
   tdsAmount?: number;
   advanceInterest?: number;
   financedAmount?: number;
+  marginPercent?: number;
+  marginDeduction?: number;
 };
 
 type SummaryFormulaModalProps = {
@@ -392,6 +394,47 @@ export const DisbursementRequestedFormulaModal: React.FC<{
         `DRA = Invoice Amount ${MINUS} TDS`,
         `    = ${fmtMoney(invoiceAmount)} ${MINUS} ${fmtMoney(amounts.tdsAmount ?? 0)}`,
         `    = ${fmtMoney(requestedAmount)}`,
+      ]}
+    />
+  );
+};
+
+export const FinancedAmountFormulaModal: React.FC<{
+  visible: boolean;
+  onClose: () => void;
+  amounts: InvoiceSummaryFormulaAmounts;
+}> = ({visible, onClose, amounts}) => {
+  const requestedAmount = computeInvoiceSubTotalAfterTds(
+    amounts.basicAmount,
+    amounts.discount,
+    amounts.gstAmount,
+    amounts.tdsAmount ?? 0,
+  );
+  const marginPct = Number(amounts.marginPercent) || 0;
+  const financedRaw = Number(amounts.financedAmount);
+  const financed = Number.isFinite(financedRaw) && financedRaw > 0
+    ? round2(financedRaw)
+    : round2(requestedAmount * ((100 - marginPct) / 100));
+  const marginRaw = Number(amounts.marginDeduction);
+  const marginDeduction =
+    Number.isFinite(marginRaw) && marginRaw >= 0
+      ? round2(marginRaw)
+      : round2(Math.max(0, requestedAmount - financed));
+  const retainPct = round2(100 - marginPct);
+
+  return (
+    <SummaryFormulaModal
+      visible={visible}
+      onClose={onClose}
+      title="Financed Amount"
+      lines={[
+        `F = DRA ${TIMES} (100 ${MINUS} Margin)%`,
+        `  = ${fmtMoney(requestedAmount)} ${TIMES} (100 ${MINUS} ${marginPct})%`,
+        `  = ${fmtMoney(requestedAmount)} ${TIMES} ${retainPct}%`,
+        `  = ${fmtMoney(financed)}`,
+        `Margin Deduction = DRA ${MINUS} F`,
+        `                 = ${fmtMoney(requestedAmount)} ${MINUS} ${fmtMoney(financed)}`,
+        `                 = ${fmtMoney(marginDeduction)}`,
       ]}
     />
   );

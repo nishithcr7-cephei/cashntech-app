@@ -133,32 +133,33 @@ export const ProgramBreadcrumb: React.FC<ProgramBreadcrumbProps> = ({
     if (!program) return null;
     return (
       <View style={!embedded && styles.fullBreadcrumb}>
-        {/* Row 1: Bank › Product */}
-        <View style={styles.breadcrumbRow}>
-          <View style={styles.itemFixed}>
+        <View style={styles.scopeStack}>
+          <View style={styles.bankBlock}>
             <BankBuilding
               width={scaleWidth(13)}
               height={scaleWidth(13)}
               color={Colors.primaryColor}
             />
-            <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">
+            <Text
+              style={[styles.breadcrumbText, styles.breadcrumbTextFill]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+              ellipsizeMode="tail">
               {getBankLabel(program.bankName)}
             </Text>
           </View>
 
-          <RightChevron
-            height={scaleHeight(10)}
-            width={scaleWidth(10)}
-            style={styles.chev}
-          />
-
-          <View style={styles.itemFixed}>
+          <View style={styles.productRow}>
             <Folder
               width={scaleWidth(13)}
               height={scaleWidth(13)}
               color={Colors.primaryColor}
             />
-            <Text style={styles.breadcrumbText} numberOfLines={1} ellipsizeMode="tail">
+            <Text
+              style={styles.breadcrumbText}
+              numberOfLines={2}
+              ellipsizeMode="tail">
               {getProductLabel(program.productName)}
             </Text>
           </View>
@@ -285,17 +286,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaleWidth(10),
     paddingVertical: scaleHeight(8),
   },
-  breadcrumbRow: {
+  scopeStack: {
+    width: '100%',
+    gap: scaleHeight(2),
+  },
+  bankBlock: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: scaleWidth(4),
+    width: '100%',
+  },
+  productRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'nowrap',
+    gap: scaleWidth(4),
+    width: '100%',
+  },
+  breadcrumbRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
     gap: scaleWidth(4),
     width: '100%',
   },
   breadcrumbRow2: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'nowrap',
+    flexWrap: 'wrap',
     gap: scaleWidth(4),
     width: '100%',
     marginTop: scaleHeight(4),
@@ -332,6 +349,19 @@ const styles = StyleSheet.create({
     gap: scaleWidth(4),
     flexShrink: 0,
   },
+  itemWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: scaleWidth(4),
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: '100%',
+  },
+  textWrap: {
+    flexShrink: 1,
+    flexGrow: 1,
+    minWidth: 0,
+  },
   itemGrow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -342,11 +372,18 @@ const styles = StyleSheet.create({
   },
   chev: {
     opacity: 0.8,
+    marginTop: scaleHeight(2),
   },
   breadcrumbText: {
+    flexShrink: 1,
     fontSize: scaleFont(12),
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.primaryColor,
+    lineHeight: scaleHeight(14),
+  },
+  breadcrumbTextFill: {
+    flex: 1,
+    minWidth: 0,
   },
   programNameLabel: {
     fontSize: scaleFont(12),

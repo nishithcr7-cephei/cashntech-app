@@ -31,18 +31,23 @@ import {AttachmentPreviewModal} from '@components/AttachmentPreviewModal/Attachm
 import {
   AdvanceInterestFormulaModal,
   DisbursementRequestedFormulaModal,
+  FinancedAmountFormulaModal,
   InvoiceAmountFormulaModal,
   NetDisbursementFormulaModal,
 } from '@components/AdvanceInterestFormulaModal';
 import {InvoiceAccountingSummary} from '@components/InvoiceAccountingSummary';
 import {DateNTimePicker} from '@components/DateNTimePicker/DateNTimePicker';
 import {calculateInvoiceDueDate} from '@utils/invoiceDueDate';
-import {resolveNetDisbursementAmountFromInvoice} from '@utils/invoiceTotals';
+import {
+  resolveNetDisbursementAmountFromInvoice,
+  shouldShowMarginFinancing,
+} from '@utils/invoiceTotals';
 import {InvoiceStatusBadges} from '@components/InvoiceStatusBadges';
 import {PersistentScrollView} from '@components/PersistentScrollView/PersistentScrollView';
 import {fileNameFromAttachmentUrl} from '@utils/invoiceAttachments';
 import {unitCodeToLabel} from '@utils/unitNormalizer';
 import {toYYYYMMDD} from '@services/api/invoice.api';
+import {dismissKeyboardOrClose} from '@utils/modalRequestClose';
 
 export type ApproveRejectInvoiceItem = {
   id: string;
@@ -93,6 +98,9 @@ export type ApproveRejectInvoiceDetails = {
   tdsAmount?: number;
   totalAmount?: number;
   netDisbursementAmount?: number;
+  marginPercent?: number;
+  marginDeduction?: number;
+  financedAmount?: number;
   roiPercent?: number;
   items?: ApproveRejectInvoiceItem[];
   attachments?: ApproveRejectAttachment[];
@@ -279,6 +287,8 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
     useState(false);
   const [showNetDisbursementFormula, setShowNetDisbursementFormula] =
     useState(false);
+  const [showFinancedAmountFormula, setShowFinancedAmountFormula] =
+    useState(false);
 
   const effectiveCode = getEffectiveProductCode(productCode);
   const isVendorFinance = effectiveCode === PRODUCT_CODES.VENDOR_FINANCE;
@@ -450,12 +460,26 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
 
   const items = details.items || [];
   const attachments = details.attachments || [];
-  const isSidProduct =
-    effectiveCode === PRODUCT_CODES.SALES_INVOICE_DISCOUNTING;
   const showAdvanceInterest =
     isVendorFinance ||
-    isSidProduct ||
+    isSid ||
     Number(details.advanceInterest ?? 0) > 0;
+  const showMarginFinancing = shouldShowMarginFinancing({
+    marginPercent: details.marginPercent,
+    marginDeduction: details.marginDeduction,
+  });
+  const formulaAmounts = {
+    basicAmount: details.subTotalAmount ?? 0,
+    discount: details.discountAmount ?? 0,
+    gstAmount: details.taxAmount ?? 0,
+    tdsAmount: details.tdsAmount ?? 0,
+    advanceInterest: details.advanceInterest ?? 0,
+    roiPercent: details.roiPercent,
+    tenorDays: details.tenorDays,
+    marginPercent: details.marginPercent,
+    marginDeduction: details.marginDeduction,
+    financedAmount: details.financedAmount,
+  };
 
   const creditToValue =
     details.creditTo || details.creditAccountNumber || undefined;
@@ -466,13 +490,14 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
       transparent
       visible={visible}
       animationType="fade"
-      onRequestClose={handleClose}>
+      onRequestClose={() => dismissKeyboardOrClose(handleClose)}>
       <View
         style={[
           styles.overlay,
           {paddingTop: insets.top, paddingBottom: insets.bottom},
         ]}>
-        <TouchableWithoutFeedback onPress={handleClose}>
+        <TouchableWithoutFeedback
+          onPress={() => dismissKeyboardOrClose(handleClose)}>
           <View style={styles.backdrop} />
         </TouchableWithoutFeedback>
         <View style={[styles.modalContainer, styles.modalContainerRich]}>
@@ -647,11 +672,21 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
                         })
                       }
                       showAdvanceInterest={showAdvanceInterest}
+                      showMarginFinancing={showMarginFinancing}
+                      marginPercent={details.marginPercent ?? 0}
+                      marginDeduction={details.marginDeduction ?? 0}
+                      financedAmount={details.financedAmount}
                       onInvoiceAmountInfoPress={() =>
                         setShowInvoiceAmountFormula(true)
                       }
                       onDisbursementRequestedInfoPress={() =>
                         setShowDisbursementRequestedFormula(true)
+                      }
+                      onMarginInfoPress={() =>
+                        setShowFinancedAmountFormula(true)
+                      }
+                      onFinancedAmountInfoPress={() =>
+                        setShowFinancedAmountFormula(true)
                       }
                       onAdvanceInterestInfoPress={() =>
                         setShowAdvanceInterestFormula(true)
@@ -878,45 +913,27 @@ export const ApproveRejectModal: React.FC<ApproveRejectModalProps> = ({
     <AdvanceInterestFormulaModal
       visible={showAdvanceInterestFormula}
       onClose={() => setShowAdvanceInterestFormula(false)}
-      amounts={{
-        basicAmount: details.subTotalAmount ?? 0,
-        discount: details.discountAmount ?? 0,
-        gstAmount: details.taxAmount ?? 0,
-        tdsAmount: details.tdsAmount ?? 0,
-        advanceInterest: details.advanceInterest ?? 0,
-        roiPercent: details.roiPercent,
-        tenorDays: details.tenorDays,
-      }}
+      amounts={formulaAmounts}
     />
     <InvoiceAmountFormulaModal
       visible={showInvoiceAmountFormula}
       onClose={() => setShowInvoiceAmountFormula(false)}
-      amounts={{
-        basicAmount: details.subTotalAmount ?? 0,
-        discount: details.discountAmount ?? 0,
-        gstAmount: details.taxAmount ?? 0,
-      }}
+      amounts={formulaAmounts}
     />
     <DisbursementRequestedFormulaModal
       visible={showDisbursementRequestedFormula}
       onClose={() => setShowDisbursementRequestedFormula(false)}
-      amounts={{
-        basicAmount: details.subTotalAmount ?? 0,
-        discount: details.discountAmount ?? 0,
-        gstAmount: details.taxAmount ?? 0,
-        tdsAmount: details.tdsAmount ?? 0,
-      }}
+      amounts={formulaAmounts}
+    />
+    <FinancedAmountFormulaModal
+      visible={showFinancedAmountFormula}
+      onClose={() => setShowFinancedAmountFormula(false)}
+      amounts={formulaAmounts}
     />
     <NetDisbursementFormulaModal
       visible={showNetDisbursementFormula}
       onClose={() => setShowNetDisbursementFormula(false)}
-      amounts={{
-        basicAmount: details.subTotalAmount ?? 0,
-        discount: details.discountAmount ?? 0,
-        gstAmount: details.taxAmount ?? 0,
-        tdsAmount: details.tdsAmount ?? 0,
-        advanceInterest: details.advanceInterest ?? 0,
-      }}
+      amounts={formulaAmounts}
     />
     </>
   );

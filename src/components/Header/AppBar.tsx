@@ -7,6 +7,8 @@ import {
   ViewStyle,
   TouchableOpacity,
   TouchableOpacityProps,
+  StatusBar,
+  Platform,
 } from 'react-native';
 import React from 'react';
 import {Colors, Fonts, ROLE_HEADER_COLORS} from '@constants/index';
@@ -66,7 +68,13 @@ export const AppBar = ({
     : ROLE_HEADER_COLORS.anchor_maker;
 
   return (
-    <View style={[
+    <>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={headerColors.bg}
+        translucent={Platform.OS === 'android' ? false : undefined}
+      />
+      <View style={[
       styles.container,
       {backgroundColor: headerColors.bg},
       {paddingTop: insets.top},
@@ -106,6 +114,7 @@ export const AppBar = ({
         {rightContent}
       </View>
     </View>
+    </>
   );
 };
 

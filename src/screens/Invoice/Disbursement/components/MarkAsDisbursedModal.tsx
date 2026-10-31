@@ -43,7 +43,7 @@ import {
   resolveNetInvoiceAmountFromPreview,
 } from '@utils/invoiceTotals';
 import {computeUsanceDays} from '@utils/usanceDays';
-import {dismissKeyboardOrClose} from './dismissKeyboardOrClose';
+import {dismissKeyboardOrClose} from '@utils/modalRequestClose';
 import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 
 type MarkAsDisbursedModalProps = {

@@ -1,6 +1,7 @@
 <resources>
     <!-- Keep EditText text dark even if the system is in night mode. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
         <item name="android:textColor">#191D23</item>
         <item name="android:textColorPrimary">#191D23</item>

@@ -23,7 +23,7 @@ import {
 import {decryptValue} from '@utils/decrypt';
 import {FontAwesome6} from '@react-native-vector-icons/fontawesome6';
 import {isVfUpfrontChargeType} from '@utils/invoiceTotals';
-import {dismissKeyboardOrClose} from './dismissKeyboardOrClose';
+import {dismissKeyboardOrClose} from '@utils/modalRequestClose';
 import {INVOICE_SUMMARY_LABELS} from '@constants/invoiceSummaryLabels';
 
 const WINDOW_HEIGHT = Dimensions.get('window').height;

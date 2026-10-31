@@ -13,6 +13,7 @@ import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker} from '@components/index';
 import {BusyOverlay} from '@components/BusyOverlay/BusyOverlay';
+import {dismissKeyboardOrClose} from '@utils/modalRequestClose';
 
 type AddFundModalProps = {
   visible: boolean;
@@ -83,8 +84,9 @@ export const AddFundModal: React.FC<AddFundModalProps> = ({
       transparent
       visible={visible}
       animationType="fade"
-      onRequestClose={handleClose}>
-      <TouchableWithoutFeedback onPress={handleClose}>
+      onRequestClose={() => dismissKeyboardOrClose(handleClose)}>
+      <TouchableWithoutFeedback
+        onPress={() => dismissKeyboardOrClose(handleClose)}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback onPress={() => {}}>
             <View style={styles.modalContainer}>

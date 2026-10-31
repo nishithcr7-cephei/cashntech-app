@@ -299,7 +299,10 @@ export const CreateInvoice: React.FC = () => {
 
   const lastPreviewTokenRef = useRef<number | undefined>();
   // After user confirms Leave/Cancel / success — skip second beforeRemove prompt.
+  // Do not clear this inside beforeRemove: that event can fire twice, and the
+  // second call was showing the prompt after Invoice List was already open.
   const allowLeaveRef = useRef(false);
+  const leavePromptOpenRef = useRef(false);
 
   const clearCreateInvoiceRouteParams = useCallback(() => {
     try {
@@ -1369,11 +1372,17 @@ export const CreateInvoice: React.FC = () => {
           {
             text: 'OK',
             onPress: () => {
+              // Alert dismiss blocks an immediate navigate on Android.
+              // Leave after it closes, and skip the "Leave Create Invoice?" prompt.
               allowLeaveRef.current = true;
-              goToInvoiceList(true);
+              dispatch(setLeavingCreateInvoice(true));
+              InteractionManager.runAfterInteractions(() => {
+                goToInvoiceList(true);
+              });
             },
           },
         ],
+        {cancelable: false},
       );
     }
   }, [createInvoiceSuccess, dispatch, goToInvoiceList, mode]);
@@ -2355,6 +2364,8 @@ export const CreateInvoice: React.FC = () => {
 
   useFocusEffect(
     useCallback(() => {
+      allowLeaveRef.current = false;
+      leavePromptOpenRef.current = false;
       dispatch(setLeavingCreateInvoice(false));
       return () => {
         // Clear loading / leave flags when leaving Create so list is never
@@ -2422,17 +2433,31 @@ export const CreateInvoice: React.FC = () => {
         return;
       }
 
+      if (leavePromptOpenRef.current) {
+        return;
+      }
+      leavePromptOpenRef.current = true;
       Alert.alert(
         'Leave Create Invoice?',
         'You have entered invoice details. If you go back, this information will be cleared.',
         [
-          {text: 'Stay', style: 'cancel'},
+          {
+            text: 'Stay',
+            style: 'cancel',
+            onPress: () => {
+              leavePromptOpenRef.current = false;
+            },
+          },
           {
             text: 'Leave & Clear',
             style: 'destructive',
-            onPress: clearAndLeave,
+            onPress: () => {
+              leavePromptOpenRef.current = false;
+              clearAndLeave();
+            },
           },
         ],
+        {cancelable: false},
       );
     },
     [ocrLoading, isCreateFormDirty, beginLeaveToInvoiceList],
@@ -2457,9 +2482,8 @@ export const CreateInvoice: React.FC = () => {
           return;
         }
 
-        // User already confirmed via Cancel / AppBar / hardware back.
+        // User already confirmed via Cancel / AppBar / hardware back / success.
         if (allowLeaveRef.current) {
-          allowLeaveRef.current = false;
           resetCreateInvoiceForm();
           resetScreenData();
           clearCreateInvoiceRouteParams();
@@ -2473,24 +2497,17 @@ export const CreateInvoice: React.FC = () => {
           return;
         }
 
-        // Block pop/navigate-away until user confirms.
+        // Drawer often finishes the switch before this listener runs, so the
+        // user is already on Invoice List. Do not ask them to leave a page
+        // they have already left. The back arrow / hardware back ask first.
+        if (!(navigation as any).isFocused?.()) {
+          return;
+        }
+
         e.preventDefault();
-        Alert.alert(
-          'Leave Create Invoice?',
-          'You have entered invoice details. If you go back, this information will be cleared.',
-          [
-            {text: 'Stay', style: 'cancel'},
-            {
-              text: 'Leave & Clear',
-              style: 'destructive',
-              onPress: () => {
-                beginLeaveToInvoiceList(() =>
-                  navigation.dispatch(e.data.action),
-                );
-              },
-            },
-          ],
-        );
+        confirmLeaveCreateInvoice(() => {
+          beginLeaveToInvoiceList(() => navigation.dispatch(e.data.action));
+        });
       },
     );
 
@@ -2499,6 +2516,7 @@ export const CreateInvoice: React.FC = () => {
     navigation,
     isCreateFormDirty,
     beginLeaveToInvoiceList,
+    confirmLeaveCreateInvoice,
     resetCreateInvoiceForm,
     resetScreenData,
     clearCreateInvoiceRouteParams,

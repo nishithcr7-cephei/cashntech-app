@@ -366,7 +366,9 @@ export const InvoiceActionMenuModal: React.FC<Props> = ({
                       ]}>
                       Notice of Assignment
                     </Text>
-                    <Text style={styles.menuSubText}>View served notice</Text>
+                    <Text style={styles.menuSubText}>
+                      Serve or view notice
+                    </Text>
                   </View>
                 </TouchableOpacity>
               )}

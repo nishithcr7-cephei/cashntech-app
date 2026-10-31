@@ -29,6 +29,8 @@ export type InvoiceAccountingSummaryProps = {
   financedAmount?: number;
   onInvoiceAmountInfoPress?: () => void;
   onDisbursementRequestedInfoPress?: () => void;
+  onMarginInfoPress?: () => void;
+  onFinancedAmountInfoPress?: () => void;
   onAdvanceInterestInfoPress?: () => void;
   onNetDisbursementInfoPress?: () => void;
   /** Prefix before the formatted amount, e.g. `₹`. */
@@ -113,6 +115,8 @@ export const InvoiceAccountingSummary: React.FC<
   financedAmount,
   onInvoiceAmountInfoPress,
   onDisbursementRequestedInfoPress,
+  onMarginInfoPress,
+  onFinancedAmountInfoPress,
   onAdvanceInterestInfoPress,
   onNetDisbursementInfoPress,
   amountPrefix = '',
@@ -186,12 +190,22 @@ export const InvoiceAccountingSummary: React.FC<
             sign={MINUS}
             label={formatMarginDeductionLabel(marginPercent)}
             value={money(marginDeduction)}
+            trailing={
+              onMarginInfoPress ? (
+                <AdvanceInterestInfoButton onPress={onMarginInfoPress} />
+              ) : null
+            }
           />
           <View style={styles.rule} />
           <AccountingRow
             label={SUMMARY.financedAmount}
             value={money(financed)}
             kind="subtotal"
+            trailing={
+              onFinancedAmountInfoPress ? (
+                <AdvanceInterestInfoButton onPress={onFinancedAmountInfoPress} />
+              ) : null
+            }
           />
         </>
       ) : null}

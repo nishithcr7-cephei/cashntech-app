@@ -71,12 +71,23 @@ function* fetchDealerListWorker(
       const mappedData = rawData.map((item: any) => {
         const drawingPower = Number(item.drawing_power || 0);
         const utilizedAmount = Number(item.utilized_amount || 0);
-        const availableLimit =
-          item.available_limit != null
-            ? Number(item.available_limit)
-            : drawingPower - utilizedAmount;
         const sanctionLimitRaw = Number(item.sanctioned_limit || 0) || 0;
         const pipelineRequestsRaw = Number(item.pipeline_requests || 0) || 0;
+        // Web / export: Available = usable_limit − utilized − pipeline.
+        // SID list API sends usable_limit (limit × eligibility) but not
+        // available_limit; drawing_power is 0 — do not use DP − utilized.
+        const usableLimitRaw = Number(
+          item.usable_limit != null && item.usable_limit !== ''
+            ? item.usable_limit
+            : sanctionLimitRaw,
+        );
+        const availableFromApi = Number(item.available_limit);
+        const availableLimit =
+          item.available_limit != null &&
+          item.available_limit !== '' &&
+          Number.isFinite(availableFromApi)
+            ? availableFromApi
+            : usableLimitRaw - utilizedAmount - pipelineRequestsRaw;
         const excessCreditRaw = Number(item.excess_credit || 0) || 0;
         const totalOsAmountRaw = Number(item.total_os_amount || 0) || 0;
         const totalAmountPaidRaw = Number(item.total_amount_paid || 0) || 0;

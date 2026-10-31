@@ -30,6 +30,7 @@ import {
 import {decryptValue} from '@utils/decrypt';
 import {unitCodeToLabel} from '@utils/unitNormalizer';
 import {toYYYYMMDD} from '@services/api/invoice.api';
+import {dismissKeyboardOrClose} from '@utils/modalRequestClose';
 import {
   resolveAdvanceInterestFromPreview,
   resolveInvoiceRoiPercent,
@@ -377,8 +378,9 @@ export const FinanceRequestDetailsModal: React.FC<Props> = ({
         transparent
         visible={visible}
         animationType="fade"
-        onRequestClose={onClose}>
-        <TouchableWithoutFeedback onPress={onClose}>
+        onRequestClose={() => dismissKeyboardOrClose(onClose)}>
+        <TouchableWithoutFeedback
+          onPress={() => dismissKeyboardOrClose(onClose)}>
           <View style={styles.overlay}>
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalContainer}>

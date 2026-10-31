@@ -2,6 +2,8 @@
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- Dark status-bar icons on light headers (Android 6+). -->
+        <item name="android:windowLightStatusBar">true</item>
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
         <item name="android:textColor">#191D23</item>
         <item name="android:textColorPrimary">#191D23</item>

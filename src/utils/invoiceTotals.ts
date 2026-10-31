@@ -574,6 +574,111 @@ export function resolveNetInvoiceAmountFromPreview(
   return 0;
 }
 
+/**
+ * Locked margin / financed amount.
+ * Prefer explicit API fields. Otherwise F = net disbursement + upfront
+ * interest (same lock the backend stores), and margin = DRA − F.
+ */
+export function readStoredMarginFinancing(source: {
+  financedAmount?: number | string | null;
+  financed_amount?: number | string | null;
+  margin_percent?: number | string | null;
+  marginPercent?: number | string | null;
+  margin_deduction?: number | string | null;
+  marginDeduction?: number | string | null;
+  upfront_interest?: number | string | null;
+  disbursed_amount?: number | string | null;
+  net_disbursement_amount?: number | string | null;
+  netDisbursementAmount?: number | string | null;
+  net_disbursal_amount?: number | string | null;
+  final_total_after_tds?: number | string | null;
+  sub_total?: number | string | null;
+  discount_total?: number | string | null;
+  tax_total?: number | string | null;
+  tds_amount?: number | string | null;
+} | null | undefined): {
+  marginPercent: number;
+  marginDeduction: number;
+  financedAmount?: number;
+} {
+  if (!source) {
+    return {marginPercent: 0, marginDeduction: 0, financedAmount: undefined};
+  }
+
+  const upfront = Number(source.upfront_interest) || 0;
+  const disbursed = Number(source.disbursed_amount) || 0;
+  let financed = Number(source.financedAmount ?? source.financed_amount);
+  if (!(Number.isFinite(financed) && financed > 0)) {
+    if (source.disbursed_amount != null && disbursed > 0) {
+      financed = round2(disbursed + upfront);
+    } else {
+      const net =
+        Number(
+          source.net_disbursement_amount ??
+            source.netDisbursementAmount ??
+            source.net_disbursal_amount,
+        ) || 0;
+      financed = net + upfront > 0 ? round2(net + upfront) : NaN;
+    }
+  }
+
+  let dra = Number(source.final_total_after_tds);
+  if (!(Number.isFinite(dra) && dra > 0)) {
+    const sub = Number(source.sub_total);
+    if (Number.isFinite(sub) && sub > 0) {
+      dra = round2(
+        sub -
+          (Number(source.discount_total) || 0) +
+          (Number(source.tax_total) || 0) -
+          (Number(source.tds_amount) || 0),
+      );
+    }
+  }
+
+  let marginDeduction = Number(
+    source.margin_deduction ?? source.marginDeduction,
+  );
+  if (
+    !(Number.isFinite(marginDeduction) && marginDeduction > 0) &&
+    Number.isFinite(financed) &&
+    Number.isFinite(dra) &&
+    dra > financed
+  ) {
+    marginDeduction = round2(dra - financed);
+  }
+  if (!Number.isFinite(marginDeduction) || marginDeduction < 0.01) {
+    return {marginPercent: 0, marginDeduction: 0, financedAmount: undefined};
+  }
+
+  let marginPercent = Number(source.margin_percent ?? source.marginPercent);
+  if (
+    !(Number.isFinite(marginPercent) && marginPercent > 0) &&
+    Number.isFinite(dra) &&
+    dra > 0 &&
+    Number.isFinite(financed)
+  ) {
+    marginPercent = round2(100 - (financed / dra) * 100);
+  }
+  if (!Number.isFinite(marginPercent) || marginPercent < 0) {
+    marginPercent = 0;
+  }
+
+  return {
+    marginPercent,
+    marginDeduction: round2(marginDeduction),
+    financedAmount: round2(financed),
+  };
+}
+
+/** Show Margin Deduction + Financed Amount when a margin was applied. */
+export function shouldShowMarginFinancing(input: {
+  marginPercent?: number;
+  marginDeduction?: number;
+}): boolean {
+  return (Number(input.marginPercent) || 0) > 0 ||
+    (Number(input.marginDeduction) || 0) > 0;
+}
+
 export function resolveInvoiceRoiPercent(source: {
   transaction_interest_rate?: number | string | null;
   interest_rate_percent?: number | string | null;

@@ -12,6 +12,7 @@ import {
 import {Colors, Fonts} from '@constants/index';
 import {scaleFont, scaleHeight, scaleWidth} from '@utils/Scale';
 import {DateNTimePicker, CustomDropdown} from '@components/index';
+import {dismissKeyboardOrClose} from '@utils/modalRequestClose';
 
 type RecordRepaymentModalProps = {
   visible: boolean;
@@ -98,8 +99,13 @@ export const RecordRepaymentModal: React.FC<RecordRepaymentModalProps> = ({
   };
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={() => dismissKeyboardOrClose(onClose)}>
+      <TouchableWithoutFeedback
+        onPress={() => dismissKeyboardOrClose(onClose)}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback onPress={() => {}}>
             <View style={styles.modalContainer}>

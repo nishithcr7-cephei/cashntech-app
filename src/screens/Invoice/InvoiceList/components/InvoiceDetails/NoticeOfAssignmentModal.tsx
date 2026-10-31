@@ -23,6 +23,7 @@ import {
   truncateNoaNoticeSegments,
   type NoaPreviewModel,
 } from './noticeOfAssignmentMap';
+import {dismissKeyboardOrClose} from '@utils/modalRequestClose';
 
 const NOTICE_COLLAPSE_LEN = 280;
 
@@ -218,8 +219,9 @@ export const NoticeOfAssignmentModal: React.FC<Props> = ({
         transparent
         visible={visible}
         animationType="fade"
-        onRequestClose={onClose}>
-        <TouchableWithoutFeedback onPress={onClose}>
+        onRequestClose={() => dismissKeyboardOrClose(onClose)}>
+        <TouchableWithoutFeedback
+          onPress={() => dismissKeyboardOrClose(onClose)}>
           <View style={styles.overlay}>
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalContainer}>
@@ -394,21 +396,6 @@ export const NoticeOfAssignmentModal: React.FC<Props> = ({
                                 : '—'}
                             </Text>
                           </View>
-
-                          <View style={styles.checkboxRow}>
-                            <View
-                              style={[
-                                styles.checkbox,
-                                styles.checkboxChecked,
-                              ]}>
-                              <Text style={styles.checkMark}>✓</Text>
-                            </View>
-                            <Text style={styles.checkboxLabel}>
-                              {preview.servedConsent.consentText !== '-'
-                                ? preview.servedConsent.consentText
-                                : preview.consentText}
-                            </Text>
-                          </View>
                         </>
                       ) : (
                         <>
@@ -460,29 +447,39 @@ export const NoticeOfAssignmentModal: React.FC<Props> = ({
                             editable={!submitting}
                             multiline
                             maxLength={500}
+                            blurOnSubmit
                           />
-
-                          <TouchableOpacity
-                            style={styles.checkboxRow}
-                            onPress={() => setConsentAccepted(v => !v)}
-                            activeOpacity={0.7}
-                            disabled={submitting}>
-                            <View
-                              style={[
-                                styles.checkbox,
-                                consentAccepted && styles.checkboxChecked,
-                              ]}>
-                              {consentAccepted ? (
-                                <Text style={styles.checkMark}>✓</Text>
-                              ) : null}
-                            </View>
-                            <Text style={styles.checkboxLabel}>
-                              {preview.consentText}
-                            </Text>
-                          </TouchableOpacity>
                         </>
                       )}
                     </PersistentScrollView>
+
+                    <TouchableOpacity
+                      style={styles.checkboxDock}
+                      onPress={() => {
+                        if (!isReadOnly) {
+                          setConsentAccepted(v => !v);
+                        }
+                      }}
+                      activeOpacity={isReadOnly ? 1 : 0.7}
+                      disabled={isReadOnly || submitting}>
+                      <View
+                        style={[
+                          styles.checkbox,
+                          (isReadOnly || consentAccepted) &&
+                            styles.checkboxChecked,
+                        ]}>
+                        {isReadOnly || consentAccepted ? (
+                          <Text style={styles.checkMark}>✓</Text>
+                        ) : null}
+                      </View>
+                      <Text style={styles.checkboxLabel}>
+                        {isReadOnly &&
+                        preview.servedConsent?.consentText &&
+                        preview.servedConsent.consentText !== '-'
+                          ? preview.servedConsent.consentText
+                          : preview.consentText}
+                      </Text>
+                    </TouchableOpacity>
 
                     <View style={styles.footer}>
                       {isReadOnly ? (
@@ -757,12 +754,16 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.GilroySemiBold,
     color: Colors.graybase,
   },
-  checkboxRow: {
+  checkboxDock: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: scaleWidth(10),
-    marginTop: scaleHeight(14),
-    marginBottom: scaleHeight(4),
+    paddingHorizontal: scaleWidth(16),
+    paddingTop: scaleHeight(12),
+    paddingBottom: scaleHeight(4),
+    backgroundColor: Colors.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E6E6E6',
   },
   checkbox: {
     width: scaleWidth(22),
