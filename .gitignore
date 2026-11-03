@@ -84,3 +84,7 @@ yarn-error.log
 docs/
 AGENTS.md
 GST_EXTRACTION_SUMMARY.md
+README.md
+README_ML_IMPLEMENTATION.md
+TESTING_GUIDE.md
+.cursor/
