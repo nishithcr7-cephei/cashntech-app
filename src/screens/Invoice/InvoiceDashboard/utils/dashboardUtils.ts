@@ -3,6 +3,7 @@ import type {InvoiceOverviewSummaryItem} from '@store/invoiceOverview';
 import type {ProductTabType, MetricItem, DashboardKpis} from '../types';
 import {PRODUCT_CODES} from '@store/product/product.types';
 import {resolveProductCode} from '@store/product/product.resolver';
+import {formatKpiCurrency} from '@utils/formatKpiCurrency';
 
 /**
  * Format date as DD MMM YYYY (e.g., 15 Apr 2026)
@@ -136,10 +137,7 @@ export const getCardMetrics = (
   const finalInterestOverdue = parsed.interestOverdue || sumInterestOverdue;
   const finalPenalOverdue = parsed.penalOverdue || sumPenalOverdue;
 
-  const formatCurrency = (amount: number) =>
-    `₹ ${amount.toLocaleString('en-IN', {
-      maximumFractionDigits: 2,
-    })}`;
+  const formatCurrency = (amount: number) => formatKpiCurrency(amount);
 
   const formatPercentage = (value: number) =>
     `${value.toLocaleString('en-IN', {

@@ -42,6 +42,7 @@ import {FetchRepaymentListRequest} from '@store/repayment/repayment.types';
 import {decryptValue} from '@utils/decrypt';
 import {formatDateDash, formatStatus} from '../InvoiceList/components/InvoiceDetails/types';
 import {invoiceApi, RepaymentKpisResponse} from '@services/api/invoice.api';
+import {formatKpiCurrency} from '@utils/formatKpiCurrency';
 
 // Summary metrics for Repayment & Settlement will be dynamically built inside the component
 
@@ -148,10 +149,7 @@ export const RepaymentSettlementScreen: React.FC = () => {
     dispatch,
   ]);
 
-  const getVal = (val: string | number | undefined | null) =>
-    val != null && val !== ''
-      ? `₹ ${Number(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}`
-      : '-';
+  const getVal = (val: string | number | undefined | null) => formatKpiCurrency(val);
 
   const repaymentMetrics = useMemo(() => [
     {

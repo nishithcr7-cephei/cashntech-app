@@ -1,8 +1,8 @@
-const CRORE = 10_000_000;
+import {formatKpiCurrency} from './formatKpiCurrency';
 
-/** ₹5.65 Cr — web Risk dashboards show amounts in crores with 2 decimals. */
+/** Compact INR for risk KPI tiles (Cr / Lakh / full — same as invoice KPI cards). */
 export const formatCr = (amount: number): string =>
-  `₹${((Number(amount) || 0) / CRORE).toFixed(2)} Cr`;
+  formatKpiCurrency(Number(amount) || 0);
 
 /** ₹12,34,567 — Indian grouping, no decimals. */
 export const formatInr = (amount: number): string =>

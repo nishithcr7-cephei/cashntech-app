@@ -24,6 +24,7 @@ import {selectProgramSelection, selectAllProgramIds} from '@store/programSelecti
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import {decryptValue} from '@utils/decrypt';
 import {invoiceApi, InterestAccrualKpisResponse} from '@services/api/invoice.api';
+import {formatKpiCurrency} from '@utils/formatKpiCurrency';
 import {
   selectActiveProductId,
   selectActiveProductName,
@@ -329,13 +330,6 @@ export const InterestAccrualsScreen: React.FC = () => {
       sum + Math.max(0, (r.finalTotalRaw || 0) - (r.disbursedAmountRaw || 0)),
     0,
   );
-
-  const formatKpiCurrency = (value?: string | number | null) => {
-    if (value === undefined || value === null || value === '') return '-';
-    const num = Number(value);
-    if (Number.isNaN(num)) return String(value);
-    return `₹ ${num.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
-  };
 
   const renderRow = ({item: row}: {item: InterestAccrualInvoiceRow}) => (
     <View style={styles.cardWrapper}>

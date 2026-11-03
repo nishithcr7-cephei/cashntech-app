@@ -42,6 +42,7 @@ import {userSelector} from '@store/user';
 import {AppRole, ROLE_LABELS} from '@constants/roles';
 import {selectProgramSelection, selectAllProgramIds} from '@store/programSelection/programSelection.selector';
 import {invoiceApi} from '@services/api/invoice.api';
+import {formatKpiCurrency} from '@utils/formatKpiCurrency';
 import {formatStatus} from '@screens/Invoice/InvoiceList/components/InvoiceDetails/types';
 import {formatDateDash} from '../InvoiceList/components/InvoiceDetails/types';
 import Toast from 'react-native-toast-message';
@@ -506,15 +507,15 @@ export const DisbursementScreen: React.FC = () => {
   const disbursementMetrics = [
     {
       label: 'Total Invoices Uploaded',
-      value: `₹ ${totalInvoiceAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
+      value: formatKpiCurrency(totalInvoiceAmount),
     },
     {
       label: 'Total Disbursed Amount',
-      value: `₹ ${totalDisbursedAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
+      value: formatKpiCurrency(totalDisbursedAmount),
     },
     {
       label: 'Pending Disbursed Amount',
-      value: `₹ ${pendingDisAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}`,
+      value: formatKpiCurrency(pendingDisAmount),
     },
     {
       label: 'Repeat Usage Rate %',

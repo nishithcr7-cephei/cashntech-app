@@ -41,6 +41,7 @@ import {
 import {FetchDPDListRequest} from '@store/dpd/dpd.types';
 import {invoiceApi, DpdKpisResponse} from '@services/api/invoice.api';
 import {decryptValue} from '@utils/decrypt';
+import {formatKpiCurrency} from '@utils/formatKpiCurrency';
 
 // DPD Metrics will be dynamically populated in the component
 
@@ -172,15 +173,10 @@ export const DPDPenalInterestNPAScreen: React.FC = () => {
     dispatch,
   ]);
 
-  const getVal = (val: string | number | undefined | null) =>
-    val != null && val !== ''
-      ? `₹ ${Number(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}`
-      : '-';
+  const getVal = (val: string | number | undefined | null) => formatKpiCurrency(val);
 
   const getOverdueVal = (val: string | number | undefined | null) =>
-    `₹ ${Number(val != null && val !== '' ? val : 0).toLocaleString('en-IN', {
-      minimumFractionDigits: 2,
-    })}`;
+    formatKpiCurrency(val != null && val !== '' ? val : 0);
 
   const dpdMetrics = useMemo(() => {
     const dpdRow = apiKpis?.disbursedInvoices?.[0];

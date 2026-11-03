@@ -59,7 +59,7 @@ describe('bank detail', () => {
       parties: parties.slice(0, 2),
     };
     const kpis = buildBankDetailKpis(detail);
-    expect(kpis.map(k => k.value)).toEqual(['₹0.08 Cr', '₹0.00 Cr', '—', '0', '0']);
+    expect(kpis.map(k => k.value)).toEqual(['₹ 8 Lakh', '₹ 0.00', '—', '0', '0']);
     expect(kpis[0].subtitle).toBe('Across 1 product');
     expect(kpis[1].subtitle).toBe('0% of book');
     expect(kpis[3].subtitle).toBe('of 2 in view');
@@ -107,8 +107,8 @@ describe('party profile', () => {
       'Pune · Borrows from 1 bank across 1 program',
     );
     const kpis = buildPartyKpis(profile);
-    expect(kpis.map(k => k.value)).toEqual(['₹0.02 Cr', '4%', '—', '0 of 1', '0']);
-    expect(kpis[0].subtitle).toBe('Limit ₹0.50 Cr');
+    expect(kpis.map(k => k.value)).toEqual(['₹ 2 Lakh', '4%', '—', '0 of 1', '0']);
+    expect(kpis[0].subtitle).toBe('Limit ₹ 50 Lakh');
     expect(kpis[2].subtitle).toBe('Standard');
   });
 

@@ -139,7 +139,7 @@ describe('alert + borrower helpers', () => {
 
 describe('riskFormat', () => {
   it('formats crores, percentages and DPD', () => {
-    expect(formatCr(56500000)).toBe('₹5.65 Cr');
+    expect(formatCr(56500000)).toBe('₹ 5.65 Cr');
     expect(pct(3, 6)).toBe(50);
     expect(pct(1, 0)).toBe(0);
     expect(dpdText(0)).toBe('—');

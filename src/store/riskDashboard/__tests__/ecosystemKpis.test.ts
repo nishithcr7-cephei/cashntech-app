@@ -24,9 +24,9 @@ describe('buildEcosystemKpis', () => {
       'Parties Flagged',
       'Overdue at 2+ Banks',
     ]);
-    expect(kpis[0]).toMatchObject({value: '₹5.65 Cr', subtitle: 'Across 8 banks'});
+    expect(kpis[0]).toMatchObject({value: '₹ 5.65 Cr', subtitle: 'Across 8 banks'});
     expect(kpis[1].subtitle).toBe('53.1% of book');
-    expect(kpis[2]).toMatchObject({value: '₹0.07 Cr', subtitle: 'Across 1 bank'});
+    expect(kpis[2]).toMatchObject({value: '₹ 7 Lakh', subtitle: 'Across 1 bank'});
   });
 
   it('shows an em dash for zero NPA', () => {
